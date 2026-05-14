@@ -17,7 +17,7 @@ export class OnboardingService {
             })
         }
 
-        if (session?.status === 'in_progress' && session.expiresAt && session.expiresAt < new Date()) {
+        if (session?.status === 'in_progress' && session.expires_at && session.expires_at < new Date()) {
             await this.wizardSessionModelAction.markAsExpired(session.id)
 
             throw new NotFoundException({
@@ -36,8 +36,9 @@ export class OnboardingService {
             sessionId: session.id,
             status: session.status,
             answers: cleanedAnswers,
-            created_at: session.createdAt,
-            expires_at: session.expiresAt
+            created_at: session.created_at,
+            expires_at: session.expires_at,
+            steps_completed: session.steps_completed
         }
     }
 
