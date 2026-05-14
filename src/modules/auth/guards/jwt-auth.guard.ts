@@ -1,20 +1,94 @@
-import { ExecutionContext, Injectable } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  HttpStatus,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { AuthGuard } from '@nestjs/passport';
+import { JwtService } from '@nestjs/jwt';
+import { Request } from 'express';
+import { RedisService } from '../../redis/redis.service';
+import { UsersService } from '../../users/users.service';
 import { IS_PUBLIC_KEY } from '../../../common/decorators/public.decorator';
+import * as SYS_MSG from '../../../constants/system.messages';
+import { jwtConfig } from '../../../config/jwt.config';
 
 @Injectable()
-export class JwtAuthGuard extends AuthGuard('jwt') {
-  constructor(private readonly reflector: Reflector) {
-    super();
+export class AuthGuard implements CanActivate {
+  private readonly logger = new Logger(AuthGuard.name);
+  constructor(
+    private jwtService: JwtService,
+    private reflector: Reflector,
+    private redisService: RedisService,
+    private userService: UsersService,
+  ) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest();
+    const token = this.extractTokenFromHeader(request);
+
+    const isPublicRoute = this.reflector.getAllAndOverride<boolean>(
+      IS_PUBLIC_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+
+    if (isPublicRoute) {
+      return true;
+    }
+
+    if (!token) {
+      throw new UnauthorizedException(
+        SYS_MSG.AUTH_MESSAGES.UNAUTHENTICATED_MESSAGE,
+      );
+    }
+
+    const payload = await this.jwtService
+      .verifyAsync(token, {
+        secret: jwtConfig().accessSecret,
+      })
+      .catch((err) => null);
+
+    if (!payload)
+      throw new UnauthorizedException(
+        SYS_MSG.AUTH_MESSAGES.UNAUTHENTICATED_MESSAGE,
+      );
+
+    const { sessionId, sub: userId } = payload;
+
+    if (!sessionId) {
+      throw new UnauthorizedException(
+        SYS_MSG.AUTH_MESSAGES.UNAUTHENTICATED_MESSAGE,
+      );
+    }
+
+    const sessionKey = `sess:${userId}:${sessionId}`;
+    const sessionData = await this.redisService.get(sessionKey);
+
+    if (!sessionData) {
+      this.logger.warn('Session not found or Redis unreachable');
+      throw new UnauthorizedException(
+        SYS_MSG.AUTH_MESSAGES.UNAUTHENTICATED_MESSAGE,
+      );
+    }
+
+    const user = await this.userService.findById(userId).catch(() => null);
+    if (!user || user.deleted_at !== null || !user.is_active) {
+      throw new UnauthorizedException(
+        SYS_MSG.AUTH_MESSAGES.UNAUTHENTICATED_MESSAGE,
+      );
+    }
+
+    request['user'] = payload;
+    request['session'] = JSON.parse(sessionData);
+    request['token'] = token;
+
+    return true;
   }
 
-  canActivate(context: ExecutionContext) {
-    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
-    if (isPublic) return true;
-    return super.canActivate(context);
+  private extractTokenFromHeader(request: Request): string | undefined {
+    const [type, token] = request.headers.authorization?.split(' ') ?? [];
+    return type === 'Bearer' ? token : undefined;
   }
 }
