@@ -10,9 +10,12 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
+import { UserRole } from './enums/user-role.enum';
 
 const BCRYPT_ROUNDS = 10;
-const NO_TRANSACTION = { transactionOptions: { useTransaction: false as const } };
+const NO_TRANSACTION = {
+  transactionOptions: { useTransaction: false as const },
+};
 
 @Injectable()
 export class UsersService {
@@ -29,9 +32,8 @@ export class UsersService {
       ...NO_TRANSACTION,
       createPayload: {
         email: dto.email,
-        password: passwordHash,
-        fullName: dto.fullName,
-        role: dto.role,
+        password_hash: passwordHash,
+        full_name: dto.fullName,
       },
     });
   }
@@ -39,7 +41,7 @@ export class UsersService {
   findAll(pagination: PaginationDto) {
     return this.userModelAction.list({
       paginationPayload: { page: pagination.page!, limit: pagination.limit! },
-      order: { createdAt: 'DESC' },
+      order: { created_at: 'DESC' },
     });
   }
 
@@ -60,7 +62,7 @@ export class UsersService {
 
     const payload: Partial<User> = { ...dto };
     if (dto.password) {
-      payload.password = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+      payload.password_hash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
     }
 
     const updated = await this.userModelAction.update({
@@ -79,14 +81,6 @@ export class UsersService {
     await this.userModelAction.delete({
       ...NO_TRANSACTION,
       identifierOptions: { id },
-    });
-  }
-
-  async setRefreshTokenHash(id: string, hash: string | null): Promise<void> {
-    await this.userModelAction.update({
-      ...NO_TRANSACTION,
-      identifierOptions: { id },
-      updatePayload: { refreshTokenHash: hash },
     });
   }
 }

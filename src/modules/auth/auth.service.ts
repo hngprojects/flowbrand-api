@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import type { StringValue } from 'ms';
@@ -28,90 +25,23 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async register(dto: RegisterDto): Promise<AuthResponse> {
-    const user = await this.usersService.create({
-      email: dto.email,
-      password: dto.password,
-      fullName: dto.fullName,
-    });
-    return this.issueTokens(user);
+  async register(): Promise<void> {
+    return;
   }
 
-  async login(dto: LoginDto): Promise<AuthResponse> {
-    const user = await this.usersService.findByEmail(dto.email);
-    if (!user) throw new UnauthorizedException('Invalid credentials');
-
-    const valid = await bcrypt.compare(dto.password, user.password);
-    if (!valid) throw new UnauthorizedException('Invalid credentials');
-
-    return this.issueTokens(user);
+  async login(): Promise<void> {
+    return;
   }
 
-  async refresh(refreshToken: string): Promise<AuthTokens> {
-    let payload: JwtPayload;
-    try {
-      payload = await this.jwtService.verifyAsync<JwtPayload>(refreshToken, {
-        secret: env.JWT_REFRESH_SECRET,
-      });
-    } catch {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-
-    const user = await this.usersService.findOne(payload.sub);
-    if (!user.refreshTokenHash) {
-      throw new UnauthorizedException('Refresh token has been revoked');
-    }
-
-    const matches = await bcrypt.compare(refreshToken, user.refreshTokenHash);
-    if (!matches) throw new UnauthorizedException('Invalid refresh token');
-
-    const tokens = await this.signTokens(user);
-    await this.persistRefreshToken(user.id, tokens.refreshToken);
-    return tokens;
+  async refresh(): Promise<void> {
+    return;
   }
 
-  async logout(userId: string): Promise<void> {
-    await this.usersService.setRefreshTokenHash(userId, null);
+  async logout(): Promise<void> {
+    return;
   }
 
-  async getProfile(userId: string): Promise<User> {
-    return this.usersService.findOne(userId);
-  }
-
-  private async issueTokens(user: User): Promise<AuthResponse> {
-    const tokens = await this.signTokens(user);
-    await this.persistRefreshToken(user.id, tokens.refreshToken);
-
-    const {
-      password: _password,
-      refreshTokenHash: _hash,
-      deletedAt: _deletedAt,
-      ...safeUser
-    } = user;
-
-    return { ...tokens, user: safeUser };
-  }
-
-  private async signTokens(user: User): Promise<AuthTokens> {
-    const payload: JwtPayload = { sub: user.id, email: user.email };
-    const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(payload, {
-        secret: env.JWT_ACCESS_SECRET,
-        expiresIn: env.JWT_ACCESS_EXPIRES_IN as StringValue,
-      }),
-      this.jwtService.signAsync(payload, {
-        secret: env.JWT_REFRESH_SECRET,
-        expiresIn: env.JWT_REFRESH_EXPIRES_IN as StringValue,
-      }),
-    ]);
-    return { accessToken, refreshToken };
-  }
-
-  private async persistRefreshToken(
-    userId: string,
-    refreshToken: string,
-  ): Promise<void> {
-    const hash = await bcrypt.hash(refreshToken, 10);
-    await this.usersService.setRefreshTokenHash(userId, hash);
+  async getProfile(): Promise<void> {
+    return;
   }
 }
