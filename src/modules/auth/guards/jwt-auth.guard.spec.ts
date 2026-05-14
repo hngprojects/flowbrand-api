@@ -14,7 +14,7 @@ import * as SYS_MSG from '../../../constants/system.messages';
 const mockJwtService = { verifyAsync: jest.fn() };
 const mockReflector = { getAllAndOverride: jest.fn() };
 const mockRedisService = { get: jest.fn() };
-const mockUserService = { getUserById: jest.fn() };
+const mockUserService = { findById: jest.fn() };
 
 const VALID_PAYLOAD = { sub: 'user-123', sessionId: 'sess-abc' };
 const ACTIVE_USER = { id: 'user-123', deleted_at: null, is_active: true };
@@ -198,7 +198,7 @@ describe('AuthGuard', () => {
     });
 
     it('throws 401 when user is not found in DB', async () => {
-      mockUserService.getUserById.mockResolvedValue(null);
+      mockUserService.findById.mockResolvedValue(null);
       const { ctx } = buildContext(bearerHeader('valid.token'));
 
       await expect(guard.canActivate(ctx)).rejects.toThrow(
@@ -206,8 +206,8 @@ describe('AuthGuard', () => {
       );
     });
 
-    it('throws 401 when getUserById rejects (DB error)', async () => {
-      mockUserService.getUserById.mockRejectedValue(new Error('DB down'));
+    it('throws 401 when findById rejects (DB error)', async () => {
+      mockUserService.findById.mockRejectedValue(new Error('DB down'));
       const { ctx } = buildContext(bearerHeader('valid.token'));
 
       await expect(guard.canActivate(ctx)).rejects.toThrow(
@@ -216,7 +216,7 @@ describe('AuthGuard', () => {
     });
 
     it('throws 401 when user is soft-deleted (deleted_at is set)', async () => {
-      mockUserService.getUserById.mockResolvedValue({
+      mockUserService.findById.mockResolvedValue({
         ...ACTIVE_USER,
         deleted_at: new Date('2024-01-01'),
       });
@@ -228,7 +228,7 @@ describe('AuthGuard', () => {
     });
 
     it('throws 401 when user is deactivated (is_active = false)', async () => {
-      mockUserService.getUserById.mockResolvedValue({
+      mockUserService.findById.mockResolvedValue({
         ...ACTIVE_USER,
         is_active: false,
       });
@@ -240,7 +240,7 @@ describe('AuthGuard', () => {
     });
 
     it('throws 401 when user is both soft-deleted and inactive', async () => {
-      mockUserService.getUserById.mockResolvedValue({
+      mockUserService.findById.mockResolvedValue({
         ...ACTIVE_USER,
         deleted_at: new Date(),
         is_active: false,
@@ -259,7 +259,7 @@ describe('AuthGuard', () => {
     beforeEach(() => {
       mockJwtService.verifyAsync.mockResolvedValue(VALID_PAYLOAD);
       mockRedisService.get.mockResolvedValue(SESSION_DATA);
-      mockUserService.getUserById.mockResolvedValue(ACTIVE_USER);
+      mockUserService.findById.mockResolvedValue(ACTIVE_USER);
     });
 
     it('returns true when all checks pass', async () => {
@@ -292,14 +292,12 @@ describe('AuthGuard', () => {
       expect(request['token']).toBe('valid.token');
     });
 
-    it('calls getUserById with the sub claim from the JWT', async () => {
+    it('calls findById with the sub claim from the JWT', async () => {
       const { ctx } = buildContext(bearerHeader('valid.token'));
 
       await guard.canActivate(ctx);
 
-      expect(mockUserService.getUserById).toHaveBeenCalledWith(
-        VALID_PAYLOAD.sub,
-      );
+      expect(mockUserService.findById).toHaveBeenCalledWith(VALID_PAYLOAD.sub);
     });
   });
 
