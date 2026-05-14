@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import type { StringValue } from 'ms';
 import { env } from '../../config/env';
 import { UsersModule } from '../users/users.module';
+import { RedisModule } from '../redis/redis.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { User } from '../users/entities/user.entity';
@@ -20,6 +21,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       signOptions: { expiresIn: env.JWT_ACCESS_EXPIRES_IN as StringValue },
     }),
     UsersModule,
+    RedisModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

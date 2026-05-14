@@ -1,28 +1,28 @@
 {
   "compilerOptions": {
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "resolvePackageJsonExports": true,
-    "resolvePackageJsonImports": true,
-    "target": "ES2023",
-    "lib": ["ES2023"],
-    "types": ["node", "jest"],
+    "module": "node16",
+    "moduleResolution": "node16",
+    "target": "ES2021",
+    "lib": [
+      "ES2023"
+    ],
+    "types": [
+      "node",
+      "jest"
+    ],
+    "rootDir": "./",
     "outDir": "./dist",
-
     "esModuleInterop": true,
     "isolatedModules": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
-
     "declaration": true,
     "removeComments": true,
     "sourceMap": true,
     "incremental": true,
     "skipLibCheck": true,
-
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-
     "strict": true,
     "strictNullChecks": true,
     "strictPropertyInitialization": false,
@@ -33,6 +33,13 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
-  "include": ["src/**/*", "test/**/*"],
-  "exclude": ["node_modules", "dist", "coverage"]
+  "include": [
+    "src/**/*",
+    "test/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage"
+  ]
 }

@@ -8,14 +8,9 @@ import {
   Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import * as SYS_MSG from '../../shared/constants/SystemMessages';
-import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
+import * as SYS_MSG from '../../constants/system.messages';
 import { Public } from '../../common/decorators/public.decorator';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -44,7 +39,7 @@ export class AuthController {
 
     return res.json({
       statusCode: HttpStatus.CREATED,
-      message: SYS_MSG.USER_CREATED_SUCCESSFULLY || 'User created successfully',
+      message: SYS_MSG.USER_CREATED_SUCCESSFULLY,
       data: {
         accessToken: result.accessToken,
         user: result.user,
@@ -70,7 +65,7 @@ export class AuthController {
 
     return res.json({
       statusCode: HttpStatus.OK,
-      message: 'Login successful',
+      message: SYS_MSG.AUTH_MESSAGES.LOGIN_SUCCESSFUL,
       data: {
         accessToken: result.accessToken,
         user: result.user,
@@ -83,22 +78,50 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Issue a new access token from a refresh token' })
-  refresh(@Body() dto: RefreshTokenDto) {
-    return this.authService.refresh(dto.refreshToken);
+  async refresh(@Body() dto: RefreshTokenDto, @Res() res: Response) {
+    const result = await this.authService.refresh(dto);
+
+    res.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.json({
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.AUTH_MESSAGES.TOKEN_REFRESHED,
+      data: {
+        accessToken: result.accessToken,
+        user: result.user,
+        redirectUrl: '/dashboard',
+      },
+    });
   }
 
   @ApiBearerAuth()
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Revoke the current refresh token' })
-  logout(@CurrentUser('sub') userId: string) {
-    return this.authService.logout(userId);
+  async logout(
+    @CurrentUser('sessionId') sessionId: string,
+    @Res() res: Response,
+  ) {
+    await this.authService.logout(sessionId);
+
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+    });
+
+    return res.status(HttpStatus.NO_CONTENT).send();
   }
 
   @ApiBearerAuth()
   @Get('me')
   @ApiOperation({ summary: 'Return the current authenticated user' })
-  me(@CurrentUser() user: AuthenticatedUser) {
-    return this.authService.getProfile(user.sub);
+  me(@CurrentUser('sub') userId: string) {
+    return this.authService.getProfile(userId);
   }
 }

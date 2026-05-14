@@ -10,9 +10,13 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
+import { UserRole } from './enums/user-role.enum';
+import { QueryFailedError } from 'typeorm';
 
 const BCRYPT_ROUNDS = 10;
-const NO_TRANSACTION = { transactionOptions: { useTransaction: false as const } };
+const NO_TRANSACTION = {
+  transactionOptions: { useTransaction: false as const },
+};
 
 @Injectable()
 export class UsersService {
@@ -21,26 +25,45 @@ export class UsersService {
   async create(dto: CreateUserDto): Promise<User> {
     const existing = await this.userModelAction.findByEmail(dto.email);
     if (existing) {
+      if (existing.is_active === false) {
+        throw new ConflictException('Account is locked');
+      }
       throw new ConflictException('Email already in use');
     }
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
-    return this.userModelAction.create({
-      ...NO_TRANSACTION,
-      createPayload: {
-        email: dto.email,
-        password: passwordHash,
-        fullName: dto.fullName,
-        termsAccepted: dto.termsAccepted ?? false,
-        role: dto.role,
-      },
-    });
+    try {
+      return await this.userModelAction.create({
+        ...NO_TRANSACTION,
+        createPayload: {
+          email: dto.email,
+          termsAccepted: dto.termsAccepted ?? false,
+          password_hash: passwordHash,
+          full_name: dto.fullName,
+          roles: [
+            {
+              role: dto.role ?? UserRole.USER,
+            },
+          ],
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof QueryFailedError &&
+        (error as { driverError?: { code?: string } }).driverError?.code ===
+          '23505'
+      ) {
+        throw new ConflictException('Email already in use');
+      }
+
+      throw error;
+    }
   }
 
   findAll(pagination: PaginationDto) {
     return this.userModelAction.list({
       paginationPayload: { page: pagination.page!, limit: pagination.limit! },
-      order: { createdAt: 'DESC' },
+      order: { created_at: 'DESC' },
     });
   }
 
@@ -61,7 +84,7 @@ export class UsersService {
 
     const payload: Partial<User> = { ...dto };
     if (dto.password) {
-      payload.password = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+      payload.password_hash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
     }
 
     const updated = await this.userModelAction.update({
@@ -80,14 +103,6 @@ export class UsersService {
     await this.userModelAction.delete({
       ...NO_TRANSACTION,
       identifierOptions: { id },
-    });
-  }
-
-  async setRefreshTokenHash(id: string, hash: string | null): Promise<void> {
-    await this.userModelAction.update({
-      ...NO_TRANSACTION,
-      identifierOptions: { id },
-      updatePayload: { refreshTokenHash: hash },
     });
   }
 }
