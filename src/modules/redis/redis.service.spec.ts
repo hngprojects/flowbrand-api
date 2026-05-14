@@ -1,6 +1,7 @@
 /// <reference types="jest" />
 import { Test, TestingModule } from '@nestjs/testing';
 import { RedisService } from './redis.service';
+import { Logger } from '@nestjs/common';
 
 const mockRedisInstance = {
   on: jest.fn().mockReturnThis(),
@@ -26,6 +27,9 @@ describe('RedisService (unit)', () => {
   let service: RedisService;
 
   beforeEach(async () => {
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
     jest.clearAllMocks();
     mockRedisInstance.connect.mockResolvedValue(undefined);
     mockRedisInstance.on.mockReturnThis();
