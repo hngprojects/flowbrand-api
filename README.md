@@ -1,6 +1,6 @@
 # SEIL API
 
-NestJS 11 REST API backend for SEIL — built on the HNG boilerplate with PostgreSQL, JWT auth, the repository pattern via [`@hng-sdk/orm`](https://www.npmjs.com/package/@hng-sdk/orm), and migrations 
+NestJS 11 REST API backend for SEIL — built on the HNG boilerplate with PostgreSQL, JWT auth, the repository pattern via [`@hng-sdk/orm`](https://www.npmjs.com/package/@hng-sdk/orm), and migrations
 
 ## Stack
 
@@ -47,6 +47,7 @@ Open `http://localhost:3000/docs` for the Swagger UI.
 ## Scripts
 
 ### App
+
 | Script | Purpose |
 |---|---|
 | `pnpm start:dev` | Run with watch mode |
@@ -60,6 +61,7 @@ Open `http://localhost:3000/docs` for the Swagger UI.
 | `pnpm test:cov` | Coverage report |
 
 ### Database
+
 | Script | Purpose |
 |---|---|
 | `pnpm migration:run` | Apply all pending migrations |
