@@ -64,6 +64,12 @@ jobs:
                   node-version: ${{ inputs.node_version || '22' }}
                   cache: pnpm
 
+            - name: Approve known build scripts
+              run: |
+                  pnpm approve-builds @nestjs/core
+                  pnpm approve-builds bcrypt
+                  pnpm approve-builds unrs-resolver
+
             - name: Install dependencies
               run: pnpm install
 

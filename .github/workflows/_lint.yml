@@ -31,6 +31,6 @@ jobs:
                   node-version: ${{ inputs.node_version || '22' }}
                   cache: pnpm
             - name: Install dependencies
-              run: pnpm install --include=dev
+              run: pnpm install --include=dev --ignore-scripts
             - name: Lint code
               run: pnpm run lint
