@@ -6,11 +6,7 @@ import {
   HttpStatus,
   Post,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
@@ -29,7 +25,7 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register a new user' })
   register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+    return this.authService.register();
   }
 
   @Public()
@@ -37,7 +33,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Log in with email and password' })
   login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+    return this.authService.login();
   }
 
   @Public()
@@ -45,7 +41,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Issue a new access token from a refresh token' })
   refresh(@Body() dto: RefreshTokenDto) {
-    return this.authService.refresh(dto.refreshToken);
+    return this.authService.refresh();
   }
 
   @ApiBearerAuth()
@@ -53,13 +49,13 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Revoke the current refresh token' })
   logout(@CurrentUser('sub') userId: string) {
-    return this.authService.logout(userId);
+    return this.authService.logout();
   }
 
   @ApiBearerAuth()
   @Get('me')
   @ApiOperation({ summary: 'Return the current authenticated user' })
   me(@CurrentUser() user: AuthenticatedUser) {
-    return this.authService.getProfile(user.sub);
+    return this.authService.getProfile();
   }
 }
