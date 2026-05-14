@@ -1,0 +1,128 @@
+name: Pipeline
+
+on:
+    push:
+        branches:
+            - dev
+            - staging
+            - main
+    pull_request:
+        branches:
+            - dev
+            - staging
+            - main
+    workflow_dispatch:
+        inputs:
+            environment:
+                description: 'Environment to deploy'
+                required: true
+                type: choice
+                options: [dev, staging, production]
+
+concurrency:
+    group: pipeline-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    lint-pr:
+        name: Lint (PR)
+        if: github.event_name == 'pull_request'
+        uses: ./.github/workflows/_lint.yml
+        with:
+            node_version: '22'
+
+    build-pr:
+        name: Build (PR)
+        if: github.event_name == 'pull_request'
+        needs: lint-pr
+        uses: ./.github/workflows/_build.yml
+        with:
+            environment: dev
+
+    lint:
+        name: Lint
+        if: github.event_name != 'pull_request'
+        uses: ./.github/workflows/_lint.yml
+        with:
+            node_version: '22'
+
+    security:
+        name: Security
+        if: github.event_name != 'pull_request'
+        uses: ./.github/workflows/_security.yml
+
+    test:
+        name: Test
+        if: github.event_name != 'pull_request'
+        uses: ./.github/workflows/_test.yml
+
+    build:
+        name: Build
+        if: github.event_name != 'pull_request'
+        needs: [lint, security, test]
+        uses: ./.github/workflows/_build.yml
+        with:
+            environment: >-
+                ${{
+                    github.event_name == 'workflow_dispatch' && inputs.environment ||
+                    github.ref == 'refs/heads/main' && 'production' ||
+                    github.ref == 'refs/heads/staging' && 'staging' ||
+                    'dev'
+                }}
+
+    deploy-dev:
+        name: Deploy -> dev
+        if: >-
+            github.event_name != 'pull_request' && (
+            (github.event_name == 'push' && github.ref == 'refs/heads/dev') ||
+            (github.event_name == 'workflow_dispatch' && inputs.environment == 'dev')
+            )
+        needs: build
+        uses: ./.github/workflows/_deploy.yml
+        with:
+            environment: dev
+            deploy_dir: /flowbrand/dev
+            artifact_name: ${{ needs.build.outputs.artifact_name }}
+            tarball: ${{ needs.build.outputs.tarball }}
+        secrets:
+            HOST: ${{ secrets.HOST }}
+            USERNAME: ${{ secrets.USERNAME }}
+            SSH_KEY: ${{ secrets.SSH_KEY }}
+
+    deploy-staging:
+        name: Deploy -> staging
+        if: >-
+            github.event_name != 'pull_request' && (
+            (github.event_name == 'push' && github.ref == 'refs/heads/staging') ||
+            (github.event_name == 'workflow_dispatch' && inputs.environment == 'staging')
+            )
+        needs: build
+        uses: ./.github/workflows/_deploy.yml
+        with:
+            environment: staging
+            deploy_dir: /flowbrand/staging
+            artifact_name: ${{ needs.build.outputs.artifact_name }}
+            tarball: ${{ needs.build.outputs.tarball }}
+        secrets:
+            HOST: ${{ secrets.HOST }}
+            USERNAME: ${{ secrets.USERNAME }}
+            SSH_KEY: ${{ secrets.SSH_KEY }}
+
+    deploy-production:
+        name: Deploy -> production
+        if: >-
+            github.event_name != 'pull_request' && (
+            (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+            (github.event_name == 'workflow_dispatch' && inputs.environment == 'production')
+            )
+        needs: build
+        uses: ./.github/workflows/_deploy.yml
+        with:
+            environment: production
+            deploy_dir: /flowbrand/production
+            artifact_name: ${{ needs.build.outputs.artifact_name }}
+            tarball: ${{ needs.build.outputs.tarball }}
+        secrets:
+            HOST: ${{ secrets.HOST }}
+            USERNAME: ${{ secrets.USERNAME }}
+            SSH_KEY: ${{ secrets.SSH_KEY }}

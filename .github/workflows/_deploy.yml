@@ -1,0 +1,103 @@
+name: _deploy
+on:
+    workflow_call:
+        inputs:
+            environment:
+                description: 'Target environment (dev | staging | production)'
+                required: true
+                type: string
+
+            deploy_dir:
+                description: 'Absolute path on server to deploy in (e.g flowbrand/dev)'
+                required: true
+                type: string
+
+            artifact_name:
+                description: 'GitHub Actions artifact name produced by the build job'
+                required: true
+                type: string
+
+            tarball:
+                description: 'Tarball filename (e.g nestjs-dev.tar.gz)'
+                required: true
+                type: string
+
+        secrets:
+            HOST:
+                required: true
+
+            USERNAME:
+                required: true
+
+            SSH_KEY:
+                required: true
+env:
+    DEPLOY_DIR: ${{ inputs.deploy_dir }}
+    PM2_ENV: ${{ inputs.environment == 'production' && 'main' || inputs.environment }}
+    REMOTE_TMP: /home/${{ secrets.USERNAME }}/tmp/nestjs
+    TARBALL: ${{ inputs.tarball }}
+
+jobs:
+    deploy:
+        name: Deploy (${{ inputs.environment }})
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Download build artifact
+              uses: actions/download-artifact@v4
+              with:
+                  name: ${{ inputs.artifact_name }}
+
+            - name: Setup SSH key
+              run: |
+                  mkdir -p ~/.ssh
+                  echo "${{ secrets.SSH_KEY }}" > ~/.ssh/deploy_key
+                  chmod 600 ~/.ssh/deploy_key
+                  ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
+
+            - name: Copy tarball to server
+              run: |
+                  echo "================================================================================"
+                  echo "  Copying ${{ inputs.tarball }} -> ${{ secrets.HOST }}:${{ env.REMOTE_TMP }}"
+                  echo "================================================================================"
+                  ssh -i ~/.ssh/deploy_key ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+                      "mkdir -p ${{ env.REMOTE_TMP }}"
+
+                  scp -i ~/.ssh/deploy_key \
+                      ${{ inputs.tarball }} \
+                      ${{ secrets.USERNAME }}@${{ secrets.HOST }}:${{ env.REMOTE_TMP }}/
+
+            - name: Deploy on server
+              run: |
+                  ssh -i ~/.ssh/deploy_key ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+                  set -euo pipefail
+
+                  DEPLOY_DIR="${{ env.DEPLOY_DIR }}"
+                  PM2_ENV="${{ env.PM2_ENV }}"
+                  REMOTE_TMP="${{ env.REMOTE_TMP }}"
+                  TARBALL="${{ env.TARBALL }}"
+
+                  echo "================================================================="
+                  echo "  Environment   : ${{ inputs.environment }}"
+                  echo "  Deploy dir    : ${DEPLOY_DIR}"
+                  echo "  PM2 env       : ${PM2_ENV}"
+                  echo "================================================================="
+
+                  echo "==================== Navigate to deploy dir ====================="
+                  cd "${DEPLOY_DIR}"
+
+                  echo "==================== Extract tarball ============================"
+                  tar -xzf "${REMOTE_TMP}/${TARBALL}" -C .
+                  rm -f "${REMOTE_TMP}/${TARBALL}"
+
+                  echo "==================== Move Runtime files out of dist ============="
+                  mv dist/{package.json,*-ecosystem-config.json,deployment.sh} .
+
+                  echo "==================== Run deployment script ======================"
+                  chmod +x deployment.sh
+                  ./deployment.sh "${PM2_ENV}"
+
+                  echo "=================================================================="
+                  echo "  Deploy Complete (${{ inputs.environment }})"
+                  echo "=================================================================="
+                  EOF

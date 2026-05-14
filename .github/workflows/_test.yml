@@ -1,0 +1,55 @@
+name: _test
+
+on:
+    workflow_call:
+        inputs:
+            node_version:
+                description: 'Node.js version to use'
+                required: false
+                type: string
+                default: '22'
+    workflow_dispatch:
+        inputs:
+            node_version:
+                description: 'Node.js version to use'
+                required: false
+                type: string
+                default: '22'
+
+jobs:
+    test:
+        name: Test
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: latest
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ inputs.node_version || '22' }}
+                  cache: pnpm
+
+            - name: Install dependencies
+              run: pnpm install
+
+            - name: Run Tests
+              run: pnpm run test
+
+              # Uncomment if coverage test exists
+              # run: pnpm run test -- --coverage
+
+            # Comment out and remove coverage flag
+            # if no coverage tests to avoid errors
+            # - name: Upload coverage report
+            #   uses: actions/upload-artifact@v4
+            #   with:
+            #       name: coverage-report
+            #       path: coverage/
+            #       retention-days: 7
