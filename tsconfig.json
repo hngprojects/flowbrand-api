@@ -10,6 +10,7 @@
       "node",
       "jest"
     ],
+    "rootDir": "./",
     "outDir": "./dist",
     "esModuleInterop": true,
     "isolatedModules": true,
