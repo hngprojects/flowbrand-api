@@ -13,6 +13,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { HealthModule } from './modules/health/health.module';
 import { UsersModule } from './modules/users/users.module';
+import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { RedisModule } from './modules/redis/redis.module';
 
 @Module({
@@ -27,6 +28,7 @@ import { RedisModule } from './modules/redis/redis.module';
     HealthModule,
     UsersModule,
     AuthModule,
+    OnboardingModule,
     RedisModule,
   ],
   providers: [

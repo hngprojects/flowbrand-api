@@ -1,56 +1,68 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { Exclude } from 'class-transformer';
 import {
   Column,
-  CreateDateColumn,
   DeleteDateColumn,
   Entity,
   Index,
-  PrimaryGeneratedColumn,
-  UpdateDateColumn,
+  OneToMany,
+  OneToOne,
 } from 'typeorm';
-
-export enum UserRole {
-  ADMIN = 'admin',
-  USER = 'user',
-}
+import { Exclude } from 'class-transformer';
+import { BaseEntity } from '../../../common/entities/base.entity';
+import { UserRoleEntity } from './user-role.entity';
+import { AuthMetadata } from '../../auth/entities/auth-metadata.entity';
+import { UserSession } from './user-session.entity';
 
 @Entity('users')
-export class User {
-  @ApiProperty({ format: 'uuid' })
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+export class User extends BaseEntity {
+  @Column({ type: 'varchar', length: 100 })
+  full_name: string;
 
-  @ApiProperty({ example: 'user@example.com' })
   @Index({ unique: true })
-  @Column({ type: 'varchar', length: 255, unique: true })
+  @Column({ type: 'varchar', length: 255 })
   email: string;
 
   @Exclude()
-  @Column({ type: 'varchar', length: 255 })
-  password: string;
+  @Column({ type: 'text', nullable: true })
+  password_hash: string | null;
 
-  @ApiProperty()
-  @Column({ type: 'varchar', length: 255, name: 'full_name' })
-  fullName: string;
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  country: string | null;
 
-  @ApiProperty({ enum: UserRole, default: UserRole.USER })
-  @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
-  role: UserRole;
+  @Column({ type: 'boolean', default: false })
+  is_verified: boolean;
 
-  @Exclude()
-  @Column({ type: 'varchar', length: 500, nullable: true, name: 'refresh_token_hash' })
-  refreshTokenHash: string | null;
+  @Column({ type: 'boolean', default: true })
+  is_active: boolean;
 
-  @ApiProperty()
-  @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
+  @Column({ type: 'text', nullable: true })
+  avatar_url: string | null;
 
-  @ApiProperty()
-  @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
+  @Column({ type: 'varchar', length: 20, default: 'local' })
+  auth_provider: string;
+
+  @Column({ type: 'text', nullable: true })
+  provider_user_id: string | null;
 
   @Exclude()
-  @DeleteDateColumn({ name: 'deleted_at' })
-  deletedAt: Date | null;
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  otp_hash: string | null;
+
+  @Column({ type: 'boolean', default: false })
+  terms_accepted: boolean;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  expires_at: Date | null;
+
+  @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz', nullable: true })
+  deleted_at: Date | null;
+
+  // Relations
+  @OneToMany(() => UserRoleEntity, (r) => r.user, { cascade: true })
+  roles: UserRoleEntity[];
+
+  @OneToOne(() => AuthMetadata, (m) => m.user, { cascade: true })
+  auth_metadata: AuthMetadata;
+
+  @OneToMany(() => UserSession, (s) => s.user, { cascade: true })
+  sessions: UserSession[];
 }
