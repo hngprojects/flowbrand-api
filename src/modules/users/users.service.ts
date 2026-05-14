@@ -31,6 +31,7 @@ export class UsersService {
         email: dto.email,
         password: passwordHash,
         fullName: dto.fullName,
+        termsAccepted: dto.termsAccepted ?? false,
         role: dto.role,
       },
     });

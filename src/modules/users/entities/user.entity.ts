@@ -50,6 +50,10 @@ export class User {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
+  @ApiProperty({ default: false })
+  @Column({ type: 'boolean', default: false, name: 'terms_accepted' })
+  termsAccepted: boolean;
+
   @Exclude()
   @DeleteDateColumn({ name: 'deleted_at' })
   deletedAt: Date | null;

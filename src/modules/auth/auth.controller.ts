@@ -5,13 +5,16 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiBearerAuth,
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import * as SYS_MSG from '../../shared/constants/SystemMessages';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { AuthService } from './auth.service';
@@ -28,16 +31,52 @@ export class AuthController {
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register a new user' })
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  async register(@Body() dto: RegisterDto, @Res() res: Response) {
+    const result = await this.authService.register(dto);
+
+    // Set refresh token as HttpOnly cookie
+    res.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    return res.json({
+      statusCode: HttpStatus.CREATED,
+      message: SYS_MSG.USER_CREATED_SUCCESSFULLY || 'User created successfully',
+      data: {
+        accessToken: result.accessToken,
+        user: result.user,
+        redirectUrl: '/dashboard',
+      },
+    });
   }
 
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Log in with email and password' })
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  async login(@Body() dto: LoginDto, @Res() res: Response) {
+    const result = await this.authService.login(dto);
+
+    // Set refresh token as HttpOnly cookie
+    res.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    return res.json({
+      statusCode: HttpStatus.OK,
+      message: 'Login successful',
+      data: {
+        accessToken: result.accessToken,
+        user: result.user,
+        redirectUrl: '/dashboard',
+      },
+    });
   }
 
   @Public()

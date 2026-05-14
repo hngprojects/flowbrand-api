@@ -1,12 +1,16 @@
 import {
   Injectable,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import type { StringValue } from 'ms';
 import { env } from '../../config/env';
 import { User } from '../users/entities/user.entity';
+import { UserSession } from './entities/user-session.entity';
 import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -26,13 +30,20 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    @InjectRepository(UserSession)
+    private readonly userSessionRepository: Repository<UserSession>,
   ) {}
 
   async register(dto: RegisterDto): Promise<AuthResponse> {
+    if (!dto.termsAccepted) {
+      throw new BadRequestException('You must accept the terms and conditions to register');
+    }
+
     const user = await this.usersService.create({
       email: dto.email,
       password: dto.password,
       fullName: dto.fullName,
+      termsAccepted: true,
     });
     return this.issueTokens(user);
   }
@@ -79,8 +90,8 @@ export class AuthService {
   }
 
   private async issueTokens(user: User): Promise<AuthResponse> {
-    const tokens = await this.signTokens(user);
-    await this.persistRefreshToken(user.id, tokens.refreshToken);
+    const sessionId = await this.createSession(user.id);
+    const tokens = await this.signTokens(user, sessionId);
 
     const {
       password: _password,
@@ -92,8 +103,12 @@ export class AuthService {
     return { ...tokens, user: safeUser };
   }
 
-  private async signTokens(user: User): Promise<AuthTokens> {
-    const payload: JwtPayload = { sub: user.id, email: user.email };
+  private async signTokens(user: User, sessionId?: string): Promise<AuthTokens> {
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      sessionId: sessionId || '',
+    };
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: env.JWT_ACCESS_SECRET,
@@ -113,5 +128,35 @@ export class AuthService {
   ): Promise<void> {
     const hash = await bcrypt.hash(refreshToken, 10);
     await this.usersService.setRefreshTokenHash(userId, hash);
+  }
+
+  private async createSession(userId: string): Promise<string> {
+    const refreshTokenPlaceholder = `temp-${Date.now()}`;
+    const refreshTokenHash = await bcrypt.hash(refreshTokenPlaceholder, 10);
+
+    const expiresAt = new Date();
+    const refreshExpiresInSeconds = parseInt(
+      env.JWT_REFRESH_EXPIRES_IN.replace(/\D/g, ''),
+      10
+    );
+    const refreshExpiresInMs = env.JWT_REFRESH_EXPIRES_IN.includes('d')
+      ? refreshExpiresInSeconds * 24 * 60 * 60 * 1000
+      : env.JWT_REFRESH_EXPIRES_IN.includes('h')
+        ? refreshExpiresInSeconds * 60 * 60 * 1000
+        : env.JWT_REFRESH_EXPIRES_IN.includes('m')
+          ? refreshExpiresInSeconds * 60 * 1000
+          : refreshExpiresInSeconds * 1000;
+
+    expiresAt.setTime(expiresAt.getTime() + refreshExpiresInMs);
+
+    const session = this.userSessionRepository.create({
+      userId,
+      refreshToken: refreshTokenHash,
+      expiresAt,
+      isRevoked: false,
+    });
+
+    const savedSession = await this.userSessionRepository.save(session);
+    return savedSession.id;
   }
 }
