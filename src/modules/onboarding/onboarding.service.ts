@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { OnboardingModelAction } from './actions/onboarding.action';
+import { WizardSessionStatus } from './enums/wizard-session.enum';
 
 @Injectable()
 export class OnboardingService {
@@ -17,7 +18,7 @@ export class OnboardingService {
             })
         }
 
-        if (session?.status === 'in_progress' && session.expires_at && session.expires_at < new Date()) {
+        if (session?.status === WizardSessionStatus.IN_PROGRESS && session.expires_at && session.expires_at < new Date()) {
             await this.wizardSessionModelAction.markAsExpired(session.id)
 
             throw new NotFoundException({
