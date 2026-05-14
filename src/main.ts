@@ -26,8 +26,8 @@ async function bootstrap() {
 
   if (env.SWAGGER_ENABLED) {
     const config = new DocumentBuilder()
-      .setTitle('NestJS Starter')
-      .setDescription('REST API documentation')
+      .setTitle('SEIL API')
+      .setDescription('SEIL REST API documentation')
       .setVersion('1.0.0')
       .addBearerAuth(
         { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },

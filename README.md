@@ -1,6 +1,6 @@
-# NestJS Starter
+# SEIL API
 
-A production-ready NestJS 11 starter with PostgreSQL, JWT auth, the repository pattern via [`@hng-sdk/orm`](https://www.npmjs.com/package/@hng-sdk/orm), and migrations out of the box.
+NestJS 11 REST API backend for SEIL — built on the HNG boilerplate with PostgreSQL, JWT auth, the repository pattern via [`@hng-sdk/orm`](https://www.npmjs.com/package/@hng-sdk/orm), and migrations 
 
 ## Stack
 
@@ -101,7 +101,7 @@ src/
 
 ### Repository pattern via `@hng-sdk/orm`
 
-Services never depend on TypeORM `Repository<T>` directly. Instead, each entity gets a `*ModelAction` class that extends `AbstractModelAction<T>` and exposes a uniform CRUD API (`create`, `get`, `find`, `list`, `update`, `delete`, `save`) plus any domain-specific helpers.
+Services never depend on TypeORM `Repository<T>` directly. Instead, each entity gets a `*ModelAction` class that extends `AbstractModelAction<T>` and exposes a uniform CRUD API (`create`, `get`, `find
 
 ```ts
 // modules/users/actions/user.action.ts
@@ -142,7 +142,7 @@ export class UsersService {
 
 ### Env validation
 
-`src/config/env.ts` uses `@t3-oss/env-core` with Zod. The app fails to boot with a readable error if any required variable is missing or invalid. Import the typed `env` object instead of reaching into `process.env`:
+`src/config/env.ts` uses `@t3-oss/env-core` with Zod. The app fails to boot with a readable error if any required variable is missing or invalid. Import the typed `env` object instead of reaching into
 
 ```ts
 import { env } from './config/env';
