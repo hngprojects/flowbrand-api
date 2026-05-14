@@ -10,7 +10,7 @@ import { databaseConfig } from './config/database.config';
 import './config/env';
 import { jwtConfig } from './config/jwt.config';
 import { AuthModule } from './modules/auth/auth.module';
-import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { AuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { HealthModule } from './modules/health/health.module';
 import { UsersModule } from './modules/users/users.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
@@ -41,7 +41,7 @@ import { RedisModule } from './modules/redis/redis.module';
         transformOptions: { enableImplicitConversion: false },
       }),
     },
-    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },

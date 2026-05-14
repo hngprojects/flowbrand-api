@@ -1,3 +1,4 @@
+// Redis Messages
 export const REDIS_MESSAGES = {
   CONNECTION_ESTABLISHED: 'Redis connection established',
   CLIENT_READY: 'Redis client ready',
@@ -10,4 +11,15 @@ export const REDIS_MESSAGES = {
   RETRY_LIMIT_REACHED: 'Redis retry limit reached',
   PATTERN_DELETE_SUCCESS: (count: number, pattern: string) =>
     `Deleted ${count} keys matching pattern: ${pattern}`,
+};
+
+// Auth Messages
+export const AUTH_MESSAGES = {
+  USER_NOT_FOUND: 'User not found',
+  SESSION_NOT_FOUND: 'Session not found',
+  TOKEN_EXPIRED: 'Token expired',
+  TOKEN_INVALID: 'Invalid token',
+  TOKEN_NOT_FOUND: 'Token not found',
+  TOKEN_VERIFY_FAILED: 'Token verify failed',
+  UNAUTHENTICATED_MESSAGE: 'User is not authenticated',
 };
