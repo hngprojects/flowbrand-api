@@ -1,13 +1,8 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, Timestamp, UpdateDateColumn } from "typeorm";
-
-export enum WizardSessionStatus {
-    IN_PROGRESS = 'in_progress',
-    COMPLETE = 'complete',
-    EXPIRED = 'expired'
-}
+import { BaseEntity, Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, Timestamp, UpdateDateColumn } from "typeorm";
+import { WizardSessionStatus } from "../enums/wizard-session.enum";
 
 @Entity('wizard_sessions')
-export class WizardSession {
+export class WizardSession extends BaseEntity {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
