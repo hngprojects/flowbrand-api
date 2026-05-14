@@ -1,4 +1,4 @@
-import { Column, Entity, Index, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { Exclude } from 'class-transformer';
 import { User } from '../../users/entities/user.entity';
 import { BaseEntity } from '../../../common/entities/base.entity';
@@ -24,5 +24,6 @@ export class UserSession extends BaseEntity {
 
   // Relations
   @ManyToOne(() => User, (u) => u.sessions, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'user_id' })
   user: User;
 }

@@ -1,4 +1,4 @@
-import { Column, Entity, Index, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { BaseEntity } from '../../../common/entities/base.entity';
 import { WizardStatus } from '../enums/wizzard-status.enum';
@@ -27,5 +27,6 @@ export class WizardSession extends BaseEntity {
 
   // Relations
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'user_id' })
   user: User;
 }

@@ -1,4 +1,4 @@
-import { Column, Entity, Index, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { UserRole } from '../enums/user-role.enum';
 import { User } from './user.entity';
 import { BaseEntity } from '../../../common/entities/base.entity';
@@ -15,5 +15,6 @@ export class UserRoleEntity extends BaseEntity {
 
   // Relations
   @ManyToOne(() => User, (u) => u.roles, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'user_id' })
   user: User;
 }
