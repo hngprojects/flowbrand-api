@@ -85,6 +85,66 @@ Guidelines:
   - `Refs: #123`
   - `Closes #456`
 
+## Swagger documentation
+
+Every module keeps its Swagger decorators in a dedicated file:
+
+```text
+src/modules/<name>/docs/<name>-swagger.doc.ts
+```
+
+Each endpoint gets its own decorator factory using `applyDecorators`. The controller imports and applies these — keeping the controller file clean.
+
+```typescript
+// src/modules/auth/docs/auth-swagger.doc.ts
+import { applyDecorators, HttpCode, HttpStatus } from '@nestjs/common';
+import { ApiBody, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { LoginDto } from '../dto/login.dto';
+
+export function LoginDocs() {
+  return applyDecorators(
+    HttpCode(HttpStatus.OK),
+    ApiOperation({ summary: 'Login with email and password' }),
+    ApiBody({ type: LoginDto }),
+    ApiResponse({
+      status: HttpStatus.OK,
+      description: 'Returns JWT access token and user. Refresh token set as HttpOnly cookie.',
+      schema: {
+        example: {
+          status_code: 200,
+          message: 'Login Successful',
+          data: {
+            access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+            expires_at: '2026-05-11T12:00:00.000Z',
+            user: { id: 'uuid', full_name: 'Jane Doe', email: 'jane@example.com' },
+          },
+        },
+      },
+    }),
+    ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Invalid email or password.' }),
+    ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Account locked.' })
+  );
+}
+```
+
+```typescript
+// src/modules/auth/auth.controller.ts
+import { LoginDocs } from './docs/auth-swagger.doc';
+
+@LoginDocs()
+@Post('login')
+login(@Body() dto: LoginDto) {
+  return this.authService.login(dto);
+}
+```
+
+Rules:
+
+- One factory per endpoint — name it after the operation (`LoginDocs`, `RegisterDocs`, etc.)
+- Always document every `ApiResponse` status the endpoint can return
+- For endpoints that set HttpOnly cookies, note it in the `description` — Swagger cannot demonstrate cookies via "Try it out"
+- For OAuth redirect endpoints, add a `description` explaining they cannot be tested via Swagger and must be opened directly in a browser
+
 ## Code style
 
 - Run formatting and linting before pushing:
