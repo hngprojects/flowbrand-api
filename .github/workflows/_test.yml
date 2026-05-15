@@ -34,7 +34,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node_version || '22' }}
-          # cache: pnpm removed
 
       - name: Approve known build scripts
         run: |
@@ -47,10 +46,10 @@ jobs:
         run: pnpm install --no-lockfile
 
       - name: Run Tests
-        run: pnpm run test --passWithNoTests
+        run: pnpm run test -- --passWithNoTests
 
       - name: Run Tests with coverage
-        run: pnpm run test --passWithNoTests --coverage
+        run: pnpm run test -- --passWithNoTests --coverage
 
       - name: Upload coverage report
         if: hashFiles('src/**/*.spec.ts', 'src/**/*.test.ts', 'test/**/*.ts') != ''
