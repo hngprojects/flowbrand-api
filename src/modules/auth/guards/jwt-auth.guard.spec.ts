@@ -215,7 +215,7 @@ describe('AuthGuard', () => {
       );
     });
 
-    it('throws 401 when user is soft-deleted (deleted_at is set)', async () => {
+    it('throws 401 when user is soft-deleted (deletedAt is set)', async () => {
       mockUserService.findById.mockResolvedValue({
         ...ACTIVE_USER,
         deleted_at: new Date('2024-01-01'),
@@ -314,9 +314,7 @@ describe('AuthGuard', () => {
       } catch (err) {
         expect(err).toBeInstanceOf(UnauthorizedException);
         const httpErr = err as UnauthorizedException;
-        expect(httpErr.message).toBe(
-          SYS_MSG.AUTH_MESSAGES.UNAUTHENTICATED_MESSAGE,
-        );
+        expect(httpErr.message).toBe(SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE);
         expect(httpErr.getStatus()).toBe(HttpStatus.UNAUTHORIZED);
       }
     });

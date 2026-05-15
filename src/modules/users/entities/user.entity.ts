@@ -47,12 +47,13 @@ export class User extends BaseEntity {
   @Column({ type: 'varchar', length: 255, nullable: true })
   otp_hash: string | null;
 
-  @Column({ type: 'boolean', default: false })
-  terms_accepted: boolean;
-
   @Column({ type: 'timestamptz', nullable: true })
   expires_at: Date | null;
 
+  @Column({ type: 'boolean', default: false, name: 'terms_accepted' })
+  termsAccepted: boolean;
+
+  @Exclude()
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz', nullable: true })
   deleted_at: Date | null;
 

@@ -1,5 +1,4 @@
 import { registerAs } from '@nestjs/config';
-import { env } from './env';
 
 export const redisConfig = registerAs('redis', () => ({
   host: process.env.REDIS_HOST,

@@ -1,7 +1,6 @@
 import {
   CanActivate,
   ExecutionContext,
-  HttpStatus,
   Injectable,
   Logger,
   UnauthorizedException,
@@ -14,6 +13,13 @@ import { UsersService } from '../../users/users.service';
 import { IS_PUBLIC_KEY } from '../../../common/decorators/public.decorator';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { jwtConfig } from '../../../config/jwt.config';
+import { JwtPayload } from '../strategies/jwt.strategy';
+
+interface AuthenticatedRequest extends Request {
+  user?: JwtPayload;
+  session?: Record<string, unknown>;
+  token?: string;
+}
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -26,7 +32,7 @@ export class AuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const token = this.extractTokenFromHeader(request);
 
     const isPublicRoute = this.reflector.getAllAndOverride<boolean>(
@@ -40,26 +46,33 @@ export class AuthGuard implements CanActivate {
 
     if (!token) {
       throw new UnauthorizedException(
-        SYS_MSG.AUTH_MESSAGES.UNAUTHENTICATED_MESSAGE,
+        SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE,
       );
     }
 
-    const payload = await this.jwtService
-      .verifyAsync(token, {
-        secret: jwtConfig().accessSecret,
-      })
-      .catch((err) => null);
+    let payload: JwtPayload | null;
 
-    if (!payload)
+    try {
+      payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
+        secret: jwtConfig().accessSecret,
+      });
+    } catch {
       throw new UnauthorizedException(
-        SYS_MSG.AUTH_MESSAGES.UNAUTHENTICATED_MESSAGE,
+        SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE,
       );
+    }
+
+    if (!payload) {
+      throw new UnauthorizedException(
+        SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE,
+      );
+    }
 
     const { sessionId, sub: userId } = payload;
 
     if (!sessionId) {
       throw new UnauthorizedException(
-        SYS_MSG.AUTH_MESSAGES.UNAUTHENTICATED_MESSAGE,
+        SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE,
       );
     }
 
@@ -69,20 +82,20 @@ export class AuthGuard implements CanActivate {
     if (!sessionData) {
       this.logger.warn('Session not found or Redis unreachable');
       throw new UnauthorizedException(
-        SYS_MSG.AUTH_MESSAGES.UNAUTHENTICATED_MESSAGE,
+        SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE,
       );
     }
 
     const user = await this.userService.findById(userId).catch(() => null);
     if (!user || user.deleted_at !== null || !user.is_active) {
       throw new UnauthorizedException(
-        SYS_MSG.AUTH_MESSAGES.UNAUTHENTICATED_MESSAGE,
+        SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE,
       );
     }
 
-    request['user'] = payload;
-    request['session'] = JSON.parse(sessionData);
-    request['token'] = token;
+    request.user = payload;
+    request.session = JSON.parse(sessionData) as Record<string, unknown>;
+    request.token = token;
 
     return true;
   }

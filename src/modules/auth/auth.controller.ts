@@ -2,60 +2,129 @@ import {
   Body,
   Controller,
   Get,
-  HttpCode,
   HttpStatus,
+  HttpCode,
   Post,
+  Res,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { CookieOptions, Response } from 'express';
+import { ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
+import * as SYS_MSG from '../../constants/system.messages';
 import { Public } from '../../common/decorators/public.decorator';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
+import { LoginDocs, LogoutDocs, MeDocs, RefreshDocs, RegisterDocs } from './docs/auth-swagger.doc';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
+  private static readonly REDIRECT_URL = '/dashboard';
+
   constructor(private readonly authService: AuthService) {}
+
+  private getRefreshCookieOptions(): CookieOptions {
+    return {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    };
+  }
+
+  private buildAuthResponse(
+    statusCode: HttpStatus,
+    message: string,
+    result: Awaited<ReturnType<AuthService['register']>>,
+  ) {
+    return {
+      statusCode,
+      message,
+      data: {
+        accessToken: result.accessToken,
+        user: result.user,
+        redirectUrl: AuthController.REDIRECT_URL,
+      },
+    };
+  }
 
   @Public()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Register a new user' })
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register();
+  @RegisterDocs()
+  async register(@Body() dto: RegisterDto, @Res() res: Response) {
+    const result = await this.authService.register(dto);
+
+    res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
+
+    return res.json(
+      this.buildAuthResponse(
+        HttpStatus.CREATED,
+        SYS_MSG.USER_CREATED_SUCCESSFULLY,
+        result,
+      ),
+    );
   }
 
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Log in with email and password' })
-  login(@Body() dto: LoginDto) {
-    return this.authService.login();
+  @LoginDocs()
+  async login(@Body() dto: LoginDto, @Res() res: Response) {
+    const result = await this.authService.login(dto);
+
+    res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
+
+    return res.json(
+      this.buildAuthResponse(
+        HttpStatus.OK,
+        SYS_MSG.AUTH_LOGIN_SUCCESSFUL,
+        result,
+      ),
+    );
   }
 
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Issue a new access token from a refresh token' })
-  refresh(@Body() dto: RefreshTokenDto) {
-    return this.authService.refresh();
+  @RefreshDocs()
+  async refresh(@Body() dto: RefreshTokenDto, @Res() res: Response) {
+    const result = await this.authService.refresh(dto);
+
+    res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
+
+    return res.json(
+      this.buildAuthResponse(
+        HttpStatus.OK,
+        SYS_MSG.AUTH_TOKEN_REFRESHED,
+        result,
+      ),
+    );
   }
 
-  @ApiBearerAuth()
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Revoke the current refresh token' })
-  logout(@CurrentUser('sub') userId: string) {
-    return this.authService.logout();
+  @LogoutDocs()
+  async logout(
+    @CurrentUser('sessionId') sessionId: string,
+    @Res() res: Response,
+  ) {
+    await this.authService.logout(sessionId);
+
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+    });
+
+    return res.status(HttpStatus.NO_CONTENT).send();
   }
 
-  @ApiBearerAuth()
   @Get('me')
-  @ApiOperation({ summary: 'Return the current authenticated user' })
-  me(@CurrentUser() user: AuthenticatedUser) {
-    return this.authService.getProfile();
+  @MeDocs()
+  me(@CurrentUser('sub') userId: string) {
+    return this.authService.getProfile(userId);
   }
 }
