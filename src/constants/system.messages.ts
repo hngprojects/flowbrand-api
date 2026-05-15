@@ -29,6 +29,9 @@ export const AI_GENERATION_FAILED = 'AI generation failed';
 
 // Health
 export const HEALTH_OK = 'ok';
+export const HEALTH_DEGRADED = 'degraded';
+export const HEALTH_SERVICE_UP = 'ok';
+export const HEALTH_SERVICE_DOWN = 'down';
 
 // HTTP
 export const HTTP_INTERNAL_SERVER_ERROR = 'Internal server error';

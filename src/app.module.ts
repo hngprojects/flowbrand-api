@@ -10,6 +10,7 @@ import { appConfig } from './config/app.config';
 import { databaseConfig } from './config/database.config';
 import './config/env';
 import { jwtConfig } from './config/jwt.config';
+import { redisConfig } from './config/redis.config';
 import * as SYS_MSG from './constants/system.messages';
 import { AuthModule } from './modules/auth/auth.module';
 import { AuthGuard } from './modules/auth/guards/jwt-auth.guard';
@@ -17,6 +18,7 @@ import { HealthModule } from './modules/health/health.module';
 import { UsersModule } from './modules/users/users.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { RedisModule } from './modules/redis/redis.module';
+import { QueueModule } from './queue/queue.module';
 
 function collectValidationErrors(
   errors: ValidationError[],
@@ -37,7 +39,7 @@ function collectValidationErrors(
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, jwtConfig],
+      load: [appConfig, databaseConfig, jwtConfig, redisConfig],
     }),
     TypeOrmModule.forRootAsync({
       useFactory: () => databaseConfig(),
@@ -47,6 +49,7 @@ function collectValidationErrors(
     AuthModule,
     OnboardingModule,
     RedisModule,
+    QueueModule,
   ],
   providers: [
     {
