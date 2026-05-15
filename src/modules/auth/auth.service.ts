@@ -182,7 +182,7 @@ export class AuthService {
   private sanitizeUser(user: User): SafeUser {
     const safeUser = { ...user } as SafeUser & Partial<User>;
     delete safeUser.password_hash;
-    delete safeUser.deletedAt;
+    delete safeUser.deleted_at;
     delete safeUser.auth_metadata;
     delete safeUser.roles;
     delete safeUser.sessions;

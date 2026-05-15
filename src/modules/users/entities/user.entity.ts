@@ -55,7 +55,7 @@ export class User extends BaseEntity {
 
   @Exclude()
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz', nullable: true })
-  deletedAt: Date | null;
+  deleted_at: Date | null;
 
   // Relations
   @OneToMany(() => UserRoleEntity, (r) => r.user, { cascade: true })
