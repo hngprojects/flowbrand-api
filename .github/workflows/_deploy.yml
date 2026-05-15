@@ -87,7 +87,8 @@ jobs:
           cd "${DEPLOY_DIR}"
 
           echo "==================== Extract tarball ============================"
-          tar -xzf "${REMOTE_TMP}/${TARBALL}" -C .
+          tar --overwrite -xzf "${REMOTE_TMP}/${TARBALL}" -C .
+          # tar -xzf "${REMOTE_TMP}/${TARBALL}" -C .
           rm -f "${REMOTE_TMP}/${TARBALL}"
 
           echo "==================== Move Runtime files out of dist ============="

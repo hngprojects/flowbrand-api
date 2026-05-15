@@ -49,7 +49,7 @@ jobs:
       - name: Run Tests
         run: pnpm run test --passWithNoTests
 
-      - name: Run Tests
+      - name: Run Tests with coverage
         run: pnpm run test --passWithNoTests --coverage
 
       - name: Upload coverage report

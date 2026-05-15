@@ -1,7 +1,6 @@
-import {
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import type { StringValue } from 'ms';
