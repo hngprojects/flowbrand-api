@@ -72,7 +72,7 @@ jobs:
       #     pnpm approve-builds @scarf/scarf
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: Build application
         run: pnpm run build
