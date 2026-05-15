@@ -10,9 +10,14 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
+import { UserRole } from './enums/user-role.enum';
+import { QueryFailedError } from 'typeorm';
+import * as SYS_MSG from '../../constants/system.messages';
 
 const BCRYPT_ROUNDS = 10;
-const NO_TRANSACTION = { transactionOptions: { useTransaction: false as const } };
+const NO_TRANSACTION = {
+  transactionOptions: { useTransaction: false as const },
+};
 
 @Injectable()
 export class UsersService {
@@ -21,33 +26,53 @@ export class UsersService {
   async create(dto: CreateUserDto): Promise<User> {
     const existing = await this.userModelAction.findByEmail(dto.email);
     if (existing) {
-      throw new ConflictException('Email already in use');
+      if (existing.is_active === false) {
+        throw new ConflictException(SYS_MSG.USER_ACCOUNT_LOCKED);
+      }
+      throw new ConflictException(SYS_MSG.USER_EMAIL_IN_USE);
     }
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
-    return this.userModelAction.create({
-      ...NO_TRANSACTION,
-      createPayload: {
-        email: dto.email,
-        password: passwordHash,
-        fullName: dto.fullName,
-        role: dto.role,
-      },
-    });
+    try {
+      return await this.userModelAction.create({
+        ...NO_TRANSACTION,
+        createPayload: {
+          email: dto.email,
+          termsAccepted: dto.termsAccepted ?? false,
+          password_hash: passwordHash,
+          full_name: dto.fullName,
+          roles: [
+            {
+              role: dto.role ?? UserRole.USER,
+            },
+          ],
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof QueryFailedError &&
+        (error as { driverError?: { code?: string } }).driverError?.code ===
+          '23505'
+      ) {
+        throw new ConflictException(SYS_MSG.USER_EMAIL_IN_USE);
+      }
+
+      throw error;
+    }
   }
 
   findAll(pagination: PaginationDto) {
     return this.userModelAction.list({
       paginationPayload: { page: pagination.page!, limit: pagination.limit! },
-      order: { createdAt: 'DESC' },
+      order: { created_at: 'DESC' },
     });
   }
 
-  async findOne(id: string): Promise<User> {
+  async findById(id: string): Promise<User> {
     const user = await this.userModelAction.get({
       identifierOptions: { id },
     });
-    if (!user) throw new NotFoundException(`User ${id} not found`);
+    if (!user) throw new NotFoundException(SYS_MSG.USER_NOT_FOUND(id));
     return user;
   }
 
@@ -56,11 +81,11 @@ export class UsersService {
   }
 
   async update(id: string, dto: UpdateUserDto): Promise<User> {
-    await this.findOne(id);
+    await this.findById(id);
 
     const payload: Partial<User> = { ...dto };
     if (dto.password) {
-      payload.password = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+      payload.password_hash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
     }
 
     const updated = await this.userModelAction.update({
@@ -69,24 +94,18 @@ export class UsersService {
       updatePayload: payload,
     });
     if (!updated) {
-      throw new InternalServerErrorException('Failed to update user');
+      throw new InternalServerErrorException(
+        SYS_MSG.USER_UPDATE_FAILED,
+      );
     }
     return updated;
   }
 
   async remove(id: string): Promise<void> {
-    await this.findOne(id);
+    await this.findById(id);
     await this.userModelAction.delete({
       ...NO_TRANSACTION,
       identifierOptions: { id },
-    });
-  }
-
-  async setRefreshTokenHash(id: string, hash: string | null): Promise<void> {
-    await this.userModelAction.update({
-      ...NO_TRANSACTION,
-      identifierOptions: { id },
-      updatePayload: { refreshTokenHash: hash },
     });
   }
 }

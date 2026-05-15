@@ -1,13 +1,20 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { UserSessionModelAction } from '../users/actions/user-session.action';
 import * as bcrypt from 'bcrypt';
 import type { StringValue } from 'ms';
+import * as SYS_MSG from '../../constants/system.messages';
 import { env } from '../../config/env';
 import { User } from '../users/entities/user.entity';
+import type { UserSession } from '../users/entities/user-session.entity';
 import { UsersService } from '../users/users.service';
+import { RedisService } from '../redis/redis.service';
 import { LoginDto } from './dto/login.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtPayload } from './strategies/jwt.strategy';
 
@@ -16,8 +23,21 @@ export interface AuthTokens {
   refreshToken: string;
 }
 
+const REGISTRATION_REDIS_TTL_SECONDS = 15 * 60;
+const REGISTRATION_REDIS_KEY_PREFIX = 'sess';
+
+type SafeUser = Omit<
+  User,
+  | 'password_hash'
+  | 'deletedAt'
+  | 'deleted_at'
+  | 'auth_metadata'
+  | 'sessions'
+  | 'roles'
+>;
+
 export interface AuthResponse extends AuthTokens {
-  user: Omit<User, 'password' | 'refreshTokenHash' | 'deletedAt'>;
+  user: SafeUser;
 }
 
 @Injectable()
@@ -25,74 +45,155 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly redisService: RedisService,
+    private readonly userSessionModelAction: UserSessionModelAction,
   ) {}
 
+  // Local minimal interface to avoid unsafe-call lint issues from third-party model action types
+  private get userSessionAction(): {
+    findById(id: string): Promise<UserSession | null>;
+    updateById(
+      id: string,
+      payload: Partial<UserSession>,
+    ): Promise<UserSession | null>;
+    deleteById(id: string): Promise<void>;
+    createSession(payload: Partial<UserSession>): Promise<UserSession>;
+  } {
+    return this.userSessionModelAction;
+  }
+
   async register(dto: RegisterDto): Promise<AuthResponse> {
+    if (!dto.termsAccepted) {
+      throw new BadRequestException(SYS_MSG.AUTH_TERMS_REQUIRED);
+    }
+
     const user = await this.usersService.create({
       email: dto.email,
       password: dto.password,
       fullName: dto.fullName,
+      termsAccepted: true,
     });
-    return this.issueTokens(user);
+    return this.issueTokens(user, { persistRedisSession: true });
   }
 
   async login(dto: LoginDto): Promise<AuthResponse> {
     const user = await this.usersService.findByEmail(dto.email);
-    if (!user) throw new UnauthorizedException('Invalid credentials');
 
-    const valid = await bcrypt.compare(dto.password, user.password);
-    if (!valid) throw new UnauthorizedException('Invalid credentials');
+    if (!user?.password_hash) {
+      throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_CREDENTIALS);
+    }
+
+    const passwordMatches = await bcrypt.compare(
+      dto.password,
+      user.password_hash,
+    );
+
+    if (!passwordMatches) {
+      throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_CREDENTIALS);
+    }
 
     return this.issueTokens(user);
   }
 
-  async refresh(refreshToken: string): Promise<AuthTokens> {
+  async refresh(dto: RefreshTokenDto): Promise<AuthResponse> {
     let payload: JwtPayload;
+
     try {
-      payload = await this.jwtService.verifyAsync<JwtPayload>(refreshToken, {
-        secret: env.JWT_REFRESH_SECRET,
-      });
+      payload = await this.jwtService.verifyAsync<JwtPayload>(
+        dto.refreshToken,
+        {
+          secret: env.JWT_REFRESH_SECRET,
+        },
+      );
     } catch {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_REFRESH_TOKEN);
     }
 
-    const user = await this.usersService.findOne(payload.sub);
-    if (!user.refreshTokenHash) {
-      throw new UnauthorizedException('Refresh token has been revoked');
+    const session = await this.userSessionAction.findById(payload.sessionId);
+
+    if (!session || session.is_revoked) {
+      throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_REFRESH_TOKEN);
     }
 
-    const matches = await bcrypt.compare(refreshToken, user.refreshTokenHash);
-    if (!matches) throw new UnauthorizedException('Invalid refresh token');
+    const tokenMatches = await bcrypt.compare(
+      dto.refreshToken,
+      session.refresh_token,
+    );
 
-    const tokens = await this.signTokens(user);
-    await this.persistRefreshToken(user.id, tokens.refreshToken);
-    return tokens;
+    if (!tokenMatches) {
+      throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_REFRESH_TOKEN);
+    }
+
+    const user = await this.usersService.findById(payload.sub);
+    return this.issueTokens(user, session.id);
   }
 
-  async logout(userId: string): Promise<void> {
-    await this.usersService.setRefreshTokenHash(userId, null);
+  async logout(sessionId: string): Promise<void> {
+    if (!sessionId) return;
+
+    await this.userSessionAction.updateById(sessionId, {
+      is_revoked: true,
+      revoked_at: new Date(),
+    });
   }
 
   async getProfile(userId: string): Promise<User> {
-    return this.usersService.findOne(userId);
+    return this.usersService.findById(userId);
   }
 
-  private async issueTokens(user: User): Promise<AuthResponse> {
-    const tokens = await this.signTokens(user);
-    await this.persistRefreshToken(user.id, tokens.refreshToken);
+  private async issueTokens(
+    user: User,
+    optionsOrSessionId?: string | { persistRedisSession?: boolean },
+  ): Promise<AuthResponse> {
+    const shouldPersistRedisSession =
+      typeof optionsOrSessionId === 'object'
+        ? optionsOrSessionId.persistRedisSession === true
+        : false;
+    let sessionId: string | undefined;
 
-    const {
-      password: _password,
-      refreshTokenHash: _hash,
-      deletedAt: _deletedAt,
-      ...safeUser
-    } = user;
+    try {
+      sessionId =
+        typeof optionsOrSessionId === 'string'
+          ? optionsOrSessionId
+          : await this.createSession(user.id);
 
-    return { ...tokens, user: safeUser };
+      const tokens = await this.signTokens(user, sessionId);
+      await Promise.all([
+        this.persistRefreshToken(sessionId, tokens.refreshToken),
+        shouldPersistRedisSession
+          ? this.persistRedisRegistrationSession(user.id, sessionId)
+          : Promise.resolve(),
+      ]);
+
+      return { ...tokens, user: this.sanitizeUser(user) };
+    } catch (error) {
+      if (shouldPersistRedisSession) {
+        await this.rollbackRegistration(user.id, sessionId);
+      }
+      throw error;
+    }
   }
 
-  private async signTokens(user: User): Promise<AuthTokens> {
-    const payload: JwtPayload = { sub: user.id, email: user.email };
+  private sanitizeUser(user: User): SafeUser {
+    const safeUser = { ...user } as SafeUser & Partial<User>;
+    delete safeUser.password_hash;
+    delete safeUser.deleted_at;
+    delete safeUser.auth_metadata;
+    delete safeUser.roles;
+    delete safeUser.sessions;
+    return safeUser;
+  }
+
+  private async signTokens(
+    user: User,
+    sessionId?: string,
+  ): Promise<AuthTokens> {
+    const payload: JwtPayload = {
+      userId: user.id,
+      sub: user.id,
+      email: user.email,
+      sessionId: sessionId || '',
+    };
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: env.JWT_ACCESS_SECRET,
@@ -107,10 +208,64 @@ export class AuthService {
   }
 
   private async persistRefreshToken(
-    userId: string,
+    sessionId: string,
     refreshToken: string,
   ): Promise<void> {
     const hash = await bcrypt.hash(refreshToken, 10);
-    await this.usersService.setRefreshTokenHash(userId, hash);
+    await this.userSessionAction.updateById(sessionId, {
+      refresh_token: hash,
+    });
+  }
+
+  private async persistRedisRegistrationSession(
+    userId: string,
+    sessionId: string,
+  ): Promise<void> {
+    const redisKey = `${REGISTRATION_REDIS_KEY_PREFIX}:${userId}:${sessionId}`;
+    const redisValue = JSON.stringify({ userId, sessionId });
+    await this.redisService.setStrict(
+      redisKey,
+      redisValue,
+      REGISTRATION_REDIS_TTL_SECONDS,
+    );
+  }
+
+  private async rollbackRegistration(
+    userId: string,
+    sessionId?: string,
+  ): Promise<void> {
+    if (sessionId) {
+      await this.userSessionAction.deleteById(sessionId);
+    }
+
+    await this.usersService.remove(userId);
+  }
+
+  private async createSession(userId: string): Promise<string> {
+    const refreshTokenPlaceholder = `temp-${Date.now()}`;
+    const refreshTokenHash = await bcrypt.hash(refreshTokenPlaceholder, 10);
+
+    const expiresAt = new Date();
+    const refreshExpiresInSeconds = parseInt(
+      env.JWT_REFRESH_EXPIRES_IN.replace(/\D/g, ''),
+      10,
+    );
+    const refreshExpiresInMs = env.JWT_REFRESH_EXPIRES_IN.includes('d')
+      ? refreshExpiresInSeconds * 24 * 60 * 60 * 1000
+      : env.JWT_REFRESH_EXPIRES_IN.includes('h')
+        ? refreshExpiresInSeconds * 60 * 60 * 1000
+        : env.JWT_REFRESH_EXPIRES_IN.includes('m')
+          ? refreshExpiresInSeconds * 60 * 1000
+          : refreshExpiresInSeconds * 1000;
+
+    expiresAt.setTime(expiresAt.getTime() + refreshExpiresInMs);
+
+    const savedSession = await this.userSessionAction.createSession({
+      user_id: userId,
+      refresh_token: refreshTokenHash,
+      expires_at: expiresAt,
+      is_revoked: false,
+    });
+    return savedSession.id;
   }
 }

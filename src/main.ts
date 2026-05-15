@@ -7,6 +7,19 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { env } from './config/env';
 
+const bootstrapLogger = new Logger('Bootstrap');
+
+process.on('unhandledRejection', (reason) => {
+  bootstrapLogger.error(
+    'Unhandled promise rejection',
+    reason instanceof Error ? reason.stack : String(reason),
+  );
+});
+
+process.on('uncaughtException', (error) => {
+  bootstrapLogger.error('Uncaught exception', error.stack);
+});
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
@@ -19,15 +32,13 @@ async function bootstrap() {
     credentials: true,
   });
   app.setGlobalPrefix('api', { exclude: ['health'] });
-  app.useGlobalInterceptors(
-    new ClassSerializerInterceptor(app.get(Reflector)),
-  );
+  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
   app.enableShutdownHooks();
 
   if (env.SWAGGER_ENABLED) {
     const config = new DocumentBuilder()
-      .setTitle('NestJS Starter')
-      .setDescription('REST API documentation')
+      .setTitle('SEIL API')
+      .setDescription('SEIL REST API documentation')
       .setVersion('1.0.0')
       .addBearerAuth(
         { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
@@ -42,10 +53,9 @@ async function bootstrap() {
 
   await app.listen(env.PORT);
 
-  const logger = new Logger('Bootstrap');
-  logger.log(`Application running on http://localhost:${env.PORT}`);
+  bootstrapLogger.log(`Application running on http://localhost:${env.PORT}`);
   if (env.SWAGGER_ENABLED) {
-    logger.log(`Swagger docs at http://localhost:${env.PORT}/docs`);
+    bootstrapLogger.log(`Swagger docs at http://localhost:${env.PORT}/docs`);
   }
 }
 
