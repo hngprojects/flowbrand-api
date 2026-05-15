@@ -60,15 +60,9 @@ jobs:
 
       - name: Copy tarball to server
         run: |
-          ssh -i ~/.ssh/deploy_key \
-              -o StrictHostKeyChecking=yes \
-              ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-              "mkdir -p ${{ env.REMOTE_TMP }}"
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes ${{ secrets.USERNAME }}@${{ secrets.HOST }} "mkdir -p ${{ env.REMOTE_TMP }}"
 
-          scp -i ~/.ssh/deploy_key \
-              -o StrictHostKeyChecking=yes \
-              ${{ inputs.tarball }} \
-              ${{ secrets.USERNAME }}@${{ secrets.HOST }}:${{ env.REMOTE_TMP }}/
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes ${{ inputs.tarball }} ${{ secrets.USERNAME }}@${{ secrets.HOST }}:${{ env.REMOTE_TMP }}/
 
       - name: Deploy on server
         run: |
