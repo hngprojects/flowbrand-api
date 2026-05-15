@@ -68,7 +68,7 @@ export class UsersService {
     });
   }
 
-  async findOne(id: string): Promise<User> {
+  async findById(id: string): Promise<User> {
     const user = await this.userModelAction.get({
       identifierOptions: { id },
     });
@@ -81,7 +81,7 @@ export class UsersService {
   }
 
   async update(id: string, dto: UpdateUserDto): Promise<User> {
-    await this.findOne(id);
+    await this.findById(id);
 
     const payload: Partial<User> = { ...dto };
     if (dto.password) {
@@ -102,7 +102,7 @@ export class UsersService {
   }
 
   async remove(id: string): Promise<void> {
-    await this.findOne(id);
+    await this.findById(id);
     await this.userModelAction.delete({
       ...NO_TRANSACTION,
       identifierOptions: { id },

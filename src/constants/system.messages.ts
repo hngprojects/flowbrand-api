@@ -11,6 +11,7 @@ export const AUTH_LOGOUT_SUCCESSFUL = 'Logout successful';
 export const AUTH_TOKEN_REFRESHED = 'Token refreshed successfully';
 export const AUTH_INVALID_CREDENTIALS = 'Invalid email or password';
 export const AUTH_INVALID_REFRESH_TOKEN = 'Invalid or expired refresh token';
+export const AUTH_UNAUTHENTICATED_MESSAGE = 'Unauthenticated';
 export const AUTH_TERMS_REQUIRED = 'You must accept the terms and conditions to register';
 
 // User messages
@@ -45,4 +46,3 @@ export const REDIS_RECONNECT_ATTEMPT = (attempt: number, delay: number) =>
 export const REDIS_RETRY_LIMIT_REACHED = 'Redis retry limit reached';
 export const REDIS_PATTERN_DELETE_SUCCESS = (count: number, pattern: string) =>
   `Deleted ${count} keys matching pattern: ${pattern}`;
-

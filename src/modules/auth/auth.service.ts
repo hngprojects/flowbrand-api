@@ -129,7 +129,7 @@ export class AuthService {
       );
     }
 
-    const user = await this.usersService.findOne(payload.sub);
+    const user = await this.usersService.findById(payload.sub);
     return this.issueTokens(user, session.id);
   }
 
@@ -143,7 +143,7 @@ export class AuthService {
   }
 
   async getProfile(userId: string): Promise<User> {
-    return this.usersService.findOne(userId);
+    return this.usersService.findById(userId);
   }
 
   private async issueTokens(
