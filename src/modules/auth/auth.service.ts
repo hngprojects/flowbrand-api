@@ -1,20 +1,23 @@
 import {
+  HttpException,
+  HttpStatus,
   Injectable,
   UnauthorizedException,
   BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UserSessionModelAction } from '../users/actions/user-session.action';
+import { AuthMetadataModelAction } from './actions/auth-metadata.action';
 import * as bcrypt from 'bcrypt';
 import type { StringValue } from 'ms';
 import * as SYS_MSG from '../../constants/system.messages';
 import { env } from '../../config/env';
 import { User } from '../users/entities/user.entity';
 import type { UserSession } from '../users/entities/user-session.entity';
+import type { AuthMetadata } from './entities/auth-metadata.entity';
 import { UsersService } from '../users/users.service';
 import { RedisService } from '../redis/redis.service';
 import { LoginDto } from './dto/login.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtPayload } from './strategies/jwt.strategy';
 
@@ -23,8 +26,10 @@ export interface AuthTokens {
   refreshToken: string;
 }
 
-const REGISTRATION_REDIS_TTL_SECONDS = 15 * 60;
-const REGISTRATION_REDIS_KEY_PREFIX = 'sess';
+const REDIS_SESSION_TTL_SECONDS = 15 * 60;
+const REDIS_SESSION_KEY_PREFIX = 'sess';
+const MAX_FAILED_LOGIN_ATTEMPTS = 5;
+const ACCOUNT_LOCK_DURATION_MS = 60 * 60 * 1000;
 
 type SafeUser = Omit<
   User,
@@ -47,6 +52,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
     private readonly userSessionModelAction: UserSessionModelAction,
+    private readonly authMetadataModelAction: AuthMetadataModelAction,
   ) {}
 
   // Local minimal interface to avoid unsafe-call lint issues from third-party model action types
@@ -57,6 +63,17 @@ export class AuthService {
     createSession(payload: Partial<UserSession>): Promise<UserSession>;
   } {
     return this.userSessionModelAction;
+  }
+
+  private get authMetadataAction(): {
+    findByUserId(userId: string): Promise<AuthMetadata | null>;
+    updateByUserId(
+      userId: string,
+      payload: Partial<AuthMetadata>,
+    ): Promise<AuthMetadata | null>;
+    createForUser(payload: Partial<AuthMetadata>): Promise<AuthMetadata>;
+  } {
+    return this.authMetadataModelAction;
   }
 
   async register(dto: RegisterDto): Promise<AuthResponse> {
@@ -70,7 +87,7 @@ export class AuthService {
       fullName: dto.fullName,
       termsAccepted: true,
     });
-    return this.issueTokens(user, { persistRedisSession: true });
+    return this.issueTokens(user, { rollbackOnFailure: true });
   }
 
   async login(dto: LoginDto): Promise<AuthResponse> {
@@ -80,28 +97,30 @@ export class AuthService {
       throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_CREDENTIALS);
     }
 
+    const metadata = await this.ensureAuthMetadata(user.id);
+    this.throwIfLocked(metadata);
+
     const passwordMatches = await bcrypt.compare(
       dto.password,
       user.password_hash,
     );
 
     if (!passwordMatches) {
+      await this.recordFailedLogin(user.id, metadata);
       throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_CREDENTIALS);
     }
 
+    await this.recordSuccessfulLogin(user.id);
     return this.issueTokens(user);
   }
 
-  async refresh(dto: RefreshTokenDto): Promise<AuthResponse> {
+  async refresh(refreshToken: string): Promise<AuthResponse> {
     let payload: JwtPayload;
 
     try {
-      payload = await this.jwtService.verifyAsync<JwtPayload>(
-        dto.refreshToken,
-        {
-          secret: env.JWT_REFRESH_SECRET,
-        },
-      );
+      payload = await this.jwtService.verifyAsync<JwtPayload>(refreshToken, {
+        secret: env.JWT_REFRESH_SECRET,
+      });
     } catch {
       throw new UnauthorizedException(
         SYS_MSG.AUTH_INVALID_REFRESH_TOKEN,
@@ -119,7 +138,7 @@ export class AuthService {
     }
 
     const tokenMatches = await bcrypt.compare(
-      dto.refreshToken,
+      refreshToken,
       session.refresh_token,
     );
 
@@ -133,13 +152,17 @@ export class AuthService {
     return this.issueTokens(user, session.id);
   }
 
-  async logout(sessionId: string): Promise<void> {
+  async logout(userId: string, sessionId: string): Promise<void> {
     if (!sessionId) return;
 
-    await this.userSessionAction.updateById(sessionId, {
-      is_revoked: true,
-      revoked_at: new Date(),
-    });
+    const redisKey = `${REDIS_SESSION_KEY_PREFIX}:${userId}:${sessionId}`;
+    await Promise.all([
+      this.userSessionAction.updateById(sessionId, {
+        is_revoked: true,
+        revoked_at: new Date(),
+      }),
+      this.redisService.del(redisKey),
+    ]);
   }
 
   async getProfile(userId: string): Promise<User> {
@@ -148,11 +171,11 @@ export class AuthService {
 
   private async issueTokens(
     user: User,
-    optionsOrSessionId?: string | { persistRedisSession?: boolean },
+    optionsOrSessionId?: string | { rollbackOnFailure?: boolean },
   ): Promise<AuthResponse> {
-    const shouldPersistRedisSession =
+    const rollbackOnFailure =
       typeof optionsOrSessionId === 'object'
-        ? optionsOrSessionId.persistRedisSession === true
+        ? optionsOrSessionId.rollbackOnFailure === true
         : false;
     let sessionId: string | undefined;
 
@@ -165,14 +188,12 @@ export class AuthService {
       const tokens = await this.signTokens(user, sessionId);
       await Promise.all([
         this.persistRefreshToken(sessionId, tokens.refreshToken),
-        shouldPersistRedisSession
-          ? this.persistRedisRegistrationSession(user.id, sessionId)
-          : Promise.resolve(),
+        this.persistRedisSession(user.id, sessionId),
       ]);
 
       return { ...tokens, user: this.sanitizeUser(user) };
     } catch (error) {
-      if (shouldPersistRedisSession) {
+      if (rollbackOnFailure) {
         await this.rollbackRegistration(user.id, sessionId);
       }
       throw error;
@@ -219,16 +240,16 @@ export class AuthService {
     });
   }
 
-  private async persistRedisRegistrationSession(
+  private async persistRedisSession(
     userId: string,
     sessionId: string,
   ): Promise<void> {
-    const redisKey = `${REGISTRATION_REDIS_KEY_PREFIX}:${userId}:${sessionId}`;
+    const redisKey = `${REDIS_SESSION_KEY_PREFIX}:${userId}:${sessionId}`;
     const redisValue = JSON.stringify({ userId, sessionId });
     await this.redisService.setStrict(
       redisKey,
       redisValue,
-      REGISTRATION_REDIS_TTL_SECONDS,
+      REDIS_SESSION_TTL_SECONDS,
     );
   }
 
@@ -241,6 +262,57 @@ export class AuthService {
     }
 
     await this.usersService.remove(userId);
+  }
+
+  private async ensureAuthMetadata(userId: string): Promise<AuthMetadata> {
+    const existing = await this.authMetadataAction.findByUserId(userId);
+    if (existing) return existing;
+    return this.authMetadataAction.createForUser({
+      user_id: userId,
+      failed_attempts: 0,
+      locked_until: null,
+      last_login_at: null,
+    });
+  }
+
+  private throwIfLocked(metadata: AuthMetadata): void {
+    if (metadata.locked_until && metadata.locked_until.getTime() > Date.now()) {
+      throw new HttpException(
+        SYS_MSG.AUTH_ACCOUNT_LOCKED,
+        HttpStatus.LOCKED,
+      );
+    }
+  }
+
+  private async recordFailedLogin(
+    userId: string,
+    metadata: AuthMetadata,
+  ): Promise<void> {
+    const nextAttempts = metadata.failed_attempts + 1;
+    const shouldLock = nextAttempts >= MAX_FAILED_LOGIN_ATTEMPTS;
+    const lockedUntil = shouldLock
+      ? new Date(Date.now() + ACCOUNT_LOCK_DURATION_MS)
+      : metadata.locked_until;
+
+    await this.authMetadataAction.updateByUserId(userId, {
+      failed_attempts: nextAttempts,
+      locked_until: lockedUntil,
+    });
+
+    if (shouldLock) {
+      throw new HttpException(
+        SYS_MSG.AUTH_TOO_MANY_FAILED_ATTEMPTS,
+        HttpStatus.LOCKED,
+      );
+    }
+  }
+
+  private async recordSuccessfulLogin(userId: string): Promise<void> {
+    await this.authMetadataAction.updateByUserId(userId, {
+      failed_attempts: 0,
+      locked_until: null,
+      last_login_at: new Date(),
+    });
   }
 
   private async createSession(userId: string): Promise<string> {

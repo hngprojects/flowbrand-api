@@ -5,9 +5,11 @@ import {
   HttpStatus,
   HttpCode,
   Post,
+  Req,
   Res,
+  UnauthorizedException,
 } from '@nestjs/common';
-import type { CookieOptions, Response } from 'express';
+import type { CookieOptions, Request, Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../constants/system.messages';
@@ -87,11 +89,22 @@ export class AuthController {
   }
 
   @Public()
-  @Post('refresh')
+  @Post('refresh-token')
   @HttpCode(HttpStatus.OK)
   @RefreshDocs()
-  async refresh(@Body() dto: RefreshTokenDto, @Res() res: Response) {
-    const result = await this.authService.refresh(dto);
+  async refresh(
+    @Body() dto: RefreshTokenDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const refreshToken =
+      dto.refreshToken ?? (req.cookies?.refreshToken as string | undefined);
+
+    if (!refreshToken) {
+      throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_REFRESH_TOKEN);
+    }
+
+    const result = await this.authService.refresh(refreshToken);
 
     res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
 
@@ -108,10 +121,11 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @LogoutDocs()
   async logout(
+    @CurrentUser('sub') userId: string,
     @CurrentUser('sessionId') sessionId: string,
     @Res() res: Response,
   ) {
-    await this.authService.logout(sessionId);
+    await this.authService.logout(userId, sessionId);
 
     res.clearCookie('refreshToken', {
       httpOnly: true,

@@ -10,12 +10,14 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { User } from '../users/entities/user.entity';
 import { UserSession } from '../users/entities/user-session.entity';
+import { AuthMetadata } from './entities/auth-metadata.entity';
+import { AuthMetadataModelAction } from './actions/auth-metadata.action';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
-    TypeOrmModule.forFeature([User, UserSession]),
+    TypeOrmModule.forFeature([User, UserSession, AuthMetadata]),
     JwtModule.register({
       secret: env.JWT_ACCESS_SECRET,
       signOptions: { expiresIn: env.JWT_ACCESS_EXPIRES_IN as StringValue },
@@ -24,7 +26,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     RedisModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, AuthMetadataModelAction],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}
