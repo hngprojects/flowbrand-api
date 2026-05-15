@@ -64,15 +64,15 @@ jobs:
           node-version: ${{ inputs.node_version || '22' }}
           cache: pnpm
 
-      - name: Approve known build scripts
-        run: |
-          pnpm approve-builds @nestjs/core
-          pnpm approve-builds bcrypt
-          pnpm approve-builds unrs-resolver
-          pnpm approve-builds @scarf/scarf
+      # - name: Approve known build scripts
+      #   run: |
+      #     pnpm approve-builds @nestjs/core
+      #     pnpm approve-builds bcrypt
+      #     pnpm approve-builds unrs-resolver
+      #     pnpm approve-builds @scarf/scarf
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --config.allow-build=true
 
       - name: Build application
         run: pnpm run build
