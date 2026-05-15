@@ -28,10 +28,15 @@ echo_step "Installing production dependencies..."
 pnpm install --prod --ignore-scripts
 
 # ================================================================
-echo_step "Running database migrations..."
+# echo_step "Running database migrations..."
 # ================================================================
 # pnpm run migration:run
-./node_modules/.bin/typeorm migration:run -d dist/database/data-source.js
+# ./node_modules/.bin/typeorm migration:run -d dist/database/data-source.js
+
+# ================================================================
+echo_step "Syncing database schema..."
+# ================================================================
+./node_modules/.bin/typeorm schema:sync -d dist/database/data-source.js
 
 # ================================================================
 echo_step "Reloading PM2 process (zero-downtime)..."
