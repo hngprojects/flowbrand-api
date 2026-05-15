@@ -44,7 +44,7 @@ jobs:
       #     pnpm approve-builds @scarf/scarf
 
       - name: Install dependencies
-        run: pnpm install --config.allow-build=true
+        run: pnpm install --allow-build=@nestjs/core,bcrypt,msgpackr-extract,unrs-resolver,@scarf/scarf
 
       - name: Run Tests
         run: pnpm run test --passWithNoTests
