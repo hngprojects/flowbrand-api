@@ -8,13 +8,7 @@ import {
   Res,
 } from '@nestjs/common';
 import type { CookieOptions, Response } from 'express';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiTags,
-  ApiCreatedResponse,
-  ApiOkResponse,
-} from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../constants/system.messages';
 import { Public } from '../../common/decorators/public.decorator';
@@ -22,6 +16,7 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
+import { LoginDocs, LogoutDocs, MeDocs, RefreshDocs, RegisterDocs } from './docs/auth-swagger.doc';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -58,25 +53,7 @@ export class AuthController {
   @Public()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Register a new user' })
-  @ApiCreatedResponse({
-    description: 'User registered and logged in',
-    schema: {
-      example: {
-        statusCode: 201,
-        message: 'User Created Successfully',
-        data: {
-          accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-          user: {
-            id: 'uuid',
-            email: 'user@example.com',
-            full_name: 'Jane Doe',
-          },
-          redirectUrl: '/dashboard',
-        },
-      },
-    },
-  })
+  @RegisterDocs()
   async register(@Body() dto: RegisterDto, @Res() res: Response) {
     const result = await this.authService.register(dto);
 
@@ -94,25 +71,7 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Log in with email and password' })
-  @ApiOkResponse({
-    description: 'Login successful',
-    schema: {
-      example: {
-        statusCode: 200,
-        message: 'Login successful',
-        data: {
-          accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-          user: {
-            id: 'uuid',
-            email: 'user@example.com',
-            full_name: 'Jane Doe',
-          },
-          redirectUrl: '/dashboard',
-        },
-      },
-    },
-  })
+  @LoginDocs()
   async login(@Body() dto: LoginDto, @Res() res: Response) {
     const result = await this.authService.login(dto);
 
@@ -130,25 +89,7 @@ export class AuthController {
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Issue a new access token from a refresh token' })
-  @ApiOkResponse({
-    description: 'Refresh token exchanged for new access token',
-    schema: {
-      example: {
-        statusCode: 200,
-        message: 'Token refreshed successfully',
-        data: {
-          accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-          user: {
-            id: 'uuid',
-            email: 'user@example.com',
-            full_name: 'Jane Doe',
-          },
-          redirectUrl: '/dashboard',
-        },
-      },
-    },
-  })
+  @RefreshDocs()
   async refresh(@Body() dto: RefreshTokenDto, @Res() res: Response) {
     const result = await this.authService.refresh(dto);
 
@@ -163,10 +104,9 @@ export class AuthController {
     );
   }
 
-  @ApiBearerAuth()
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Revoke the current refresh token' })
+  @LogoutDocs()
   async logout(
     @CurrentUser('sessionId') sessionId: string,
     @Res() res: Response,
@@ -182,9 +122,8 @@ export class AuthController {
     return res.status(HttpStatus.NO_CONTENT).send();
   }
 
-  @ApiBearerAuth()
   @Get('me')
-  @ApiOperation({ summary: 'Return the current authenticated user' })
+  @MeDocs()
   me(@CurrentUser('sub') userId: string) {
     return this.authService.getProfile(userId);
   }
