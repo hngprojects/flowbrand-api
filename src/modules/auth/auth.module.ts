@@ -9,7 +9,7 @@ import { RedisModule } from '../redis/redis.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { User } from '../users/entities/user.entity';
-import { UserSession } from './entities/user-session.entity';
+import { UserSession } from '../users/entities/user-session.entity';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({

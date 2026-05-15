@@ -12,6 +12,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { UserRole } from './enums/user-role.enum';
 import { QueryFailedError } from 'typeorm';
+import * as SYS_MSG from '../../constants/system.messages';
 
 const BCRYPT_ROUNDS = 10;
 const NO_TRANSACTION = {
@@ -26,9 +27,9 @@ export class UsersService {
     const existing = await this.userModelAction.findByEmail(dto.email);
     if (existing) {
       if (existing.is_active === false) {
-        throw new ConflictException('Account is locked');
+        throw new ConflictException(SYS_MSG.USER_ACCOUNT_LOCKED);
       }
-      throw new ConflictException('Email already in use');
+      throw new ConflictException(SYS_MSG.USER_EMAIL_IN_USE);
     }
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
@@ -53,7 +54,7 @@ export class UsersService {
         (error as { driverError?: { code?: string } }).driverError?.code ===
           '23505'
       ) {
-        throw new ConflictException('Email already in use');
+        throw new ConflictException(SYS_MSG.USER_EMAIL_IN_USE);
       }
 
       throw error;
@@ -71,7 +72,7 @@ export class UsersService {
     const user = await this.userModelAction.get({
       identifierOptions: { id },
     });
-    if (!user) throw new NotFoundException(`User ${id} not found`);
+    if (!user) throw new NotFoundException(SYS_MSG.USER_NOT_FOUND(id));
     return user;
   }
 
@@ -93,7 +94,9 @@ export class UsersService {
       updatePayload: payload,
     });
     if (!updated) {
-      throw new InternalServerErrorException('Failed to update user');
+      throw new InternalServerErrorException(
+        SYS_MSG.USER_UPDATE_FAILED,
+      );
     }
     return updated;
   }

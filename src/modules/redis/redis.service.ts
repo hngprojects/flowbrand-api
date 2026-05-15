@@ -26,12 +26,12 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       enableOfflineQueue: false,
       retryStrategy: (times: number) => {
         if (times > 5) {
-          this.logger.error(SYS_MSG.REDIS_MESSAGES.RETRY_LIMIT_REACHED);
+          this.logger.error(SYS_MSG.REDIS_RETRY_LIMIT_REACHED);
           return null;
         }
         const delay = Math.min(times * 200, 2000); // 2s max delay
         this.logger.warn(
-          SYS_MSG.REDIS_MESSAGES.RECONNECT_ATTEMPT(times, delay),
+          SYS_MSG.REDIS_RECONNECT_ATTEMPT(times, delay),
         );
         return delay;
       },
@@ -40,23 +40,30 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     this.client = new Redis(options);
 
     this.client.on('connect', () =>
-      this.logger.log('Redis connection established'),
+      this.logger.log(SYS_MSG.REDIS_CONNECTION_ESTABLISHED),
     );
-    this.client.on('ready', () => this.logger.log('Redis client ready'));
-    this.client.on('close', () => this.logger.warn('Redis connection closed'));
+    this.client.on('ready', () =>
+      this.logger.log(SYS_MSG.REDIS_CLIENT_READY),
+    );
+    this.client.on('close', () =>
+      this.logger.warn(SYS_MSG.REDIS_CONNECTION_CLOSED),
+    );
     this.client.on('error', (err: Error) => {
       const error = err;
       if (error.message.includes('OOM')) {
-        this.logger.error(SYS_MSG.REDIS_MESSAGES.CRITICAL_OOM, error.message);
+        this.logger.error(
+          SYS_MSG.REDIS_CRITICAL_OOM,
+          error.message,
+        );
       } else {
-        this.logger.error(SYS_MSG.REDIS_MESSAGES.CLIENT_ERROR, error.message);
+        this.logger.error(SYS_MSG.REDIS_CLIENT_ERROR, error.message);
       }
     });
 
     this.client.connect().catch((err) => {
       const error = err as Error;
       this.logger.error(
-        SYS_MSG.REDIS_MESSAGES.INITIAL_CONNECTION_FAILED,
+        SYS_MSG.REDIS_INITIAL_CONNECTION_FAILED,
         error.message,
       );
     });
@@ -146,7 +153,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       if (keysToDelete.length > 0) {
         await this.client.del(...keysToDelete);
         this.logger.log(
-          SYS_MSG.REDIS_MESSAGES.PATTERN_DELETE_SUCCESS(
+          SYS_MSG.REDIS_PATTERN_DELETE_SUCCESS(
             keysToDelete.length,
             pattern,
           ),
@@ -159,6 +166,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy() {
     await this.client?.quit();
-    this.logger.log(SYS_MSG.REDIS_MESSAGES.CONNECTION_CLOSED);
+    this.logger.log(SYS_MSG.REDIS_CONNECTION_CLOSED);
   }
 }

@@ -1,0 +1,38 @@
+import { AbstractModelAction } from '@hng-sdk/orm';
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { UserSession } from './../entities/user-session.entity';
+
+@Injectable()
+export class UserSessionModelAction extends AbstractModelAction<UserSession> {
+  constructor(
+    @InjectRepository(UserSession)
+    repository: Repository<UserSession>,
+  ) {
+    super(repository, UserSession);
+  }
+
+  async findById(id: string): Promise<UserSession | null> {
+    return (await this.get({ identifierOptions: { id } }));
+  }
+
+  async updateById(
+    id: string,
+    updatePayload: Partial<UserSession>,
+  ): Promise<UserSession | null> {
+    return (await this.update({
+      identifierOptions: { id },
+      updatePayload,
+      transactionOptions: { useTransaction: false },
+    }));
+  }
+
+  async deleteById(id: string): Promise<void> {
+    await this.delete({ identifierOptions: { id }, transactionOptions: { useTransaction: false } });
+  }
+
+  async createSession(createPayload: Partial<UserSession>): Promise<UserSession> {
+    return (await this.create({ createPayload, transactionOptions: { useTransaction: false } }));
+  }
+}

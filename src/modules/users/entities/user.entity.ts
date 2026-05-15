@@ -47,9 +47,6 @@ export class User extends BaseEntity {
   @Column({ type: 'varchar', length: 255, nullable: true })
   otp_hash: string | null;
 
-  @Column({ type: 'boolean', default: false })
-  terms_accepted: boolean;
-
   @Column({ type: 'timestamptz', nullable: true })
   expires_at: Date | null;
 
@@ -57,10 +54,8 @@ export class User extends BaseEntity {
   termsAccepted: boolean;
 
   @Exclude()
-  @DeleteDateColumn({ name: 'deleted_at' })
-  deletedAt: Date | null;
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz', nullable: true })
-  deleted_at: Date | null;
+  deletedAt: Date | null;
 
   // Relations
   @OneToMany(() => UserRoleEntity, (r) => r.user, { cascade: true })

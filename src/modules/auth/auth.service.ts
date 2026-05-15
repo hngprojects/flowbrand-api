@@ -4,14 +4,13 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { UserSessionModelAction } from '../users/actions/user-session.action';
 import * as bcrypt from 'bcrypt';
 import type { StringValue } from 'ms';
 import * as SYS_MSG from '../../constants/system.messages';
 import { env } from '../../config/env';
 import { User } from '../users/entities/user.entity';
-import { UserSession } from './entities/user-session.entity';
+import type { UserSession } from '../users/entities/user-session.entity';
 import { UsersService } from '../users/users.service';
 import { RedisService } from '../redis/redis.service';
 import { LoginDto } from './dto/login.dto';
@@ -47,15 +46,22 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
-    @InjectRepository(UserSession)
-    private readonly userSessionRepository: Repository<UserSession>,
+    private readonly userSessionModelAction: UserSessionModelAction,
   ) {}
+
+  // Local minimal interface to avoid unsafe-call lint issues from third-party model action types
+  private get userSessionAction(): {
+    findById(id: string): Promise<UserSession | null>;
+    updateById(id: string, payload: Partial<UserSession>): Promise<UserSession | null>;
+    deleteById(id: string): Promise<void>;
+    createSession(payload: Partial<UserSession>): Promise<UserSession>;
+  } {
+    return this.userSessionModelAction;
+  }
 
   async register(dto: RegisterDto): Promise<AuthResponse> {
     if (!dto.termsAccepted) {
-      throw new BadRequestException(
-        'You must accept the terms and conditions to register',
-      );
+      throw new BadRequestException(SYS_MSG.AUTH_TERMS_REQUIRED);
     }
 
     const user = await this.usersService.create({
@@ -71,7 +77,7 @@ export class AuthService {
     const user = await this.usersService.findByEmail(dto.email);
 
     if (!user?.password_hash) {
-      throw new UnauthorizedException(SYS_MSG.AUTH_MESSAGES.INVALID_CREDENTIALS);
+      throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_CREDENTIALS);
     }
 
     const passwordMatches = await bcrypt.compare(
@@ -80,7 +86,7 @@ export class AuthService {
     );
 
     if (!passwordMatches) {
-      throw new UnauthorizedException(SYS_MSG.AUTH_MESSAGES.INVALID_CREDENTIALS);
+      throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_CREDENTIALS);
     }
 
     return this.issueTokens(user);
@@ -98,28 +104,28 @@ export class AuthService {
       );
     } catch {
       throw new UnauthorizedException(
-        SYS_MSG.AUTH_MESSAGES.INVALID_REFRESH_TOKEN,
+        SYS_MSG.AUTH_INVALID_REFRESH_TOKEN,
       );
     }
 
-    const session = await this.userSessionRepository.findOne({
-      where: { id: payload.sessionId },
-    });
+    const session = await this.userSessionAction.findById(
+      payload.sessionId,
+    );
 
-    if (!session || session.isRevoked) {
+    if (!session || session.is_revoked) {
       throw new UnauthorizedException(
-        SYS_MSG.AUTH_MESSAGES.INVALID_REFRESH_TOKEN,
+        SYS_MSG.AUTH_INVALID_REFRESH_TOKEN,
       );
     }
 
     const tokenMatches = await bcrypt.compare(
       dto.refreshToken,
-      session.refreshToken,
+      session.refresh_token,
     );
 
     if (!tokenMatches) {
       throw new UnauthorizedException(
-        SYS_MSG.AUTH_MESSAGES.INVALID_REFRESH_TOKEN,
+        SYS_MSG.AUTH_INVALID_REFRESH_TOKEN,
       );
     }
 
@@ -130,13 +136,10 @@ export class AuthService {
   async logout(sessionId: string): Promise<void> {
     if (!sessionId) return;
 
-    await this.userSessionRepository.update(
-      { id: sessionId },
-      {
-        isRevoked: true,
-        revokedAt: new Date(),
-      },
-    );
+    await this.userSessionAction.updateById(sessionId, {
+      is_revoked: true,
+      revoked_at: new Date(),
+    });
   }
 
   async getProfile(userId: string): Promise<User> {
@@ -180,7 +183,6 @@ export class AuthService {
     const safeUser = { ...user } as SafeUser & Partial<User>;
     delete safeUser.password_hash;
     delete safeUser.deletedAt;
-    delete safeUser.deleted_at;
     delete safeUser.auth_metadata;
     delete safeUser.roles;
     delete safeUser.sessions;
@@ -212,7 +214,9 @@ export class AuthService {
     refreshToken: string,
   ): Promise<void> {
     const hash = await bcrypt.hash(refreshToken, 10);
-    await this.userSessionRepository.update({ id: sessionId }, { refreshToken: hash });
+    await this.userSessionAction.updateById(sessionId, {
+      refresh_token: hash,
+    });
   }
 
   private async persistRedisRegistrationSession(
@@ -233,7 +237,7 @@ export class AuthService {
     sessionId?: string,
   ): Promise<void> {
     if (sessionId) {
-      await this.userSessionRepository.delete({ id: sessionId });
+      await this.userSessionAction.deleteById(sessionId);
     }
 
     await this.usersService.remove(userId);
@@ -258,14 +262,12 @@ export class AuthService {
 
     expiresAt.setTime(expiresAt.getTime() + refreshExpiresInMs);
 
-    const session = this.userSessionRepository.create({
-      userId,
-      refreshToken: refreshTokenHash,
-      expiresAt,
-      isRevoked: false,
+    const savedSession = await this.userSessionAction.createSession({
+      user_id: userId,
+      refresh_token: refreshTokenHash,
+      expires_at: expiresAt,
+      is_revoked: false,
     });
-
-    const savedSession = await this.userSessionRepository.save(session);
     return savedSession.id;
   }
 }

@@ -2,13 +2,19 @@ import {
   Body,
   Controller,
   Get,
-  HttpCode,
   HttpStatus,
+  HttpCode,
   Post,
   Res,
 } from '@nestjs/common';
-import type { Response } from 'express';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { CookieOptions, Response } from 'express';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiCreatedResponse,
+  ApiOkResponse,
+} from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../constants/system.messages';
 import { Public } from '../../common/decorators/public.decorator';
@@ -20,83 +26,141 @@ import { RegisterDto } from './dto/register.dto';
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
+  private static readonly REDIRECT_URL = '/dashboard';
+
   constructor(private readonly authService: AuthService) {}
+
+  private getRefreshCookieOptions(): CookieOptions {
+    return {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    };
+  }
+
+  private buildAuthResponse(
+    statusCode: HttpStatus,
+    message: string,
+    result: Awaited<ReturnType<AuthService['register']>>,
+  ) {
+    return {
+      statusCode,
+      message,
+      data: {
+        accessToken: result.accessToken,
+        user: result.user,
+        redirectUrl: AuthController.REDIRECT_URL,
+      },
+    };
+  }
 
   @Public()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register a new user' })
+  @ApiCreatedResponse({
+    description: 'User registered and logged in',
+    schema: {
+      example: {
+        statusCode: 201,
+        message: 'User Created Successfully',
+        data: {
+          accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+          user: {
+            id: 'uuid',
+            email: 'user@example.com',
+            full_name: 'Jane Doe',
+          },
+          redirectUrl: '/dashboard',
+        },
+      },
+    },
+  })
   async register(@Body() dto: RegisterDto, @Res() res: Response) {
     const result = await this.authService.register(dto);
 
-    // Set refresh token as HttpOnly cookie
-    res.cookie('refreshToken', result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+    res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
 
-    return res.json({
-      statusCode: HttpStatus.CREATED,
-      message: SYS_MSG.USER_CREATED_SUCCESSFULLY,
-      data: {
-        accessToken: result.accessToken,
-        user: result.user,
-        redirectUrl: '/dashboard',
-      },
-    });
+    return res.json(
+      this.buildAuthResponse(
+        HttpStatus.CREATED,
+        SYS_MSG.USER_CREATED_SUCCESSFULLY,
+        result,
+      ),
+    );
   }
 
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Log in with email and password' })
+  @ApiOkResponse({
+    description: 'Login successful',
+    schema: {
+      example: {
+        statusCode: 200,
+        message: 'Login successful',
+        data: {
+          accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+          user: {
+            id: 'uuid',
+            email: 'user@example.com',
+            full_name: 'Jane Doe',
+          },
+          redirectUrl: '/dashboard',
+        },
+      },
+    },
+  })
   async login(@Body() dto: LoginDto, @Res() res: Response) {
     const result = await this.authService.login(dto);
 
-    // Set refresh token as HttpOnly cookie
-    res.cookie('refreshToken', result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+    res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
 
-    return res.json({
-      statusCode: HttpStatus.OK,
-      message: SYS_MSG.AUTH_MESSAGES.LOGIN_SUCCESSFUL,
-      data: {
-        accessToken: result.accessToken,
-        user: result.user,
-        redirectUrl: '/dashboard',
-      },
-    });
+    return res.json(
+      this.buildAuthResponse(
+        HttpStatus.OK,
+        SYS_MSG.AUTH_LOGIN_SUCCESSFUL,
+        result,
+      ),
+    );
   }
 
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Issue a new access token from a refresh token' })
+  @ApiOkResponse({
+    description: 'Refresh token exchanged for new access token',
+    schema: {
+      example: {
+        statusCode: 200,
+        message: 'Token refreshed successfully',
+        data: {
+          accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+          user: {
+            id: 'uuid',
+            email: 'user@example.com',
+            full_name: 'Jane Doe',
+          },
+          redirectUrl: '/dashboard',
+        },
+      },
+    },
+  })
   async refresh(@Body() dto: RefreshTokenDto, @Res() res: Response) {
     const result = await this.authService.refresh(dto);
 
-    res.cookie('refreshToken', result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
 
-    return res.json({
-      statusCode: HttpStatus.OK,
-      message: SYS_MSG.AUTH_MESSAGES.TOKEN_REFRESHED,
-      data: {
-        accessToken: result.accessToken,
-        user: result.user,
-        redirectUrl: '/dashboard',
-      },
-    });
+    return res.json(
+      this.buildAuthResponse(
+        HttpStatus.OK,
+        SYS_MSG.AUTH_TOKEN_REFRESHED,
+        result,
+      ),
+    );
   }
 
   @ApiBearerAuth()
