@@ -13,6 +13,10 @@ export const AUTH_INVALID_CREDENTIALS = 'Invalid email or password';
 export const AUTH_INVALID_REFRESH_TOKEN = 'Invalid or expired refresh token';
 export const AUTH_UNAUTHENTICATED_MESSAGE = 'Unauthenticated';
 export const AUTH_TERMS_REQUIRED = 'You must accept the terms and conditions to register';
+export const AUTH_ACCOUNT_LOCKED =
+  'Account locked due to too many failed login attempts. Try again later.';
+export const AUTH_TOO_MANY_FAILED_ATTEMPTS =
+  'Too many failed login attempts. Your account has been locked for 1 hour.';
 
 // User messages
 export const USER_EMAIL_IN_USE = 'Email already in use';
