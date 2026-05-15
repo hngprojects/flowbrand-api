@@ -18,6 +18,14 @@ export const USER_EMAIL_IN_USE = 'Email already in use';
 export const USER_NOT_FOUND = (id: string) => `User ${id} not found`;
 export const USER_UPDATE_FAILED = 'Failed to update user';
 
+// Error handling
+export const VALIDATION_FAILED = 'Validation failed';
+export const UPLOAD_FAILED = 'File upload failed';
+export const UPLOAD_FILE_TOO_LARGE = 'Uploaded file is too large';
+export const UPLOAD_INVALID_FILE = 'Uploaded file type is not allowed';
+export const UPLOAD_TOO_MANY_FILES = 'Too many files uploaded';
+export const AI_GENERATION_FAILED = 'AI generation failed';
+
 // Health
 export const HEALTH_OK = 'ok';
 

@@ -7,6 +7,19 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { env } from './config/env';
 
+const bootstrapLogger = new Logger('Bootstrap');
+
+process.on('unhandledRejection', (reason) => {
+  bootstrapLogger.error(
+    'Unhandled promise rejection',
+    reason instanceof Error ? reason.stack : String(reason),
+  );
+});
+
+process.on('uncaughtException', (error) => {
+  bootstrapLogger.error('Uncaught exception', error.stack);
+});
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
@@ -42,10 +55,9 @@ async function bootstrap() {
 
   await app.listen(env.PORT);
 
-  const logger = new Logger('Bootstrap');
-  logger.log(`Application running on http://localhost:${env.PORT}`);
+  bootstrapLogger.log(`Application running on http://localhost:${env.PORT}`);
   if (env.SWAGGER_ENABLED) {
-    logger.log(`Swagger docs at http://localhost:${env.PORT}/docs`);
+    bootstrapLogger.log(`Swagger docs at http://localhost:${env.PORT}/docs`);
   }
 }
 
