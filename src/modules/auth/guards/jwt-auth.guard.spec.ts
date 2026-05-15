@@ -17,7 +17,7 @@ const mockRedisService = { get: jest.fn() };
 const mockUserService = { findById: jest.fn() };
 
 const VALID_PAYLOAD = { sub: 'user-123', sessionId: 'sess-abc' };
-const ACTIVE_USER = { id: 'user-123', deletedAt: null, is_active: true };
+const ACTIVE_USER = { id: 'user-123', deleted_at: null, is_active: true };
 const SESSION_DATA = JSON.stringify({ ip: '127.0.0.1', ua: 'jest' });
 
 function buildContext(authHeader?: string): {
@@ -218,7 +218,7 @@ describe('AuthGuard', () => {
     it('throws 401 when user is soft-deleted (deletedAt is set)', async () => {
       mockUserService.findById.mockResolvedValue({
         ...ACTIVE_USER,
-        deletedAt: new Date('2024-01-01'),
+        deleted_at: new Date('2024-01-01'),
       });
       const { ctx } = buildContext(bearerHeader('valid.token'));
 
@@ -242,7 +242,7 @@ describe('AuthGuard', () => {
     it('throws 401 when user is both soft-deleted and inactive', async () => {
       mockUserService.findById.mockResolvedValue({
         ...ACTIVE_USER,
-        deletedAt: new Date(),
+        deleted_at: new Date(),
         is_active: false,
       });
       const { ctx } = buildContext(bearerHeader('valid.token'));

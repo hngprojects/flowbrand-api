@@ -87,7 +87,7 @@ export class AuthGuard implements CanActivate {
     }
 
     const user = await this.userService.findById(userId).catch(() => null);
-    if (!user || user.deletedAt !== null || !user.is_active) {
+    if (!user || user.deleted_at !== null || !user.is_active) {
       throw new UnauthorizedException(
         SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE,
       );
