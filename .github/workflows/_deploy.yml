@@ -64,44 +64,59 @@ jobs:
               -o StrictHostKeyChecking=yes \
               ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
               "mkdir -p ${{ env.REMOTE_TMP }}"
+
           scp -i ~/.ssh/deploy_key \
               -o StrictHostKeyChecking=yes \
               ${{ inputs.tarball }} \
               ${{ secrets.USERNAME }}@${{ secrets.HOST }}:${{ env.REMOTE_TMP }}/
 
       - name: Deploy on server
-        env:
-          DEPLOY_DIR: ${{ env.DEPLOY_DIR }}
-          PM2_ENV: ${{ env.PM2_ENV }}
-          REMOTE_TMP: ${{ env.REMOTE_TMP }}
-          TARBALL: ${{ env.TARBALL }}
-          ENVIRONMENT: ${{ inputs.environment }}
         run: |
           ssh -i ~/.ssh/deploy_key \
               -o StrictHostKeyChecking=yes \
               ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-              DEPLOY_DIR="$DEPLOY_DIR" \
-              PM2_ENV="$PM2_ENV" \
-              REMOTE_TMP="$REMOTE_TMP" \
-              TARBALL="$TARBALL" \
-              ENVIRONMENT="$ENVIRONMENT" \
-              bash << 'EOF'
+              bash -s -- \
+                "${{ env.DEPLOY_DIR }}" \
+                "${{ env.PM2_ENV }}" \
+                "${{ env.REMOTE_TMP }}" \
+                "${{ env.TARBALL }}" \
+                "${{ inputs.environment }}" \
+              << 'EOF'
           set -euo pipefail
+          DEPLOY_DIR="$1"
+          PM2_ENV="$2"
+          REMOTE_TMP="$3"
+          TARBALL="$4"
+          ENVIRONMENT="$5"
+
           echo "================================================================="
           echo "  Environment   : ${ENVIRONMENT}"
           echo "  Deploy dir    : ${DEPLOY_DIR}"
           echo "  PM2 env       : ${PM2_ENV}"
           echo "================================================================="
+
+          echo "==================== Navigate to deploy dir ====================="
           cd "${DEPLOY_DIR}"
+
+          echo "==================== Extract tarball ============================"
           tar --overwrite --no-same-permissions --touch -xzf "${REMOTE_TMP}/${TARBALL}" -C .
           rm -f "${REMOTE_TMP}/${TARBALL}"
+
+          echo "==================== Move Runtime files out of dist ============="
           mv dist/{package.json,*-ecosystem-config.json,deployment.sh} .
+
+          echo "==================== Link environment file ======================"
           if [[ ! -f ".env" ]]; then
               echo "ERROR: .env not found at ${DEPLOY_DIR}/.env"
               exit 1
           fi
           ln -sf "${DEPLOY_DIR}/.env" dist/.env
+
+          echo "==================== Run deployment script ======================"
           chmod +x deployment.sh
           ./deployment.sh "${PM2_ENV}"
-          echo "Deploy Complete (${ENVIRONMENT})"
+
+          echo "================================================================="
+          echo "  Deploy Complete (${ENVIRONMENT})"
+          echo "================================================================="
           EOF
