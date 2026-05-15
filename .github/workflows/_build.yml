@@ -36,6 +36,7 @@ on:
       artifact_name:
         description: 'Github Actions artifact name that holds the tarball'
         value: ${{ jobs.build.outputs.artifact_name }}
+
 env:
   TARBALL: nestjs-${{ inputs.environment }}.tar.gz
   ECOSYSTEM_CONFIG: ${{ inputs.environment == 'production' && 'main' || inputs.environment }}-ecosystem-config.json
@@ -62,7 +63,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node_version || '22' }}
-          cache: pnpm
+          # cache: pnpm removed
 
       - name: Approve known build scripts
         run: |
@@ -72,7 +73,7 @@ jobs:
           pnpm approve-builds @scarf/scarf
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --no-frozen-lockfile
 
       - name: Build application
         run: pnpm run build
@@ -81,7 +82,7 @@ jobs:
         run: cp package.json deployment.sh ${{ env.ECOSYSTEM_CONFIG }} dist/
 
       - name: Create tarball
-        run: tar -czf ${{ env.TARBALL }} dist/
+        run: tar --no-same-permissions -czf ${{ env.TARBALL }} dist/
 
       - name: Expose metadata to downstream jobs
         id: meta

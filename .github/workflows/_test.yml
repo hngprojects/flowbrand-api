@@ -34,7 +34,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node_version || '22' }}
-          cache: pnpm
+          # cache: pnpm removed
 
       - name: Approve known build scripts
         run: |
@@ -44,7 +44,7 @@ jobs:
           pnpm approve-builds @scarf/scarf
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --no-frozen-lockfile
 
       - name: Run Tests
         run: pnpm run test --passWithNoTests

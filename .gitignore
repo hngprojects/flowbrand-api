@@ -1,5 +1,6 @@
 # Devops
 IGNORE
+pnpm-lock.yaml
 
 # compiled output
 /dist

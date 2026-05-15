@@ -1,4 +1,5 @@
 name: _lint
+
 on:
   workflow_call:
     inputs:
@@ -14,6 +15,7 @@ on:
         required: false
         type: string
         default: '22'
+
 jobs:
   lint:
     name: Lint
@@ -31,10 +33,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node_version || '22' }}
-          cache: pnpm
+          # cache: pnpm removed
 
       - name: Install dependencies
-        run: pnpm install --include=dev --ignore-scripts
+        run: pnpm install --no-frozen-lockfile --include=dev --ignore-scripts
         env:
           PNPM_FETCH_RETRIES: 3
           PNPM_FETCH_RETRY_MINTIMEOUT: 10000

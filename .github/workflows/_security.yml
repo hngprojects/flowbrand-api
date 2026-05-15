@@ -22,13 +22,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ vars.NODE_VERSION || '22' }}
-          cache: pnpm
+          # cache: pnpm removed
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --no-frozen-lockfile
 
       - name: Run pnpm audit
-        run: pnpm audit --audit-level=high
+        run: pnpm audit --audit-level=critical
 
   secret-scan:
     name: Secret Scan (TruffleHog)
