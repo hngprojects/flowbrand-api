@@ -44,7 +44,7 @@ jobs:
       #     pnpm approve-builds @scarf/scarf
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Run Tests
         run: pnpm run test --passWithNoTests
