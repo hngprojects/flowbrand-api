@@ -1,0 +1,98 @@
+name: _build
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options: [dev, staging, production]
+
+      node_version:
+        description: 'Node.js version to use'
+        required: false
+        type: string
+        default: '22'
+
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Target environment - controls which ecosystem config is bundled (dev | staging | production)'
+        required: true
+        type: string
+
+      node_version:
+        description: 'Node.js version to use'
+        required: false
+        type: string
+        default: '22'
+
+    outputs:
+      tarball:
+        description: 'Tarball filename produced by this job'
+        value: ${{ jobs.build.outputs.tarball }}
+
+      artifact_name:
+        description: 'Github Actions artifact name that holds the tarball'
+        value: ${{ jobs.build.outputs.artifact_name }}
+
+env:
+  TARBALL: nestjs-${{ inputs.environment }}.tar.gz
+  ECOSYSTEM_CONFIG: ${{ inputs.environment == 'production' && 'main' || inputs.environment }}-ecosystem-config.json
+  ARTIFACT_NAME: build-${{ inputs.environment }}
+
+jobs:
+  build:
+    name: Build (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    outputs:
+      tarball: ${{ steps.meta.outputs.tarball }}
+      artifact_name: ${{ steps.meta.outputs.artifact_name }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version || '22' }}
+          # cache: pnpm removed
+
+      - name: Approve known build scripts
+        run: |
+          pnpm approve-builds @nestjs/core
+          pnpm approve-builds bcrypt
+          pnpm approve-builds unrs-resolver
+          pnpm approve-builds @scarf/scarf
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build application
+        run: pnpm run build
+
+      - name: Bundle runtime files into dist
+        run: cp package.json deployment.sh ${{ env.ECOSYSTEM_CONFIG }} dist/
+
+      - name: Create tarball
+        run: tar --no-same-permissions -czf ${{ env.TARBALL }} dist/
+
+      - name: Expose metadata to downstream jobs
+        id: meta
+        run: |
+          echo "tarball=${{ env.TARBALL }}" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=${{ env.ARTIFACT_NAME }}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ env.TARBALL }}
+          retention-days: 1
