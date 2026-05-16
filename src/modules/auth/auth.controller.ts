@@ -77,10 +77,11 @@ export class AuthController {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
+    const { refreshToken: _refreshToken, ...safeResult } = result;
     return res.json({
       statusCode: HttpStatus.OK,
       message: SYS_MSG.AUTH_TOKEN_REFRESHED,
-      data: result,
+      data: safeResult,
     });
   }
 
@@ -138,7 +139,7 @@ export class AuthController {
         sameSite: 'strict',
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
-      const redirectUrl = `${base}/dashboard?access_token=${encodeURIComponent(result.access_token)}`;
+      const redirectUrl = `${base}/dashboard#access_token=${encodeURIComponent(result.access_token)}`;
       res.redirect(HttpStatus.FOUND, redirectUrl);
     } catch {
       res.redirect(

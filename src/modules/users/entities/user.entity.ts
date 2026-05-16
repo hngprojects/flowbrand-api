@@ -50,15 +50,15 @@ export class User extends BaseEntity {
   provider_user_id: string | null;
 
   @ApiProperty({ enum: AuthProvider, default: AuthProvider.EMAIL })
-  @Column({ type: 'enum', enum: AuthProvider, default: AuthProvider.EMAIL })
+  @Column({ name: 'auth_provider', type: 'enum', enum: AuthProvider, default: AuthProvider.EMAIL })
   authProvider: AuthProvider;
 
   @ApiProperty({ required: false, nullable: true })
-  @Column({ type: 'varchar', length: 255, nullable: true })
+  @Column({ name: 'provider_user_id', type: 'varchar', length: 255, nullable: true })
   providerUserId: string | null;
 
   @ApiProperty({ required: false, nullable: true })
-  @Column({ type: 'varchar', length: 2048, nullable: true })
+  @Column({ name: 'avatar_url', type: 'varchar', length: 2048, nullable: true })
   avatarUrl: string | null;
 
   @Exclude()

@@ -123,6 +123,11 @@ export class UsersService {
         avatar_url: payload.avatar_url,
         is_verified: true,
         termsAccepted: true,
+        roles: [
+          {
+            role: UserRole.USER,
+          },
+        ],
       },
     });
   }

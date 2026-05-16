@@ -23,7 +23,6 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       secret: env.JWT_ACCESS_SECRET,
       signOptions: { expiresIn: env.JWT_ACCESS_EXPIRES_IN as StringValue },
     }),
-    RedisModule,
     UsersModule,
     RedisModule,
   ],

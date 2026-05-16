@@ -86,7 +86,7 @@ export const RefreshDocs = () =>
     ApiOperation({
       summary: 'Rotate the refresh token for a new access token',
       description:
-        'Reads the refresh token from the request body, or falls back to the HttpOnly `refreshToken` cookie set on login when the body field is omitted. Validates the token, rotates it in place on the
+        'Reads the refresh token from the request body, or falls back to the HttpOnly `refreshToken` cookie set on login when omitted. Validates and rotates the token in place.',
     }),
     ApiOkResponse({
       description: 'Refresh token rotated and new access token issued',
@@ -117,7 +117,7 @@ export const LogoutDocs = () =>
     ApiOperation({
       summary: 'Revoke the current session',
       description:
-        'Sets `is_revoked = true` on the active `user_sessions` row and deletes the matching `sess:{userId}:{sessionId}` key in Redis, so neither the refresh token nor the still-unexpired access token
+         'Sets `is_revoked = true` on the active `user_sessions` row and deletes the matching `sess:{userId}:{sessionId}` key in Redis, invalidating the active session.',
     }),
   );
 
