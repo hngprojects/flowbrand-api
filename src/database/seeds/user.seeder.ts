@@ -21,6 +21,7 @@ export const userSeeder: Seeder = {
       email: adminEmail,
       password_hash: await bcrypt.hash('Admin@123456', 10),
       full_name: 'Admin User',
+      termsAccepted: true,
     });
     const savedAdmin = await repository.save(admin);
 

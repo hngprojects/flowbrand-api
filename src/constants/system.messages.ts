@@ -26,6 +26,11 @@ export const USER_EMAIL_IN_USE = 'Email already in use';
 export const USER_NOT_FOUND = (id: string) => `User ${id} not found`;
 export const USER_UPDATE_FAILED = 'Failed to update user';
 
+// Onboarding — API response `message` values (machine-oriented identifiers)
+export const ONBOARDING_SESSION_STARTED = 'ONBOARDING_SESSION_STARTED';
+export const ONBOARDING_SESSION_RESUMED = 'ONBOARDING_SESSION_RESUMED';
+export const ONBOARDING_ALREADY_COMPLETE = 'ONBOARDING_ALREADY_COMPLETE';
+
 // Error handling
 export const VALIDATION_FAILED = 'Validation failed';
 export const UPLOAD_FAILED = 'File upload failed';
