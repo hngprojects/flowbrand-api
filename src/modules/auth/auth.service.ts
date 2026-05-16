@@ -4,6 +4,7 @@ import {
   Injectable,
   UnauthorizedException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UserSessionModelAction } from '../users/actions/user-session.action';
@@ -21,13 +22,37 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtPayload } from './strategies/jwt.strategy';
 
+export interface GoogleOAuthProfile {
+  provider: 'google';
+  providerId: string;
+  email: string;
+  full_name: string;
+  avatar_url: string | null;
+}
+
+export interface OAuthLoginResponse {
+  status_code: number;
+  message: string;
+  access_token: string;
+  refresh_token: string;
+  data: {
+    user: {
+      id: string;
+      full_name: string;
+      email: string;
+      avatar_url: string | null;
+    };
+  };
+}
+
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
 }
 
 const REDIS_SESSION_TTL_SECONDS = 15 * 60;
-const REDIS_SESSION_KEY_PREFIX = 'sess';
+const ACTIVE_SESSION_KEY_PREFIX = 'active_session';
+const LEGACY_SESSION_KEY_PREFIX = 'sess';
 const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 const ACCOUNT_LOCK_DURATION_MS = 60 * 60 * 1000;
 
@@ -114,6 +139,78 @@ export class AuthService {
     return this.issueTokens(user);
   }
 
+  async handleOAuthLogin(profile: GoogleOAuthProfile): Promise<OAuthLoginResponse> {
+    const email = profile.email.trim().toLowerCase();
+    const existingUser = await this.usersService.findByEmail(email);
+
+    let user: User;
+
+    if (existingUser) {
+      if (
+        existingUser.auth_provider === 'google' &&
+        existingUser.provider_user_id &&
+        existingUser.provider_user_id !== profile.providerId
+      ) {
+        throw new ConflictException(SYS_MSG.GOOGLE_ACCOUNT_LINK_CONFLICT);
+      }
+
+      user = await this.usersService.updateGoogleAccount(existingUser.id, {
+        fullName: profile.full_name || existingUser.full_name,
+        providerUserId: profile.providerId,
+        avatarUrl: profile.avatar_url,
+      });
+    } else {
+      try {
+        user = await this.usersService.createGoogleAccount({
+          email,
+          fullName: profile.full_name || email,
+          providerUserId: profile.providerId,
+          avatarUrl: profile.avatar_url,
+        });
+      } catch (error) {
+        if (this.isUniqueEmailConflict(error)) {
+          const concurrentUser = await this.usersService.findByEmail(email);
+          if (!concurrentUser) {
+            throw error;
+          }
+
+          if (
+            concurrentUser.auth_provider === 'google' &&
+            concurrentUser.provider_user_id &&
+            concurrentUser.provider_user_id !== profile.providerId
+          ) {
+            throw new ConflictException(SYS_MSG.GOOGLE_ACCOUNT_LINK_CONFLICT);
+          }
+
+          user = await this.usersService.updateGoogleAccount(concurrentUser.id, {
+            fullName: profile.full_name || concurrentUser.full_name,
+            providerUserId: profile.providerId,
+            avatarUrl: profile.avatar_url,
+          });
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    const tokens = await this.issueTokens(user);
+
+    return {
+      status_code: HttpStatus.OK,
+      message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
+      access_token: tokens.accessToken,
+      refresh_token: tokens.refreshToken,
+      data: {
+        user: {
+          id: tokens.user.id,
+          full_name: tokens.user.full_name,
+          email: tokens.user.email,
+          avatar_url: tokens.user.avatar_url,
+        },
+      },
+    };
+  }
+
   async refresh(refreshToken: string): Promise<AuthResponse> {
     let payload: JwtPayload;
 
@@ -155,13 +252,15 @@ export class AuthService {
   async logout(userId: string, sessionId: string): Promise<void> {
     if (!sessionId) return;
 
-    const redisKey = `${REDIS_SESSION_KEY_PREFIX}:${userId}:${sessionId}`;
+    const redisKey = `${ACTIVE_SESSION_KEY_PREFIX}:${userId}:${sessionId}`;
+    const legacyRedisKey = `${LEGACY_SESSION_KEY_PREFIX}:${userId}:${sessionId}`;
     await Promise.all([
       this.userSessionAction.updateById(sessionId, {
         is_revoked: true,
         revoked_at: new Date(),
       }),
       this.redisService.del(redisKey),
+      this.redisService.del(legacyRedisKey),
     ]);
   }
 
@@ -244,13 +343,21 @@ export class AuthService {
     userId: string,
     sessionId: string,
   ): Promise<void> {
-    const redisKey = `${REDIS_SESSION_KEY_PREFIX}:${userId}:${sessionId}`;
+    const redisKey = `${ACTIVE_SESSION_KEY_PREFIX}:${userId}:${sessionId}`;
+    const legacyRedisKey = `${LEGACY_SESSION_KEY_PREFIX}:${userId}:${sessionId}`;
     const redisValue = JSON.stringify({ userId, sessionId });
-    await this.redisService.setStrict(
-      redisKey,
-      redisValue,
-      REDIS_SESSION_TTL_SECONDS,
-    );
+    await Promise.all([
+      this.redisService.setStrict(
+        redisKey,
+        redisValue,
+        REDIS_SESSION_TTL_SECONDS,
+      ),
+      this.redisService.setStrict(
+        legacyRedisKey,
+        redisValue,
+        REDIS_SESSION_TTL_SECONDS,
+      ),
+    ]);
   }
 
   private async rollbackRegistration(
@@ -341,5 +448,14 @@ export class AuthService {
       is_revoked: false,
     });
     return savedSession.id;
+  }
+
+  private isUniqueEmailConflict(error: unknown): boolean {
+    return Boolean(
+      error &&
+      typeof error === 'object' &&
+      'driverError' in error &&
+      (error as { driverError?: { code?: string } }).driverError?.code === '23505',
+    );
   }
 }

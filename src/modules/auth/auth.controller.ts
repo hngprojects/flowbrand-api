@@ -8,22 +8,33 @@ import {
   Req,
   Res,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import type { CookieOptions, Request, Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../constants/system.messages';
 import { Public } from '../../common/decorators/public.decorator';
-import { AuthService } from './auth.service';
+import { AuthService, GoogleOAuthProfile } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
-import { LoginDocs, LogoutDocs, MeDocs, RefreshDocs, RegisterDocs } from './docs/auth-swagger.doc';
+import {
+  GoogleAuthDocs,
+  GoogleCallbackDocs,
+  LoginDocs,
+  LogoutDocs,
+  MeDocs,
+  RefreshDocs,
+  RegisterDocs,
+} from './docs/auth-swagger.doc';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   private static readonly REDIRECT_URL = '/dashboard';
+  private static readonly OAUTH_REDIRECT_URL = '/onboarding';
 
   constructor(private readonly authService: AuthService) {}
 
@@ -50,6 +61,10 @@ export class AuthController {
         redirectUrl: AuthController.REDIRECT_URL,
       },
     };
+  }
+
+  private getFrontendBaseUrl(): string {
+    return (process.env.FRONTEND_URL ?? 'http://localhost:3000').replace(/\/$/, '');
   }
 
   @Public()
@@ -140,5 +155,34 @@ export class AuthController {
   @MeDocs()
   me(@CurrentUser('sub') userId: string) {
     return this.authService.getProfile(userId);
+  }
+
+  @Public()
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  @GoogleAuthDocs()
+  googleAuth(): void {
+    // Passport redirects the request to Google.
+  }
+
+  @Public()
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  @GoogleCallbackDocs()
+  async googleAuthRedirect(
+    @Req() req: Request & { user?: GoogleOAuthProfile },
+    @Res() res: Response,
+  ): Promise<void> {
+    const payload = req.user;
+
+    if (!payload) {
+      throw new UnauthorizedException(SYS_MSG.GOOGLE_OAUTH_FAILED);
+    }
+
+    const result = await this.authService.handleOAuthLogin(payload);
+    res.cookie('refreshToken', result.refresh_token, this.getRefreshCookieOptions());
+
+    const redirectUrl = `${this.getFrontendBaseUrl()}${AuthController.OAUTH_REDIRECT_URL}?access_token=${encodeURIComponent(result.access_token)}`;
+    res.redirect(HttpStatus.FOUND, redirectUrl);
   }
 }

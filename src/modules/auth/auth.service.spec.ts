@@ -11,12 +11,17 @@ import * as SYS_MSG from '../../constants/system.messages';
 
 jest.mock('bcrypt');
 
-const mockUsersService = { findByEmail: jest.fn(), findById: jest.fn() };
+const mockUsersService = {
+  findByEmail: jest.fn(),
+  findById: jest.fn(),
+  createGoogleAccount: jest.fn(),
+  updateGoogleAccount: jest.fn(),
+};
 const mockJwtService = {
   signAsync: jest.fn(),
   verifyAsync: jest.fn(),
 };
-const mockRedisService = { setStrict: jest.fn() };
+const mockRedisService = { setStrict: jest.fn(), del: jest.fn() };
 const mockUserSessionModelAction = {
   findById: jest.fn(),
   updateById: jest.fn(),
@@ -61,6 +66,8 @@ describe('AuthService login lockout (BE-005)', () => {
     mockUserSessionModelAction.createSession.mockResolvedValue({ id: 'sess-1' });
     mockUserSessionModelAction.updateById.mockResolvedValue(null);
     mockAuthMetadataModelAction.updateByUserId.mockResolvedValue(null);
+    mockRedisService.setStrict.mockResolvedValue(undefined);
+    mockRedisService.del.mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -257,6 +264,75 @@ describe('AuthService login lockout (BE-005)', () => {
 
       await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(
         UnauthorizedException,
+      );
+    });
+  });
+
+  describe('Google OAuth login', () => {
+    it('creates a new verified Google account and issues tokens', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(null);
+      mockUsersService.createGoogleAccount.mockResolvedValue({
+        id: 'google-user-1',
+        email: 'new.google@example.com',
+        full_name: 'Google User',
+        avatar_url: 'https://example.com/avatar.png',
+        is_verified: true,
+        auth_provider: 'google',
+        provider_user_id: 'google-123',
+        password_hash: null,
+        is_active: true,
+      });
+
+      const result = await service.handleOAuthLogin({
+        provider: 'google',
+        providerId: 'google-123',
+        email: 'new.google@example.com',
+        full_name: 'Google User',
+        avatar_url: 'https://example.com/avatar.png',
+      });
+
+      expect(mockUsersService.createGoogleAccount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'new.google@example.com',
+          providerUserId: 'google-123',
+        }),
+      );
+      expect(result).toMatchObject({
+        status_code: HttpStatus.OK,
+        message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
+        access_token: 'signed.jwt.token',
+        refresh_token: 'signed.jwt.token',
+      });
+    });
+
+    it('links an existing local account to the Google provider', async () => {
+      mockUsersService.findByEmail.mockResolvedValue({
+        ...TEST_USER,
+        auth_provider: 'local',
+        provider_user_id: null,
+        password_hash: TEST_USER.password_hash,
+      });
+      mockUsersService.updateGoogleAccount.mockResolvedValue({
+        ...TEST_USER,
+        auth_provider: 'google',
+        provider_user_id: 'google-456',
+        is_verified: true,
+      });
+
+      await service.handleOAuthLogin({
+        provider: 'google',
+        providerId: 'google-456',
+        email: TEST_USER.email,
+        full_name: TEST_USER.full_name,
+        avatar_url: null,
+      });
+
+      expect(mockUsersService.updateGoogleAccount).toHaveBeenCalledWith(
+        TEST_USER.id,
+        expect.objectContaining({
+          providerUserId: 'google-456',
+          fullName: TEST_USER.full_name,
+        }),
       );
     });
   });

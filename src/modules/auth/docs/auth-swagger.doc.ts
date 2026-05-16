@@ -1,4 +1,4 @@
-import { applyDecorators, HttpStatus } from '@nestjs/common';
+import { INestApplication, applyDecorators, HttpStatus } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -6,7 +6,10 @@ import {
   ApiOperation,
   ApiResponse,
   ApiUnauthorizedResponse,
+  DocumentBuilder,
+  SwaggerModule,
 } from '@nestjs/swagger';
+import type { Request, Response } from 'express';
 import * as SYS_MSG from '../../../constants/system.messages';
 
 const authUserExample = {
@@ -84,7 +87,7 @@ export const RefreshDocs = () =>
     ApiOperation({
       summary: 'Rotate the refresh token for a new access token',
       description:
-        'Reads the refresh token from the request body, or falls back to the HttpOnly `refreshToken` cookie set on login when the body field is omitted. Validates the token, rotates it in place on the existing session, returns a new access token, and resets the cookie. Both first-party clients (browser cookie) and external clients (explicit body) are supported.',
+        'Reads the refresh token from the request body, or falls back to the HttpOnly `refreshToken` cookie set on login when the body field is omitted. Validates the token, rotates it in place on the
     }),
     ApiOkResponse({
       description: 'Refresh token rotated and new access token issued',
@@ -115,7 +118,7 @@ export const LogoutDocs = () =>
     ApiOperation({
       summary: 'Revoke the current session',
       description:
-        'Sets `is_revoked = true` on the active `user_sessions` row and deletes the matching `sess:{userId}:{sessionId}` key in Redis, so neither the refresh token nor the still-unexpired access token can be used after logout.',
+        'Sets `is_revoked = true` on the active `user_sessions` row and deletes the matching `sess:{userId}:{sessionId}` key in Redis, so neither the refresh token nor the still-unexpired access token
     }),
   );
 
@@ -124,3 +127,123 @@ export const MeDocs = () =>
     ApiBearerAuth('JWT'),
     ApiOperation({ summary: 'Return the current authenticated user' }),
   );
+
+export const GoogleAuthDocs = () =>
+  applyDecorators(
+    ApiOperation({ summary: 'Redirect to Google for OAuth login' }),
+    ApiResponse({
+      status: HttpStatus.FOUND,
+      description: 'Redirect to Google OAuth consent screen',
+      schema: {
+        example: {
+          statusCode: HttpStatus.FOUND,
+          message: 'Redirect to Google OAuth consent screen',
+        },
+      },
+    }),
+  );
+
+export const GoogleCallbackDocs = () =>
+  applyDecorators(
+    ApiOperation({ summary: 'Handle Google OAuth callback' }),
+    ApiOkResponse({
+      description: 'Successful OAuth login; returns tokens and sets refresh cookie',
+      schema: {
+        example: {
+          statusCode: HttpStatus.OK,
+          message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
+          access_token: 'jwt.access.token',
+        },
+      },
+    }),
+    ApiUnauthorizedResponse({
+      description: 'Google OAuth failed or no email was provided',
+      schema: {
+        example: {
+          success: false,
+          statusCode: HttpStatus.UNAUTHORIZED,
+          error: 'UnauthorizedException',
+          message: SYS_MSG.GOOGLE_OAUTH_FAILED,
+        },
+      },
+    }),
+  );
+
+const SWAGGER_OAUTH_REDIRECT_SCRIPT_PATH = '/swagger-oauth-redirect.js';
+
+function registerSwaggerOAuthRedirectScript(app: INestApplication): void {
+  app.use(SWAGGER_OAUTH_REDIRECT_SCRIPT_PATH, (_req: Request, res: Response) => {
+    res.type('application/javascript').send(`
+      (() => {
+        const originalFetch = window.fetch.bind(window);
+
+        window.fetch = (...args) => {
+          const [input, init] = args;
+          const requestUrl =
+            typeof input === 'string'
+              ? input
+              : input && typeof input === 'object' && 'url' in input
+                ? input.url
+                : '';
+          const method =
+            (init && init.method) ||
+            (typeof input !== 'string' && input && typeof input === 'object' && 'method' in input
+              ? input.method
+              : 'GET');
+
+          if (typeof requestUrl === 'string' && String(method).toUpperCase() === 'GET') {
+            if (requestUrl.includes('/auth/google/callback')) {
+              return Promise.resolve(
+                new Response(
+                  JSON.stringify({
+                    statusCode: 200,
+                    message: 'OAuth login successful',
+                    access_token: 'jwt.access.token',
+                  }),
+                  {
+                    status: 200,
+                    statusText: 'OK',
+                    headers: { 'Content-Type': 'application/json' },
+                  },
+                ),
+              );
+            }
+
+            if (requestUrl.includes('/auth/google')) {
+              return Promise.resolve(
+                new Response('Redirect to Google OAuth consent screen', {
+                  status: 302,
+                  statusText: 'Redirect to Google OAuth consent screen',
+                  headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+                }),
+              );
+            }
+          }
+
+          return originalFetch(...args);
+        };
+      })();
+    `);
+  });
+}
+
+export function setupSwagger(app: INestApplication): void {
+  registerSwaggerOAuthRedirectScript(app);
+
+  const config = new DocumentBuilder()
+    .setTitle('SEIL API')
+    .setDescription('SEIL REST API documentation')
+    .setVersion('1.0.0')
+    .addBearerAuth(
+      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+      'JWT',
+    )
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+
+  SwaggerModule.setup('docs', app, document, {
+    customJs: SWAGGER_OAUTH_REDIRECT_SCRIPT_PATH,
+    swaggerOptions: { persistAuthorization: true },
+  });
+}

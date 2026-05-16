@@ -176,7 +176,7 @@ describe('AuthGuard', () => {
       );
     });
 
-    it('constructs the session key as sess:{userId}:{sessionId}', async () => {
+    it('constructs the session key as active_session:{userId}:{sessionId}', async () => {
       mockJwtService.verifyAsync.mockResolvedValue(VALID_PAYLOAD);
       mockRedisService.get.mockResolvedValue(null);
 
@@ -184,7 +184,7 @@ describe('AuthGuard', () => {
 
       await expect(guard.canActivate(ctx)).rejects.toThrow();
       expect(mockRedisService.get).toHaveBeenCalledWith(
-        `sess:${VALID_PAYLOAD.sub}:${VALID_PAYLOAD.sessionId}`,
+        `active_session:${VALID_PAYLOAD.sub}:${VALID_PAYLOAD.sessionId}`,
       );
     });
   });

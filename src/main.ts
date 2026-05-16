@@ -1,12 +1,12 @@
-import { Logger } from '@nestjs/common';
+import { Logger, RequestMethod } from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { ClassSerializerInterceptor } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { env } from './config/env';
+import { setupSwagger } from './modules/auth/docs/auth-swagger.doc';
 
 const bootstrapLogger = new Logger('Bootstrap');
 
@@ -33,24 +33,17 @@ async function bootstrap() {
     origin: env.CORS_ORIGIN === '*' ? true : env.CORS_ORIGIN.split(','),
     credentials: true,
   });
-  app.setGlobalPrefix('api', { exclude: ['health'] });
+  app.setGlobalPrefix('api', {
+    exclude: [
+      { path: 'health', method: RequestMethod.ALL },
+      { path: 'auth/(.*)', method: RequestMethod.ALL },
+    ],
+  });
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
   app.enableShutdownHooks();
 
   if (env.SWAGGER_ENABLED) {
-    const config = new DocumentBuilder()
-      .setTitle('SEIL API')
-      .setDescription('SEIL REST API documentation')
-      .setVersion('1.0.0')
-      .addBearerAuth(
-        { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-        'JWT',
-      )
-      .build();
-    const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('docs', app, document, {
-      swaggerOptions: { persistAuthorization: true },
-    });
+    setupSwagger(app);
   }
 
   await app.listen(env.PORT);

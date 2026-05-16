@@ -13,6 +13,7 @@ import { UserSession } from '../users/entities/user-session.entity';
 import { AuthMetadata } from './entities/auth-metadata.entity';
 import { AuthMetadataModelAction } from './actions/auth-metadata.action';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { GoogleStrategy } from './strategies/google.strategy';
 
 @Module({
   imports: [
@@ -26,7 +27,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     RedisModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, AuthMetadataModelAction],
+  providers: [AuthService, JwtStrategy, GoogleStrategy, AuthMetadataModelAction],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

@@ -23,6 +23,14 @@ export const USER_EMAIL_IN_USE = 'Email already in use';
 export const USER_NOT_FOUND = (id: string) => `User ${id} not found`;
 export const USER_UPDATE_FAILED = 'Failed to update user';
 
+// OAuth and external auth messages
+export const GOOGLE_ACCOUNT_NO_EMAIL = 'Google account has no email';
+export const GOOGLE_ACCOUNT_LINK_CONFLICT = 'Google account is linked to a different account';
+export const GOOGLE_OAUTH_FAILED = 'Google OAuth authentication failed';
+export const GOOGLE_OAUTH_CONFIGURATION_INVALID = 'Google OAuth configuration is missing';
+export const USER_OAUTH_CREATION_FAILED = 'Failed to create user account';
+export const OAUTH_LOGIN_SUCCESSFUL = 'OAuth login successful';
+
 // Onboarding — API response `message` values (machine-oriented identifiers)
 export const ONBOARDING_SESSION_STARTED = 'ONBOARDING_SESSION_STARTED';
 export const ONBOARDING_SESSION_RESUMED = 'ONBOARDING_SESSION_RESUMED';

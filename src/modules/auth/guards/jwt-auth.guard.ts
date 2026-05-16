@@ -76,8 +76,13 @@ export class AuthGuard implements CanActivate {
       );
     }
 
-    const sessionKey = `sess:${userId}:${sessionId}`;
-    const sessionData = await this.redisService.get(sessionKey);
+    const sessionKeys = [
+      `active_session:${userId}:${sessionId}`,
+      `sess:${userId}:${sessionId}`,
+    ];
+    const sessionData =
+      (await this.redisService.get(sessionKeys[0])) ??
+      (await this.redisService.get(sessionKeys[1]));
 
     if (!sessionData) {
       this.logger.warn('Session not found or Redis unreachable');
