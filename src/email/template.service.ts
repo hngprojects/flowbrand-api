@@ -19,6 +19,8 @@ export class TemplateService implements OnModuleInit {
     'otp-reset': 'Reset your SEIL account',
   };
 
+  private compiledSubjects: Record<EmailType, Handlebars.TemplateDelegate>;
+
   async onModuleInit(): Promise<void> {
     const templatesDir = path.join(__dirname, 'templates');
 
