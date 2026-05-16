@@ -1,9 +1,10 @@
 import {
+  BadRequestException,
+  ConflictException,
   HttpException,
   HttpStatus,
   Injectable,
   UnauthorizedException,
-  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UserSessionModelAction } from '../users/actions/user-session.action';
@@ -12,12 +13,12 @@ import * as bcrypt from 'bcrypt';
 import type { StringValue } from 'ms';
 import * as SYS_MSG from '../../constants/system.messages';
 import { env } from '../../config/env';
-import { User } from '../users/entities/user.entity';
-import type { UserSession } from '../users/entities/user-session.entity';
-import type { AuthMetadata } from './entities/auth-metadata.entity';
+import { AuthProvider, User } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
 import { RedisService } from '../redis/redis.service';
 import { LoginDto } from './dto/login.dto';
+import { GoogleOAuthProfile, OAuthLoginResponse } from './dto/google-oauth.dto';
+import type { AuthMetadata } from './entities/auth-metadata.entity';
 import { RegisterDto } from './dto/register.dto';
 import { JwtPayload } from './strategies/jwt.strategy';
 
@@ -33,17 +34,19 @@ const ACCOUNT_LOCK_DURATION_MS = 60 * 60 * 1000;
 
 type SafeUser = Omit<
   User,
-  | 'password_hash'
-  | 'deletedAt'
+  | 'password'
   | 'deleted_at'
   | 'auth_metadata'
   | 'sessions'
   | 'roles'
+  | 'otp_hash'
 >;
 
 export interface AuthResponse extends AuthTokens {
   user: SafeUser;
 }
+
+// ACTIVE_SESSION_PREFIX was previously used for Redis markers but is unused now
 
 @Injectable()
 export class AuthService {
@@ -51,19 +54,11 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
-    private readonly userSessionModelAction: UserSessionModelAction,
+    private readonly userSessionAction: UserSessionModelAction,
     private readonly authMetadataModelAction: AuthMetadataModelAction,
   ) {}
 
-  // Local minimal interface to avoid unsafe-call lint issues from third-party model action types
-  private get userSessionAction(): {
-    findById(id: string): Promise<UserSession | null>;
-    updateById(id: string, payload: Partial<UserSession>): Promise<UserSession | null>;
-    deleteById(id: string): Promise<void>;
-    createSession(payload: Partial<UserSession>): Promise<UserSession>;
-  } {
-    return this.userSessionModelAction;
-  }
+
 
   private get authMetadataAction(): {
     findByUserId(userId: string): Promise<AuthMetadata | null>;
@@ -93,7 +88,7 @@ export class AuthService {
   async login(dto: LoginDto): Promise<AuthResponse> {
     const user = await this.usersService.findByEmail(dto.email);
 
-    if (!user?.password_hash) {
+    if (!user?.password) {
       throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_CREDENTIALS);
     }
 
@@ -102,7 +97,7 @@ export class AuthService {
 
     const passwordMatches = await bcrypt.compare(
       dto.password,
-      user.password_hash,
+      user.password,
     );
 
     if (!passwordMatches) {
@@ -112,6 +107,58 @@ export class AuthService {
 
     await this.recordSuccessfulLogin(user.id);
     return this.issueTokens(user);
+  }
+
+  async handleOAuthLogin(profile: GoogleOAuthProfile): Promise<OAuthLoginResponse> {
+    const email = profile.email?.trim().toLowerCase();
+
+    if (!email) {
+      throw new UnauthorizedException(SYS_MSG.GOOGLE_ACCOUNT_NO_EMAIL);
+    }
+
+    const existingUser = await this.usersService.findByEmail(email);
+    let user: User;
+
+    if (existingUser) {
+      if (
+        existingUser.authProvider === AuthProvider.GOOGLE &&
+        existingUser.providerUserId &&
+        existingUser.providerUserId !== profile.providerId
+      ) {
+        throw new ConflictException(SYS_MSG.GOOGLE_ACCOUNT_LINK_CONFLICT);
+      }
+
+      user = await this.usersService.updateGoogleAccount(existingUser.id, {
+        full_name: profile.full_name || existingUser.full_name,
+        provider_user_id: profile.providerId,
+        avatar_url: profile.avatar_url,
+        is_verified: true,
+      });
+    } else {
+      user = await this.usersService.createGoogleAccount({
+        email,
+        full_name: profile.full_name || email,
+        provider_user_id: profile.providerId,
+        avatar_url: profile.avatar_url,
+      });
+    }
+
+    const auth = await this.issueTokens(user);
+
+    return {
+      status_code: 200,
+      message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
+      access_token: auth.accessToken,
+      refresh_token: auth.refreshToken,
+      data: {
+        user: {
+          id: auth.user.id,
+          full_name: auth.user.full_name,
+          email: auth.user.email,
+          avatar_url: auth.user.avatar_url,
+        },
+      },
+    };
   }
 
   async refresh(refreshToken: string): Promise<AuthResponse> {
@@ -202,7 +249,7 @@ export class AuthService {
 
   private sanitizeUser(user: User): SafeUser {
     const safeUser = { ...user } as SafeUser & Partial<User>;
-    delete safeUser.password_hash;
+    delete safeUser.password;
     delete safeUser.deleted_at;
     delete safeUser.auth_metadata;
     delete safeUser.roles;
@@ -227,6 +274,7 @@ export class AuthService {
         expiresIn: env.JWT_REFRESH_EXPIRES_IN as StringValue,
       }),
     ]);
+
     return { accessToken, refreshToken };
   }
 

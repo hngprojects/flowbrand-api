@@ -6,11 +6,17 @@ import {
   OneToMany,
   OneToOne,
 } from 'typeorm';
+import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
 import { BaseEntity } from '../../../common/entities/base.entity';
 import { UserRoleEntity } from './user-role.entity';
 import { AuthMetadata } from '../../auth/entities/auth-metadata.entity';
 import { UserSession } from './user-session.entity';
+
+export enum AuthProvider {
+  EMAIL = 'email',
+  GOOGLE = 'google',
+}
 
 @Entity('users')
 export class User extends BaseEntity {
@@ -22,8 +28,8 @@ export class User extends BaseEntity {
   email: string;
 
   @Exclude()
-  @Column({ type: 'text', nullable: true })
-  password_hash: string | null;
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  password: string | null;
 
   @Column({ type: 'varchar', length: 100, nullable: true })
   country: string | null;
@@ -42,6 +48,18 @@ export class User extends BaseEntity {
 
   @Column({ type: 'text', nullable: true })
   provider_user_id: string | null;
+
+  @ApiProperty({ enum: AuthProvider, default: AuthProvider.EMAIL })
+  @Column({ type: 'enum', enum: AuthProvider, default: AuthProvider.EMAIL })
+  authProvider: AuthProvider;
+
+  @ApiProperty({ required: false, nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  providerUserId: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  @Column({ type: 'varchar', length: 2048, nullable: true })
+  avatarUrl: string | null;
 
   @Exclude()
   @Column({ type: 'varchar', length: 255, nullable: true })

@@ -5,14 +5,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import * as SYS_MSG from '../../constants/system.messages';
 import { UserModelAction } from './actions/user.action';
 import { CreateUserDto } from './dto/create-user.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { User } from './entities/user.entity';
+import { AuthProvider, User } from './entities/user.entity';
 import { UserRole } from './enums/user-role.enum';
 import { QueryFailedError } from 'typeorm';
-import * as SYS_MSG from '../../constants/system.messages';
 
 const BCRYPT_ROUNDS = 10;
 const NO_TRANSACTION = {
@@ -39,7 +39,7 @@ export class UsersService {
         createPayload: {
           email: dto.email,
           termsAccepted: dto.termsAccepted ?? false,
-          password_hash: passwordHash,
+          password: passwordHash,
           full_name: dto.fullName,
           roles: [
             {
@@ -85,7 +85,7 @@ export class UsersService {
 
     const payload: Partial<User> = { ...dto };
     if (dto.password) {
-      payload.password_hash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+      payload.password = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
     }
 
     const updated = await this.userModelAction.update({
@@ -98,6 +98,57 @@ export class UsersService {
         SYS_MSG.USER_UPDATE_FAILED,
       );
     }
+    return updated;
+  }
+
+  async createGoogleAccount(payload: {
+    email: string;
+    full_name: string;
+    provider_user_id: string;
+    avatar_url: string | null;
+  }): Promise<User> {
+    const existing = await this.userModelAction.findByEmail(payload.email);
+    if (existing) {
+      throw new ConflictException(SYS_MSG.USER_EMAIL_IN_USE);
+    }
+
+    return this.userModelAction.create({
+      ...NO_TRANSACTION,
+      createPayload: {
+        email: payload.email,
+        password: null,
+        full_name: payload.full_name,
+        auth_provider: AuthProvider.GOOGLE,
+        provider_user_id: payload.provider_user_id,
+        avatar_url: payload.avatar_url,
+        is_verified: true,
+        termsAccepted: true,
+      },
+    });
+  }
+
+  async updateGoogleAccount(
+    id: string,
+    payload: {
+      full_name?: string;
+      provider_user_id?: string;
+      avatar_url?: string | null;
+      is_verified?: boolean;
+    },
+  ): Promise<User> {
+    const updated = await this.userModelAction.update({
+      ...NO_TRANSACTION,
+      identifierOptions: { id },
+      updatePayload: {
+        ...payload,
+        auth_provider: AuthProvider.GOOGLE,
+      },
+    });
+
+    if (!updated) {
+      throw new InternalServerErrorException(SYS_MSG.USER_UPDATE_FAILED);
+    }
+
     return updated;
   }
 

@@ -8,84 +8,48 @@ import {
   Req,
   Res,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
-import type { CookieOptions, Request, Response } from 'express';
-import { ApiTags } from '@nestjs/swagger';
+import { AuthGuard } from '@nestjs/passport';
+import type { Request, Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import * as SYS_MSG from '../../constants/system.messages';
 import { Public } from '../../common/decorators/public.decorator';
+import * as SYS_MSG from '../../constants/system.messages';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { GoogleOAuthProfile, OAuthLoginResponse } from './dto/google-oauth.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
-import { LoginDocs, LogoutDocs, MeDocs, RefreshDocs, RegisterDocs } from './docs/auth-swagger.doc';
+import {
+  GoogleAuthDocs,
+  GoogleCallbackDocs,
+  LoginDocs,
+  LogoutDocs,
+  MeDocs,
+  RefreshDocs,
+  RegisterDocs,
+} from './docs/auth-swagger.doc';
 
-@ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   private static readonly REDIRECT_URL = '/dashboard';
 
   constructor(private readonly authService: AuthService) {}
 
-  private getRefreshCookieOptions(): CookieOptions {
-    return {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    };
-  }
-
-  private buildAuthResponse(
-    statusCode: HttpStatus,
-    message: string,
-    result: Awaited<ReturnType<AuthService['register']>>,
-  ) {
-    return {
-      statusCode,
-      message,
-      data: {
-        accessToken: result.accessToken,
-        user: result.user,
-        redirectUrl: AuthController.REDIRECT_URL,
-      },
-    };
-  }
-
   @Public()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @RegisterDocs()
-  async register(@Body() dto: RegisterDto, @Res() res: Response) {
-    const result = await this.authService.register(dto);
-
-    res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
-
-    return res.json(
-      this.buildAuthResponse(
-        HttpStatus.CREATED,
-        SYS_MSG.USER_CREATED_SUCCESSFULLY,
-        result,
-      ),
-    );
+  register(@Body() dto: RegisterDto) {
+    return this.authService.register(dto);
   }
 
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @LoginDocs()
-  async login(@Body() dto: LoginDto, @Res() res: Response) {
-    const result = await this.authService.login(dto);
-
-    res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
-
-    return res.json(
-      this.buildAuthResponse(
-        HttpStatus.OK,
-        SYS_MSG.AUTH_LOGIN_SUCCESSFUL,
-        result,
-      ),
-    );
+  login(@Body() dto: LoginDto) {
+    return this.authService.login(dto);
   }
 
   @Public()
@@ -106,15 +70,18 @@ export class AuthController {
 
     const result = await this.authService.refresh(refreshToken);
 
-    res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
+    res.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
 
-    return res.json(
-      this.buildAuthResponse(
-        HttpStatus.OK,
-        SYS_MSG.AUTH_TOKEN_REFRESHED,
-        result,
-      ),
-    );
+    return res.json({
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.AUTH_TOKEN_REFRESHED,
+      data: result,
+    });
   }
 
   @Post('logout')
@@ -134,6 +101,51 @@ export class AuthController {
     });
 
     return res.status(HttpStatus.NO_CONTENT).send();
+  }
+
+  @Public()
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  @GoogleAuthDocs()
+  async googleAuth(): Promise<void> {
+    // Passport handles the redirect to Google
+  }
+
+  @Public()
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  @GoogleCallbackDocs()
+  async googleAuthRedirect(
+    @Req() req: Request & { user?: GoogleOAuthProfile },
+    @Res() res: Response,
+  ): Promise<void> {
+    const payload = req.user;
+
+    if (!payload) {
+      res.redirect(
+        HttpStatus.FOUND,
+        `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/login?error=oauth_failed`,
+      );
+      return;
+    }
+
+    try {
+      const result: OAuthLoginResponse = await this.authService.handleOAuthLogin(payload);
+      const base = (process.env.FRONTEND_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+      res.cookie('refreshToken', result.refresh_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+      const redirectUrl = `${base}/dashboard?access_token=${encodeURIComponent(result.access_token)}`;
+      res.redirect(HttpStatus.FOUND, redirectUrl);
+    } catch {
+      res.redirect(
+        HttpStatus.FOUND,
+        `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/login?error=oauth_failed`,
+      );
+    }
   }
 
   @Get('me')

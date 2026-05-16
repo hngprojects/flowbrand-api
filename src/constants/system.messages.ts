@@ -53,3 +53,10 @@ export const REDIS_RECONNECT_ATTEMPT = (attempt: number, delay: number) =>
 export const REDIS_RETRY_LIMIT_REACHED = 'Redis retry limit reached';
 export const REDIS_PATTERN_DELETE_SUCCESS = (count: number, pattern: string) =>
   `Deleted ${count} keys matching pattern: ${pattern}`;
+
+// OAuth and external auth messages
+export const GOOGLE_ACCOUNT_NO_EMAIL = 'Google account has no email';
+export const GOOGLE_ACCOUNT_LINK_CONFLICT = 'Google account is linked to a different account';
+export const GOOGLE_OAUTH_FAILED = 'Google OAuth authentication failed';
+export const USER_OAUTH_CREATION_FAILED = 'Failed to create user account';
+export const OAUTH_LOGIN_SUCCESSFUL = 'OAuth login successful';
