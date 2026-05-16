@@ -1,23 +1,17 @@
 export type EmailType = 'otp-verification' | 'otp-reset';
 
-export interface OtpVerificationPayload {
+export interface OtpPayload {
   fullName: string;
   otpCode: string;
   expiryMins: number;
 }
 
-export interface OtpResetPayload {
-  fullName: string;
-  otpCode: string;
-  expiryMins: number;
-}
-
-export type EmailPayload = OtpVerificationPayload | OtpResetPayload;
+export type EmailPayload = OtpPayload;
 
 export interface EmailJob {
   to: string;
   type: EmailType;
-  payload: EmailPayload;
+  payload: OtpPayload;
   userId?: string;
   requestId?: string;
 }

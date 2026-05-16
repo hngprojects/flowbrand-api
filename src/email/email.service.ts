@@ -1,12 +1,8 @@
 import { InjectQueue } from '@nestjs/bull';
 import { Injectable, Logger } from '@nestjs/common';
 import type { Queue } from 'bull';
-import { JOBS, JOB_RETENTION, QUEUES } from '../common/constants/queue.constants';
-import type {
-  EmailJob,
-  OtpResetPayload,
-  OtpVerificationPayload,
-} from './interfaces/email-job.interface';
+import { JOBS, QUEUES } from '../common/constants/queue.constants';
+import type { EmailJob, OtpPayload } from './interfaces/email-job.interface';
 
 const DEFAULT_PRIORITY = 5;
 
@@ -20,7 +16,7 @@ export class EmailService {
 
   async sendOtpVerification(
     to: string,
-    payload: OtpVerificationPayload,
+    payload: OtpPayload,
     userId?: string,
   ): Promise<string | undefined> {
     return this.dispatch(
@@ -31,7 +27,7 @@ export class EmailService {
 
   async sendOtpReset(
     to: string,
-    payload: OtpResetPayload,
+    payload: OtpPayload,
     userId?: string,
   ): Promise<string | undefined> {
     return this.dispatch(
@@ -47,13 +43,6 @@ export class EmailService {
     try {
       const queued = await this.emailQueue.add(JOBS.SEND_EMAIL, job, {
         priority,
-        attempts: parseInt(process.env.QUEUE_MAX_ATTEMPTS ?? '3'),
-        backoff: {
-          type: 'exponential',
-          delay: parseInt(process.env.EMAIL_QUEUE_BACKOFF_DELAY ?? '3000'),
-        },
-        removeOnComplete: true,
-        removeOnFail: { age: JOB_RETENTION.FAILED_MS / 1000 },
       });
 
       this.logger.log({
