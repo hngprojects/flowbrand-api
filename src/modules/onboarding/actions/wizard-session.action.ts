@@ -15,10 +15,6 @@ export class WizardSessionModelAction extends AbstractModelAction<WizardSession>
     super(wizardSessionRepository, WizardSession);
   }
 
-  /**
-   * Atomically resolve start-session: one in-progress row per user under concurrency
-   * (transaction + per-user advisory lock).
-   */
   async resolveStartWizardSession(
     userId: string,
     at: Date,
