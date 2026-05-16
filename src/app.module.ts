@@ -1,19 +1,23 @@
-import { BadRequestException, Module, ValidationPipe } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import type { StringValue } from 'ms';
+import { BadRequestException, Module, ValidationPipe } from '@nestjs/common';
 import type { ValidationError } from 'class-validator';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { appConfig } from './config/app.config';
 import { databaseConfig } from './config/database.config';
+import { env } from './config/env';
 import './config/env';
 import { jwtConfig } from './config/jwt.config';
 import { redisConfig } from './config/redis.config';
 import * as SYS_MSG from './constants/system.messages';
 import { AuthModule } from './modules/auth/auth.module';
 import { AuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { UserSession } from './modules/users/entities/user-session.entity';
 import { HealthModule } from './modules/health/health.module';
 import { UsersModule } from './modules/users/users.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
@@ -44,6 +48,11 @@ function collectValidationErrors(
     }),
     TypeOrmModule.forRootAsync({
       useFactory: () => databaseConfig(),
+    }),
+    TypeOrmModule.forFeature([UserSession]),
+    JwtModule.register({
+      secret: env.JWT_ACCESS_SECRET,
+      signOptions: { expiresIn: env.JWT_ACCESS_EXPIRES_IN as StringValue },
     }),
     HealthModule,
     UsersModule,

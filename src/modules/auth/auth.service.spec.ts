@@ -33,7 +33,7 @@ const TEST_USER = {
   id: 'user-uuid-1',
   email: 'jane@example.com',
   full_name: 'Jane Doe',
-  password_hash: '$2b$10$hash',
+  password: '$2b$10$hash',
   is_active: true,
 };
 
@@ -249,10 +249,10 @@ describe('AuthService login lockout (BE-005)', () => {
       expect(mockAuthMetadataModelAction.findByUserId).not.toHaveBeenCalled();
     });
 
-    it('throws 401 when the user has no password_hash (OAuth-only account)', async () => {
+    it('throws 401 when the user has no password (OAuth-only account)', async () => {
       mockUsersService.findByEmail.mockResolvedValue({
         ...TEST_USER,
-        password_hash: null,
+        password: null,
       });
 
       await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(

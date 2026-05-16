@@ -33,7 +33,7 @@ export class CreateUserDto {
   @IsEnum(UserRole)
   role?: UserRole;
 
-  @ApiProperty({ required: false, default: false })
+  @ApiProperty({ example: true, required: false, default: false })
   @IsOptional()
   @IsBoolean()
   termsAccepted?: boolean;

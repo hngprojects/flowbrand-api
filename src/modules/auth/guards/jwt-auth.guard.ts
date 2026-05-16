@@ -8,15 +8,19 @@ import {
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
-import { RedisService } from '../../redis/redis.service';
-import { UsersService } from '../../users/users.service';
 import { IS_PUBLIC_KEY } from '../../../common/decorators/public.decorator';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { jwtConfig } from '../../../config/jwt.config';
+import { UsersService } from '../../users/users.service';
+import { RedisService } from '../../redis/redis.service';
 import { JwtPayload } from '../strategies/jwt.strategy';
 
-interface AuthenticatedRequest extends Request {
-  user?: JwtPayload;
+export interface AuthenticatedRequest extends Request {
+  user?: {
+    sub: string;
+    email: string;
+    sessionId: string;
+  };
   session?: Record<string, unknown>;
   token?: string;
 }

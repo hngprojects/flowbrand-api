@@ -19,12 +19,12 @@ export const userSeeder: Seeder = {
 
     const admin = repository.create({
       email: adminEmail,
-      password_hash: await bcrypt.hash('Admin@123456', 10),
+      password: await bcrypt.hash('Admin@123456', 10),
       full_name: 'Admin User',
     });
     const savedAdmin = await repository.save(admin);
 
-    const roleRepostory = dataSource.getRepository(UserRoleEntity);
-    await roleRepostory.save({ user_id: savedAdmin.id, role: UserRole.ADMIN });
+    const roleRepository = dataSource.getRepository(UserRoleEntity);
+    await roleRepository.save({ user_id: savedAdmin.id, role: UserRole.ADMIN });
   },
 };
