@@ -1,4 +1,4 @@
-import { Controller, Post, Res } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Post, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -25,5 +25,10 @@ export class OnboardingController {
       message,
       data,
     });
+  }
+
+  @Get('session')
+  getSession(@CurrentUser('sub') id: string) {
+    return this.onboardingService.getOnboardingSession(id)
   }
 }
