@@ -24,7 +24,6 @@ export class WaitlistController {
     if (isNew) {
       res.status(HttpStatus.CREATED);
       return {
-        success: true,
         message: SYS_MSG.WAITLIST_JOINED_SUCCESSFULLY,
         data: user,
       };
@@ -32,7 +31,6 @@ export class WaitlistController {
 
     res.status(HttpStatus.OK);
     return {
-      success: true,
       message: SYS_MSG.WAITLIST_ALREADY_JOINED,
       data: user,
     };
