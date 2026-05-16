@@ -9,6 +9,7 @@ import { RedisModule } from '../redis/redis.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { User } from '../users/entities/user.entity';
+import { GoogleStrategy } from './strategies/google.strategy';
 import { UserSession } from '../users/entities/user-session.entity';
 import { AuthMetadata } from './entities/auth-metadata.entity';
 import { AuthMetadataModelAction } from './actions/auth-metadata.action';
@@ -22,11 +23,12 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       secret: env.JWT_ACCESS_SECRET,
       signOptions: { expiresIn: env.JWT_ACCESS_EXPIRES_IN as StringValue },
     }),
+    RedisModule,
     UsersModule,
     RedisModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, AuthMetadataModelAction],
+  providers: [AuthService, JwtStrategy, GoogleStrategy, AuthMetadataModelAction],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

@@ -1,25 +1,12 @@
-import { Logger } from '@nestjs/common';
+import { Logger, RequestMethod } from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { ClassSerializerInterceptor } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { env } from './config/env';
-
-const bootstrapLogger = new Logger('Bootstrap');
-
-process.on('unhandledRejection', (reason) => {
-  bootstrapLogger.error(
-    'Unhandled promise rejection',
-    reason instanceof Error ? reason.stack : String(reason),
-  );
-});
-
-process.on('uncaughtException', (error) => {
-  bootstrapLogger.error('Uncaught exception', error.stack);
-});
+import { setupSwagger } from './config/swagger.config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -33,31 +20,25 @@ async function bootstrap() {
     origin: env.CORS_ORIGIN === '*' ? true : env.CORS_ORIGIN.split(','),
     credentials: true,
   });
-  app.setGlobalPrefix('api', { exclude: ['health'] });
+  app.setGlobalPrefix('api', {
+    exclude: [
+      { path: 'health', method: RequestMethod.ALL },
+      { path: 'auth/(.*)', method: RequestMethod.ALL },
+    ],
+  });
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
   app.enableShutdownHooks();
 
   if (env.SWAGGER_ENABLED) {
-    const config = new DocumentBuilder()
-      .setTitle('SEIL API')
-      .setDescription('SEIL REST API documentation')
-      .setVersion('1.0.0')
-      .addBearerAuth(
-        { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-        'JWT',
-      )
-      .build();
-    const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('docs', app, document, {
-      swaggerOptions: { persistAuthorization: true },
-    });
+    setupSwagger(app);
   }
 
   await app.listen(env.PORT);
 
-  bootstrapLogger.log(`Application running on http://localhost:${env.PORT}`);
+  const logger = new Logger('Bootstrap');
+  logger.log(`Application running on http://localhost:${env.PORT}`);
   if (env.SWAGGER_ENABLED) {
-    bootstrapLogger.log(`Swagger docs at http://localhost:${env.PORT}/docs`);
+    logger.log(`Swagger docs at http://localhost:${env.PORT}/docs`);
   }
 }
 
