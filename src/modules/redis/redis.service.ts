@@ -133,6 +133,23 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async rateLimit(
+    key: string,
+    limit: number,
+    windowSeconds: number,
+  ): Promise<{ count: number; exceeded: boolean }> {
+    try {
+      const count = await this.client.incr(key);
+      if (count === 1) {
+        await this.client.expire(key, windowSeconds);
+      }
+      return { count, exceeded: count > limit };
+    } catch (err) {
+      this.logger.error(`rateLimit failed`, (err as Error).message);
+      return { count: 0, exceeded: false };
+    }
+  }
+
   async delByPattern(pattern: string): Promise<void> {
     try {
       let cursor = '0';

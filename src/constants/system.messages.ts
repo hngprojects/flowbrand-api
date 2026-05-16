@@ -50,6 +50,8 @@ export const OTP_RESENT_SUCCESSFULLY =
   'A new verification code has been sent to your email address.';
 export const OTP_RESEND_RATE_LIMITED = 'Please wait before requesting a new code.';
 export const OTP_RESEND_HOURLY_LIMIT = 'Too many resend requests. Please try again in an hour.';
+export const OTP_VERIFY_ATTEMPTS_EXCEEDED =
+  'Too many failed verification attempts. Please request a new OTP.';
 
 // Health
 export const HEALTH_OK = 'ok';

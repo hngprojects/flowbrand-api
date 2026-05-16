@@ -18,7 +18,7 @@ const mockJwtService = {
   signAsync: jest.fn(),
   verifyAsync: jest.fn(),
 };
-const mockRedisService = { setStrict: jest.fn() };
+const mockRedisService = { setStrict: jest.fn(), del: jest.fn(), rateLimit: jest.fn() };
 const mockUserSessionModelAction = {
   findById: jest.fn(),
   updateById: jest.fn(),

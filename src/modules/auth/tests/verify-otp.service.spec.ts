@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpStatus } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
@@ -26,6 +26,7 @@ const mockRedisService = {
   del: jest.fn(),
   get: jest.fn(),
   set: jest.fn(),
+  rateLimit: jest.fn(),
 };
 const mockOtpTokenModelAction = {
   replaceToken: jest.fn(),
@@ -92,6 +93,7 @@ describe('AuthService.verifyOtp (BE-004)', () => {
 
     (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-value');
     (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+    mockRedisService.rateLimit.mockResolvedValue({ count: 1, exceeded: false });
   });
 
   describe('unknown email', () => {
@@ -113,6 +115,30 @@ describe('AuthService.verifyOtp (BE-004)', () => {
       await expect(service.verifyOtp(USER_EMAIL, OTP_CODE)).rejects.toThrow(
         new ConflictException(SYS_MSG.ACCOUNT_ALREADY_VERIFIED),
       );
+    });
+  });
+
+  describe('rate limit', () => {
+    it('throws 429 OTP_VERIFY_ATTEMPTS_EXCEEDED when attempt counter is exceeded', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(UNVERIFIED_USER);
+      mockRedisService.rateLimit.mockResolvedValue({ count: 6, exceeded: true });
+
+      await expect(service.verifyOtp(USER_EMAIL, OTP_CODE)).rejects.toMatchObject({
+        status: HttpStatus.TOO_MANY_REQUESTS,
+        message: SYS_MSG.OTP_VERIFY_ATTEMPTS_EXCEEDED,
+      });
+
+      expect(mockOtpTokenModelAction.findByUserAndType).not.toHaveBeenCalled();
+    });
+
+    it('uses a per-user key with a 5-minute window', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(UNVERIFIED_USER);
+      mockRedisService.rateLimit.mockResolvedValue({ count: 1, exceeded: false });
+      mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(null);
+
+      await service.verifyOtp(USER_EMAIL, OTP_CODE).catch(() => undefined);
+
+      expect(mockRedisService.rateLimit).toHaveBeenCalledWith(`otp:verify:${USER_ID}`, 5, 300);
     });
   });
 
@@ -205,6 +231,12 @@ describe('AuthService.verifyOtp (BE-004)', () => {
       expect(result).toHaveProperty('accessToken');
       expect(result).toHaveProperty('refreshToken');
       expect(result.user).toMatchObject({ email: USER_EMAIL });
+    });
+
+    it('clears the attempt counter on successful verification', async () => {
+      await service.verifyOtp(USER_EMAIL, OTP_CODE);
+
+      expect(mockRedisService.del).toHaveBeenCalledWith(`otp:verify:${USER_ID}`);
     });
 
     it('does not include password_hash in the returned user', async () => {

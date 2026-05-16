@@ -227,6 +227,12 @@ export class AuthService {
       throw new ConflictException(SYS_MSG.ACCOUNT_ALREADY_VERIFIED);
     }
 
+    const attemptsKey = `otp:verify:${user.id}`;
+    const { exceeded } = await this.redisService.rateLimit(attemptsKey, 5, 300);
+    if (exceeded) {
+      throw new HttpException(SYS_MSG.OTP_VERIFY_ATTEMPTS_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS);
+    }
+
     const token = await this.otpTokenModelAction.findByUserAndType(user.id, 'email_verification');
 
     if (!token) {
@@ -246,10 +252,13 @@ export class AuthService {
       throw new BadRequestException(SYS_MSG.OTP_INVALID);
     }
 
-    await this.otpTokenAction.delete({
-      identifierOptions: { user_id: user.id, type: 'email_verification' as const },
-      transactionOptions: { useTransaction: false },
-    });
+    await Promise.all([
+      this.redisService.del(attemptsKey),
+      this.otpTokenAction.delete({
+        identifierOptions: { user_id: user.id, type: 'email_verification' as const },
+        transactionOptions: { useTransaction: false },
+      }),
+    ]);
 
     const verifiedUser = await this.usersService.markVerified(user.id);
     return this.issueTokens(verifiedUser);
@@ -297,6 +306,7 @@ export class AuthService {
   }
 
   private async generateAndSendOtp(user: User): Promise<void> {
+    await this.redisService.del(`otp:verify:${user.id}`);
     const otpCode = crypto.randomInt(100000, 1000000);
     const token_hash = await bcrypt.hash(String(otpCode), 10);
     await this.otpTokenAction.replaceToken({

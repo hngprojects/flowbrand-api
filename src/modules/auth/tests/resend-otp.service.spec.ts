@@ -26,6 +26,7 @@ const mockRedisService = {
   del: jest.fn(),
   get: jest.fn(),
   set: jest.fn(),
+  rateLimit: jest.fn(),
 };
 const mockOtpTokenModelAction = {
   replaceToken: jest.fn(),

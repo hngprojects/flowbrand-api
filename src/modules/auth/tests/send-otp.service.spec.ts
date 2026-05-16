@@ -16,6 +16,7 @@ const mockRedisService = {
   expire: jest.fn(),
   setStrict: jest.fn(),
   del: jest.fn(),
+  rateLimit: jest.fn(),
 };
 const mockOtpTokenModelAction = {
   replaceToken: jest.fn(),
