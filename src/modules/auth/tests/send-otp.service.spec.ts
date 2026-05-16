@@ -18,9 +18,7 @@ const mockRedisService = {
   del: jest.fn(),
 };
 const mockOtpTokenModelAction = {
-  create: jest.fn(),
-  delete: jest.fn(),
-  findByUserAndType: jest.fn(),
+  replaceToken: jest.fn(),
 };
 const mockEmailService = {
   sendOtpVerification: jest.fn(),
@@ -61,14 +59,8 @@ describe('AuthService.sendOtp (BE-004)', () => {
         { provide: UsersService, useValue: mockUsersService },
         { provide: JwtService, useValue: mockJwtService },
         { provide: RedisService, useValue: mockRedisService },
-        {
-          provide: UserSessionModelAction,
-          useValue: mockUserSessionModelAction,
-        },
-        {
-          provide: AuthMetadataModelAction,
-          useValue: mockAuthMetadataModelAction,
-        },
+        { provide: UserSessionModelAction, useValue: mockUserSessionModelAction },
+        { provide: AuthMetadataModelAction, useValue: mockAuthMetadataModelAction },
         { provide: OtpTokenModelAction, useValue: mockOtpTokenModelAction },
         { provide: EmailService, useValue: mockEmailService },
       ],
@@ -89,16 +81,14 @@ describe('AuthService.sendOtp (BE-004)', () => {
   });
 
   describe('already verified', () => {
-    it('returns ACCOUNT_ALREADY_VERIFIED when user.is_verified is true', async () => {
-      mockUsersService.findByEmail.mockResolvedValue({
-        ...UNVERIFIED_USER,
-        is_verified: true,
-      });
+    it('returns OTP_SENT_SUCCESSFULLY silently when user is already verified (no enumeration)', async () => {
+      mockUsersService.findByEmail.mockResolvedValue({ ...UNVERIFIED_USER, is_verified: true });
 
       const result = await service.sendOtp(USER_EMAIL);
 
-      expect(result.message).toBe(SYS_MSG.ACCOUNT_ALREADY_VERIFIED);
+      expect(result.message).toBe(SYS_MSG.OTP_SENT_SUCCESSFULLY);
       expect(mockEmailService.sendOtpVerification).not.toHaveBeenCalled();
+      expect(mockOtpTokenModelAction.replaceToken).not.toHaveBeenCalled();
     });
   });
 
@@ -118,23 +108,18 @@ describe('AuthService.sendOtp (BE-004)', () => {
     it('sets a 900-second TTL when the counter reaches 1 (first request in window)', async () => {
       mockUsersService.findByEmail.mockResolvedValue(UNVERIFIED_USER);
       mockRedisService.incr.mockResolvedValue(1);
-      mockOtpTokenModelAction.delete.mockResolvedValue(undefined);
-      mockOtpTokenModelAction.create.mockResolvedValue({ id: 'tok-1' });
+      mockOtpTokenModelAction.replaceToken.mockResolvedValue({ id: 'tok-1' });
       mockEmailService.sendOtpVerification.mockResolvedValue(undefined);
 
       await service.sendOtp(USER_EMAIL);
 
-      expect(mockRedisService.expire).toHaveBeenCalledWith(
-        `otp:rate:${USER_ID}`,
-        900,
-      );
+      expect(mockRedisService.expire).toHaveBeenCalledWith(`otp:rate:${USER_ID}`, 900);
     });
 
     it('does not reset TTL when counter is greater than 1', async () => {
       mockUsersService.findByEmail.mockResolvedValue(UNVERIFIED_USER);
       mockRedisService.incr.mockResolvedValue(3);
-      mockOtpTokenModelAction.delete.mockResolvedValue(undefined);
-      mockOtpTokenModelAction.create.mockResolvedValue({ id: 'tok-1' });
+      mockOtpTokenModelAction.replaceToken.mockResolvedValue({ id: 'tok-1' });
       mockEmailService.sendOtpVerification.mockResolvedValue(undefined);
 
       await service.sendOtp(USER_EMAIL);
@@ -148,8 +133,7 @@ describe('AuthService.sendOtp (BE-004)', () => {
       mockUsersService.findByEmail.mockResolvedValue(UNVERIFIED_USER);
       mockRedisService.incr.mockResolvedValue(1);
       mockRedisService.expire.mockResolvedValue(undefined);
-      mockOtpTokenModelAction.delete.mockResolvedValue(undefined);
-      mockOtpTokenModelAction.create.mockResolvedValue({ id: 'tok-1' });
+      mockOtpTokenModelAction.replaceToken.mockResolvedValue({ id: 'tok-1' });
       mockEmailService.sendOtpVerification.mockResolvedValue(undefined);
     });
 
@@ -158,33 +142,20 @@ describe('AuthService.sendOtp (BE-004)', () => {
       expect(result.message).toBe(SYS_MSG.OTP_SENT_SUCCESSFULLY);
     });
 
-    it('deletes any existing token for the user+type before creating a new one', async () => {
-      await service.sendOtp(USER_EMAIL);
-
-      expect(mockOtpTokenModelAction.delete).toHaveBeenCalledWith(
-        expect.objectContaining({
-          identifierOptions: expect.objectContaining({
-            user_id: USER_ID,
-            type: 'email_verification',
-          }),
-        }),
-      );
-    });
-
-    it('creates a new otp_token with type email_verification and 5-minute expiry', async () => {
+    it('calls replaceToken with correct user_id, type, and 5-minute expiry', async () => {
       const before = Date.now();
       await service.sendOtp(USER_EMAIL);
       const after = Date.now();
 
-      const createCall = mockOtpTokenModelAction.create.mock.calls[0][0];
-      expect(createCall.createPayload.type).toBe('email_verification');
-      expect(createCall.createPayload.token_hash).toEqual(expect.any(String));
-      expect(createCall.createPayload).not.toHaveProperty('is_used');
+      const call = mockOtpTokenModelAction.replaceToken.mock.calls[0][0];
+      expect(call.user_id).toBe(USER_ID);
+      expect(call.type).toBe('email_verification');
+      expect(call.token_hash).toEqual(expect.any(String));
+      expect(call).not.toHaveProperty('is_used');
 
-      const expiresAt: Date = createCall.createPayload.expires_at;
       const fiveMinMs = 5 * 60 * 1000;
-      expect(expiresAt.getTime()).toBeGreaterThanOrEqual(before + fiveMinMs);
-      expect(expiresAt.getTime()).toBeLessThanOrEqual(after + fiveMinMs);
+      expect(call.expires_at.getTime()).toBeGreaterThanOrEqual(before + fiveMinMs);
+      expect(call.expires_at.getTime()).toBeLessThanOrEqual(after + fiveMinMs);
     });
 
     it("enqueues a verification email to the user's address with expiryMins: 5", async () => {
@@ -192,10 +163,7 @@ describe('AuthService.sendOtp (BE-004)', () => {
 
       expect(mockEmailService.sendOtpVerification).toHaveBeenCalledWith(
         UNVERIFIED_USER.email,
-        expect.objectContaining({
-          expiryMins: 5,
-          fullName: UNVERIFIED_USER.full_name,
-        }),
+        expect.objectContaining({ expiryMins: 5, fullName: UNVERIFIED_USER.full_name }),
         USER_ID,
       );
     });
@@ -210,8 +178,7 @@ describe('AuthService.sendOtp (BE-004)', () => {
     it('proceeds without throwing when Redis incr returns null (Redis down)', async () => {
       mockUsersService.findByEmail.mockResolvedValue(UNVERIFIED_USER);
       mockRedisService.incr.mockResolvedValue(null);
-      mockOtpTokenModelAction.delete.mockResolvedValue(undefined);
-      mockOtpTokenModelAction.create.mockResolvedValue({ id: 'tok-1' });
+      mockOtpTokenModelAction.replaceToken.mockResolvedValue({ id: 'tok-1' });
       mockEmailService.sendOtpVerification.mockResolvedValue(undefined);
 
       await expect(service.sendOtp(USER_EMAIL)).resolves.toMatchObject({

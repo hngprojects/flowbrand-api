@@ -31,8 +31,7 @@ const mockAuthMetadataModelAction = {
   createForUser: jest.fn(),
 };
 const mockOtpTokenModelAction = {
-  create: jest.fn(),
-  delete: jest.fn(),
+  replaceToken: jest.fn(),
 };
 const mockEmailService = {
   sendOtpVerification: jest.fn(),

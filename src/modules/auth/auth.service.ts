@@ -17,7 +17,7 @@ import { env } from '../../config/env';
 import { User } from '../users/entities/user.entity';
 import type { UserSession } from '../users/entities/user-session.entity';
 import type { AuthMetadata } from './entities/auth-metadata.entity';
-import type { OtpToken } from './entities/otp-token.entity';
+import type { OtpToken, OtpTokenType } from './entities/otp-token.entity';
 import { UsersService } from '../users/users.service';
 import { RedisService } from '../redis/redis.service';
 import { EmailService } from '../../email/email.service';
@@ -86,13 +86,11 @@ export class AuthService {
   }
 
   private get otpTokenAction(): {
-    delete(options: {
-      identifierOptions: Partial<OtpToken>;
-      transactionOptions: { useTransaction: false };
-    }): Promise<unknown>;
-    create(options: {
-      createPayload: Partial<OtpToken>;
-      transactionOptions: { useTransaction: false };
+    replaceToken(payload: {
+      user_id: string;
+      type: OtpTokenType;
+      token_hash: string;
+      expires_at: Date;
     }): Promise<OtpToken>;
   } {
     return this.otpTokenModelAction;
@@ -191,7 +189,7 @@ export class AuthService {
     }
 
     if (user.is_verified) {
-      return { message: SYS_MSG.ACCOUNT_ALREADY_VERIFIED };
+      return { message: SYS_MSG.OTP_SENT_SUCCESSFULLY };
     }
 
     const rateKey = `otp:rate:${user.id}`;
@@ -208,25 +206,14 @@ export class AuthService {
       }
     }
 
-    await this.otpTokenAction.delete({
-      identifierOptions: {
-        user_id: user.id,
-        type: 'email_verification' as const,
-      },
-      transactionOptions: { useTransaction: false },
-    });
-
     const otpCode = crypto.randomInt(100000, 1000000);
     const token_hash = await bcrypt.hash(String(otpCode), 10);
 
-    await this.otpTokenAction.create({
-      createPayload: {
-        user_id: user.id,
-        type: 'email_verification' as const,
-        token_hash,
-        expires_at: new Date(Date.now() + 5 * 60 * 1000),
-      },
-      transactionOptions: { useTransaction: false },
+    await this.otpTokenAction.replaceToken({
+      user_id: user.id,
+      type: 'email_verification',
+      token_hash,
+      expires_at: new Date(Date.now() + 5 * 60 * 1000),
     });
 
     await this.emailService.sendOtpVerification(

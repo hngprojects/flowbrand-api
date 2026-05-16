@@ -1,7 +1,7 @@
 // Individual message constants (single-line exports)
 export const USER_CREATED_SUCCESSFULLY = 'User Created Successfully';
 export const FAILED_TO_CREATE_USER =
-  'Error Occured while creating user, kindly try again';
+  'Error Occurred while creating user, kindly try again';
 export const USER_ACCOUNT_EXIST = 'Account with the specified email exists';
 export const USER_ACCOUNT_DOES_NOT_EXIST =
   "Account with the specified email doesn't exist";
