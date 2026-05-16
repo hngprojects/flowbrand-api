@@ -11,9 +11,7 @@ const USER_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const SESSION_1 = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
 const mockWizardSessionModelAction = {
-  findCompletedByUserId: jest.fn(),
-  findActiveInProgressByUserId: jest.fn(),
-  createWizardSession: jest.fn(),
+  resolveStartWizardSession: jest.fn(),
 };
 
 function buildSession(partial: Partial<WizardSession> = {}): WizardSession {
@@ -50,9 +48,9 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
   });
 
   it('throws 409 when user already has a completed wizard session', async () => {
-    mockWizardSessionModelAction.findCompletedByUserId.mockResolvedValue(
-      buildSession({ status: WizardStatus.COMPLETE, steps_completed: 3 }),
-    );
+    mockWizardSessionModelAction.resolveStartWizardSession.mockResolvedValue({
+      status: 'already_complete',
+    });
 
     let caught: unknown;
     try {
@@ -65,11 +63,6 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
       message: SYS_MSG.ONBOARDING_API.ALREADY_COMPLETE,
       code: SYS_MSG.ONBOARDING_API.ALREADY_COMPLETE,
     });
-
-    expect(
-      mockWizardSessionModelAction.findActiveInProgressByUserId,
-    ).not.toHaveBeenCalled();
-    expect(mockWizardSessionModelAction.createWizardSession).not.toHaveBeenCalled();
   });
 
   it('returns existing active in-progress session without creating (idempotent)', async () => {
@@ -80,10 +73,10 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
       answers: { step_1: { x: 1 }, step_2: { y: 2 } },
     });
 
-    mockWizardSessionModelAction.findCompletedByUserId.mockResolvedValue(null);
-    mockWizardSessionModelAction.findActiveInProgressByUserId.mockResolvedValue(
-      existing,
-    );
+    mockWizardSessionModelAction.resolveStartWizardSession.mockResolvedValue({
+      status: 'active',
+      session: existing,
+    });
 
     const result = await service.startWizardSession(USER_A);
 
@@ -97,7 +90,6 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
       created_at: existing.created_at,
       updated_at: existing.updated_at,
     });
-    expect(mockWizardSessionModelAction.createWizardSession).not.toHaveBeenCalled();
   });
 
   it('creates a new session when none completed and no non-expired active session', async () => {
@@ -110,24 +102,20 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
         expires_at: new Date('2026-05-16T10:00:00.000Z'),
       });
 
-      mockWizardSessionModelAction.findCompletedByUserId.mockResolvedValue(null);
-      mockWizardSessionModelAction.findActiveInProgressByUserId.mockResolvedValue(
-        null,
-      );
-      mockWizardSessionModelAction.createWizardSession.mockResolvedValue(created);
+      mockWizardSessionModelAction.resolveStartWizardSession.mockResolvedValue({
+        status: 'created',
+        session: created,
+      });
 
       const result = await service.startWizardSession(USER_A);
 
       expect(
-        mockWizardSessionModelAction.createWizardSession,
-      ).toHaveBeenCalledTimes(1);
-      const [payload] =
-        mockWizardSessionModelAction.createWizardSession.mock.calls[0];
-      expect(payload.user_id).toBe(USER_A);
-      expect(payload.status).toBe(WizardStatus.IN_PROGRESS);
-      expect(payload.steps_completed).toBe(0);
-      expect(payload.answers).toEqual({});
-      expect(payload.expires_at).toEqual(new Date('2026-05-16T10:00:00.000Z'));
+        mockWizardSessionModelAction.resolveStartWizardSession,
+      ).toHaveBeenCalledWith(
+        USER_A,
+        new Date('2026-05-15T10:00:00.000Z'),
+        new Date('2026-05-16T10:00:00.000Z'),
+      );
 
       expect(result.session_id).toBe(created.id);
       expect(result.user_id).toBe(USER_A);
@@ -137,77 +125,60 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
     }
   });
 
-  it('creates when only expired in-progress would exist (active query returns null)', async () => {
-    mockWizardSessionModelAction.findCompletedByUserId.mockResolvedValue(null);
-    mockWizardSessionModelAction.findActiveInProgressByUserId.mockResolvedValue(
-      null,
-    );
-
+  it('returns created session when only expired in-progress exists (resolved in DB layer)', async () => {
     const created = buildSession({ id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee' });
-    mockWizardSessionModelAction.createWizardSession.mockResolvedValue(created);
+    mockWizardSessionModelAction.resolveStartWizardSession.mockResolvedValue({
+      status: 'created',
+      session: created,
+    });
 
     await service.startWizardSession(USER_A);
 
-    expect(mockWizardSessionModelAction.findActiveInProgressByUserId).toHaveBeenCalledWith(
-      USER_A,
-      expect.any(Date),
-    );
-    expect(mockWizardSessionModelAction.createWizardSession).toHaveBeenCalled();
+    expect(
+      mockWizardSessionModelAction.resolveStartWizardSession,
+    ).toHaveBeenCalledWith(USER_A, expect.any(Date), expect.any(Date));
   });
 
   it('isolates users: completed for user A does not block user B', async () => {
-    mockWizardSessionModelAction.findCompletedByUserId.mockImplementation(
-      async (uid: string) =>
-        uid === USER_A
-          ? buildSession({ user_id: USER_A, status: WizardStatus.COMPLETE })
-          : null,
-    );
-    mockWizardSessionModelAction.findActiveInProgressByUserId.mockResolvedValue(
-      null,
-    );
-    mockWizardSessionModelAction.createWizardSession.mockResolvedValue(
-      buildSession({ id: 'new-for-b', user_id: USER_B }),
+    mockWizardSessionModelAction.resolveStartWizardSession.mockImplementation(
+      async (userId: string) => {
+        if (userId === USER_A) {
+          return { status: 'already_complete' };
+        }
+        return {
+          status: 'created',
+          session: buildSession({ id: 'new-for-b', user_id: USER_B }),
+        };
+      },
     );
 
     await expect(service.startWizardSession(USER_A)).rejects.toBeInstanceOf(
       ConflictException,
     );
 
-    await service.startWizardSession(USER_B);
-    expect(mockWizardSessionModelAction.createWizardSession).toHaveBeenCalledWith(
-      expect.objectContaining({ user_id: USER_B }),
-    );
+    const result = await service.startWizardSession(USER_B);
+    expect(result.user_id).toBe(USER_B);
   });
 
-  it('calls findCompleted before findActive when starting fresh', async () => {
-    const order: string[] = [];
-    mockWizardSessionModelAction.findCompletedByUserId.mockImplementation(
-      async () => {
-        order.push('completed');
-        return null;
-      },
-    );
-    mockWizardSessionModelAction.findActiveInProgressByUserId.mockImplementation(
-      async () => {
-        order.push('active');
-        return null;
-      },
-    );
-    mockWizardSessionModelAction.createWizardSession.mockResolvedValue(
-      buildSession(),
-    );
+  it('delegates to atomic resolveStartWizardSession', async () => {
+    mockWizardSessionModelAction.resolveStartWizardSession.mockResolvedValue({
+      status: 'created',
+      session: buildSession(),
+    });
 
     await service.startWizardSession(USER_A);
 
-    expect(order).toEqual(['completed', 'active']);
+    expect(
+      mockWizardSessionModelAction.resolveStartWizardSession,
+    ).toHaveBeenCalledTimes(1);
   });
 
   it('maps entity id to response session_id (no duplicate id field)', async () => {
     const existing = buildSession({ id: 'ffffffff-ffff-4fff-8fff-ffffffffffff' });
-    mockWizardSessionModelAction.findCompletedByUserId.mockResolvedValue(null);
-    mockWizardSessionModelAction.findActiveInProgressByUserId.mockResolvedValue(
-      existing,
-    );
+    mockWizardSessionModelAction.resolveStartWizardSession.mockResolvedValue({
+      status: 'active',
+      session: existing,
+    });
 
     const result = await service.startWizardSession(USER_A);
 

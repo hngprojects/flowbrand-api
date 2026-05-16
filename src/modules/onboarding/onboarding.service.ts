@@ -1,8 +1,8 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import * as SYS_MSG from '../../constants/system.messages';
 import { WizardSession } from './entities/wizzard-session.entity';
-import { WizardStatus } from './enums/wizzard-status.enum';
 import { WizardSessionModelAction } from './actions/wizard-session.action';
+import { WizardStatus } from './enums/wizzard-status.enum';
 
 export interface OnboardingStartResponseData {
   session_id: string;
@@ -28,9 +28,17 @@ export class OnboardingService {
   async startWizardSession(
     userId: string,
   ): Promise<OnboardingStartResponseData> {
-    const completed =
-      await this.wizardSessionModelAction.findCompletedByUserId(userId);
-    if (completed) {
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+    const result =
+      await this.wizardSessionModelAction.resolveStartWizardSession(
+        userId,
+        now,
+        expiresAt,
+      );
+
+    if (result.status === 'already_complete') {
       throw new ConflictException({
         error: 'ConflictException',
         message: SYS_MSG.ONBOARDING_API.ALREADY_COMPLETE,
@@ -38,26 +46,7 @@ export class OnboardingService {
       });
     }
 
-    const now = new Date();
-    const existingActive =
-      await this.wizardSessionModelAction.findActiveInProgressByUserId(
-        userId,
-        now,
-      );
-    if (existingActive) {
-      return this.mapSessionToResponse(existingActive);
-    }
-
-    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    const created = await this.wizardSessionModelAction.createWizardSession({
-      user_id: userId,
-      status: WizardStatus.IN_PROGRESS,
-      steps_completed: 0,
-      answers: {},
-      expires_at: expiresAt,
-    });
-
-    return this.mapSessionToResponse(created);
+    return this.mapSessionToResponse(result.session);
   }
 
   private mapSessionToResponse(
