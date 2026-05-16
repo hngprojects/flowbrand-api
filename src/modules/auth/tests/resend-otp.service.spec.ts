@@ -101,6 +101,7 @@ describe('AuthService.resendOtp (BE-004)', () => {
 
       expect(result.message).toBe(SYS_MSG.ACCOUNT_ALREADY_VERIFIED);
       expect(mockEmailService.sendOtpVerification).not.toHaveBeenCalled();
+      expect(mockRedisService.incr).not.toHaveBeenCalled();
     });
   });
 

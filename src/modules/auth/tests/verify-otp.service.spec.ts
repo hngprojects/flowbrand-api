@@ -162,6 +162,7 @@ describe('AuthService.verifyOtp (BE-004)', () => {
         new BadRequestException(SYS_MSG.OTP_INVALID),
       );
 
+      expect(mockOtpTokenModelAction.delete).not.toHaveBeenCalled();
       expect(mockUsersService.markVerified).not.toHaveBeenCalled();
     });
   });

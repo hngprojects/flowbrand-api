@@ -283,7 +283,7 @@ export class AuthService {
     const cooldownKey = `otp:cooldown:${user.id}`;
     const cooldownRaw = await this.redisService.get(cooldownKey);
     if (cooldownRaw) {
-      const retryAfter = Math.ceil((parseInt(cooldownRaw) - Date.now()) / 1000);
+      const retryAfter = Math.ceil((parseInt(cooldownRaw, 10) - Date.now()) / 1000);
       throw new HttpException(
         { message: SYS_MSG.OTP_RESEND_RATE_LIMITED, retryAfter },
         HttpStatus.TOO_MANY_REQUESTS,

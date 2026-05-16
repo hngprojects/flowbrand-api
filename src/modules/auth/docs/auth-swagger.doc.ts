@@ -237,7 +237,9 @@ export const ResendOtpDocs = () =>
     }),
     ApiResponse({
       status: HttpStatus.TOO_MANY_REQUESTS,
-      description: '30-second cooldown active or hourly limit reached',
+      description:
+        '30-second cooldown active (`retryAfter` = seconds remaining) ' +
+        'or hourly limit reached (`retryAfter` = 3600)',
       schema: {
         example: {
           statusCode: 429,
