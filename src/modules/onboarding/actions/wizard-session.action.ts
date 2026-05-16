@@ -4,11 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import { WizardSession } from '../entities/wizzard-session.entity';
 import { WizardStatus } from '../enums/wizzard-status.enum';
-
-export type ResolveWizardStartResult =
-  | { status: 'already_complete' }
-  | { status: 'active'; session: WizardSession }
-  | { status: 'created'; session: WizardSession };
+import { WizardStartResolveResult } from '../interfaces/onboarding.interface';
 
 @Injectable()
 export class WizardSessionModelAction extends AbstractModelAction<WizardSession> {
@@ -27,7 +23,7 @@ export class WizardSessionModelAction extends AbstractModelAction<WizardSession>
     userId: string,
     at: Date,
     expiresAt: Date,
-  ): Promise<ResolveWizardStartResult> {
+  ): Promise<WizardStartResolveResult> {
     return this.wizardSessionRepository.manager.transaction(
       async (manager) => {
         await manager.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [

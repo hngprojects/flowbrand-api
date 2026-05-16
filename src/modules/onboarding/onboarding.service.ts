@@ -4,26 +4,12 @@ import {
   Injectable,
 } from '@nestjs/common';
 import * as SYS_MSG from '../../constants/system.messages';
-import { WizardSession } from './entities/wizzard-session.entity';
 import { WizardSessionModelAction } from './actions/wizard-session.action';
-import { WizardStatus } from './enums/wizzard-status.enum';
-
-export interface OnboardingStartResponseData {
-  session_id: string;
-  user_id: string;
-  status: WizardStatus;
-  steps_completed: number;
-  answers: Record<string, unknown>;
-  expires_at: Date;
-  created_at: Date;
-  updated_at: Date;
-}
-
-export interface OnboardingStartResult {
-  statusCode: typeof HttpStatus.OK | typeof HttpStatus.CREATED;
-  message: string;
-  data: OnboardingStartResponseData;
-}
+import { WizardSession } from './entities/wizzard-session.entity';
+import {
+  OnboardingStartResponseData,
+  OnboardingStartResult,
+} from './interfaces/onboarding.interface';
 
 @Injectable()
 export class OnboardingService {
@@ -32,8 +18,8 @@ export class OnboardingService {
   ) {}
 
   /**
-   * Idempotent start: returns existing active in-progress session or creates a new one.
-   * Users who already completed onboarding get 409.
+   * Idempotent start: 201 when created, 200 when an active session is resumed.
+   * 409 when the user already completed onboarding.
    */
   async startWizardSession(userId: string): Promise<OnboardingStartResult> {
     const now = new Date();

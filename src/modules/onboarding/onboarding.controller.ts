@@ -21,7 +21,7 @@ export class OnboardingController {
       await this.onboardingService.startWizardSession(userId);
 
     res.status(statusCode).json({
-      status_code: statusCode,
+      statusCode,
       message,
       data,
     });

@@ -33,7 +33,7 @@ export const StartOnboardingDocs = () =>
       description: 'New wizard session created.',
       schema: {
         example: {
-          status_code: HttpStatus.CREATED,
+          statusCode: HttpStatus.CREATED,
           message: SYS_MSG.ONBOARDING_SESSION_STARTED,
           data: startResponseDataExample,
         },
@@ -43,7 +43,7 @@ export const StartOnboardingDocs = () =>
       description: 'Existing in-progress session resumed (idempotent).',
       schema: {
         example: {
-          status_code: HttpStatus.OK,
+          statusCode: HttpStatus.OK,
           message: SYS_MSG.ONBOARDING_SESSION_RESUMED,
           data: startResponseDataExample,
         },
