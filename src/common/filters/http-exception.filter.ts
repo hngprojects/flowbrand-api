@@ -18,7 +18,6 @@ type ErrorBody = {
   path: string;
   timestamp: string;
   details?: unknown;
-  code?: string;
 };
 
 const INTERNAL_SERVER_ERROR_THRESHOLD = 500;
@@ -99,8 +98,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     if (typeof response === 'object' && response !== null) {
       const body = response as Record<string, unknown>;
-      const code =
-        typeof body.code === 'string' ? body.code : undefined;
       return {
         success: false,
         statusCode,
@@ -108,7 +105,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
         message:
           (body.message as string | string[]) ?? SYS_MSG.VALIDATION_FAILED,
         details: body.details ?? body.errors,
-        ...(code ? { code } : {}),
       };
     }
 

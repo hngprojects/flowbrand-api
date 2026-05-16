@@ -49,8 +49,7 @@ export class OnboardingService {
     if (result.status === 'already_complete') {
       throw new ConflictException({
         error: 'ConflictException',
-        message: SYS_MSG.ONBOARDING_API.ALREADY_COMPLETE,
-        code: SYS_MSG.ONBOARDING_API.ALREADY_COMPLETE,
+        message: SYS_MSG.ONBOARDING_ALREADY_COMPLETE,
       });
     }
 
@@ -59,8 +58,8 @@ export class OnboardingService {
     return {
       statusCode: created ? HttpStatus.CREATED : HttpStatus.OK,
       message: created
-        ? SYS_MSG.ONBOARDING_API.SESSION_STARTED
-        : SYS_MSG.ONBOARDING_API.SESSION_RESUMED,
+        ? SYS_MSG.ONBOARDING_SESSION_STARTED
+        : SYS_MSG.ONBOARDING_SESSION_RESUMED,
       data: this.mapSessionToResponse(result.session),
     };
   }

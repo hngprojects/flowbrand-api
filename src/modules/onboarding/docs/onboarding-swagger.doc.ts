@@ -34,7 +34,7 @@ export const StartOnboardingDocs = () =>
       schema: {
         example: {
           status_code: HttpStatus.CREATED,
-          message: SYS_MSG.ONBOARDING_API.SESSION_STARTED,
+          message: SYS_MSG.ONBOARDING_SESSION_STARTED,
           data: startResponseDataExample,
         },
       },
@@ -44,7 +44,7 @@ export const StartOnboardingDocs = () =>
       schema: {
         example: {
           status_code: HttpStatus.OK,
-          message: SYS_MSG.ONBOARDING_API.SESSION_RESUMED,
+          message: SYS_MSG.ONBOARDING_SESSION_RESUMED,
           data: startResponseDataExample,
         },
       },
@@ -59,8 +59,7 @@ export const StartOnboardingDocs = () =>
           success: false,
           statusCode: HttpStatus.CONFLICT,
           error: 'ConflictException',
-          message: SYS_MSG.ONBOARDING_API.ALREADY_COMPLETE,
-          code: SYS_MSG.ONBOARDING_API.ALREADY_COMPLETE,
+          message: SYS_MSG.ONBOARDING_ALREADY_COMPLETE,
           path: '/api/onboarding/start',
           timestamp: '2026-05-15T12:00:00.000Z',
         },

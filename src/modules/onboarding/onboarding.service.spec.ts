@@ -60,8 +60,7 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
     }
     expect(caught).toBeInstanceOf(ConflictException);
     expect((caught as ConflictException).getResponse()).toMatchObject({
-      message: SYS_MSG.ONBOARDING_API.ALREADY_COMPLETE,
-      code: SYS_MSG.ONBOARDING_API.ALREADY_COMPLETE,
+      message: SYS_MSG.ONBOARDING_ALREADY_COMPLETE,
     });
   });
 
@@ -81,7 +80,7 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
     const result = await service.startWizardSession(USER_A);
 
     expect(result.statusCode).toBe(HttpStatus.OK);
-    expect(result.message).toBe(SYS_MSG.ONBOARDING_API.SESSION_RESUMED);
+    expect(result.message).toBe(SYS_MSG.ONBOARDING_SESSION_RESUMED);
     expect(result.data).toEqual({
       session_id: SESSION_1,
       user_id: USER_A,
@@ -120,7 +119,7 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
       );
 
       expect(result.statusCode).toBe(HttpStatus.CREATED);
-      expect(result.message).toBe(SYS_MSG.ONBOARDING_API.SESSION_STARTED);
+      expect(result.message).toBe(SYS_MSG.ONBOARDING_SESSION_STARTED);
       expect(result.data.session_id).toBe(created.id);
       expect(result.data.user_id).toBe(USER_A);
       expect(result.data.status).toBe(WizardStatus.IN_PROGRESS);
