@@ -19,6 +19,7 @@ import { UsersModule } from './modules/users/users.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { QueueModule } from './queue/queue.module';
+import { EmailModule } from './email/email.module';
 
 function collectValidationErrors(
   errors: ValidationError[],
@@ -50,6 +51,7 @@ function collectValidationErrors(
     OnboardingModule,
     RedisModule,
     QueueModule,
+    EmailModule,
   ],
   providers: [
     {
