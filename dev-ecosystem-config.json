@@ -6,6 +6,7 @@
       "cwd": "/flowbrand/dev/backend/dist",
       "instances": 1,
       "exec_mode": "fork",
+      "env_file": ".env",
       "env_dev": {
         "NODE_ENV": "development"
       }
