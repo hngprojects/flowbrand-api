@@ -42,6 +42,13 @@ export class TemplateService implements OnModuleInit {
       this.templates.set(type, Handlebars.compile(source));
     }
 
+    this.compiledSubjects = Object.fromEntries(
+      Object.entries(this.SUBJECTS).map(([type, subject]) => [
+        type,
+        Handlebars.compile(subject),
+      ]),
+    ) as Record<EmailType, Handlebars.TemplateDelegate>;
+
     this.logger.log('Email templates loaded successfully');
   }
 
@@ -62,7 +69,7 @@ export class TemplateService implements OnModuleInit {
       unsubscribeUrl: `${process.env.FRONTEND_URL ?? ''}/unsubscribe`,
     });
 
-    const subject = Handlebars.compile(this.SUBJECTS[type])(payload);
+    const subject = this.compiledSubjects[type](payload);
 
     return { html, subject };
   }
