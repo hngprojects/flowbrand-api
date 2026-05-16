@@ -31,6 +31,7 @@ export const ONBOARDING_COMPLETE_SUCCESS = 'Onboarding completed successfully';
 export const ONBOARDING_INCOMPLETE = 'Onboarding incomplete';
 export const ONBOARDING_SESSION_NOT_FOUND = 'Session not found';
 export const ONBOARDING_SESSION_EXPIRED = 'Session expired';
+export const ONBOARDING_UNKNOWN_CHANNEL = 'Unknown discovery channel, defaulting to awareness';
 
 // Error handling
 export const VALIDATION_FAILED = 'Validation failed';
