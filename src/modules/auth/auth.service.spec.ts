@@ -1,8 +1,4 @@
-import {
-  HttpException,
-  HttpStatus,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { HttpException, HttpStatus, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
@@ -36,8 +32,7 @@ const mockAuthMetadataModelAction = {
 };
 const mockOtpTokenModelAction = {
   create: jest.fn(),
-  update: jest.fn(),
-  findActiveByUserId: jest.fn(),
+  delete: jest.fn(),
 };
 const mockEmailService = {
   sendOtpVerification: jest.fn(),
@@ -144,14 +139,10 @@ describe('AuthService login lockout (BE-005)', () => {
   describe('failed login tracking', () => {
     it('increments failed_attempts on wrong password and throws 401', async () => {
       mockUsersService.findByEmail.mockResolvedValue(TEST_USER);
-      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(
-        buildMetadata({ failed_attempts: 2 }),
-      );
+      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata({ failed_attempts: 2 }));
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
-      await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(
-        UnauthorizedException,
-      );
+      await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(UnauthorizedException);
 
       expect(mockAuthMetadataModelAction.updateByUserId).toHaveBeenCalledWith(
         TEST_USER.id,
@@ -164,9 +155,7 @@ describe('AuthService login lockout (BE-005)', () => {
 
     it('locks the account on the 5th consecutive failed attempt and throws 423', async () => {
       mockUsersService.findByEmail.mockResolvedValue(TEST_USER);
-      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(
-        buildMetadata({ failed_attempts: 4 }),
-      );
+      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata({ failed_attempts: 4 }));
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
       expect.assertions(4);
@@ -190,9 +179,7 @@ describe('AuthService login lockout (BE-005)', () => {
 
     it('sets locked_until ~1 hour in the future on lock', async () => {
       mockUsersService.findByEmail.mockResolvedValue(TEST_USER);
-      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(
-        buildMetadata({ failed_attempts: 4 }),
-      );
+      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata({ failed_attempts: 4 }));
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
       const before = Date.now();
@@ -210,9 +197,7 @@ describe('AuthService login lockout (BE-005)', () => {
   describe('successful login', () => {
     it('resets failed_attempts, clears locked_until, and stamps last_login_at', async () => {
       mockUsersService.findByEmail.mockResolvedValue(TEST_USER);
-      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(
-        buildMetadata({ failed_attempts: 3 }),
-      );
+      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata({ failed_attempts: 3 }));
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
       await service.login(LOGIN_DTO);
@@ -229,9 +214,7 @@ describe('AuthService login lockout (BE-005)', () => {
 
     it('issues access + refresh tokens', async () => {
       mockUsersService.findByEmail.mockResolvedValue(TEST_USER);
-      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(
-        buildMetadata(),
-      );
+      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata());
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
       const result = await service.login(LOGIN_DTO);
@@ -246,9 +229,7 @@ describe('AuthService login lockout (BE-005)', () => {
     it('creates an AuthMetadata row the first time a user logs in', async () => {
       mockUsersService.findByEmail.mockResolvedValue(TEST_USER);
       mockAuthMetadataModelAction.findByUserId.mockResolvedValue(null);
-      mockAuthMetadataModelAction.createForUser.mockResolvedValue(
-        buildMetadata(),
-      );
+      mockAuthMetadataModelAction.createForUser.mockResolvedValue(buildMetadata());
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
       await service.login(LOGIN_DTO);
@@ -267,9 +248,7 @@ describe('AuthService login lockout (BE-005)', () => {
     it('throws 401 (not 423) when the user does not exist', async () => {
       mockUsersService.findByEmail.mockResolvedValue(null);
 
-      await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(
-        UnauthorizedException,
-      );
+      await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(UnauthorizedException);
 
       expect(mockAuthMetadataModelAction.findByUserId).not.toHaveBeenCalled();
     });
@@ -280,9 +259,7 @@ describe('AuthService login lockout (BE-005)', () => {
         password_hash: null,
       });
 
-      await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(
-        UnauthorizedException,
-      );
+      await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(UnauthorizedException);
     });
   });
 });

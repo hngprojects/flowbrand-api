@@ -43,7 +43,8 @@ export const LoginDocs = () =>
     ApiOperation({
       summary: 'Log in with email and password',
       description:
-        'Issues a JWT access token and sets the refresh token as an HttpOnly cookie. After 5 consecutive failed attempts the account is locked for 1 hour.',
+        'Issues a JWT access token and sets the refresh token as an HttpOnly cookie.\
+        After 5 consecutive failed attempts the account is locked for 1 hour.',
     }),
     ApiOkResponse({
       description: 'Login successful',
@@ -69,7 +70,8 @@ export const LoginDocs = () =>
     ApiResponse({
       status: HttpStatus.LOCKED,
       description:
-        'Account locked after 5 consecutive failed login attempts. The lock lifts 1 hour after the lockout was triggered.',
+        'Account locked after 5 consecutive failed login attempts. The lock lifts 1 \
+        hour after the lockout was triggered.',
       schema: {
         example: {
           success: false,
@@ -86,7 +88,11 @@ export const RefreshDocs = () =>
     ApiOperation({
       summary: 'Rotate the refresh token for a new access token',
       description:
-        'Reads the refresh token from the request body, or falls back to the HttpOnly `refreshToken` cookie set on login when the body field is omitted. Validates the token, rotates it in place on the
+        'Reads the refresh token from the request body, or falls back to the HttpOnly \
+        `refreshToken` cookie set on login when the body field is omitted. Validates the \
+        token, rotates it in place on the existing session, returns a new access token, and \
+        resets the cookie. Both first-party clients (browser cookie) and external clients\
+         (explicit body) are supported.',
     }),
     ApiOkResponse({
       description: 'Refresh token rotated and new access token issued',
@@ -117,7 +123,9 @@ export const LogoutDocs = () =>
     ApiOperation({
       summary: 'Revoke the current session',
       description:
-        'Sets `is_revoked = true` on the active `user_sessions` row and deletes the matching `sess:{userId}:{sessionId}` key in Redis, so neither the refresh token nor the still-unexpired access token
+        'Sets `is_revoked = true` on the active `user_sessions` row and deletes the \
+        matching `sess:{userId}:{sessionId}` key in Redis, so neither the refresh \
+        token nor the still-unexpired access token can be used after logout.',
     }),
   );
 
