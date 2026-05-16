@@ -27,6 +27,10 @@ export const USER_UPDATE_FAILED = 'Failed to update user';
 export const ONBOARDING_SESSION_STARTED = 'ONBOARDING_SESSION_STARTED';
 export const ONBOARDING_SESSION_RESUMED = 'ONBOARDING_SESSION_RESUMED';
 export const ONBOARDING_ALREADY_COMPLETE = 'ONBOARDING_ALREADY_COMPLETE';
+export const ONBOARDING_COMPLETE_SUCCESS = 'Onboarding completed successfully';
+export const ONBOARDING_INCOMPLETE = 'Onboarding incomplete';
+export const ONBOARDING_SESSION_NOT_FOUND = 'Session not found';
+export const ONBOARDING_SESSION_EXPIRED = 'Session expired';
 
 // Error handling
 export const VALIDATION_FAILED = 'Validation failed';
