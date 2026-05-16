@@ -35,6 +35,8 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().default(''),
   GOOGLE_REDIRECT_URI: z.string().default(''),
 
+  FRONTEND_URL: z.string().default('http://localhost:3000'),
+
   CORS_ORIGIN: z.string().default('*'),
   SWAGGER_ENABLED: boolEnv.default(true),
 });

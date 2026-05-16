@@ -58,8 +58,6 @@ export class AuthService {
     private readonly authMetadataModelAction: AuthMetadataModelAction,
   ) {}
 
-
-
   private get authMetadataAction(): {
     findByUserId(userId: string): Promise<AuthMetadata | null>;
     updateByUserId(
@@ -130,16 +128,16 @@ export class AuthService {
 
       user = await this.usersService.updateGoogleAccount(existingUser.id, {
         full_name: profile.full_name || existingUser.full_name,
-        provider_user_id: profile.providerId,
-        avatar_url: profile.avatar_url,
+        providerUserId: profile.providerId,
+        avatarUrl: profile.avatar_url,
         is_verified: true,
       });
     } else {
       user = await this.usersService.createGoogleAccount({
         email,
         full_name: profile.full_name || email,
-        provider_user_id: profile.providerId,
-        avatar_url: profile.avatar_url,
+        providerUserId: profile.providerId,
+        avatarUrl: profile.avatar_url,
       });
     }
 
@@ -155,7 +153,7 @@ export class AuthService {
           id: auth.user.id,
           full_name: auth.user.full_name,
           email: auth.user.email,
-          avatar_url: auth.user.avatar_url,
+          avatar_url: auth.user.avatarUrl,
         },
       },
     };

@@ -15,6 +15,7 @@ import type { Request, Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import * as SYS_MSG from '../../constants/system.messages';
+import { env } from '../../config/env';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { GoogleOAuthProfile, OAuthLoginResponse } from './dto/google-oauth.dto';
@@ -72,7 +73,7 @@ export class AuthController {
 
     res.cookie('refreshToken', result.refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: env.NODE_ENV === 'production',
       sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
@@ -96,7 +97,7 @@ export class AuthController {
 
     res.clearCookie('refreshToken', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: env.NODE_ENV === 'production',
       sameSite: 'strict',
     });
 
@@ -124,17 +125,17 @@ export class AuthController {
     if (!payload) {
       res.redirect(
         HttpStatus.FOUND,
-        `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/login?error=oauth_failed`,
+        `${env.FRONTEND_URL}/login?error=oauth_failed`,
       );
       return;
     }
 
     try {
       const result: OAuthLoginResponse = await this.authService.handleOAuthLogin(payload);
-      const base = (process.env.FRONTEND_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+      const base = env.FRONTEND_URL.replace(/\/$/, '');
       res.cookie('refreshToken', result.refresh_token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: env.NODE_ENV === 'production',
         sameSite: 'strict',
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
@@ -143,7 +144,7 @@ export class AuthController {
     } catch {
       res.redirect(
         HttpStatus.FOUND,
-        `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/login?error=oauth_failed`,
+        `${env.FRONTEND_URL}/login?error=oauth_failed`,
       );
     }
   }

@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy, VerifyCallback } from 'passport-google-oauth20';
 import { env } from '../../../config/env';
@@ -15,17 +15,19 @@ interface PassportGoogleProfile {
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
+  private static readonly logger = new Logger(GoogleStrategy.name);
+
   constructor() {
     if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.GOOGLE_REDIRECT_URI) {
-      throw new Error(
-        'Missing Google OAuth environment variables (GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET/GOOGLE_REDIRECT_URI)'
+      GoogleStrategy.logger.warn(
+        'Google OAuth is not configured: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI must be set for OAuth to work.',
       );
     }
 
     super({
-      clientID: env.GOOGLE_CLIENT_ID,
-      clientSecret: env.GOOGLE_CLIENT_SECRET,
-      callbackURL: env.GOOGLE_REDIRECT_URI,
+      clientID: env.GOOGLE_CLIENT_ID || 'GOOGLE_CLIENT_ID_NOT_SET',
+      clientSecret: env.GOOGLE_CLIENT_SECRET || 'GOOGLE_CLIENT_SECRET_NOT_SET',
+      callbackURL: env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/auth/google/callback',
       scope: ['email', 'profile'],
     });
   }

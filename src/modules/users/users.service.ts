@@ -104,8 +104,8 @@ export class UsersService {
   async createGoogleAccount(payload: {
     email: string;
     full_name: string;
-    provider_user_id: string;
-    avatar_url: string | null;
+    providerUserId: string;
+    avatarUrl: string | null;
   }): Promise<User> {
     const existing = await this.userModelAction.findByEmail(payload.email);
     if (existing) {
@@ -118,9 +118,9 @@ export class UsersService {
         email: payload.email,
         password: null,
         full_name: payload.full_name,
-        auth_provider: AuthProvider.GOOGLE,
-        provider_user_id: payload.provider_user_id,
-        avatar_url: payload.avatar_url,
+        authProvider: AuthProvider.GOOGLE,
+        providerUserId: payload.providerUserId,
+        avatarUrl: payload.avatarUrl,
         is_verified: true,
         termsAccepted: true,
       },
@@ -131,8 +131,8 @@ export class UsersService {
     id: string,
     payload: {
       full_name?: string;
-      provider_user_id?: string;
-      avatar_url?: string | null;
+      providerUserId?: string;
+      avatarUrl?: string | null;
       is_verified?: boolean;
     },
   ): Promise<User> {
@@ -141,11 +141,11 @@ export class UsersService {
       identifierOptions: { id },
       updatePayload: {
         ...payload,
-        auth_provider: AuthProvider.GOOGLE,
+        authProvider: AuthProvider.GOOGLE,
       },
     });
 
-    if (!updated) {
+
       throw new InternalServerErrorException(SYS_MSG.USER_UPDATE_FAILED);
     }
 
