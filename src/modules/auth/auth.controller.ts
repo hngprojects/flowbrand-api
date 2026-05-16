@@ -24,9 +24,18 @@ import {
   MeDocs,
   RefreshDocs,
   RegisterDocs,
+  ResendOtpDocs,
   SendOtpDocs,
+  VerifyOtpDocs,
 } from './docs/auth-swagger.doc';
 import { SendOtpDto } from './dto/send-otp.dto';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { ResendOtpDto } from './dto/resend-otp.dto';
+
+interface SimpleResponse {
+  statusCode: HttpStatus;
+  message: string;
+}
 
 @ApiTags('auth')
 @Controller('auth')
@@ -160,8 +169,27 @@ export class AuthController {
   @Post('send-otp')
   @HttpCode(HttpStatus.OK)
   @SendOtpDocs()
-  async sendOtp(@Body() dto: SendOtpDto) {
+  async sendOtp(@Body() dto: SendOtpDto): Promise<SimpleResponse> {
     const result = await this.authService.sendOtp(dto.email);
+    return { statusCode: HttpStatus.OK, message: result.message };
+  }
+
+  @Public()
+  @Post('verify-otp')
+  @HttpCode(HttpStatus.OK)
+  @VerifyOtpDocs()
+  async verifyOtp(@Body() dto: VerifyOtpDto, @Res() res: Response): Promise<void> {
+    const result = await this.authService.verifyOtp(dto.email, dto.otp_code);
+    res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
+    res.json(this.buildAuthResponse(HttpStatus.OK, SYS_MSG.OTP_VERIFIED_SUCCESSFULLY, result));
+  }
+
+  @Public()
+  @Post('resend-otp')
+  @HttpCode(HttpStatus.OK)
+  @ResendOtpDocs()
+  async resendOtp(@Body() dto: ResendOtpDto): Promise<SimpleResponse> {
+    const result = await this.authService.resendOtp(dto.email);
     return { statusCode: HttpStatus.OK, message: result.message };
   }
 

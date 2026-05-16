@@ -9,6 +9,8 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { SendOtpDto } from '../dto/send-otp.dto';
+import { VerifyOtpDto } from '../dto/verify-otp.dto';
+import { ResendOtpDto } from '../dto/resend-otp.dto';
 import * as SYS_MSG from '../../../constants/system.messages';
 
 const authUserExample = {
@@ -165,6 +167,82 @@ export const SendOtpDocs = () =>
           statusCode: 429,
           message: 'Too many OTP requests. Please try again later.',
           error: 'HttpException',
+        },
+      },
+    }),
+  );
+
+export const VerifyOtpDocs = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Verify the OTP code and activate the account',
+      description:
+        'Validates the 6-digit OTP against the stored hash. On success the token is deleted, ' +
+        'the account is marked verified, and a JWT access token + HttpOnly refresh cookie are issued. ' +
+        'The token is single-use — submitting it a second time returns 400.',
+    }),
+    ApiBody({ type: VerifyOtpDto }),
+    ApiOkResponse({
+      description: 'OTP verified, account activated, tokens issued',
+      schema: {
+        example: {
+          statusCode: 200,
+          message: SYS_MSG.OTP_VERIFIED_SUCCESSFULLY,
+          data: authResponseExample,
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.BAD_REQUEST,
+      description: 'OTP is invalid, already used, or expired',
+      schema: {
+        example: {
+          statusCode: 400,
+          message: SYS_MSG.OTP_INVALID,
+          error: 'BadRequestException',
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.CONFLICT,
+      description: 'Account is already verified',
+      schema: {
+        example: {
+          statusCode: 409,
+          message: SYS_MSG.ACCOUNT_ALREADY_VERIFIED,
+          error: 'ConflictException',
+        },
+      },
+    }),
+  );
+
+export const ResendOtpDocs = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Resend a fresh OTP verification code',
+      description:
+        'Invalidates any existing OTP, generates a new one, and sends it. ' +
+        'Enforces a 30-second per-request cooldown and a max of 10 resend requests per hour. ' +
+        'Returns 200 for unknown emails and already-verified accounts to prevent enumeration.',
+    }),
+    ApiBody({ type: ResendOtpDto }),
+    ApiOkResponse({
+      description: 'OTP sent, email not found, or account already verified — all return 200',
+      schema: {
+        example: {
+          statusCode: 200,
+          message: SYS_MSG.OTP_RESENT_SUCCESSFULLY,
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.TOO_MANY_REQUESTS,
+      description: '30-second cooldown active or hourly limit reached',
+      schema: {
+        example: {
+          statusCode: 429,
+          message: SYS_MSG.OTP_RESEND_RATE_LIMITED,
+          retryAfter: 18,
         },
       },
     }),
