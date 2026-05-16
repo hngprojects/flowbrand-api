@@ -46,6 +46,10 @@ describe('WaitlistService', () => {
     service = module.get<WaitlistService>(WaitlistService);
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   describe('joinWaitlist', () => {
     it('should return existing user and isNew=false if email already on waitlist', async () => {
       mockWaitlistAction.findByEmail.mockResolvedValue(EXISTING_USER);
@@ -111,14 +115,12 @@ describe('WaitlistService', () => {
 
       expect(mockEmailService.sendWaitlistConfirmation).toHaveBeenCalled();
       expect(loggerSpy).toHaveBeenCalledWith(
-        `Failed to queue waitlist email for ${NEW_USER.email}`,
+        `Failed to queue waitlist email for te***@example.com`,
         error.stack,
       );
       
       // Still returns success for the user
       expect(result).toEqual({ user: NEW_USER, isNew: true });
-      
-      loggerSpy.mockRestore();
     });
   });
 });

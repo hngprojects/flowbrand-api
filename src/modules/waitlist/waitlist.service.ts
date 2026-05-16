@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { QueryFailedError } from 'typeorm';
+import { maskEmail } from '../../utils/pii.utils';
 import { EmailService } from '../../email/email.service';
 import { WaitlistModelAction } from './actions/waitlist.action';
 import { JoinWaitlistDto } from './dto/join-waitlist.dto';
@@ -25,13 +27,30 @@ export class WaitlistService {
       return { user: existing, isNew: false };
     }
 
-    const user = await this.waitlistAction.create({
-      ...NO_TRANSACTION,
-      createPayload: {
-        email: dto.email,
-        is_notified: false,
-      },
-    });
+    let user: Waitlist;
+    try {
+      user = await this.waitlistAction.create({
+        ...NO_TRANSACTION,
+        createPayload: {
+          email: dto.email,
+          is_notified: false,
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof QueryFailedError &&
+        (error as { driverError?: { code?: string } }).driverError?.code ===
+          '23505'
+      ) {
+        const existingAfterCreate = await this.waitlistAction.findByEmail(
+          dto.email,
+        );
+        if (existingAfterCreate) {
+          return { user: existingAfterCreate, isNew: false };
+        }
+      }
+      throw error;
+    }
 
     try {
       await this.emailService.sendWaitlistConfirmation(user.email, {
@@ -39,7 +58,7 @@ export class WaitlistService {
       });
     } catch (err) {
       this.logger.error(
-        `Failed to queue waitlist email for ${user.email}`,
+        `Failed to queue waitlist email for ${maskEmail(user.email)}`,
         (err as Error).stack,
       );
     }

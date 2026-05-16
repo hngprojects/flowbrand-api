@@ -68,6 +68,7 @@ export class TemplateService implements OnModuleInit {
       body,
       year: new Date().getFullYear(),
       unsubscribeUrl: `${process.env.FRONTEND_URL ?? ''}/unsubscribe`,
+      privacyPolicyUrl: `${process.env.FRONTEND_URL ?? ''}/privacy-policy`,
     });
 
     const subject = this.compiledSubjects[type](payload);

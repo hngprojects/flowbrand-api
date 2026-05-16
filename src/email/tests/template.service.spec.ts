@@ -5,7 +5,7 @@ import { TemplateService } from '../template.service';
 jest.mock('fs/promises');
 const mockReadFile = fs.readFile as jest.MockedFunction<typeof fs.readFile>;
 
-const BASE_HBS = `<!DOCTYPE html><html><body>{{{body}}} {{year}} <a href="{{unsubscribeUrl}}">Unsubscribe</a></body></html>`;
+const BASE_HBS = `<!DOCTYPE html><html><body>{{{body}}} {{year}} <a href="{{unsubscribeUrl}}">Unsubscribe</a> <a href="{{privacyPolicyUrl}}">Privacy</a></body></html>`;
 const OTP_VERIFICATION_HBS = `<p>Hello {{fullName}}</p><p>{{otpCode}}</p><p>{{expiryMins}} minutes</p>`;
 const OTP_RESET_HBS = `<p>Hello {{fullName}}</p><p>{{otpCode}}</p><p>{{expiryMins}} minutes</p>`;
 const WAITLIST_HBS = `<p>Hi {{user.name}}</p><p>You are on the waitlist</p>`;
@@ -68,6 +68,7 @@ describe('TemplateService', () => {
 
       expect(html).toContain('Charlie');
       expect(html).toContain('waitlist');
+      expect(html).toContain('/privacy-policy');
       expect(subject).toBe('You are on the waitlist');
     });
 
