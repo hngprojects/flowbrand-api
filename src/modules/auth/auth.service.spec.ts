@@ -1,4 +1,8 @@
-import { HttpException, HttpStatus, UnauthorizedException } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
@@ -7,6 +11,8 @@ import { UsersService } from '../users/users.service';
 import { RedisService } from '../redis/redis.service';
 import { UserSessionModelAction } from '../users/actions/user-session.action';
 import { AuthMetadataModelAction } from './actions/auth-metadata.action';
+import { OtpTokenModelAction } from './actions/otp-token.action';
+import { EmailService } from '../../email/email.service';
 import * as SYS_MSG from '../../constants/system.messages';
 
 jest.mock('bcrypt');
@@ -27,6 +33,15 @@ const mockAuthMetadataModelAction = {
   findByUserId: jest.fn(),
   updateByUserId: jest.fn(),
   createForUser: jest.fn(),
+};
+const mockOtpTokenModelAction = {
+  create: jest.fn(),
+  update: jest.fn(),
+  findActiveByUserId: jest.fn(),
+};
+const mockEmailService = {
+  sendOtpVerification: jest.fn(),
+  sendOtpReset: jest.fn(),
 };
 
 const TEST_USER = {
@@ -58,7 +73,9 @@ describe('AuthService login lockout (BE-005)', () => {
     jest.clearAllMocks();
 
     mockJwtService.signAsync.mockResolvedValue('signed.jwt.token');
-    mockUserSessionModelAction.createSession.mockResolvedValue({ id: 'sess-1' });
+    mockUserSessionModelAction.createSession.mockResolvedValue({
+      id: 'sess-1',
+    });
     mockUserSessionModelAction.updateById.mockResolvedValue(null);
     mockAuthMetadataModelAction.updateByUserId.mockResolvedValue(null);
 
@@ -68,8 +85,16 @@ describe('AuthService login lockout (BE-005)', () => {
         { provide: UsersService, useValue: mockUsersService },
         { provide: JwtService, useValue: mockJwtService },
         { provide: RedisService, useValue: mockRedisService },
-        { provide: UserSessionModelAction, useValue: mockUserSessionModelAction },
-        { provide: AuthMetadataModelAction, useValue: mockAuthMetadataModelAction },
+        {
+          provide: UserSessionModelAction,
+          useValue: mockUserSessionModelAction,
+        },
+        {
+          provide: AuthMetadataModelAction,
+          useValue: mockAuthMetadataModelAction,
+        },
+        { provide: OtpTokenModelAction, useValue: mockOtpTokenModelAction },
+        { provide: EmailService, useValue: mockEmailService },
       ],
     }).compile();
 
@@ -151,9 +176,7 @@ describe('AuthService login lockout (BE-005)', () => {
         expect(err).toBeInstanceOf(HttpException);
         const httpErr = err as HttpException;
         expect(httpErr.getStatus()).toBe(HttpStatus.LOCKED);
-        expect(httpErr.message).toBe(
-          SYS_MSG.AUTH_TOO_MANY_FAILED_ATTEMPTS,
-        );
+        expect(httpErr.message).toBe(SYS_MSG.AUTH_TOO_MANY_FAILED_ATTEMPTS);
       }
 
       expect(mockAuthMetadataModelAction.updateByUserId).toHaveBeenCalledWith(
@@ -223,7 +246,9 @@ describe('AuthService login lockout (BE-005)', () => {
     it('creates an AuthMetadata row the first time a user logs in', async () => {
       mockUsersService.findByEmail.mockResolvedValue(TEST_USER);
       mockAuthMetadataModelAction.findByUserId.mockResolvedValue(null);
-      mockAuthMetadataModelAction.createForUser.mockResolvedValue(buildMetadata());
+      mockAuthMetadataModelAction.createForUser.mockResolvedValue(
+        buildMetadata(),
+      );
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
       await service.login(LOGIN_DTO);
