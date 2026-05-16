@@ -52,7 +52,7 @@ describe('AuthController Google OAuth', () => {
     );
     expect(redirect).toHaveBeenCalledWith(
       HttpStatus.FOUND,
-      'http://localhost:3000/onboarding?access_token=access.jwt',
+      "http://localhost:3000/onboarding'#access_token'=access.jwt",
     );
   });
 

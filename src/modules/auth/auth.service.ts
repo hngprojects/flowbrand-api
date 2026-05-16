@@ -20,30 +20,8 @@ import { UsersService } from '../users/users.service';
 import { RedisService } from '../redis/redis.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import type { GoogleOAuthProfile, OAuthLoginResponse } from './interface/google-oauth.interface';
 import { JwtPayload } from './strategies/jwt.strategy';
-
-export interface GoogleOAuthProfile {
-  provider: 'google';
-  providerId: string;
-  email: string;
-  full_name: string;
-  avatar_url: string | null;
-}
-
-export interface OAuthLoginResponse {
-  status_code: number;
-  message: string;
-  access_token: string;
-  refresh_token: string;
-  data: {
-    user: {
-      id: string;
-      full_name: string;
-      email: string;
-      avatar_url: string | null;
-    };
-  };
-}
 
 export interface AuthTokens {
   accessToken: string;

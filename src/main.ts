@@ -36,7 +36,8 @@ async function bootstrap() {
   app.setGlobalPrefix('api', {
     exclude: [
       { path: 'health', method: RequestMethod.ALL },
-      { path: 'auth/(.*)', method: RequestMethod.ALL },
+      { path: 'auth/google', method: RequestMethod.ALL },
+      { path: 'auth/google/callback', method: RequestMethod.ALL },
     ],
   });
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));

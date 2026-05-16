@@ -16,8 +16,9 @@ import { ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../constants/system.messages';
 import { Public } from '../../common/decorators/public.decorator';
-import { AuthService, GoogleOAuthProfile } from './auth.service';
+import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import type { GoogleOAuthProfile } from './interface/google-oauth.interface';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import {
@@ -182,7 +183,7 @@ export class AuthController {
     const result = await this.authService.handleOAuthLogin(payload);
     res.cookie('refreshToken', result.refresh_token, this.getRefreshCookieOptions());
 
-    const redirectUrl = `${this.getFrontendBaseUrl()}${AuthController.OAUTH_REDIRECT_URL}?access_token=${encodeURIComponent(result.access_token)}`;
+    const redirectUrl = `${this.getFrontendBaseUrl()}${AuthController.OAUTH_REDIRECT_URL}'#access_token'=${encodeURIComponent(result.access_token)}`;
     res.redirect(HttpStatus.FOUND, redirectUrl);
   }
 }
