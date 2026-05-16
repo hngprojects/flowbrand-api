@@ -6,8 +6,10 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import * as crypto from 'crypto';
 import { UserSessionModelAction } from '../users/actions/user-session.action';
 import { AuthMetadataModelAction } from './actions/auth-metadata.action';
+import { OtpTokenModelAction } from './actions/otp-token.action';
 import * as bcrypt from 'bcrypt';
 import type { StringValue } from 'ms';
 import * as SYS_MSG from '../../constants/system.messages';
@@ -15,8 +17,10 @@ import { env } from '../../config/env';
 import { User } from '../users/entities/user.entity';
 import type { UserSession } from '../users/entities/user-session.entity';
 import type { AuthMetadata } from './entities/auth-metadata.entity';
+import type { OtpToken } from './entities/otp-token.entity';
 import { UsersService } from '../users/users.service';
 import { RedisService } from '../redis/redis.service';
+import { EmailService } from '../../email/email.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtPayload } from './strategies/jwt.strategy';
@@ -53,12 +57,17 @@ export class AuthService {
     private readonly redisService: RedisService,
     private readonly userSessionModelAction: UserSessionModelAction,
     private readonly authMetadataModelAction: AuthMetadataModelAction,
+    private readonly otpTokenModelAction: OtpTokenModelAction,
+    private readonly emailService: EmailService,
   ) {}
 
   // Local minimal interface to avoid unsafe-call lint issues from third-party model action types
   private get userSessionAction(): {
     findById(id: string): Promise<UserSession | null>;
-    updateById(id: string, payload: Partial<UserSession>): Promise<UserSession | null>;
+    updateById(
+      id: string,
+      payload: Partial<UserSession>,
+    ): Promise<UserSession | null>;
     deleteById(id: string): Promise<void>;
     createSession(payload: Partial<UserSession>): Promise<UserSession>;
   } {
@@ -74,6 +83,19 @@ export class AuthService {
     createForUser(payload: Partial<AuthMetadata>): Promise<AuthMetadata>;
   } {
     return this.authMetadataModelAction;
+  }
+
+  private get otpTokenAction(): {
+    delete(options: {
+      identifierOptions: Partial<OtpToken>;
+      transactionOptions: { useTransaction: false };
+    }): Promise<unknown>;
+    create(options: {
+      createPayload: Partial<OtpToken>;
+      transactionOptions: { useTransaction: false };
+    }): Promise<OtpToken>;
+  } {
+    return this.otpTokenModelAction;
   }
 
   async register(dto: RegisterDto): Promise<AuthResponse> {
@@ -122,19 +144,13 @@ export class AuthService {
         secret: env.JWT_REFRESH_SECRET,
       });
     } catch {
-      throw new UnauthorizedException(
-        SYS_MSG.AUTH_INVALID_REFRESH_TOKEN,
-      );
+      throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_REFRESH_TOKEN);
     }
 
-    const session = await this.userSessionAction.findById(
-      payload.sessionId,
-    );
+    const session = await this.userSessionAction.findById(payload.sessionId);
 
     if (!session || session.is_revoked) {
-      throw new UnauthorizedException(
-        SYS_MSG.AUTH_INVALID_REFRESH_TOKEN,
-      );
+      throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_REFRESH_TOKEN);
     }
 
     const tokenMatches = await bcrypt.compare(
@@ -143,9 +159,7 @@ export class AuthService {
     );
 
     if (!tokenMatches) {
-      throw new UnauthorizedException(
-        SYS_MSG.AUTH_INVALID_REFRESH_TOKEN,
-      );
+      throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_REFRESH_TOKEN);
     }
 
     const user = await this.usersService.findById(payload.sub);
@@ -167,6 +181,58 @@ export class AuthService {
 
   async getProfile(userId: string): Promise<User> {
     return this.usersService.findById(userId);
+  }
+
+  async sendOtp(email: string): Promise<{ message: string }> {
+    const user = await this.usersService.findByEmail(email);
+
+    if (!user) {
+      return { message: SYS_MSG.OTP_SENT_SUCCESSFULLY };
+    }
+
+    if (user.is_verified) {
+      return { message: SYS_MSG.ACCOUNT_ALREADY_VERIFIED };
+    }
+
+    const rateKey = `otp:rate:${user.id}`;
+    const newCount = await this.redisService.incr(rateKey);
+    if (newCount !== null) {
+      if (newCount === 1) {
+        await this.redisService.expire(rateKey, 900);
+      }
+      if (newCount > 5) {
+        throw new HttpException(
+          SYS_MSG.OTP_RATE_LIMITED,
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+    }
+
+    await this.otpTokenAction.delete({
+      identifierOptions: { user_id: user.id, type: 'email_verification' as const },
+      transactionOptions: { useTransaction: false },
+    });
+
+    const otpCode = crypto.randomInt(100000, 1000000);
+    const token_hash = await bcrypt.hash(String(otpCode), 10);
+
+    await this.otpTokenAction.create({
+      createPayload: {
+        user_id: user.id,
+        type: 'email_verification' as const,
+        token_hash,
+        expires_at: new Date(Date.now() + 5 * 60 * 1000),
+      },
+      transactionOptions: { useTransaction: false },
+    });
+
+    await this.emailService.sendOtpVerification(
+      user.email,
+      { fullName: user.full_name, otpCode: String(otpCode), expiryMins: 5 },
+      user.id,
+    );
+
+    return { message: SYS_MSG.OTP_SENT_SUCCESSFULLY };
   }
 
   private async issueTokens(
@@ -210,7 +276,10 @@ export class AuthService {
     return safeUser;
   }
 
-  private async signTokens(user: User, sessionId?: string): Promise<AuthTokens> {
+  private async signTokens(
+    user: User,
+    sessionId?: string,
+  ): Promise<AuthTokens> {
     const payload: JwtPayload = {
       userId: user.id,
       sub: user.id,
@@ -277,10 +346,7 @@ export class AuthService {
 
   private throwIfLocked(metadata: AuthMetadata): void {
     if (metadata.locked_until && metadata.locked_until.getTime() > Date.now()) {
-      throw new HttpException(
-        SYS_MSG.AUTH_ACCOUNT_LOCKED,
-        HttpStatus.LOCKED,
-      );
+      throw new HttpException(SYS_MSG.AUTH_ACCOUNT_LOCKED, HttpStatus.LOCKED);
     }
   }
 
@@ -322,7 +388,7 @@ export class AuthService {
     const expiresAt = new Date();
     const refreshExpiresInSeconds = parseInt(
       env.JWT_REFRESH_EXPIRES_IN.replace(/\D/g, ''),
-      10
+      10,
     );
     const refreshExpiresInMs = env.JWT_REFRESH_EXPIRES_IN.includes('d')
       ? refreshExpiresInSeconds * 24 * 60 * 60 * 1000
