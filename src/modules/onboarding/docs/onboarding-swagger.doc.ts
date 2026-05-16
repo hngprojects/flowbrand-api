@@ -1,7 +1,8 @@
-import { applyDecorators, HttpCode, HttpStatus } from '@nestjs/common';
+import { applyDecorators, HttpStatus } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -20,23 +21,30 @@ const startResponseDataExample = {
 
 export const StartOnboardingDocs = () =>
   applyDecorators(
-    HttpCode(HttpStatus.CREATED),
     ApiOperation({
       summary: 'Initialise onboarding wizard session',
       description:
-        'Requires Bearer accessToken from POST /auth/login or /auth/register (data.accessToken). ' +
-        'Do not use the DB session id or refresh cookie. ' +
+        'Requires Bearer accessToken from POST /auth/login or /auth/register. ' +
         'Returns 409 if onboarding is already complete. ' +
-        'Returns existing in-progress session when still valid (idempotent). ' +
-        'Otherwise creates a new session (24h expiry, empty answers).',
+        'Returns 200 with an existing in-progress session when still valid. ' +
+        'Returns 201 when a new session is created.',
     }),
     ApiCreatedResponse({
-      description:
-        'Wizard session ready; `data.session_id` is the server-generated session identifier.',
+      description: 'New wizard session created.',
       schema: {
         example: {
           status_code: HttpStatus.CREATED,
           message: SYS_MSG.ONBOARDING_API.SESSION_STARTED,
+          data: startResponseDataExample,
+        },
+      },
+    }),
+    ApiOkResponse({
+      description: 'Existing in-progress session resumed (idempotent).',
+      schema: {
+        example: {
+          status_code: HttpStatus.OK,
+          message: SYS_MSG.ONBOARDING_API.SESSION_RESUMED,
           data: startResponseDataExample,
         },
       },

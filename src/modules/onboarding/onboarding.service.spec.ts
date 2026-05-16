@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, HttpStatus } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as SYS_MSG from '../../constants/system.messages';
 import { WizardSessionModelAction } from './actions/wizard-session.action';
@@ -80,7 +80,9 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
 
     const result = await service.startWizardSession(USER_A);
 
-    expect(result).toEqual({
+    expect(result.statusCode).toBe(HttpStatus.OK);
+    expect(result.message).toBe(SYS_MSG.ONBOARDING_API.SESSION_RESUMED);
+    expect(result.data).toEqual({
       session_id: SESSION_1,
       user_id: USER_A,
       status: WizardStatus.IN_PROGRESS,
@@ -117,9 +119,11 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
         new Date('2026-05-16T10:00:00.000Z'),
       );
 
-      expect(result.session_id).toBe(created.id);
-      expect(result.user_id).toBe(USER_A);
-      expect(result.status).toBe(WizardStatus.IN_PROGRESS);
+      expect(result.statusCode).toBe(HttpStatus.CREATED);
+      expect(result.message).toBe(SYS_MSG.ONBOARDING_API.SESSION_STARTED);
+      expect(result.data.session_id).toBe(created.id);
+      expect(result.data.user_id).toBe(USER_A);
+      expect(result.data.status).toBe(WizardStatus.IN_PROGRESS);
     } finally {
       jest.useRealTimers();
     }
@@ -157,7 +161,8 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
     );
 
     const result = await service.startWizardSession(USER_B);
-    expect(result.user_id).toBe(USER_B);
+    expect(result.statusCode).toBe(HttpStatus.CREATED);
+    expect(result.data.user_id).toBe(USER_B);
   });
 
   it('delegates to atomic resolveStartWizardSession', async () => {
@@ -182,7 +187,8 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
 
     const result = await service.startWizardSession(USER_A);
 
-    expect(result.session_id).toBe('ffffffff-ffff-4fff-8fff-ffffffffffff');
-    expect('id' in result).toBe(false);
+    expect(result.statusCode).toBe(HttpStatus.OK);
+    expect(result.data.session_id).toBe('ffffffff-ffff-4fff-8fff-ffffffffffff');
+    expect('id' in result.data).toBe(false);
   });
 });

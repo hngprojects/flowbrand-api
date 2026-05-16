@@ -26,6 +26,7 @@ export const USER_UPDATE_FAILED = 'Failed to update user';
 // Onboarding — API response `message` / `code` values (machine-oriented, not end-user copy)
 export const ONBOARDING_API = {
   SESSION_STARTED: 'ONBOARDING_SESSION_STARTED',
+  SESSION_RESUMED: 'ONBOARDING_SESSION_RESUMED',
   ALREADY_COMPLETE: 'ONBOARDING_ALREADY_COMPLETE',
 } as const;
 

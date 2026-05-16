@@ -1,4 +1,8 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  HttpStatus,
+  Injectable,
+} from '@nestjs/common';
 import * as SYS_MSG from '../../constants/system.messages';
 import { WizardSession } from './entities/wizzard-session.entity';
 import { WizardSessionModelAction } from './actions/wizard-session.action';
@@ -15,6 +19,12 @@ export interface OnboardingStartResponseData {
   updated_at: Date;
 }
 
+export interface OnboardingStartResult {
+  statusCode: typeof HttpStatus.OK | typeof HttpStatus.CREATED;
+  message: string;
+  data: OnboardingStartResponseData;
+}
+
 @Injectable()
 export class OnboardingService {
   constructor(
@@ -25,9 +35,7 @@ export class OnboardingService {
    * Idempotent start: returns existing active in-progress session or creates a new one.
    * Users who already completed onboarding get 409.
    */
-  async startWizardSession(
-    userId: string,
-  ): Promise<OnboardingStartResponseData> {
+  async startWizardSession(userId: string): Promise<OnboardingStartResult> {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
@@ -46,7 +54,15 @@ export class OnboardingService {
       });
     }
 
-    return this.mapSessionToResponse(result.session);
+    const created = result.status === 'created';
+
+    return {
+      statusCode: created ? HttpStatus.CREATED : HttpStatus.OK,
+      message: created
+        ? SYS_MSG.ONBOARDING_API.SESSION_STARTED
+        : SYS_MSG.ONBOARDING_API.SESSION_RESUMED,
+      data: this.mapSessionToResponse(result.session),
+    };
   }
 
   private mapSessionToResponse(
