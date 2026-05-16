@@ -24,7 +24,11 @@ export const StartOnboardingDocs = () =>
     ApiOperation({
       summary: 'Initialise onboarding wizard session',
       description:
-        'Requires `Authorization: Bearer <accessToken>` from `POST /auth/login` or `/auth/register` (`data.accessToken`). Do not use the DB session id or refresh cookie. If the user already completed 
+        'Requires Bearer accessToken from POST /auth/login or /auth/register (data.accessToken). ' +
+        'Do not use the DB session id or refresh cookie. ' +
+        'Returns 409 if onboarding is already complete. ' +
+        'Returns existing in-progress session when still valid (idempotent). ' +
+        'Otherwise creates a new session (24h expiry, empty answers).',
     }),
     ApiCreatedResponse({
       description:
