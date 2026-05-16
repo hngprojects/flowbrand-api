@@ -1,8 +1,7 @@
 import * as dotenv from 'dotenv';
 import { z } from 'zod';
 
-// dotenv.config();
-dotenv.config({ path: resolve(process.cwd(), '.env') });
+dotenv.config();
 
 const boolEnv = z
   .union([z.boolean(), z.enum(['true', 'false'])])
