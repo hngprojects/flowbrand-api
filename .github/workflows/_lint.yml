@@ -36,7 +36,7 @@ jobs:
           # cache: pnpm removed
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile --include=dev --ignore-scripts
+        run: pnpm install --no-lockfile --include=dev --ignore-scripts
         env:
           PNPM_FETCH_RETRIES: 3
           PNPM_FETCH_RETRY_MINTIMEOUT: 10000

@@ -8,7 +8,7 @@ Your participation helps keep the platform smarter, more reliable, and more impa
 
 ### 1. Clone the repository
 
-This project uses a shared-repo workflow. If you have write access to `hngprojects/flowbrand-api`, clone the repo directly and branch off `dev`. External contributors without write access can fork instead and open a cross-fork PR.
+This project uses a shared-repo workflow. If you have write access to `hngprojects/flowbrand-api`, clone the repo directly and branch off `dev`. External contributors without write access can fork ins
 
 ```sh
 git clone https://github.com/hngprojects/flowbrand-api.git

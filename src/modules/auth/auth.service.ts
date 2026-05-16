@@ -52,7 +52,10 @@ export class AuthService {
   // Local minimal interface to avoid unsafe-call lint issues from third-party model action types
   private get userSessionAction(): {
     findById(id: string): Promise<UserSession | null>;
-    updateById(id: string, payload: Partial<UserSession>): Promise<UserSession | null>;
+    updateById(
+      id: string,
+      payload: Partial<UserSession>,
+    ): Promise<UserSession | null>;
     deleteById(id: string): Promise<void>;
     createSession(payload: Partial<UserSession>): Promise<UserSession>;
   } {
@@ -103,19 +106,13 @@ export class AuthService {
         },
       );
     } catch {
-      throw new UnauthorizedException(
-        SYS_MSG.AUTH_INVALID_REFRESH_TOKEN,
-      );
+      throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_REFRESH_TOKEN);
     }
 
-    const session = await this.userSessionAction.findById(
-      payload.sessionId,
-    );
+    const session = await this.userSessionAction.findById(payload.sessionId);
 
     if (!session || session.is_revoked) {
-      throw new UnauthorizedException(
-        SYS_MSG.AUTH_INVALID_REFRESH_TOKEN,
-      );
+      throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_REFRESH_TOKEN);
     }
 
     const tokenMatches = await bcrypt.compare(
@@ -124,9 +121,7 @@ export class AuthService {
     );
 
     if (!tokenMatches) {
-      throw new UnauthorizedException(
-        SYS_MSG.AUTH_INVALID_REFRESH_TOKEN,
-      );
+      throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_REFRESH_TOKEN);
     }
 
     const user = await this.usersService.findById(payload.sub);
@@ -189,7 +184,10 @@ export class AuthService {
     return safeUser;
   }
 
-  private async signTokens(user: User, sessionId?: string): Promise<AuthTokens> {
+  private async signTokens(
+    user: User,
+    sessionId?: string,
+  ): Promise<AuthTokens> {
     const payload: JwtPayload = {
       userId: user.id,
       sub: user.id,
@@ -250,7 +248,7 @@ export class AuthService {
     const expiresAt = new Date();
     const refreshExpiresInSeconds = parseInt(
       env.JWT_REFRESH_EXPIRES_IN.replace(/\D/g, ''),
-      10
+      10,
     );
     const refreshExpiresInMs = env.JWT_REFRESH_EXPIRES_IN.includes('d')
       ? refreshExpiresInSeconds * 24 * 60 * 60 * 1000

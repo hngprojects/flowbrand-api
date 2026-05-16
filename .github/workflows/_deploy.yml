@@ -55,32 +55,42 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H "${{ secrets.HOST }}" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
 
       - name: Copy tarball to server
         run: |
-          echo "================================================================================"
-          echo "  Copying ${{ inputs.tarball }} -> ${{ secrets.HOST }}:${{ env.REMOTE_TMP }}"
-          echo "================================================================================"
-          ssh -i ~/.ssh/deploy_key ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=yes \
+              ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
               "mkdir -p ${{ env.REMOTE_TMP }}"
 
           scp -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=yes \
               ${{ inputs.tarball }} \
               ${{ secrets.USERNAME }}@${{ secrets.HOST }}:${{ env.REMOTE_TMP }}/
 
       - name: Deploy on server
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=yes \
+              ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+              bash -s -- \
+                "${{ env.DEPLOY_DIR }}" \
+                "${{ env.PM2_ENV }}" \
+                "${{ env.REMOTE_TMP }}" \
+                "${{ env.TARBALL }}" \
+                "${{ inputs.environment }}" \
+              << 'EOF'
           set -euo pipefail
-
-          DEPLOY_DIR="${{ env.DEPLOY_DIR }}"
-          PM2_ENV="${{ env.PM2_ENV }}"
-          REMOTE_TMP="${{ env.REMOTE_TMP }}"
-          TARBALL="${{ env.TARBALL }}"
+          DEPLOY_DIR="$1"
+          PM2_ENV="$2"
+          REMOTE_TMP="$3"
+          TARBALL="$4"
+          ENVIRONMENT="$5"
 
           echo "================================================================="
-          echo "  Environment   : ${{ inputs.environment }}"
+          echo "  Environment   : ${ENVIRONMENT}"
           echo "  Deploy dir    : ${DEPLOY_DIR}"
           echo "  PM2 env       : ${PM2_ENV}"
           echo "================================================================="
@@ -98,7 +108,6 @@ jobs:
           echo "==================== Link environment file ======================"
           if [[ ! -f ".env" ]]; then
               echo "ERROR: .env not found at ${DEPLOY_DIR}/.env"
-              echo "Place the .env file there before deploying."
               exit 1
           fi
           ln -sf "${DEPLOY_DIR}/.env" dist/.env
@@ -107,7 +116,7 @@ jobs:
           chmod +x deployment.sh
           ./deployment.sh "${PM2_ENV}"
 
-          echo "=================================================================="
-          echo "  Deploy Complete (${{ inputs.environment }})"
-          echo "=================================================================="
+          echo "================================================================="
+          echo "  Deploy Complete (${ENVIRONMENT})"
+          echo "================================================================="
           EOF
