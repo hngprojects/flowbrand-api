@@ -40,15 +40,6 @@ export class User extends BaseEntity {
   @Column({ type: 'boolean', default: true })
   is_active: boolean;
 
-  @Column({ type: 'text', nullable: true })
-  avatar_url: string | null;
-
-  @Column({ type: 'varchar', length: 20, default: 'local' })
-  auth_provider: string;
-
-  @Column({ type: 'text', nullable: true })
-  provider_user_id: string | null;
-
   @ApiProperty({ enum: AuthProvider, default: AuthProvider.EMAIL })
   @Column({ type: 'enum', enum: AuthProvider, default: AuthProvider.EMAIL })
   authProvider: AuthProvider;

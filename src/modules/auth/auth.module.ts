@@ -25,7 +25,6 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     }),
     RedisModule,
     UsersModule,
-    RedisModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, GoogleStrategy, AuthMetadataModelAction],

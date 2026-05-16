@@ -58,8 +58,6 @@ export class AuthService {
     private readonly authMetadataModelAction: AuthMetadataModelAction,
   ) {}
 
-
-
   private get authMetadataAction(): {
     findByUserId(userId: string): Promise<AuthMetadata | null>;
     updateByUserId(
@@ -155,7 +153,7 @@ export class AuthService {
           id: auth.user.id,
           full_name: auth.user.full_name,
           email: auth.user.email,
-          avatar_url: auth.user.avatar_url,
+          avatar_url: auth.user.avatarUrl,
         },
       },
     };

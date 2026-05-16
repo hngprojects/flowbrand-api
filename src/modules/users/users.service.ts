@@ -118,9 +118,9 @@ export class UsersService {
         email: payload.email,
         password: null,
         full_name: payload.full_name,
-        auth_provider: AuthProvider.GOOGLE,
-        provider_user_id: payload.provider_user_id,
-        avatar_url: payload.avatar_url,
+        authProvider: AuthProvider.GOOGLE,
+        providerUserId: payload.provider_user_id,
+        avatarUrl: payload.avatar_url,
         is_verified: true,
         termsAccepted: true,
       },
@@ -140,12 +140,15 @@ export class UsersService {
       ...NO_TRANSACTION,
       identifierOptions: { id },
       updatePayload: {
-        ...payload,
-        auth_provider: AuthProvider.GOOGLE,
+        full_name: payload.full_name,
+        providerUserId: payload.provider_user_id,
+        avatarUrl: payload.avatar_url,
+        is_verified: payload.is_verified,
+        authProvider: AuthProvider.GOOGLE,
       },
     });
 
-    if (!updated) {
+
       throw new InternalServerErrorException(SYS_MSG.USER_UPDATE_FAILED);
     }
 

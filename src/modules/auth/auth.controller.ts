@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import type { Request, Response } from 'express';
+import type { CookieOptions, Request, Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import * as SYS_MSG from '../../constants/system.messages';
@@ -36,20 +36,49 @@ export class AuthController {
 
   constructor(private readonly authService: AuthService) {}
 
+  private getRefreshCookieOptions(): CookieOptions {
+    return {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    };
+  }
+
   @Public()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @RegisterDocs()
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  async register(@Body() dto: RegisterDto, @Res() res: Response) {
+    const result = await this.authService.register(dto);
+    res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
+    return res.status(HttpStatus.CREATED).json({
+      statusCode: HttpStatus.CREATED,
+      message: SYS_MSG.USER_CREATED_SUCCESSFULLY,
+      data: {
+        accessToken: result.accessToken,
+        user: result.user,
+        redirectUrl: AuthController.REDIRECT_URL,
+      },
+    });
   }
 
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @LoginDocs()
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  async login(@Body() dto: LoginDto, @Res() res: Response) {
+    const result = await this.authService.login(dto);
+    res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
+    return res.json({
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.AUTH_LOGIN_SUCCESSFUL,
+      data: {
+        accessToken: result.accessToken,
+        user: result.user,
+        redirectUrl: AuthController.REDIRECT_URL,
+      },
+    });
   }
 
   @Public()
