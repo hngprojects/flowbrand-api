@@ -8,6 +8,7 @@ import { Inject, Logger } from '@nestjs/common';
 import type { Job } from 'bull';
 import { Resend } from 'resend';
 import { JOBS, QUEUES } from '../../common/constants/queue.constants';
+import { maskEmail, maskId } from '../../utils/pii.utils';
 import type { EmailJob } from '../interfaces/email-job.interface';
 import { TemplateService } from '../template.service';
 
@@ -31,8 +32,8 @@ export class EmailProcessor {
       message: 'Processing email job',
       jobId: job.id,
       type,
-      to,
-      userId,
+      to: maskEmail(to),
+      userId: maskId(userId),
       requestId,
       attempt: job.attemptsMade + 1,
     });
@@ -57,7 +58,7 @@ export class EmailProcessor {
       message: 'Email sent successfully',
       jobId: job.id,
       type,
-      to,
+      to: maskEmail(to),
       resendId: result.data?.id,
     });
   }
@@ -80,8 +81,8 @@ export class EmailProcessor {
       event: 'email_job_failed',
       jobId: job.id,
       type: job.data.type,
-      to: job.data.to,
-      userId: job.data.userId,
+      to: maskEmail(job.data.to),
+      userId: maskId(job.data.userId),
       attemptsMade: job.attemptsMade,
       maxAttempts,
       willRetry,
@@ -94,8 +95,8 @@ export class EmailProcessor {
         message: 'Email permanently failed after all retries. Manual review required.',
         jobId: job.id,
         type: job.data.type,
-        to: job.data.to,
-        userId: job.data.userId,
+        to: maskEmail(job.data.to),
+        userId: maskId(job.data.userId),
       });
     }
   }

@@ -2,6 +2,7 @@ import { InjectQueue } from '@nestjs/bull';
 import { Injectable, Logger } from '@nestjs/common';
 import type { Queue } from 'bull';
 import { JOBS, QUEUES } from '../common/constants/queue.constants';
+import { maskEmail, maskId } from '../utils/pii.utils';
 import type { EmailJob, OtpPayload } from './interfaces/email-job.interface';
 
 const DEFAULT_PRIORITY = 5;
@@ -49,8 +50,8 @@ export class EmailService {
         message: 'Email job queued',
         jobId: queued.id,
         type: job.type,
-        to: job.to,
-        userId: job.userId,
+        to: maskEmail(job.to),
+        userId: maskId(job.userId),
       });
 
       return String(queued.id);
@@ -58,7 +59,7 @@ export class EmailService {
       this.logger.error({
         message: 'Failed to queue email — Redis may be unavailable',
         type: job.type,
-        to: job.to,
+        to: maskEmail(job.to),
         error: (err as Error).message,
       });
       return undefined;
