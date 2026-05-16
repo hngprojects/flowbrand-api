@@ -58,3 +58,7 @@ export const REDIS_RECONNECT_ATTEMPT = (attempt: number, delay: number) =>
 export const REDIS_RETRY_LIMIT_REACHED = 'Redis retry limit reached';
 export const REDIS_PATTERN_DELETE_SUCCESS = (count: number, pattern: string) =>
   `Deleted ${count} keys matching pattern: ${pattern}`;
+
+// Waitlist
+export const WAITLIST_JOINED_SUCCESSFULLY = 'Successfully joined the waitlist';
+export const WAITLIST_ALREADY_JOINED = 'You are already on the waitlist';
