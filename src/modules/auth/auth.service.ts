@@ -1,9 +1,10 @@
 import {
+  BadRequestException,
+  ConflictException,
   HttpException,
   HttpStatus,
   Injectable,
   UnauthorizedException,
-  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as crypto from 'crypto';
@@ -92,6 +93,10 @@ export class AuthService {
       token_hash: string;
       expires_at: Date;
     }): Promise<OtpToken>;
+    delete(options: {
+      identifierOptions: Partial<OtpToken>;
+      transactionOptions: { useTransaction: false };
+    }): Promise<unknown>;
   } {
     return this.otpTokenModelAction;
   }
@@ -206,23 +211,105 @@ export class AuthService {
       }
     }
 
+    await this.generateAndSendOtp(user);
+
+    return { message: SYS_MSG.OTP_SENT_SUCCESSFULLY };
+  }
+
+  async verifyOtp(email: string, otpCode: string): Promise<AuthResponse> {
+    const user = await this.usersService.findByEmail(email);
+
+    if (!user) {
+      throw new BadRequestException(SYS_MSG.OTP_INVALID);
+    }
+
+    if (user.is_verified) {
+      throw new ConflictException(SYS_MSG.ACCOUNT_ALREADY_VERIFIED);
+    }
+
+    const token = await this.otpTokenModelAction.findByUserAndType(user.id, 'email_verification');
+
+    if (!token) {
+      throw new BadRequestException(SYS_MSG.OTP_INVALID);
+    }
+
+    if (token.expires_at < new Date()) {
+      await this.otpTokenAction.delete({
+        identifierOptions: { user_id: user.id, type: 'email_verification' as const },
+        transactionOptions: { useTransaction: false },
+      });
+      throw new BadRequestException(SYS_MSG.OTP_EXPIRED);
+    }
+
+    const codeMatches = await bcrypt.compare(otpCode, token.token_hash);
+    if (!codeMatches) {
+      throw new BadRequestException(SYS_MSG.OTP_INVALID);
+    }
+
+    await this.otpTokenAction.delete({
+      identifierOptions: { user_id: user.id, type: 'email_verification' as const },
+      transactionOptions: { useTransaction: false },
+    });
+
+    const verifiedUser = await this.usersService.markVerified(user.id);
+    return this.issueTokens(verifiedUser);
+  }
+
+  async resendOtp(email: string): Promise<{ message: string }> {
+    const user = await this.usersService.findByEmail(email);
+
+    if (!user) {
+      return { message: SYS_MSG.OTP_SENT_SUCCESSFULLY };
+    }
+
+    if (user.is_verified) {
+      return { message: SYS_MSG.ACCOUNT_ALREADY_VERIFIED };
+    }
+
+    const hourlyKey = `otp:resend:${user.id}`;
+    const hourlyCount = await this.redisService.incr(hourlyKey);
+    if (hourlyCount !== null) {
+      if (hourlyCount === 1) {
+        await this.redisService.expire(hourlyKey, 3600);
+      }
+      if (hourlyCount > 10) {
+        throw new HttpException(
+          { message: SYS_MSG.OTP_RESEND_HOURLY_LIMIT, retryAfter: 3600 },
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+    }
+
+    const cooldownKey = `otp:cooldown:${user.id}`;
+    const cooldownRaw = await this.redisService.get(cooldownKey);
+    if (cooldownRaw) {
+      const retryAfter = Math.ceil((parseInt(cooldownRaw) - Date.now()) / 1000);
+      throw new HttpException(
+        { message: SYS_MSG.OTP_RESEND_RATE_LIMITED, retryAfter },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    await this.generateAndSendOtp(user);
+    await this.redisService.set(cooldownKey, String(Date.now() + 30_000), 30);
+
+    return { message: SYS_MSG.OTP_RESENT_SUCCESSFULLY };
+  }
+
+  private async generateAndSendOtp(user: User): Promise<void> {
     const otpCode = crypto.randomInt(100000, 1000000);
     const token_hash = await bcrypt.hash(String(otpCode), 10);
-
     await this.otpTokenAction.replaceToken({
       user_id: user.id,
       type: 'email_verification',
       token_hash,
       expires_at: new Date(Date.now() + 5 * 60 * 1000),
     });
-
     await this.emailService.sendOtpVerification(
       user.email,
       { fullName: user.full_name, otpCode: String(otpCode), expiryMins: 5 },
       user.id,
     );
-
-    return { message: SYS_MSG.OTP_SENT_SUCCESSFULLY };
   }
 
   private async issueTokens(
