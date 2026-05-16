@@ -18,7 +18,15 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
-import { LoginDocs, LogoutDocs, MeDocs, RefreshDocs, RegisterDocs } from './docs/auth-swagger.doc';
+import {
+  LoginDocs,
+  LogoutDocs,
+  MeDocs,
+  RefreshDocs,
+  RegisterDocs,
+  SendOtpDocs,
+} from './docs/auth-swagger.doc';
+import { SendOtpDto } from './dto/send-otp.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -59,7 +67,11 @@ export class AuthController {
   async register(@Body() dto: RegisterDto, @Res() res: Response) {
     const result = await this.authService.register(dto);
 
-    res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
+    res.cookie(
+      'refreshToken',
+      result.refreshToken,
+      this.getRefreshCookieOptions(),
+    );
 
     return res.json(
       this.buildAuthResponse(
@@ -77,7 +89,11 @@ export class AuthController {
   async login(@Body() dto: LoginDto, @Res() res: Response) {
     const result = await this.authService.login(dto);
 
-    res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
+    res.cookie(
+      'refreshToken',
+      result.refreshToken,
+      this.getRefreshCookieOptions(),
+    );
 
     return res.json(
       this.buildAuthResponse(
@@ -106,7 +122,11 @@ export class AuthController {
 
     const result = await this.authService.refresh(refreshToken);
 
-    res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
+    res.cookie(
+      'refreshToken',
+      result.refreshToken,
+      this.getRefreshCookieOptions(),
+    );
 
     return res.json(
       this.buildAuthResponse(
@@ -134,6 +154,15 @@ export class AuthController {
     });
 
     return res.status(HttpStatus.NO_CONTENT).send();
+  }
+
+  @Public()
+  @Post('send-otp')
+  @HttpCode(HttpStatus.OK)
+  @SendOtpDocs()
+  async sendOtp(@Body() dto: SendOtpDto) {
+    const result = await this.authService.sendOtp(dto.email);
+    return { statusCode: HttpStatus.OK, message: result.message };
   }
 
   @Get('me')

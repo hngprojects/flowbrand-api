@@ -209,7 +209,10 @@ export class AuthService {
     }
 
     await this.otpTokenAction.delete({
-      identifierOptions: { user_id: user.id, type: 'email_verification' as const },
+      identifierOptions: {
+        user_id: user.id,
+        type: 'email_verification' as const,
+      },
       transactionOptions: { useTransaction: false },
     });
 
