@@ -13,12 +13,8 @@ export class InitAuthAndOnboardingSchema1780000000000
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
-    await queryRunner.query(
-      `DO $$ BEGIN
-         CREATE TYPE "user_role_enum" AS ENUM ('user', 'admin');
-       EXCEPTION WHEN duplicate_object THEN NULL;
-       END $$`,
-    );
+    await queryRunner.query(`CREATE TYPE "user_role_enum" AS ENUM ('user', 'admin')`);
+
     await queryRunner.createTable(
       new Table({
         name: 'users',
@@ -41,13 +37,8 @@ export class InitAuthAndOnboardingSchema1780000000000
           { name: 'deleted_at', type: 'timestamp with time zone', isNullable: true },
         ],
       }),
-      true,
     );
 
-    await queryRunner.createIndex(
-      'users',
-      new TableIndex({ name: 'IDX_users_email', columnNames: ['email'], isUnique: true }),
-    );
     await queryRunner.createTable(
       new Table({
         name: 'user_roles',
@@ -59,7 +50,6 @@ export class InitAuthAndOnboardingSchema1780000000000
           { name: 'role', type: 'user_role_enum', isNullable: false },
         ],
       }),
-      true,
     );
 
     await queryRunner.createIndex(
@@ -99,7 +89,6 @@ export class InitAuthAndOnboardingSchema1780000000000
           { name: 'revoked_at', type: 'timestamp with time zone', isNullable: true },
         ],
       }),
-      true,
     );
 
     await queryRunner.createIndex(
@@ -130,7 +119,6 @@ export class InitAuthAndOnboardingSchema1780000000000
           { name: 'password_changed_at', type: 'timestamp with time zone', isNullable: true },
         ],
       }),
-      true,
     );
 
     await queryRunner.createIndex(
@@ -151,12 +139,7 @@ export class InitAuthAndOnboardingSchema1780000000000
         onDelete: 'CASCADE',
       }),
     );
-    await queryRunner.query(
-      `DO $$ BEGIN
-         CREATE TYPE "wizard_status_enum" AS ENUM ('in_progress', 'complete', 'expired');
-       EXCEPTION WHEN duplicate_object THEN NULL;
-       END $$`,
-    );
+    await queryRunner.query(`CREATE TYPE "wizard_status_enum" AS ENUM ('in_progress', 'complete', 'expired')`);
 
     await queryRunner.createTable(
       new Table({
@@ -172,7 +155,6 @@ export class InitAuthAndOnboardingSchema1780000000000
           { name: 'expires_at', type: 'timestamp with time zone', isNullable: false },
         ],
       }),
-      true,
     );
 
     await queryRunner.createIndex(
