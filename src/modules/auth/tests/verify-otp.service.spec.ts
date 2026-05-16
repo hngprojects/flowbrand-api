@@ -27,6 +27,7 @@ const mockRedisService = {
   get: jest.fn(),
   set: jest.fn(),
   rateLimit: jest.fn(),
+  setNx: jest.fn(),
 };
 const mockOtpTokenModelAction = {
   replaceToken: jest.fn(),
@@ -94,6 +95,7 @@ describe('AuthService.verifyOtp (BE-004)', () => {
     (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-value');
     (bcrypt.compare as jest.Mock).mockResolvedValue(true);
     mockRedisService.rateLimit.mockResolvedValue({ count: 1, exceeded: false });
+    mockRedisService.setNx.mockResolvedValue(true);
   });
 
   describe('unknown email', () => {
@@ -139,6 +141,28 @@ describe('AuthService.verifyOtp (BE-004)', () => {
       await service.verifyOtp(USER_EMAIL, OTP_CODE).catch(() => undefined);
 
       expect(mockRedisService.rateLimit).toHaveBeenCalledWith(`otp:verify:${USER_ID}`, 5, 300);
+    });
+  });
+
+  describe('concurrent request lock', () => {
+    it('throws 400 OTP_INVALID when the lock cannot be acquired (parallel request in flight)', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(UNVERIFIED_USER);
+      mockRedisService.setNx.mockResolvedValue(false);
+
+      await expect(service.verifyOtp(USER_EMAIL, OTP_CODE)).rejects.toThrow(
+        new BadRequestException(SYS_MSG.OTP_INVALID),
+      );
+
+      expect(mockOtpTokenModelAction.findByUserAndType).not.toHaveBeenCalled();
+    });
+
+    it('releases the lock even when verification fails', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(UNVERIFIED_USER);
+      mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(null);
+
+      await service.verifyOtp(USER_EMAIL, OTP_CODE).catch(() => undefined);
+
+      expect(mockRedisService.del).toHaveBeenCalledWith(`otp:verify:lock:${USER_ID}`);
     });
   });
 

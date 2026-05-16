@@ -233,35 +233,45 @@ export class AuthService {
       throw new HttpException(SYS_MSG.OTP_VERIFY_ATTEMPTS_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS);
     }
 
-    const token = await this.otpTokenModelAction.findByUserAndType(user.id, 'email_verification');
-
-    if (!token) {
+    const lockKey = `otp:verify:lock:${user.id}`;
+    const lockAcquired = await this.redisService.setNx(lockKey, '1', 10);
+    if (!lockAcquired) {
       throw new BadRequestException(SYS_MSG.OTP_INVALID);
     }
 
-    if (token.expires_at < new Date()) {
-      await this.otpTokenAction.delete({
-        identifierOptions: { user_id: user.id, type: 'email_verification' as const },
-        transactionOptions: { useTransaction: false },
-      });
-      throw new BadRequestException(SYS_MSG.OTP_EXPIRED);
+    try {
+      const token = await this.otpTokenModelAction.findByUserAndType(user.id, 'email_verification');
+
+      if (!token) {
+        throw new BadRequestException(SYS_MSG.OTP_INVALID);
+      }
+
+      if (token.expires_at < new Date()) {
+        await this.otpTokenAction.delete({
+          identifierOptions: { user_id: user.id, type: 'email_verification' as const },
+          transactionOptions: { useTransaction: false },
+        });
+        throw new BadRequestException(SYS_MSG.OTP_EXPIRED);
+      }
+
+      const codeMatches = await bcrypt.compare(otpCode, token.token_hash);
+      if (!codeMatches) {
+        throw new BadRequestException(SYS_MSG.OTP_INVALID);
+      }
+
+      await Promise.all([
+        this.redisService.del(attemptsKey),
+        this.otpTokenAction.delete({
+          identifierOptions: { user_id: user.id, type: 'email_verification' as const },
+          transactionOptions: { useTransaction: false },
+        }),
+      ]);
+
+      const verifiedUser = await this.usersService.markVerified(user.id);
+      return this.issueTokens(verifiedUser);
+    } finally {
+      await this.redisService.del(lockKey);
     }
-
-    const codeMatches = await bcrypt.compare(otpCode, token.token_hash);
-    if (!codeMatches) {
-      throw new BadRequestException(SYS_MSG.OTP_INVALID);
-    }
-
-    await Promise.all([
-      this.redisService.del(attemptsKey),
-      this.otpTokenAction.delete({
-        identifierOptions: { user_id: user.id, type: 'email_verification' as const },
-        transactionOptions: { useTransaction: false },
-      }),
-    ]);
-
-    const verifiedUser = await this.usersService.markVerified(user.id);
-    return this.issueTokens(verifiedUser);
   }
 
   async resendOtp(email: string): Promise<{ message: string }> {
