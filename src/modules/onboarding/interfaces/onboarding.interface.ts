@@ -26,3 +26,18 @@ export type WizardStartResolveResult =
   | { status: 'already_complete' }
   | { status: 'active'; session: WizardSession }
   | { status: 'created'; session: WizardSession };
+
+/** Typed shape of the answers JSON stored on a WizardSession.
+ *  The entity stores this as Record<string, unknown> for flexibility.
+ *  This interface is used internally by OnboardingService only.
+ */
+export interface WizardAnswers {
+  step_1?: { business_type?: string };
+  step_2?: { target_customer?: string };
+  step_3?: { discovery_channel?: string };
+}
+export interface OnboardingCompleteResult {
+  status_code: number;
+  message: string;
+  data: { redirect: { to: string } };
+}
