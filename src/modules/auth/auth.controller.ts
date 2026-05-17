@@ -183,7 +183,7 @@ export class AuthController {
     const result = await this.authService.handleOAuthLogin(payload);
     res.cookie('refreshToken', result.refresh_token, this.getRefreshCookieOptions());
 
-    const redirectUrl = `${this.getFrontendBaseUrl()}${AuthController.OAUTH_REDIRECT_URL}'#access_token'=${encodeURIComponent(result.access_token)}`;
+    const redirectUrl = `${this.getFrontendBaseUrl()}${AuthController.OAUTH_REDIRECT_URL}#access_token=${encodeURIComponent(result.access_token)}`;
     res.redirect(HttpStatus.FOUND, redirectUrl);
   }
 }

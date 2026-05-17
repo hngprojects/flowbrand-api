@@ -146,15 +146,10 @@ export const GoogleAuthDocs = () =>
 export const GoogleCallbackDocs = () =>
   applyDecorators(
     ApiOperation({ summary: 'Handle Google OAuth callback' }),
-    ApiOkResponse({
-      description: 'Successful OAuth login; returns tokens and sets refresh cookie',
-      schema: {
-        example: {
-          statusCode: HttpStatus.OK,
-          message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
-          access_token: 'jwt.access.token',
-        },
-      },
+    ApiResponse({
+      status: HttpStatus.FOUND,
+      description:
+        'Redirects to client after successful OAuth; tokens are issued via cookie and redirect URL',
     }),
     ApiUnauthorizedResponse({
       description: 'Google OAuth failed or no email was provided',
@@ -228,7 +223,10 @@ function registerSwaggerOAuthRedirectScript(app: INestApplication): void {
 }
 
 export function setupSwagger(app: INestApplication): void {
-  registerSwaggerOAuthRedirectScript(app);
+   const enableSwaggerMocks = process.env.NODE_ENV !== 'production';
+    if (enableSwaggerMocks) {
+    registerSwaggerOAuthRedirectScript(app);
+    }
 
   const config = new DocumentBuilder()
     .setTitle('SEIL API')
@@ -243,7 +241,7 @@ export function setupSwagger(app: INestApplication): void {
   const document = SwaggerModule.createDocument(app, config);
 
   SwaggerModule.setup('docs', app, document, {
-    customJs: SWAGGER_OAUTH_REDIRECT_SCRIPT_PATH,
+    customJs: enableSwaggerMocks ? SWAGGER_OAUTH_REDIRECT_SCRIPT_PATH : undefined,
     swaggerOptions: { persistAuthorization: true },
   });
 }

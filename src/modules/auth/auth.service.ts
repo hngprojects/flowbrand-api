@@ -429,6 +429,10 @@ export class AuthService {
   }
 
   private isUniqueEmailConflict(error: unknown): boolean {
+    if (error instanceof ConflictException) {
+      return true;
+    }
+
     return Boolean(
       error &&
       typeof error === 'object' &&
