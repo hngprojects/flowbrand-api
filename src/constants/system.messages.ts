@@ -68,3 +68,6 @@ export const REDIS_RECONNECT_ATTEMPT = (attempt: number, delay: number) =>
 export const REDIS_RETRY_LIMIT_REACHED = 'Redis retry limit reached';
 export const REDIS_PATTERN_DELETE_SUCCESS = (count: number, pattern: string) =>
   `Deleted ${count} keys matching pattern: ${pattern}`;
+export const ONBOARDING_SESSION_NOT_FOUND = 'Session not found. Please call POST /onboarding/start to begin the wizard.';
+export const ONBOARDING_SESSION_EXPIRED = 'Session has expired. Restart the onboarding process.';
+export const ONBOARDING_SESSION_RETRIEVED = 'Onboarding session retrieved successfully';
