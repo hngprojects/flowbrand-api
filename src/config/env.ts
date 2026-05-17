@@ -31,6 +31,10 @@ const envSchema = z.object({
     .min(32, 'JWT_REFRESH_SECRET must be at least 32 chars'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
 
+  GOOGLE_CLIENT_ID: z.string().default(''),
+  GOOGLE_CLIENT_SECRET: z.string().default(''),
+  GOOGLE_REDIRECT_URI: z.string().default(''),
+
   CORS_ORIGIN: z.string().default('*'),
   SWAGGER_ENABLED: boolEnv.default(true),
 
