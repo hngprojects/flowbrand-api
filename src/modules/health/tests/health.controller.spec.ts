@@ -14,24 +14,25 @@ function buildMockRes() {
   return { status: jest.fn().mockReturnThis() } as unknown as import('express').Response;
 }
 
-async function buildController(): Promise<HealthController> {
-  const module: TestingModule = await Test.createTestingModule({
-    imports: [ThrottlerModule.forRoot([{ ttl: 60_000, limit: 60 }])],
-    controllers: [HealthController],
-    providers: [
-      { provide: getQueueToken(QUEUES.FUNNEL_GENERATION), useValue: mockFunnelQueue },
-      { provide: getDataSourceToken(), useValue: mockDataSource },
-    ],
-  }).compile();
-  return module.get<HealthController>(HealthController);
-}
-
 describe('HealthController', () => {
+  let module: TestingModule;
   let controller: HealthController;
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    controller = await buildController();
+    module = await Test.createTestingModule({
+      imports: [ThrottlerModule.forRoot([{ ttl: 60_000, limit: 60 }])],
+      controllers: [HealthController],
+      providers: [
+        { provide: getQueueToken(QUEUES.FUNNEL_GENERATION), useValue: mockFunnelQueue },
+        { provide: getDataSourceToken(), useValue: mockDataSource },
+      ],
+    }).compile();
+    controller = module.get<HealthController>(HealthController);
+  });
+
+  afterEach(async () => {
+    await module.close();
   });
 
   describe('AC-04 — both services healthy', () => {

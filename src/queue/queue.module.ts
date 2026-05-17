@@ -1,8 +1,6 @@
 import { BullModule } from '@nestjs/bull';
-import { Logger, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-
-const logger = new Logger('QueueModule');
 
 @Module({
   imports: [
@@ -19,11 +17,12 @@ const logger = new Logger('QueueModule');
           enableReadyCheck: false,
           maxRetriesPerRequest: null,
           retryStrategy: (times: number) => {
-            if (times > 5) {
-              logger.warn('Bull Redis: retry limit reached, entering degraded mode');
-              return null;
+            if (times <= 5) {
+              return 5000;
             }
-            return 5000;
+            // slow phase: cap at 30 s + jitter so workers don't thunderherd on recovery
+            const jitter = Math.floor(Math.random() * 5000);
+            return Math.min(times * 1000, 30_000) + jitter;
           },
         },
         prefix: 'seil:bull',
