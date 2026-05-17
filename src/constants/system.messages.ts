@@ -50,8 +50,16 @@ export const AI_GENERATION_FAILED = 'AI generation failed';
 // OTP
 export const OTP_SENT_SUCCESSFULLY = 'OTP sent successfully';
 export const ACCOUNT_ALREADY_VERIFIED = 'Account is already verified';
-export const OTP_RATE_LIMITED =
-  'Too many OTP requests. Please try again later.';
+export const OTP_RATE_LIMITED = 'Too many OTP requests. Please try again later.';
+export const OTP_VERIFIED_SUCCESSFULLY = 'Email verified successfully';
+export const OTP_INVALID = 'The OTP code is invalid or has already been used';
+export const OTP_EXPIRED = 'Your OTP code has expired. Please request a new one.';
+export const OTP_RESENT_SUCCESSFULLY =
+  'A new verification code has been sent to your email address.';
+export const OTP_RESEND_RATE_LIMITED = 'Please wait before requesting a new code.';
+export const OTP_RESEND_HOURLY_LIMIT = 'Too many resend requests. Please try again in an hour.';
+export const OTP_VERIFY_ATTEMPTS_EXCEEDED =
+  'Too many failed verification attempts. Please request a new OTP.';
 
 // Health
 export const HEALTH_OK = 'ok';

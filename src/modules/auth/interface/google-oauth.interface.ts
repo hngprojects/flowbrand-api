@@ -14,9 +14,9 @@ export interface OAuthLoginResponse {
   data: {
     user: {
       id: string;
-      full_name: string;
+      fullName: string;
       email: string;
-      avatar_url: string | null;
+      avatarUrl: string | null;
     };
   };
 }

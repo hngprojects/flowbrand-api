@@ -164,7 +164,18 @@ export class UsersService {
         SYS_MSG.USER_UPDATE_FAILED,
       );
     }
+    return updated;
+  }
 
+  async markVerified(userId: string): Promise<User> {
+    const updated = await this.userModelAction.update({
+      ...NO_TRANSACTION,
+      identifierOptions: { id: userId },
+      updatePayload: { is_verified: true },
+    });
+    if (!updated) {
+      throw new InternalServerErrorException(SYS_MSG.USER_UPDATE_FAILED);
+    }
     return updated;
   }
 
