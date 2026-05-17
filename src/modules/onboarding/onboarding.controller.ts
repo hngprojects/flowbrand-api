@@ -1,9 +1,9 @@
-import { Body, Controller, Post, Res } from '@nestjs/common';
+import { Body, Controller, Get, Post, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { StartOnboardingDocs } from './docs/onboarding-swagger.doc';
-import { CompleteOnboardingDocs } from './docs/complete-onboarding.swagger'
+import { GetSessionDocs, StartOnboardingDocs } from './docs/onboarding-swagger.doc';
+import { CompleteOnboardingDocs } from './docs/complete-onboarding.swagger';
 import { OnboardingService } from './onboarding.service';
 import { CompleteOnboardingDto } from './dto/complete-onboarding.dto';
 
@@ -36,5 +36,9 @@ export class OnboardingController {
     @Body() body: CompleteOnboardingDto,
   ) {
     return this.onboardingService.completeOnboarding(userId, body.session_id)
+  @Get('session')
+  @GetSessionDocs()
+  getSession(@CurrentUser('sub') id: string) {
+    return this.onboardingService.getOnboardingSession(id)
   }
 }
