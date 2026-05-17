@@ -2,6 +2,7 @@ import { applyDecorators, HttpStatus } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiUnauthorizedResponse,
@@ -61,6 +62,52 @@ export const StartOnboardingDocs = () =>
           error: 'ConflictException',
           message: SYS_MSG.ONBOARDING_ALREADY_COMPLETE,
           path: '/api/onboarding/start',
+          timestamp: '2026-05-15T12:00:00.000Z',
+        },
+      },
+    }),
+  );
+
+export const GetSessionDocs = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Get active onboarding session',
+      description:
+        'Returns the most recent active onboarding session for the authenticated user. ' +
+        'Only answered steps are included in the answers object — null steps are omitted. ' +
+        'Returns 404 if no active session exists or if the session has expired.',
+    }),
+    ApiOkResponse({
+      description: 'Active session returned successfully.',
+      schema: {
+        example: {
+          success: true,
+          data: {
+            sessionId: '550e8400-e29b-41d4-a716-446655440001',
+            status: 'in_progress',
+            steps_completed: 2,
+            answers: {
+              step_1: { business_description: 'We sell handmade shoes' },
+              step_2: { customer_tags: { type: ['retail'] } },
+            },
+            created_at: '2026-05-15T12:00:00.000Z',
+            expires_at: '2026-05-16T12:00:00.000Z',
+          },
+        },
+      },
+    }),
+    ApiUnauthorizedResponse({
+      description: 'Missing or invalid bearer token.',
+    }),
+    ApiNotFoundResponse({
+      description: 'No active session found or session has expired.',
+      schema: {
+        example: {
+          success: false,
+          statusCode: HttpStatus.NOT_FOUND,
+          error: 'NotFoundException',
+          message: SYS_MSG.ONBOARDING_SESSION_NOT_FOUND,
+          path: '/api/onboarding/session',
           timestamp: '2026-05-15T12:00:00.000Z',
         },
       },
