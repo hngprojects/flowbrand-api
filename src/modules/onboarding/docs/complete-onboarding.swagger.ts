@@ -11,7 +11,9 @@ export function CompleteOnboardingDocs() {
       description: 'Validates the session, checks all 3 steps are answered, writes business data to user profile, and marks the session as complete.'
     }),
     ApiBody({ type: CompleteOnboardingDto }),
+    // Add explicit status codes
     ApiResponse({
+      status: HttpStatus.OK,
       description: 'Onboarding completed successfully',
       schema: {
         example: {
@@ -24,6 +26,7 @@ export function CompleteOnboardingDocs() {
       }
     }),
     ApiResponse({
+      status: HttpStatus.CONFLICT,
       description: 'Onboarding already complete',
       schema: {
         example: {
@@ -36,6 +39,7 @@ export function CompleteOnboardingDocs() {
       }
     }),
     ApiResponse({
+      status: HttpStatus.FORBIDDEN,
       description: 'Session expired',
       schema: {
         example: {
@@ -45,6 +49,7 @@ export function CompleteOnboardingDocs() {
       }
     }),
     ApiResponse({
+      status: HttpStatus.NOT_FOUND,
       description: 'Session not found',
       schema: {
         example: {
@@ -54,6 +59,7 @@ export function CompleteOnboardingDocs() {
       }
     }),
     ApiResponse({
+      status: 422,
       description: 'Onboarding incomplete',
       schema: {
         example: {
@@ -65,7 +71,13 @@ export function CompleteOnboardingDocs() {
     }),
     ApiResponse({
       status: HttpStatus.UNAUTHORIZED,
-      description: 'Unauthorized - Missing or invalid bearer token'
+      description: 'Unauthorized - Missing or invalid bearer token',
+      schema: {
+        example: {
+          statusCode: HttpStatus.UNAUTHORIZED,
+          message: 'Unauthenticated'
+        }
+      }
     })
   );
 }

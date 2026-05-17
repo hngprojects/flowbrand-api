@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { StartOnboardingDocs } from './docs/onboarding-swagger.doc';
+import { CompleteOnboardingDocs } from './docs/complete-onboarding.swagger'
 import { OnboardingService } from './onboarding.service';
 import { CompleteOnboardingDto } from './dto/complete-onboarding.dto';
 
@@ -29,6 +30,7 @@ export class OnboardingController {
   }
 
   @Post('complete')
+  @CompleteOnboardingDocs()
   async completeOnboarding(
     @CurrentUser('sub') userId: string,
     @Body() body: CompleteOnboardingDto,
