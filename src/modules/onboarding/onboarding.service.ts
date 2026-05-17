@@ -18,7 +18,6 @@ import {
   WizardAnswers,
   OnboardingCompleteResult
 } from './interfaces/onboarding.interface';
-import { WizardStatus } from './enums/wizzard-status.enum';
 
 @Injectable()
 export class OnboardingService {
