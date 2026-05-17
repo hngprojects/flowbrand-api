@@ -2,6 +2,7 @@ import {
   ConflictException,
   HttpStatus,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import * as SYS_MSG from '../../constants/system.messages';
 import { WizardSessionModelAction } from './actions/wizard-session.action';
@@ -10,6 +11,7 @@ import {
   OnboardingStartResponseData,
   OnboardingStartResult,
 } from './interfaces/onboarding.interface';
+import { WizardStatus } from './enums/wizzard-status.enum';
 
 @Injectable()
 export class OnboardingService {
@@ -63,5 +65,38 @@ export class OnboardingService {
       created_at: session.created_at,
       updated_at: session.updated_at,
     };
+  }
+
+  async getOnboardingSession(userId: string) {
+    const session = await this.wizardSessionModelAction.findActiveSession(userId)
+
+    if (!session) {
+      throw new NotFoundException({
+        code: 'RESOURCE_NOT_FOUND',
+        message: SYS_MSG.ONBOARDING_SESSION_NOT_FOUND
+      })
+    }
+
+    if (session.status === WizardStatus.IN_PROGRESS && session.expires_at && session.expires_at < new Date()) {
+      await this.wizardSessionModelAction.markAsExpired(session.id)
+
+      throw new NotFoundException({
+        code: 'RESOURCE_NOT_FOUND',
+        message: SYS_MSG.ONBOARDING_SESSION_EXPIRED
+      })
+    }
+
+    const cleanedAnswers = Object.fromEntries(
+      Object.entries(session.answers).filter(([, value]) => value !== null)
+    )
+
+    return {
+      sessionId: session.id,
+      status: session.status,
+      answers: cleanedAnswers,
+      created_at: session.created_at,
+      expires_at: session.expires_at,
+      steps_completed: session.steps_completed
+    }
   }
 }
