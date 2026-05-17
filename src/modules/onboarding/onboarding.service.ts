@@ -83,7 +83,8 @@ export class OnboardingService {
     if (session.status === WizardStatus.COMPLETE) {
       throw new ConflictException({
         error: 'ConflictException',
-        message: SYS_MSG.ONBOARDING_ALREADY_COMPLETE
+        message: SYS_MSG.ONBOARDING_ALREADY_COMPLETE,
+        data: { redirect: { to: 'funnel_generation' } }
       })
     }
 
