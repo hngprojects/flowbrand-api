@@ -84,10 +84,4 @@ export class WizardSessionModelAction extends AbstractModelAction<WizardSession>
       where: { id: sessionId },
     });
   }
-
-  async markSessionComplete(sessionId: string): Promise<void> {
-    await this.wizardSessionRepository.update(sessionId, {
-      status: WizardStatus.COMPLETE,
-    });
-  }
 }
