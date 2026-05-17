@@ -7,6 +7,8 @@ import { UsersService } from '../users/users.service';
 import { RedisService } from '../redis/redis.service';
 import { UserSessionModelAction } from '../users/actions/user-session.action';
 import { AuthMetadataModelAction } from './actions/auth-metadata.action';
+import { OtpTokenModelAction } from './actions/otp-token.action';
+import { EmailService } from '../../email/email.service';
 import * as SYS_MSG from '../../constants/system.messages';
 
 jest.mock('bcrypt');
@@ -27,6 +29,13 @@ const mockAuthMetadataModelAction = {
   findByUserId: jest.fn(),
   updateByUserId: jest.fn(),
   createForUser: jest.fn(),
+};
+const mockOtpTokenModelAction = {
+  replaceToken: jest.fn(),
+};
+const mockEmailService = {
+  sendOtpVerification: jest.fn(),
+  sendOtpReset: jest.fn(),
 };
 
 const TEST_USER = {
@@ -58,7 +67,9 @@ describe('AuthService login lockout (BE-005)', () => {
     jest.clearAllMocks();
 
     mockJwtService.signAsync.mockResolvedValue('signed.jwt.token');
-    mockUserSessionModelAction.createSession.mockResolvedValue({ id: 'sess-1' });
+    mockUserSessionModelAction.createSession.mockResolvedValue({
+      id: 'sess-1',
+    });
     mockUserSessionModelAction.updateById.mockResolvedValue(null);
     mockAuthMetadataModelAction.updateByUserId.mockResolvedValue(null);
 
@@ -68,8 +79,16 @@ describe('AuthService login lockout (BE-005)', () => {
         { provide: UsersService, useValue: mockUsersService },
         { provide: JwtService, useValue: mockJwtService },
         { provide: RedisService, useValue: mockRedisService },
-        { provide: UserSessionModelAction, useValue: mockUserSessionModelAction },
-        { provide: AuthMetadataModelAction, useValue: mockAuthMetadataModelAction },
+        {
+          provide: UserSessionModelAction,
+          useValue: mockUserSessionModelAction,
+        },
+        {
+          provide: AuthMetadataModelAction,
+          useValue: mockAuthMetadataModelAction,
+        },
+        { provide: OtpTokenModelAction, useValue: mockOtpTokenModelAction },
+        { provide: EmailService, useValue: mockEmailService },
       ],
     }).compile();
 
@@ -119,14 +138,10 @@ describe('AuthService login lockout (BE-005)', () => {
   describe('failed login tracking', () => {
     it('increments failed_attempts on wrong password and throws 401', async () => {
       mockUsersService.findByEmail.mockResolvedValue(TEST_USER);
-      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(
-        buildMetadata({ failed_attempts: 2 }),
-      );
+      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata({ failed_attempts: 2 }));
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
-      await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(
-        UnauthorizedException,
-      );
+      await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(UnauthorizedException);
 
       expect(mockAuthMetadataModelAction.updateByUserId).toHaveBeenCalledWith(
         TEST_USER.id,
@@ -139,9 +154,7 @@ describe('AuthService login lockout (BE-005)', () => {
 
     it('locks the account on the 5th consecutive failed attempt and throws 423', async () => {
       mockUsersService.findByEmail.mockResolvedValue(TEST_USER);
-      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(
-        buildMetadata({ failed_attempts: 4 }),
-      );
+      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata({ failed_attempts: 4 }));
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
       expect.assertions(4);
@@ -151,9 +164,7 @@ describe('AuthService login lockout (BE-005)', () => {
         expect(err).toBeInstanceOf(HttpException);
         const httpErr = err as HttpException;
         expect(httpErr.getStatus()).toBe(HttpStatus.LOCKED);
-        expect(httpErr.message).toBe(
-          SYS_MSG.AUTH_TOO_MANY_FAILED_ATTEMPTS,
-        );
+        expect(httpErr.message).toBe(SYS_MSG.AUTH_TOO_MANY_FAILED_ATTEMPTS);
       }
 
       expect(mockAuthMetadataModelAction.updateByUserId).toHaveBeenCalledWith(
@@ -167,9 +178,7 @@ describe('AuthService login lockout (BE-005)', () => {
 
     it('sets locked_until ~1 hour in the future on lock', async () => {
       mockUsersService.findByEmail.mockResolvedValue(TEST_USER);
-      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(
-        buildMetadata({ failed_attempts: 4 }),
-      );
+      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata({ failed_attempts: 4 }));
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
       const before = Date.now();
@@ -187,9 +196,7 @@ describe('AuthService login lockout (BE-005)', () => {
   describe('successful login', () => {
     it('resets failed_attempts, clears locked_until, and stamps last_login_at', async () => {
       mockUsersService.findByEmail.mockResolvedValue(TEST_USER);
-      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(
-        buildMetadata({ failed_attempts: 3 }),
-      );
+      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata({ failed_attempts: 3 }));
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
       await service.login(LOGIN_DTO);
@@ -206,9 +213,7 @@ describe('AuthService login lockout (BE-005)', () => {
 
     it('issues access + refresh tokens', async () => {
       mockUsersService.findByEmail.mockResolvedValue(TEST_USER);
-      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(
-        buildMetadata(),
-      );
+      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata());
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
       const result = await service.login(LOGIN_DTO);
@@ -242,9 +247,7 @@ describe('AuthService login lockout (BE-005)', () => {
     it('throws 401 (not 423) when the user does not exist', async () => {
       mockUsersService.findByEmail.mockResolvedValue(null);
 
-      await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(
-        UnauthorizedException,
-      );
+      await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(UnauthorizedException);
 
       expect(mockAuthMetadataModelAction.findByUserId).not.toHaveBeenCalled();
     });
@@ -255,9 +258,7 @@ describe('AuthService login lockout (BE-005)', () => {
         password_hash: null,
       });
 
-      await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(
-        UnauthorizedException,
-      );
+      await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(UnauthorizedException);
     });
   });
 });

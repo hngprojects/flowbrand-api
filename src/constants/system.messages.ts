@@ -1,8 +1,10 @@
 // Individual message constants (single-line exports)
 export const USER_CREATED_SUCCESSFULLY = 'User Created Successfully';
-export const FAILED_TO_CREATE_USER = 'Error Occured while creating user, kindly try again';
+export const FAILED_TO_CREATE_USER =
+  'Error Occurred while creating user, kindly try again';
 export const USER_ACCOUNT_EXIST = 'Account with the specified email exists';
-export const USER_ACCOUNT_DOES_NOT_EXIST = "Account with the specified email doesn't exist";
+export const USER_ACCOUNT_DOES_NOT_EXIST =
+  "Account with the specified email doesn't exist";
 export const USER_ACCOUNT_LOCKED = 'Account with the specified email is locked';
 
 // Auth messages
@@ -12,7 +14,8 @@ export const AUTH_TOKEN_REFRESHED = 'Token refreshed successfully';
 export const AUTH_INVALID_CREDENTIALS = 'Invalid email or password';
 export const AUTH_INVALID_REFRESH_TOKEN = 'Invalid or expired refresh token';
 export const AUTH_UNAUTHENTICATED_MESSAGE = 'Unauthenticated';
-export const AUTH_TERMS_REQUIRED = 'You must accept the terms and conditions to register';
+export const AUTH_TERMS_REQUIRED =
+  'You must accept the terms and conditions to register';
 export const AUTH_ACCOUNT_LOCKED =
   'Account locked due to too many failed login attempts. Try again later.';
 export const AUTH_TOO_MANY_FAILED_ATTEMPTS =
@@ -36,6 +39,12 @@ export const UPLOAD_INVALID_FILE = 'Uploaded file type is not allowed';
 export const UPLOAD_TOO_MANY_FILES = 'Too many files uploaded';
 export const AI_GENERATION_FAILED = 'AI generation failed';
 
+// OTP
+export const OTP_SENT_SUCCESSFULLY = 'OTP sent successfully';
+export const ACCOUNT_ALREADY_VERIFIED = 'Account is already verified';
+export const OTP_RATE_LIMITED =
+  'Too many OTP requests. Please try again later.';
+
 // Health
 export const HEALTH_OK = 'ok';
 export const HEALTH_DEGRADED = 'degraded';
@@ -50,7 +59,8 @@ export const HTTP_INTERNAL_SERVER_ERROR_NAME = 'InternalServerError';
 export const REDIS_CONNECTION_ESTABLISHED = 'Redis connection established';
 export const REDIS_CLIENT_READY = 'Redis client ready';
 export const REDIS_CONNECTION_CLOSED = 'Redis connection closed';
-export const REDIS_INITIAL_CONNECTION_FAILED = 'Initial Redis connection failed';
+export const REDIS_INITIAL_CONNECTION_FAILED =
+  'Initial Redis connection failed';
 export const REDIS_CLIENT_ERROR = 'Redis client error';
 export const REDIS_CRITICAL_OOM = 'Critical Redis Out of Memory';
 export const REDIS_RECONNECT_ATTEMPT = (attempt: number, delay: number) =>

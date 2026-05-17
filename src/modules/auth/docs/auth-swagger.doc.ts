@@ -1,12 +1,14 @@
 import { applyDecorators, HttpStatus } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
   ApiResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { SendOtpDto } from '../dto/send-otp.dto';
 import * as SYS_MSG from '../../../constants/system.messages';
 
 const authUserExample = {
@@ -41,7 +43,8 @@ export const LoginDocs = () =>
     ApiOperation({
       summary: 'Log in with email and password',
       description:
-        'Issues a JWT access token and sets the refresh token as an HttpOnly cookie. After 5 consecutive failed attempts the account is locked for 1 hour.',
+        'Issues a JWT access token and sets the refresh token as an HttpOnly cookie.\
+        After 5 consecutive failed attempts the account is locked for 1 hour.',
     }),
     ApiOkResponse({
       description: 'Login successful',
@@ -67,7 +70,8 @@ export const LoginDocs = () =>
     ApiResponse({
       status: HttpStatus.LOCKED,
       description:
-        'Account locked after 5 consecutive failed login attempts. The lock lifts 1 hour after the lockout was triggered.',
+        'Account locked after 5 consecutive failed login attempts. The lock lifts 1 \
+        hour after the lockout was triggered.',
       schema: {
         example: {
           success: false,
@@ -84,7 +88,11 @@ export const RefreshDocs = () =>
     ApiOperation({
       summary: 'Rotate the refresh token for a new access token',
       description:
-        'Reads the refresh token from the request body, or falls back to the HttpOnly `refreshToken` cookie set on login when the body field is omitted. Validates the token, rotates it in place on the existing session, returns a new access token, and resets the cookie. Both first-party clients (browser cookie) and external clients (explicit body) are supported.',
+        'Reads the refresh token from the request body, or falls back to the HttpOnly \
+        `refreshToken` cookie set on login when the body field is omitted. Validates the \
+        token, rotates it in place on the existing session, returns a new access token, and \
+        resets the cookie. Both first-party clients (browser cookie) and external clients\
+         (explicit body) are supported.',
     }),
     ApiOkResponse({
       description: 'Refresh token rotated and new access token issued',
@@ -115,7 +123,9 @@ export const LogoutDocs = () =>
     ApiOperation({
       summary: 'Revoke the current session',
       description:
-        'Sets `is_revoked = true` on the active `user_sessions` row and deletes the matching `sess:{userId}:{sessionId}` key in Redis, so neither the refresh token nor the still-unexpired access token can be used after logout.',
+        'Sets `is_revoked = true` on the active `user_sessions` row and deletes the \
+        matching `sess:{userId}:{sessionId}` key in Redis, so neither the refresh \
+        token nor the still-unexpired access token can be used after logout.',
     }),
   );
 
@@ -123,4 +133,39 @@ export const MeDocs = () =>
   applyDecorators(
     ApiBearerAuth('JWT'),
     ApiOperation({ summary: 'Return the current authenticated user' }),
+  );
+
+export const SendOtpDocs = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: "Send OTP verification code to the user's registered email",
+      description:
+        'Generates a 6-digit OTP, hashes it, stores it in otp_tokens, and enqueues a verification email. ' +
+        'Rate limited to 5 requests per 15 minutes per user. ' +
+        'Returns 200 for unknown emails to prevent enumeration. ' +
+        'Already-verified accounts also return 200 with a distinct message.',
+    }),
+    ApiBody({ type: SendOtpDto }),
+    ApiOkResponse({
+      description:
+        'OTP dispatched, email not found, or account already verified — all return 200 to prevent enumeration',
+      schema: {
+        example: {
+          statusCode: 200,
+          message: 'OTP sent successfully',
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.TOO_MANY_REQUESTS,
+      description:
+        'Rate limit exceeded — max 5 OTP requests per 15 minutes per user',
+      schema: {
+        example: {
+          statusCode: 429,
+          message: 'Too many OTP requests. Please try again later.',
+          error: 'HttpException',
+        },
+      },
+    }),
   );
