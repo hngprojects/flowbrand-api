@@ -1,6 +1,5 @@
 import { InjectQueue } from '@nestjs/bull';
 import { Controller, Get, HttpStatus, Res, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Queue } from 'bull';
@@ -9,8 +8,9 @@ import { DataSource } from 'typeorm';
 import { Public } from '../../common/decorators/public.decorator';
 import { QUEUES } from '../../common/constants/queue.constants';
 import * as SYS_MSG from '../../constants/system.messages';
+import { HealthCheckDocs } from './docs/health-swagger.doc';
+import { HEALTH_RATE_LIMIT } from './health.constants';
 
-@ApiTags('health')
 @Controller('health')
 export class HealthController {
   constructor(
@@ -18,11 +18,11 @@ export class HealthController {
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
+  @HealthCheckDocs()
   @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { ttl: 60_000, limit: 60 } })
+  @Throttle({ default: HEALTH_RATE_LIMIT })
   @Public()
   @Get()
-  @ApiOperation({ summary: 'Liveness and readiness probe' })
   async check(@Res({ passthrough: true }) res: Response) {
     const [queueHealthy, dbHealthy] = await Promise.all([
       this.checkQueue(),
