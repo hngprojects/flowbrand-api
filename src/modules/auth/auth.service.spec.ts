@@ -319,7 +319,7 @@ describe('AuthService login lockout (BE-005)', () => {
         is_verified: true,
       });
 
-      await service.handleOAuthLogin({
+      const result = await service.handleOAuthLogin({
         provider: 'google',
         providerId: 'google-456',
         email: TEST_USER.email,
@@ -334,6 +334,12 @@ describe('AuthService login lockout (BE-005)', () => {
           fullName: TEST_USER.full_name,
         }),
       );
+      expect(result).toMatchObject({
+        status_code: HttpStatus.OK,
+        message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
+        access_token: 'signed.jwt.token',
+        refresh_token: 'signed.jwt.token',
+      });
     });
   });
 });
