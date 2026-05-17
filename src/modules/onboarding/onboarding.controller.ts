@@ -36,6 +36,8 @@ export class OnboardingController {
     @Body() body: CompleteOnboardingDto,
   ) {
     return this.onboardingService.completeOnboarding(userId, body.session_id)
+  }
+  
   @Get('session')
   @GetSessionDocs()
   getSession(@CurrentUser('sub') id: string) {
