@@ -33,6 +33,20 @@ const envSchema = z.object({
 
   CORS_ORIGIN: z.string().default('*'),
   SWAGGER_ENABLED: boolEnv.default(true),
+
+  REDIS_TLS: boolEnv.default(false),
+
+  QUEUE_CONCURRENCY: z.coerce
+    .number()
+    .int()
+    .default(3)
+    .transform((v) => {
+      if (v < 1) {
+        console.warn('QUEUE_CONCURRENCY must be >= 1, defaulting to 1');
+        return 1;
+      }
+      return v;
+    }),
 });
 
 const result = envSchema.safeParse(process.env);
