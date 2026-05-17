@@ -13,6 +13,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   private client: Redis;
   private readonly logger = new Logger(RedisService.name);
 
+
   onModuleInit() {
     const { host, port, password, username } = redisConfig();
 
@@ -99,6 +100,16 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     await this.client.set(key, value);
   }
 
+  async setNx(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+    try {
+      const result = await this.client.set(key, value, 'EX', ttlSeconds, 'NX');
+      return result === 'OK';
+    } catch (err) {
+      this.logger.error(`SET NX failed`, (err as Error).message);
+      return false;
+    }
+  }
+
   async del(key: string): Promise<void> {
     try {
       await this.client.del(key);
@@ -130,6 +141,23 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       await this.client.expire(key, ttl);
     } catch (err) {
       this.logger.error(`EXPIRE failed`, (err as Error).message);
+    }
+  }
+
+  async rateLimit(
+    key: string,
+    limit: number,
+    windowSeconds: number,
+  ): Promise<{ count: number; exceeded: boolean }> {
+    try {
+      // SET NX initializes the key with a TTL atomically on first use;
+      // INCR then always operates on a key that already has a TTL.
+      await this.client.set(key, '0', 'EX', windowSeconds, 'NX');
+      const count = await this.client.incr(key);
+      return { count, exceeded: count > limit };
+    } catch (err) {
+      this.logger.error(`rateLimit failed`, (err as Error).message);
+      return { count: 0, exceeded: false };
     }
   }
 
