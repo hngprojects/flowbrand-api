@@ -37,7 +37,7 @@ export interface WizardAnswers {
   step_3?: { discovery_channel?: string };
 }
 export interface OnboardingCompleteResult {
-  status_code: number;
+  statusCode: number;
   message: string;
   data: { redirect: { to: string } };
 }

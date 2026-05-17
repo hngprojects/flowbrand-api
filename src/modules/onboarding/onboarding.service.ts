@@ -107,7 +107,7 @@ export class OnboardingService {
     });
 
     return {
-      status_code: HttpStatus.OK,
+      statusCode: HttpStatus.OK,
       message: SYS_MSG.ONBOARDING_COMPLETE_SUCCESS,
       data: { redirect: { to: 'funnel_generation'} },
     }
