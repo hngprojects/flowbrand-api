@@ -1,6 +1,7 @@
-import { applyDecorators } from '@nestjs/common';
+import { applyDecorators, HttpStatus } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { CompleteOnboardingDto } from '../dto/complete-onboarding.dto';
+import * as SYS_MSG from '../../../constants/system.messages';
 
 export function CompleteOnboardingDocs() {
   return applyDecorators(
@@ -11,12 +12,11 @@ export function CompleteOnboardingDocs() {
     }),
     ApiBody({ type: CompleteOnboardingDto }),
     ApiResponse({
-      status: 200,
       description: 'Onboarding completed successfully',
       schema: {
         example: {
-          status_code: 200,
-          message: 'Onboarding completed successfully',
+          statusCode: HttpStatus.OK,
+          message: SYS_MSG.ONBOARDING_COMPLETE_SUCCESS,
           data: {
             redirect: { to: 'funnel_generation' }
           }
@@ -24,12 +24,11 @@ export function CompleteOnboardingDocs() {
       }
     }),
     ApiResponse({
-      status: 409,
       description: 'Onboarding already complete',
       schema: {
         example: {
-          status_code: 409,
-          message: 'Onboarding already complete',
+          statusCode: HttpStatus.CONFLICT,
+          message: SYS_MSG.ONBOARDING_ALREADY_COMPLETE,
           data: {
             redirect: { to: 'funnel_generation' }
           }
@@ -37,38 +36,35 @@ export function CompleteOnboardingDocs() {
       }
     }),
     ApiResponse({
-      status: 403,
       description: 'Session expired',
       schema: {
         example: {
-          status_code: 403,
-          message: 'Session expired'
+          statusCode: HttpStatus.FORBIDDEN,
+          message: SYS_MSG.ONBOARDING_SESSION_EXPIRED
         }
       }
     }),
     ApiResponse({
-      status: 404,
       description: 'Session not found',
       schema: {
         example: {
-          status_code: 404,
-          message: 'Session not found'
+          statusCode: HttpStatus.NOT_FOUND,
+          message: SYS_MSG.ONBOARDING_SESSION_NOT_FOUND
         }
       }
     }),
     ApiResponse({
-      status: 422,
       description: 'Onboarding incomplete',
       schema: {
         example: {
-          status_code: 422,
-          message: 'Onboarding incomplete',
+          statusCode: 422,
+          message: SYS_MSG.ONBOARDING_INCOMPLETE,
           missing_fields: ['step_1', 'step_2', 'step_3']
         }
       }
     }),
     ApiResponse({
-      status: 401,
+      status: HttpStatus.UNAUTHORIZED,
       description: 'Unauthorized - Missing or invalid bearer token'
     })
   );
