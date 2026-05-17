@@ -75,7 +75,8 @@ export class OnboardingService {
       throw new NotFoundException(SYS_MSG.ONBOARDING_SESSION_NOT_FOUND);
     }
 
-    if (session.status === WizardStatus.EXPIRED) {
+    const now = new Date();
+    if (session.status === WizardStatus.EXPIRED || session.expires_at <= now) {
       throw new ForbiddenException(SYS_MSG.ONBOARDING_SESSION_EXPIRED)
     }
     
