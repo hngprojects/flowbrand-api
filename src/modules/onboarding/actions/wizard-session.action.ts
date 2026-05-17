@@ -94,4 +94,12 @@ export class WizardSessionModelAction extends AbstractModelAction<WizardSession>
   async markAsExpired(id: string): Promise<void> {
     await this.repository.update(id, { status: WizardStatus.EXPIRED })
   }
+
+  async findSessionById(sessionId: string, userId: string): Promise<WizardSession | null> {
+    return this.repository
+      .createQueryBuilder('ws')
+      .where('ws.id = :sessionId', { sessionId })
+      .andWhere('ws.user_id = :userId', { userId })
+      .getOne()
+  }
 }
