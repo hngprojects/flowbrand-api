@@ -1,5 +1,6 @@
 import { InjectQueue } from '@nestjs/bull';
 import { Controller, Get, HttpStatus, Res, UseGuards } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Queue } from 'bull';
@@ -11,6 +12,7 @@ import * as SYS_MSG from '../../constants/system.messages';
 import { HealthCheckDocs } from './docs/health-swagger.doc';
 import { HEALTH_RATE_LIMIT } from './health.constants';
 
+@ApiTags('health')
 @Controller('health')
 export class HealthController {
   constructor(

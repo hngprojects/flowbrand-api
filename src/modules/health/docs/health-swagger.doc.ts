@@ -1,9 +1,8 @@
 import { applyDecorators, HttpStatus } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 export function HealthCheckDocs() {
   return applyDecorators(
-    ApiTags('health'),
     ApiOperation({ summary: 'Liveness and readiness probe' }),
     ApiResponse({ status: HttpStatus.OK, description: 'All services healthy.' }),
     ApiResponse({
