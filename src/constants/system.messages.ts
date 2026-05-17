@@ -61,3 +61,8 @@ export const REDIS_PATTERN_DELETE_SUCCESS = (count: number, pattern: string) =>
 export const ONBOARDING_SESSION_NOT_FOUND = 'Session not found. Please call POST /onboarding/start to begin the wizard.';
 export const ONBOARDING_SESSION_EXPIRED = 'Session has expired. Restart the onboarding process.';
 export const ONBOARDING_SESSION_RETRIEVED = 'Onboarding session retrieved successfully';
+export const ONBOARDING_STEP_SAVED = 'ONBOARDING_STEP_SAVED';
+export const ONBOARDING_SESSION_NOT_BELONG = 'Session not found or does not belong to this user';
+export const ONBOARDING_SESSION_FORBIDDEN = 'Session has expired. Please start a new onboarding session.';
+export const ONBOARDING_SESSION_COMPLETE = 'ONBOARDING_ALREADY_COMPLETE';
+export const ONBOARDING_INVALID_STEP = 'Step must be 1, 2, or 3';
