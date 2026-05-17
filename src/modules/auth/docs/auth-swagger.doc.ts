@@ -1,4 +1,4 @@
-import { applyDecorators, HttpStatus } from '@nestjs/common';
+import { INestApplication, applyDecorators, HttpStatus } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -7,7 +7,10 @@ import {
   ApiOperation,
   ApiResponse,
   ApiUnauthorizedResponse,
+  DocumentBuilder,
+  SwaggerModule,
 } from '@nestjs/swagger';
+import type { Request, Response } from 'express';
 import { SendOtpDto } from '../dto/send-otp.dto';
 import { VerifyOtpDto } from '../dto/verify-otp.dto';
 import { ResendOtpDto } from '../dto/resend-otp.dto';
@@ -137,6 +140,42 @@ export const MeDocs = () =>
     ApiOperation({ summary: 'Return the current authenticated user' }),
   );
 
+export const GoogleAuthDocs = () =>
+  applyDecorators(
+    ApiOperation({ summary: 'Redirect to Google for OAuth login' }),
+    ApiResponse({
+      status: HttpStatus.FOUND,
+      description: 'Redirect to Google OAuth consent screen',
+      schema: {
+        example: {
+          status_code: HttpStatus.FOUND,
+          message: 'Redirect to Google OAuth consent screen',
+        },
+      },
+    }),
+  );
+
+export const GoogleCallbackDocs = () =>
+  applyDecorators(
+    ApiOperation({ summary: 'Handle Google OAuth callback' }),
+    ApiResponse({
+      status: HttpStatus.FOUND,
+      description:
+        'Redirects to client after successful OAuth; tokens are issued via cookie and redirect URL',
+    }),
+    ApiUnauthorizedResponse({
+      description: 'Google OAuth failed or no email was provided',
+      schema: {
+          example: {
+          success: false,
+          status_code: HttpStatus.UNAUTHORIZED,
+          error: 'UnauthorizedException',
+          message: SYS_MSG.GOOGLE_OAUTH_FAILED,
+        },
+      },
+    }),
+  );
+
 export const SendOtpDocs = () =>
   applyDecorators(
     ApiOperation({
@@ -172,6 +211,97 @@ export const SendOtpDocs = () =>
     }),
   );
 
+const SWAGGER_OAUTH_REDIRECT_SCRIPT_PATH = '/swagger-oauth-redirect.js';
+
+function registerSwaggerOAuthRedirectScript(app: INestApplication): void {
+  app.use(SWAGGER_OAUTH_REDIRECT_SCRIPT_PATH, (_req: Request, res: Response) => {
+    res.type('application/javascript').send(`
+      (() => {
+        const originalFetch = window.fetch.bind(window);
+
+        window.fetch = (...args) => {
+          const [input, init] = args;
+          const requestUrl =
+            typeof input === 'string'
+              ? input
+              : input && typeof input === 'object' && 'url' in input
+                ? input.url
+                : '';
+          const method =
+            (init && init.method) ||
+            (typeof input !== 'string' && input && typeof input === 'object' && 'method' in input
+              ? input.method
+              : 'GET');
+
+          if (typeof requestUrl === 'string' && String(method).toUpperCase() === 'GET') {
+            if (requestUrl.includes('/auth/google/callback')) {
+              return Promise.resolve(
+                new Response(
+                  JSON.stringify({
+                    status_code: 200,
+                    message: 'OAuth login successful',
+                    access_token: 'jwt.access.token',
+                    refresh_token: 'jwt.refresh.token',
+                    data: {
+                      user: {
+                        id: 'uuid',
+                        full_name: 'Jane Doe',
+                        email: 'user@example.com',
+                        avatar_url: null,
+                      },
+                    },
+                  }),
+                  {
+                    status: 200,
+                    statusText: 'OK',
+                    headers: { 'Content-Type': 'application/json' },
+                  },
+                ),
+              );
+            }
+
+            if (requestUrl.includes('/auth/google')) {
+              return Promise.resolve(
+                new Response('Redirect to Google OAuth consent screen', {
+                  status: 302,
+                  statusText: 'Redirect to Google OAuth consent screen',
+                  headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+                }),
+              );
+            }
+          }
+
+          return originalFetch(...args);
+        };
+      })();
+    `);
+  });
+}
+
+export function setupSwagger(app: INestApplication): void {
+  const enableSwaggerMocks = process.env.NODE_ENV !== 'production';
+
+  if (enableSwaggerMocks) {
+    registerSwaggerOAuthRedirectScript(app);
+  }
+
+  const config = new DocumentBuilder()
+    .setTitle('SEIL API')
+    .setDescription('SEIL REST API documentation')
+    .setVersion('1.0.0')
+    .addBearerAuth(
+      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+      'JWT',
+    )
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+
+  SwaggerModule.setup('docs', app, document, {
+    customJs: enableSwaggerMocks ? SWAGGER_OAUTH_REDIRECT_SCRIPT_PATH : undefined,
+    swaggerOptions: { persistAuthorization: true },
+  });
+}
 export const VerifyOtpDocs = () =>
   applyDecorators(
     ApiOperation({
