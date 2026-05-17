@@ -14,6 +14,7 @@ const logger = new Logger('QueueModule');
           host: config.get<string>('redis.host') || 'localhost',
           port: config.get<number>('redis.port') ?? 6379,
           password: config.get<string>('redis.password') || undefined,
+          username: config.get<string>('redis.username') || undefined,
           ...(config.get<boolean>('redis.tls') && { tls: {} }),
           enableReadyCheck: false,
           maxRetriesPerRequest: null,
