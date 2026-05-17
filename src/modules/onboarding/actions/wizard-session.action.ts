@@ -83,6 +83,8 @@ export class WizardSessionModelAction extends AbstractModelAction<WizardSession>
     return this.wizardSessionRepository.findOne({
       where: { id: sessionId },
     });
+  }
+  
   async findActiveSession(userId: string): Promise<WizardSession | null> {
     return this.repository
       .createQueryBuilder('ws')
