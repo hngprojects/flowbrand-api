@@ -34,7 +34,7 @@ const envSchema = z.object({
   REDIS_PORT: z.coerce.number().int().positive().default(6379),
   REDIS_TLS: boolEnv.default(false),
 
-  CONTACT_ADMIN_EMAIL: z.string().email().default('noreply@seil.app'),
+  CONTACT_ADMIN_EMAIL: z.string().email().default('useseil@hng14.com'),
 
   QUEUE_CONCURRENCY: z.coerce
     .number()
