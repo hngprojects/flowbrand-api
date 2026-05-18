@@ -1,9 +1,10 @@
 import {
+  BadRequestException,
+  ConflictException,
   HttpException,
   HttpStatus,
   Injectable,
   UnauthorizedException,
-  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as crypto from 'crypto';
@@ -23,6 +24,7 @@ import { RedisService } from '../redis/redis.service';
 import { EmailService } from '../../email/email.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import type { GoogleOAuthProfile, OAuthLoginResponse } from './interface/google-oauth.interface';
 import { JwtPayload } from './strategies/jwt.strategy';
 
 export interface AuthTokens {
@@ -31,7 +33,8 @@ export interface AuthTokens {
 }
 
 const REDIS_SESSION_TTL_SECONDS = 15 * 60;
-const REDIS_SESSION_KEY_PREFIX = 'sess';
+const ACTIVE_SESSION_KEY_PREFIX = 'active_session';
+const LEGACY_SESSION_KEY_PREFIX = 'sess';
 const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 const ACCOUNT_LOCK_DURATION_MS = 60 * 60 * 1000;
 
@@ -92,6 +95,10 @@ export class AuthService {
       token_hash: string;
       expires_at: Date;
     }): Promise<OtpToken>;
+    delete(options: {
+      identifierOptions: Partial<OtpToken>;
+      transactionOptions: { useTransaction: false };
+    }): Promise<unknown>;
   } {
     return this.otpTokenModelAction;
   }
@@ -134,6 +141,78 @@ export class AuthService {
     return this.issueTokens(user);
   }
 
+  async handleOAuthLogin(profile: GoogleOAuthProfile): Promise<OAuthLoginResponse> {
+    const email = profile.email.trim().toLowerCase();
+    const existingUser = await this.usersService.findByEmail(email);
+
+    let user: User;
+
+    if (existingUser) {
+      if (
+        existingUser.auth_provider === 'google' &&
+        existingUser.provider_user_id &&
+        existingUser.provider_user_id !== profile.providerId
+      ) {
+        throw new ConflictException(SYS_MSG.GOOGLE_ACCOUNT_LINK_CONFLICT);
+      }
+
+      user = await this.usersService.updateGoogleAccount(existingUser.id, {
+        fullName: profile.full_name || existingUser.full_name,
+        providerUserId: profile.providerId,
+        avatarUrl: profile.avatar_url,
+      });
+    } else {
+      try {
+        user = await this.usersService.createGoogleAccount({
+          email,
+          fullName: profile.full_name || email,
+          providerUserId: profile.providerId,
+          avatarUrl: profile.avatar_url,
+        });
+      } catch (error) {
+        if (this.isUniqueEmailConflict(error)) {
+          const concurrentUser = await this.usersService.findByEmail(email);
+          if (!concurrentUser) {
+            throw error;
+          }
+
+          if (
+            concurrentUser.auth_provider === 'google' &&
+            concurrentUser.provider_user_id &&
+            concurrentUser.provider_user_id !== profile.providerId
+          ) {
+            throw new ConflictException(SYS_MSG.GOOGLE_ACCOUNT_LINK_CONFLICT);
+          }
+
+          user = await this.usersService.updateGoogleAccount(concurrentUser.id, {
+            fullName: profile.full_name || concurrentUser.full_name,
+            providerUserId: profile.providerId,
+            avatarUrl: profile.avatar_url,
+          });
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    const tokens = await this.issueTokens(user);
+
+    return {
+      status_code: HttpStatus.OK,
+      message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
+      access_token: tokens.accessToken,
+      refresh_token: tokens.refreshToken,
+      data: {
+        user: {
+          id: tokens.user.id,
+          fullName: tokens.user.full_name,
+          email: tokens.user.email,
+          avatarUrl: tokens.user.avatar_url,
+        },
+      },
+    };
+  }
+
   async refresh(refreshToken: string): Promise<AuthResponse> {
     let payload: JwtPayload;
 
@@ -167,13 +246,15 @@ export class AuthService {
   async logout(userId: string, sessionId: string): Promise<void> {
     if (!sessionId) return;
 
-    const redisKey = `${REDIS_SESSION_KEY_PREFIX}:${userId}:${sessionId}`;
+    const redisKey = `${ACTIVE_SESSION_KEY_PREFIX}:${userId}:${sessionId}`;
+    const legacyRedisKey = `${LEGACY_SESSION_KEY_PREFIX}:${userId}:${sessionId}`;
     await Promise.all([
       this.userSessionAction.updateById(sessionId, {
         is_revoked: true,
         revoked_at: new Date(),
       }),
       this.redisService.del(redisKey),
+      this.redisService.del(legacyRedisKey),
     ]);
   }
 
@@ -206,23 +287,125 @@ export class AuthService {
       }
     }
 
+    await this.generateAndSendOtp(user);
+
+    return { message: SYS_MSG.OTP_SENT_SUCCESSFULLY };
+  }
+
+  async verifyOtp(email: string, otpCode: string): Promise<AuthResponse> {
+    const user = await this.usersService.findByEmail(email);
+
+    if (!user) {
+      throw new BadRequestException(SYS_MSG.OTP_INVALID);
+    }
+
+    if (user.is_verified) {
+      throw new ConflictException(SYS_MSG.ACCOUNT_ALREADY_VERIFIED);
+    }
+
+    const attemptsKey = `otp:verify:${user.id}`;
+    const { exceeded } = await this.redisService.rateLimit(attemptsKey, 5, 300);
+    if (exceeded) {
+      throw new HttpException(SYS_MSG.OTP_VERIFY_ATTEMPTS_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS);
+    }
+
+    const lockKey = `otp:verify:lock:${user.id}`;
+    const lockAcquired = await this.redisService.setNx(lockKey, '1', 10);
+    if (!lockAcquired) {
+      throw new BadRequestException(SYS_MSG.OTP_INVALID);
+    }
+
+    try {
+      const token = await this.otpTokenModelAction.findByUserAndType(user.id, 'email_verification');
+
+      if (!token) {
+        throw new BadRequestException(SYS_MSG.OTP_INVALID);
+      }
+
+      if (token.expires_at < new Date()) {
+        await this.otpTokenAction.delete({
+          identifierOptions: { user_id: user.id, type: 'email_verification' as const },
+          transactionOptions: { useTransaction: false },
+        });
+        throw new BadRequestException(SYS_MSG.OTP_EXPIRED);
+      }
+
+      const codeMatches = await bcrypt.compare(otpCode, token.token_hash);
+      if (!codeMatches) {
+        throw new BadRequestException(SYS_MSG.OTP_INVALID);
+      }
+
+      await Promise.all([
+        this.redisService.del(attemptsKey),
+        this.otpTokenAction.delete({
+          identifierOptions: { user_id: user.id, type: 'email_verification' as const },
+          transactionOptions: { useTransaction: false },
+        }),
+      ]);
+
+      const verifiedUser = await this.usersService.markVerified(user.id);
+      return this.issueTokens(verifiedUser);
+    } finally {
+      await this.redisService.del(lockKey);
+    }
+  }
+
+  async resendOtp(email: string): Promise<{ message: string }> {
+    const user = await this.usersService.findByEmail(email);
+
+    if (!user) {
+      return { message: SYS_MSG.OTP_SENT_SUCCESSFULLY };
+    }
+
+    if (user.is_verified) {
+      return { message: SYS_MSG.ACCOUNT_ALREADY_VERIFIED };
+    }
+
+    const hourlyKey = `otp:resend:${user.id}`;
+    const hourlyCount = await this.redisService.incr(hourlyKey);
+    if (hourlyCount !== null) {
+      if (hourlyCount === 1) {
+        await this.redisService.expire(hourlyKey, 3600);
+      }
+      if (hourlyCount > 10) {
+        throw new HttpException(
+          { message: SYS_MSG.OTP_RESEND_HOURLY_LIMIT, retryAfter: 3600 },
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+    }
+
+    const cooldownKey = `otp:cooldown:${user.id}`;
+    const cooldownRaw = await this.redisService.get(cooldownKey);
+    if (cooldownRaw) {
+      const retryAfter = Math.ceil((parseInt(cooldownRaw, 10) - Date.now()) / 1000);
+      throw new HttpException(
+        { message: SYS_MSG.OTP_RESEND_RATE_LIMITED, retryAfter },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    await this.generateAndSendOtp(user);
+    await this.redisService.set(cooldownKey, String(Date.now() + 30_000), 30);
+
+    return { message: SYS_MSG.OTP_RESENT_SUCCESSFULLY };
+  }
+
+  private async generateAndSendOtp(user: User): Promise<void> {
+    await this.redisService.del(`otp:verify:${user.id}`);
     const otpCode = crypto.randomInt(100000, 1000000);
     const token_hash = await bcrypt.hash(String(otpCode), 10);
-
     await this.otpTokenAction.replaceToken({
       user_id: user.id,
       type: 'email_verification',
       token_hash,
       expires_at: new Date(Date.now() + 5 * 60 * 1000),
     });
-
     await this.emailService.sendOtpVerification(
       user.email,
       { fullName: user.full_name, otpCode: String(otpCode), expiryMins: 5 },
       user.id,
     );
-
-    return { message: SYS_MSG.OTP_SENT_SUCCESSFULLY };
   }
 
   private async issueTokens(
@@ -303,13 +486,21 @@ export class AuthService {
     userId: string,
     sessionId: string,
   ): Promise<void> {
-    const redisKey = `${REDIS_SESSION_KEY_PREFIX}:${userId}:${sessionId}`;
+    const redisKey = `${ACTIVE_SESSION_KEY_PREFIX}:${userId}:${sessionId}`;
+    const legacyRedisKey = `${LEGACY_SESSION_KEY_PREFIX}:${userId}:${sessionId}`;
     const redisValue = JSON.stringify({ userId, sessionId });
-    await this.redisService.setStrict(
-      redisKey,
-      redisValue,
-      REDIS_SESSION_TTL_SECONDS,
-    );
+    await Promise.all([
+      this.redisService.setStrict(
+        redisKey,
+        redisValue,
+        REDIS_SESSION_TTL_SECONDS,
+      ),
+      this.redisService.setStrict(
+        legacyRedisKey,
+        redisValue,
+        REDIS_SESSION_TTL_SECONDS,
+      ),
+    ]);
   }
 
   private async rollbackRegistration(
@@ -397,5 +588,18 @@ export class AuthService {
       is_revoked: false,
     });
     return savedSession.id;
+  }
+
+  private isUniqueEmailConflict(error: unknown): boolean {
+    if (error instanceof ConflictException) {
+      return true;
+    }
+
+    return Boolean(
+      error &&
+      typeof error === 'object' &&
+      'driverError' in error &&
+      (error as { driverError?: { code?: string } }).driverError?.code === '23505',
+    );
   }
 }

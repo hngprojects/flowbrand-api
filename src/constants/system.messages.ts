@@ -26,6 +26,14 @@ export const USER_EMAIL_IN_USE = 'Email already in use';
 export const USER_NOT_FOUND = (id: string) => `User ${id} not found`;
 export const USER_UPDATE_FAILED = 'Failed to update user';
 
+// OAuth and external auth messages
+export const GOOGLE_ACCOUNT_NO_EMAIL = 'Google account has no email';
+export const GOOGLE_ACCOUNT_LINK_CONFLICT = 'Google account is linked to a different account';
+export const GOOGLE_OAUTH_FAILED = 'Google OAuth authentication failed';
+export const GOOGLE_OAUTH_CONFIGURATION_INVALID = 'Google OAuth configuration is missing';
+export const USER_OAUTH_CREATION_FAILED = 'Failed to create user account';
+export const OAUTH_LOGIN_SUCCESSFUL = 'OAuth login successful';
+
 // Onboarding — API response `message` values (machine-oriented identifiers)
 export const ONBOARDING_SESSION_STARTED = 'ONBOARDING_SESSION_STARTED';
 export const ONBOARDING_SESSION_RESUMED = 'ONBOARDING_SESSION_RESUMED';
@@ -42,8 +50,16 @@ export const AI_GENERATION_FAILED = 'AI generation failed';
 // OTP
 export const OTP_SENT_SUCCESSFULLY = 'OTP sent successfully';
 export const ACCOUNT_ALREADY_VERIFIED = 'Account is already verified';
-export const OTP_RATE_LIMITED =
-  'Too many OTP requests. Please try again later.';
+export const OTP_RATE_LIMITED = 'Too many OTP requests. Please try again later.';
+export const OTP_VERIFIED_SUCCESSFULLY = 'Email verified successfully';
+export const OTP_INVALID = 'The OTP code is invalid or has already been used';
+export const OTP_EXPIRED = 'Your OTP code has expired. Please request a new one.';
+export const OTP_RESENT_SUCCESSFULLY =
+  'A new verification code has been sent to your email address.';
+export const OTP_RESEND_RATE_LIMITED = 'Please wait before requesting a new code.';
+export const OTP_RESEND_HOURLY_LIMIT = 'Too many resend requests. Please try again in an hour.';
+export const OTP_VERIFY_ATTEMPTS_EXCEEDED =
+  'Too many failed verification attempts. Please request a new OTP.';
 
 // Health
 export const HEALTH_OK = 'ok';

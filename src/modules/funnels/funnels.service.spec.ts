@@ -84,7 +84,12 @@ describe('FunnelsService', () => {
 
   it('getStagesSummary returns lean stage payloads', async () => {
     funnelRepo.findOne.mockResolvedValue({ id: 'f1', user_id: 'u1' });
-    const qb = createMockQB({ stages: [{ id: 's1', position: 1, name: 'S1', channel: 'email', status: 'active', unlocked_at: null, completed_at: null }] , rawMany: [{ stageId: 's1', total: 2, complete
+    const qb = createMockQB({
+      stages: [
+        { id: 's1', position: 1, name: 'S1', channel: 'email', status: 'active', unlocked_at: null, completed_at: null },
+      ],
+      rawMany: [{ stageId: 's1', total: 2, complete: 1 }],
+    });
     stageRepo.createQueryBuilder.mockReturnValue(qb);
     taskRepo.createQueryBuilder.mockReturnValue(createMockQB({ rawMany: [{ stageId: 's1', total: 2, complete: 1 }] }));
 
@@ -107,9 +112,22 @@ describe('FunnelsService', () => {
   it('getStageDetail returns a full stage payload when unlocked', async () => {
     funnelRepo.findOne.mockResolvedValue({ id: 'f1', user_id: 'u1' });
     stageRepo.findOne
-      .mockResolvedValueOnce({ id: 's2', funnel_id: 'f1', position: 2, name: 'Stage 2', channel: 'email', status: 'active', explanation: 'Ex', action_prompt: 'Act', unlocked_at: new Date(), completed_
+      .mockResolvedValueOnce({
+        id: 's2',
+        funnel_id: 'f1',
+        position: 2,
+        name: 'Stage 2',
+        channel: 'email',
+        status: 'active',
+        explanation: 'Ex',
+        action_prompt: 'Act',
+        unlocked_at: new Date(),
+        completed_at: null,
+      })
       .mockResolvedValueOnce({ id: 's1', funnel_id: 'f1', position: 1, name: 'Stage 1', status: 'complete' });
-    taskRepo.createQueryBuilder.mockReturnValue(createMockQB({ stages: [{ id: 't1', position: 1, name: 'Task 1', status: 'complete' }], rawOne: { total: 1, complete: 1 } }));
+    taskRepo.createQueryBuilder.mockReturnValue(
+      createMockQB({ stages: [{ id: 't1', position: 1, name: 'Task 1', status: 'complete' }], rawOne: { total: 1, complete: 1 } }),
+    );
 
     const res = await service.getStageDetail('u1', 'f1', 's2');
     expect(res).toMatchObject({

@@ -16,6 +16,7 @@ import { OtpToken } from './entities/otp-token.entity';
 import { AuthMetadataModelAction } from './actions/auth-metadata.action';
 import { OtpTokenModelAction } from './actions/otp-token.action';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { GoogleStrategy } from './strategies/google.strategy';
 
 @Module({
   imports: [
@@ -30,12 +31,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     EmailModule,
   ],
   controllers: [AuthController],
-  providers: [
-    AuthService,
-    JwtStrategy,
-    AuthMetadataModelAction,
-    OtpTokenModelAction,
-  ],
+  providers: [AuthService, JwtStrategy, GoogleStrategy, OtpTokenModelAction, AuthMetadataModelAction],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

@@ -1,4 +1,4 @@
-import { applyDecorators, HttpStatus } from '@nestjs/common';
+import { INestApplication, applyDecorators, HttpStatus } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -7,8 +7,13 @@ import {
   ApiOperation,
   ApiResponse,
   ApiUnauthorizedResponse,
+  DocumentBuilder,
+  SwaggerModule,
 } from '@nestjs/swagger';
+import type { Request, Response } from 'express';
 import { SendOtpDto } from '../dto/send-otp.dto';
+import { VerifyOtpDto } from '../dto/verify-otp.dto';
+import { ResendOtpDto } from '../dto/resend-otp.dto';
 import * as SYS_MSG from '../../../constants/system.messages';
 
 const authUserExample = {
@@ -135,6 +140,42 @@ export const MeDocs = () =>
     ApiOperation({ summary: 'Return the current authenticated user' }),
   );
 
+export const GoogleAuthDocs = () =>
+  applyDecorators(
+    ApiOperation({ summary: 'Redirect to Google for OAuth login' }),
+    ApiResponse({
+      status: HttpStatus.FOUND,
+      description: 'Redirect to Google OAuth consent screen',
+      schema: {
+        example: {
+          status_code: HttpStatus.FOUND,
+          message: 'Redirect to Google OAuth consent screen',
+        },
+      },
+    }),
+  );
+
+export const GoogleCallbackDocs = () =>
+  applyDecorators(
+    ApiOperation({ summary: 'Handle Google OAuth callback' }),
+    ApiResponse({
+      status: HttpStatus.FOUND,
+      description:
+        'Redirects to client after successful OAuth; tokens are issued via cookie and redirect URL',
+    }),
+    ApiUnauthorizedResponse({
+      description: 'Google OAuth failed or no email was provided',
+      schema: {
+          example: {
+          success: false,
+          status_code: HttpStatus.UNAUTHORIZED,
+          error: 'UnauthorizedException',
+          message: SYS_MSG.GOOGLE_OAUTH_FAILED,
+        },
+      },
+    }),
+  );
+
 export const SendOtpDocs = () =>
   applyDecorators(
     ApiOperation({
@@ -165,6 +206,175 @@ export const SendOtpDocs = () =>
           statusCode: 429,
           message: 'Too many OTP requests. Please try again later.',
           error: 'HttpException',
+        },
+      },
+    }),
+  );
+
+const SWAGGER_OAUTH_REDIRECT_SCRIPT_PATH = '/swagger-oauth-redirect.js';
+
+function registerSwaggerOAuthRedirectScript(app: INestApplication): void {
+  app.use(SWAGGER_OAUTH_REDIRECT_SCRIPT_PATH, (_req: Request, res: Response) => {
+    res.type('application/javascript').send(`
+      (() => {
+        const originalFetch = window.fetch.bind(window);
+
+        window.fetch = (...args) => {
+          const [input, init] = args;
+          const requestUrl =
+            typeof input === 'string'
+              ? input
+              : input && typeof input === 'object' && 'url' in input
+                ? input.url
+                : '';
+          const method =
+            (init && init.method) ||
+            (typeof input !== 'string' && input && typeof input === 'object' && 'method' in input
+              ? input.method
+              : 'GET');
+
+          if (typeof requestUrl === 'string' && String(method).toUpperCase() === 'GET') {
+            if (requestUrl.includes('/auth/google/callback')) {
+              return Promise.resolve(
+                new Response(
+                  JSON.stringify({
+                    status_code: 200,
+                    message: 'OAuth login successful',
+                    access_token: 'jwt.access.token',
+                    refresh_token: 'jwt.refresh.token',
+                    data: {
+                      user: {
+                        id: 'uuid',
+                        full_name: 'Jane Doe',
+                        email: 'user@example.com',
+                        avatar_url: null,
+                      },
+                    },
+                  }),
+                  {
+                    status: 200,
+                    statusText: 'OK',
+                    headers: { 'Content-Type': 'application/json' },
+                  },
+                ),
+              );
+            }
+
+            if (requestUrl.includes('/auth/google')) {
+              return Promise.resolve(
+                new Response('Redirect to Google OAuth consent screen', {
+                  status: 302,
+                  statusText: 'Redirect to Google OAuth consent screen',
+                  headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+                }),
+              );
+            }
+          }
+
+          return originalFetch(...args);
+        };
+      })();
+    `);
+  });
+}
+
+export function setupSwagger(app: INestApplication): void {
+  const enableSwaggerMocks = process.env.NODE_ENV !== 'production';
+
+  if (enableSwaggerMocks) {
+    registerSwaggerOAuthRedirectScript(app);
+  }
+
+  const config = new DocumentBuilder()
+    .setTitle('SEIL API')
+    .setDescription('SEIL REST API documentation')
+    .setVersion('1.0.0')
+    .addBearerAuth(
+      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+      'JWT',
+    )
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+
+  SwaggerModule.setup('docs', app, document, {
+    customJs: enableSwaggerMocks ? SWAGGER_OAUTH_REDIRECT_SCRIPT_PATH : undefined,
+    swaggerOptions: { persistAuthorization: true },
+  });
+}
+export const VerifyOtpDocs = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Verify the OTP code and activate the account',
+      description:
+        'Validates the 6-digit OTP against the stored hash. On success the token is deleted, ' +
+        'the account is marked verified, and a JWT access token + HttpOnly refresh cookie are issued. ' +
+        'The token is single-use — submitting it a second time returns 400.',
+    }),
+    ApiBody({ type: VerifyOtpDto }),
+    ApiOkResponse({
+      description: 'OTP verified, account activated, tokens issued',
+      schema: {
+        example: {
+          statusCode: 200,
+          message: SYS_MSG.OTP_VERIFIED_SUCCESSFULLY,
+          data: authResponseExample,
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.BAD_REQUEST,
+      description: 'OTP is invalid, already used, or expired',
+      schema: {
+        example: {
+          statusCode: 400,
+          message: SYS_MSG.OTP_INVALID,
+          error: 'BadRequestException',
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.CONFLICT,
+      description: 'Account is already verified',
+      schema: {
+        example: {
+          statusCode: 409,
+          message: SYS_MSG.ACCOUNT_ALREADY_VERIFIED,
+          error: 'ConflictException',
+        },
+      },
+    }),
+  );
+
+export const ResendOtpDocs = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Resend a fresh OTP verification code',
+      description:
+        'Invalidates any existing OTP, generates a new one, and sends it. ' +
+        'Enforces a 30-second per-request cooldown and a max of 10 resend requests per hour. ' +
+        'Returns 200 for unknown emails and already-verified accounts to prevent enumeration.',
+    }),
+    ApiBody({ type: ResendOtpDto }),
+    ApiOkResponse({
+      description: 'OTP sent, email not found, or account already verified — all return 200',
+      schema: {
+        example: {
+          statusCode: 200,
+          message: SYS_MSG.OTP_RESENT_SUCCESSFULLY,
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.TOO_MANY_REQUESTS,
+      description:
+        '30-second cooldown active (`retryAfter` = seconds remaining) ' +
+        'or hourly limit reached (`retryAfter` = 3600)',
+      schema: {
+        example: {
+          statusCode: 429,
+          message: SYS_MSG.OTP_RESEND_RATE_LIMITED,
+          retryAfter: 18,
         },
       },
     }),
