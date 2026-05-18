@@ -22,7 +22,7 @@ export class ContactService {
     const contact = await this.contactModelAction.createContact({
       full_name: dto.fullName,
       email: dto.email,
-      business_name: dto.businessName ?? null,
+      business_name: dto.businessName,
       message: dto.message,
     });
 

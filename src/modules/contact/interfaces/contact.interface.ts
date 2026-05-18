@@ -14,7 +14,7 @@ export interface IContact {
 export interface ICreateContactPayload {
   full_name: string;
   email: string;
-  business_name?: string;
+  business_name: string;
   message: string;
 }
 
