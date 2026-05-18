@@ -1,0 +1,51 @@
+name: Deploy — Staging
+
+on:
+  push:
+    branches: [staging]
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_SSH_PORT || 22 }}
+          script: |
+            set -e
+
+            echo "==> Navigating to project directory"
+            cd ${{ secrets.STAGING_DEPLOY_PATH }}
+
+            echo "==> Pulling latest code"
+            git fetch origin staging
+            git reset --hard origin/staging
+
+            echo "==> Installing dependencies"
+            pnpm install --frozen-lockfile --prod
+
+            echo "==> Building application"
+            pnpm build
+
+            echo "==> Running database migrations"
+            pnpm migration:run
+
+            echo "==> Reloading PM2 process"
+            pm2 reload ecosystem.config.js --env staging --update-env
+
+            echo "==> Deployment to staging complete"
+            pm2 status

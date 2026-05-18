@@ -1,0 +1,61 @@
+name: Deploy — Production
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          port: ${{ secrets.PROD_SSH_PORT || 22 }}
+          script: |
+            set -e
+
+            echo "==> Navigating to project directory"
+            cd ${{ secrets.PROD_DEPLOY_PATH }}
+
+            echo "==> Pulling latest code"
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "==> Installing dependencies"
+            pnpm install --frozen-lockfile --prod
+
+            echo "==> Building application"
+            pnpm build
+
+            echo "==> Running database migrations"
+            pnpm migration:run
+
+            echo "==> Reloading PM2 process"
+            pm2 reload ecosystem.config.js --env production --update-env
+
+            echo "==> Deployment to production complete"
+            pm2 status
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "release-${{ github.run_number }}"
+          name: "Release #${{ github.run_number }}"
+          generate_release_notes: true
+          make_latest: true
