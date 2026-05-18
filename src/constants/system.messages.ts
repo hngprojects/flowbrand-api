@@ -1,10 +1,8 @@
 // Individual message constants (single-line exports)
 export const USER_CREATED_SUCCESSFULLY = 'User Created Successfully';
-export const FAILED_TO_CREATE_USER =
-  'Error Occurred while creating user, kindly try again';
+export const FAILED_TO_CREATE_USER = 'Error Occurred while creating user, kindly try again';
 export const USER_ACCOUNT_EXIST = 'Account with the specified email exists';
-export const USER_ACCOUNT_DOES_NOT_EXIST =
-  "Account with the specified email doesn't exist";
+export const USER_ACCOUNT_DOES_NOT_EXIST = "Account with the specified email doesn't exist";
 export const USER_ACCOUNT_LOCKED = 'Account with the specified email is locked';
 
 // Auth messages
@@ -14,12 +12,9 @@ export const AUTH_TOKEN_REFRESHED = 'Token refreshed successfully';
 export const AUTH_INVALID_CREDENTIALS = 'Invalid email or password';
 export const AUTH_INVALID_REFRESH_TOKEN = 'Invalid or expired refresh token';
 export const AUTH_UNAUTHENTICATED_MESSAGE = 'Unauthenticated';
-export const AUTH_TERMS_REQUIRED =
-  'You must accept the terms and conditions to register';
-export const AUTH_ACCOUNT_LOCKED =
-  'Account locked due to too many failed login attempts. Try again later.';
-export const AUTH_TOO_MANY_FAILED_ATTEMPTS =
-  'Too many failed login attempts. Your account has been locked for 1 hour.';
+export const AUTH_TERMS_REQUIRED = 'You must accept the terms and conditions to register';
+export const AUTH_ACCOUNT_LOCKED = 'Account locked due to too many failed login attempts. Try again later.';
+export const AUTH_TOO_MANY_FAILED_ATTEMPTS = 'Too many failed login attempts. Your account has been locked for 1 hour.';
 
 // User messages
 export const USER_EMAIL_IN_USE = 'Email already in use';
@@ -40,7 +35,8 @@ export const ONBOARDING_SESSION_RESUMED = 'ONBOARDING_SESSION_RESUMED';
 export const ONBOARDING_ALREADY_COMPLETE = 'ONBOARDING_ALREADY_COMPLETE';
 export const ONBOARDING_COMPLETE_SUCCESS = 'Onboarding completed successfully';
 export const ONBOARDING_INCOMPLETE = 'Onboarding incomplete';
-export const ONBOARDING_SESSION_NOT_FOUND = 'Session not found. Please call POST /onboarding/start to begin the wizard.';
+export const ONBOARDING_SESSION_NOT_FOUND =
+  'Session not found. Please call POST /onboarding/start to begin the wizard.';
 export const ONBOARDING_SESSION_EXPIRED = 'Session has expired. Restart the onboarding process.';
 export const ONBOARDING_SESSION_RETRIEVED = 'Onboarding session retrieved successfully';
 export const ONBOARDING_UNKNOWN_CHANNEL = 'Unknown discovery channel, defaulting to awareness';
@@ -60,12 +56,10 @@ export const OTP_RATE_LIMITED = 'Too many OTP requests. Please try again later.'
 export const OTP_VERIFIED_SUCCESSFULLY = 'Email verified successfully';
 export const OTP_INVALID = 'The OTP code is invalid or has already been used';
 export const OTP_EXPIRED = 'Your OTP code has expired. Please request a new one.';
-export const OTP_RESENT_SUCCESSFULLY =
-  'A new verification code has been sent to your email address.';
+export const OTP_RESENT_SUCCESSFULLY = 'A new verification code has been sent to your email address.';
 export const OTP_RESEND_RATE_LIMITED = 'Please wait before requesting a new code.';
 export const OTP_RESEND_HOURLY_LIMIT = 'Too many resend requests. Please try again in an hour.';
-export const OTP_VERIFY_ATTEMPTS_EXCEEDED =
-  'Too many failed verification attempts. Please request a new OTP.';
+export const OTP_VERIFY_ATTEMPTS_EXCEEDED = 'Too many failed verification attempts. Please request a new OTP.';
 
 // Health
 export const HEALTH_OK = 'ok';
@@ -81,8 +75,7 @@ export const HTTP_INTERNAL_SERVER_ERROR_NAME = 'InternalServerError';
 export const REDIS_CONNECTION_ESTABLISHED = 'Redis connection established';
 export const REDIS_CLIENT_READY = 'Redis client ready';
 export const REDIS_CONNECTION_CLOSED = 'Redis connection closed';
-export const REDIS_INITIAL_CONNECTION_FAILED =
-  'Initial Redis connection failed';
+export const REDIS_INITIAL_CONNECTION_FAILED = 'Initial Redis connection failed';
 export const REDIS_CLIENT_ERROR = 'Redis client error';
 export const REDIS_CRITICAL_OOM = 'Critical Redis Out of Memory';
 export const REDIS_RECONNECT_ATTEMPT = (attempt: number, delay: number) =>
@@ -94,3 +87,8 @@ export const REDIS_PATTERN_DELETE_SUCCESS = (count: number, pattern: string) =>
 // Waitlist
 export const WAITLIST_JOINED_SUCCESSFULLY = 'Successfully joined the waitlist';
 export const WAITLIST_ALREADY_JOINED = 'You are already on the waitlist';
+
+// Contact
+export const CONTACT_MESSAGE_SENT_SUCCESSFULLY = 'Message sent successfully';
+export const CONTACT_CREATED = 'Contact message submitted successfully';
+export const CONTACT_SPAM_DETECTED = 'Submission contains prohibited content';
