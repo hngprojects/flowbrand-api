@@ -105,3 +105,12 @@ jobs:
 
       - name: Run unit tests
         run: pnpm test -- --ci --forceExit --passWithNoTests
+        env:
+          NODE_ENV: test
+          DATABASE_HOST: localhost
+          DATABASE_PORT: 5432
+          DATABASE_USER: test
+          DATABASE_PASSWORD: test
+          DATABASE_NAME: test
+          JWT_ACCESS_SECRET: ci-test-access-secret-minimum-32-chars
+          JWT_REFRESH_SECRET: ci-test-refresh-secret-minimum-32-chars
