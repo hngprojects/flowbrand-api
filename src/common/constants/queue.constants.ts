@@ -1,8 +1,10 @@
 export const QUEUES = {
+  FUNNEL_GENERATION: 'funnel-generation',
   EMAIL: 'email',
 } as const;
 
 export const JOBS = {
+  GENERATE_FUNNEL: 'generate-funnel',
   SEND_EMAIL: 'send-email',
 } as const;
 

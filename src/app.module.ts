@@ -21,6 +21,7 @@ import { RedisModule } from './modules/redis/redis.module';
 import { QueueModule } from './queue/queue.module';
 import { EmailModule } from './email/email.module';
 import { FunnelsModule } from './modules/funnels/funnels.module';
+import { WaitlistModule } from './modules/waitlist/waitlist.module';
 
 function collectValidationErrors(
   errors: ValidationError[],
@@ -54,6 +55,7 @@ function collectValidationErrors(
     RedisModule,
     QueueModule,
     EmailModule,
+    WaitlistModule,
   ],
   providers: [
     {

@@ -79,6 +79,12 @@ export class WizardSessionModelAction extends AbstractModelAction<WizardSession>
       .orderBy('ws.created_at', 'DESC');
   }
 
+  async findSessionById(sessionId: string): Promise<WizardSession | null> {
+    return this.wizardSessionRepository.findOne({
+      where: { id: sessionId },
+    });
+  }
+  
   async findActiveSession(userId: string): Promise<WizardSession | null> {
     return this.repository
       .createQueryBuilder('ws')

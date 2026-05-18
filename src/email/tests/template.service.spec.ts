@@ -5,9 +5,10 @@ import { TemplateService } from '../template.service';
 jest.mock('fs/promises');
 const mockReadFile = fs.readFile as jest.MockedFunction<typeof fs.readFile>;
 
-const BASE_HBS = `<!DOCTYPE html><html><body>{{{body}}} {{year}} <a href="{{unsubscribeUrl}}">Unsubscribe</a></body></html>`;
+const BASE_HBS = `<!DOCTYPE html><html><body>{{{body}}} {{year}} <a href="{{unsubscribeUrl}}">Unsubscribe</a> <a href="{{privacyPolicyUrl}}">Privacy</a></body></html>`;
 const OTP_VERIFICATION_HBS = `<p>Hello {{fullName}}</p><p>{{otpCode}}</p><p>{{expiryMins}} minutes</p>`;
 const OTP_RESET_HBS = `<p>Hello {{fullName}}</p><p>{{otpCode}}</p><p>{{expiryMins}} minutes</p>`;
+const WAITLIST_HBS = `<p>Hi {{user.name}}</p><p>You are on the waitlist</p>`;
 
 describe('TemplateService', () => {
   let service: TemplateService;
@@ -23,6 +24,7 @@ describe('TemplateService', () => {
         if (p.includes('base.hbs')) return Promise.resolve(BASE_HBS as never);
         if (p.includes('otp-verification')) return Promise.resolve(OTP_VERIFICATION_HBS as never);
         if (p.includes('otp-reset')) return Promise.resolve(OTP_RESET_HBS as never);
+        if (p.includes('waitlist')) return Promise.resolve(WAITLIST_HBS as never);
         return Promise.reject(new Error(`Unexpected path: ${p}`));
       });
 
@@ -57,6 +59,17 @@ describe('TemplateService', () => {
       expect(html).toContain('Bob');
       expect(html).toContain('10');
       expect(subject).toBe('Reset your SEIL account');
+    });
+
+    it('renders waitlist with correct variables', () => {
+      const { html, subject } = service.render('waitlist', {
+        user: { name: 'Charlie' },
+      });
+
+      expect(html).toContain('Charlie');
+      expect(html).toContain('waitlist');
+      expect(html).toContain('/privacy-policy');
+      expect(subject).toBe('You are on the waitlist');
     });
 
     it('wraps inner content in base layout (contains DOCTYPE)', () => {

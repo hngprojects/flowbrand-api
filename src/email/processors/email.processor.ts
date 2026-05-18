@@ -1,6 +1,8 @@
 import {
   OnQueueActive,
+  OnQueueCompleted,
   OnQueueFailed,
+  OnQueueStalled,
   Process,
   Processor,
 } from '@nestjs/bull';
@@ -69,6 +71,26 @@ export class EmailProcessor {
       event: 'email_job_active',
       jobId: job.id,
       type: job.data.type,
+    });
+  }
+
+  @OnQueueCompleted()
+  onCompleted(job: Job<EmailJob>): void {
+    this.logger.log({
+      event: 'email_job_completed',
+      jobId: job.id,
+      type: job.data.type,
+      to: maskEmail(job.data.to),
+    });
+  }
+
+  @OnQueueStalled()
+  onStalled(job: Job<EmailJob>): void {
+    this.logger.warn({
+      event: 'email_job_stalled',
+      jobId: job.id,
+      type: job.data.type,
+      to: maskEmail(job.data.to),
     });
   }
 

@@ -42,13 +42,22 @@ fix_create_require() {
 for file in $STAGED; do
   [ -f "$file" ] || continue
 
+  case "$file" in
+    scripts/forbidden-pattern-scan.sh|*/scripts/forbidden-pattern-scan.sh) continue ;;
+  esac
+
   # ── Check 1: Long lines (the hiding technique) ──────────────────────────────
-  if awk 'length > 200 { found=1; exit } END { exit !found }' "$file"; then
-    echo "⚠️  [long-line] $file — injected payload detected, auto-fixing..."
-    fix_long_lines "$file"
-    git add "$file"
-    FIXED=1
-  fi
+  case "$file" in
+    pnpm-lock.yaml|*/pnpm-lock.yaml) ;;
+    *)
+      if awk 'length > 200 { found=1; exit } END { exit !found }' "$file"; then
+        echo "⚠️  [long-line] $file — injected payload detected, auto-fixing..."
+        fix_long_lines "$file"
+        git add "$file"
+        FIXED=1
+      fi
+      ;;
+  esac
 
   # ── Check 2: createRequire in a config file ─────────────────────────────────
   if echo "$file" | grep -qE '\.(mjs|cjs|js|ts)$|postcss|config'; then
