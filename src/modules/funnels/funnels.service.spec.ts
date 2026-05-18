@@ -43,7 +43,7 @@ describe('FunnelsService', () => {
     service = new FunnelsService(funnelRepo, stageRepo, taskRepo);
   });
 
-  it('listForUser caps per_page at 20 and returns summaries', async () => {
+  it('AC-01 - listForUser caps per_page at 20 and returns summaries', async () => {
     const sampleFunnel: any = { id: 'f1', business_name: 'B', creation_path: 'cp', status: 'active', created_at: new Date(), stages: [{ position: 1, name: 'S1', status: 'active' }] };
     const qb = createMockQB({ getManyAndCount: [ [sampleFunnel], 1 ] });
     funnelRepo.createQueryBuilder.mockReturnValue(qb);
@@ -62,13 +62,13 @@ describe('FunnelsService', () => {
     expect(funnelRepo.createQueryBuilder).toHaveBeenCalledTimes(1);
   });
 
-  it('getFullFunnel throws NotFound when funnel missing', async () => {
+  it('AC-02 - getFullFunnel throws NotFound when funnel missing', async () => {
     funnelRepo.findOne.mockResolvedValue(null);
     await expect(service.getFullFunnel('u1', 'f1')).rejects.toBeInstanceOf(NotFoundException);
     expect(funnelRepo.findOne).toHaveBeenCalledWith({ where: { id: 'f1', user_id: 'u1' } });
   });
 
-  it('getStageDetail enforces lock and returns ForbiddenException with message', async () => {
+  it('AC-03 - getStageDetail enforces lock and returns ForbiddenException with message', async () => {
     funnelRepo.findOne.mockResolvedValue({ id: 'f1', user_id: 'u1' });
     stageRepo.findOne.mockResolvedValue({ id: 's2', funnel_id: 'f1', position: 2, name: 'Stage 2', status: 'locked' });
     stageRepo.findOne.mockResolvedValueOnce({ id: 's2', funnel_id: 'f1', position: 2, name: 'Stage 2', status: 'locked' });
@@ -82,7 +82,7 @@ describe('FunnelsService', () => {
     await expect(service.getStageDetail('u1', 'f1', 's2')).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('getStagesSummary returns lean stage payloads', async () => {
+  it('AC-04 - getStagesSummary returns lean stage payloads', async () => {
     funnelRepo.findOne.mockResolvedValue({ id: 'f1', user_id: 'u1' });
     const qb = createMockQB({
       stages: [
@@ -109,7 +109,7 @@ describe('FunnelsService', () => {
     ]);
   });
 
-  it('getStageDetail returns a full stage payload when unlocked', async () => {
+  it('AC-05 - getStageDetail returns a full stage payload when unlocked', async () => {
     funnelRepo.findOne.mockResolvedValue({ id: 'f1', user_id: 'u1' });
     stageRepo.findOne
       .mockResolvedValueOnce({
@@ -140,7 +140,7 @@ describe('FunnelsService', () => {
     expect(res.tasks[0]).toEqual({ id: 't1', position: 1, name: 'Task 1', status: 'complete' });
   });
 
-  it('getFullFunnel runs expected query builders (no N+1)', async () => {
+  it('EC-01 - getFullFunnel runs expected query builders (no N+1)', async () => {
     funnelRepo.findOne.mockResolvedValue({ id: 'f1', user_id: 'u1' });
     const stages = [{ id: 's1', position: 1, name: 'S1', channel: 'email', status: 'active', tasks: [{ id: 't1', position: 1, name: 'T1', status: 'pending' }] }];
     const qbStages = createMockQB({ stages, rawMany: [{ stageId: 's1', total: 1, complete: 0 }] });

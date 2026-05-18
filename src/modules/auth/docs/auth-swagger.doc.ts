@@ -217,62 +217,79 @@ function registerSwaggerOAuthRedirectScript(app: INestApplication): void {
   app.use(SWAGGER_OAUTH_REDIRECT_SCRIPT_PATH, (_req: Request, res: Response) => {
     res.type('application/javascript').send(`
       (() => {
-        const originalFetch = window.fetch.bind(window);
+        const originalFetch = (window.fetch && window.fetch.bind) ? window.fetch.bind(window) : null;
 
-        window.fetch = (...args) => {
-          const [input, init] = args;
-          const requestUrl =
-            typeof input === 'string'
-              ? input
-              : input && typeof input === 'object' && 'url' in input
-                ? input.url
-                : '';
-          const method =
-            (init && init.method) ||
-            (typeof input !== 'string' && input && typeof input === 'object' && 'method' in input
-              ? input.method
-              : 'GET');
-
-          if (typeof requestUrl === 'string' && String(method).toUpperCase() === 'GET') {
-            if (requestUrl.includes('/auth/google/callback')) {
-              return Promise.resolve(
-                new Response(
-                  JSON.stringify({
-                    status_code: 200,
-                    message: 'OAuth login successful',
-                    access_token: 'jwt.access.token',
-                    refresh_token: 'jwt.refresh.token',
-                    data: {
-                      user: {
-                        id: 'uuid',
-                        full_name: 'Jane Doe',
-                        email: 'user@example.com',
-                        avatar_url: null,
-                      },
-                    },
-                  }),
-                  {
-                    status: 200,
-                    statusText: 'OK',
-                    headers: { 'Content-Type': 'application/json' },
-                  },
-                ),
-              );
-            }
-
-            if (requestUrl.includes('/auth/google')) {
-              return Promise.resolve(
-                new Response('Redirect to Google OAuth consent screen', {
-                  status: 302,
-                  statusText: 'Redirect to Google OAuth consent screen',
-                  headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-                }),
-              );
-            }
+        function getStoredJwt() {
+          try {
+            const auth = localStorage.getItem('authorized');
+            if (!auth) return null;
+            const parsed = JSON.parse(auth);
+            if (parsed && parsed.JWT && parsed.JWT.value) return parsed.JWT.value;
+            return null;
+          } catch (e) {
+            return null;
           }
+        }
 
-          return originalFetch(...args);
-        };
+        // Wrap fetch to inject Authorization header for API requests when a token exists
+        if (originalFetch) {
+          window.fetch = (input, init) => {
+            try {
+              const token = getStoredJwt();
+              const url = typeof input === 'string' ? input : input && input.url ? input.url : '';
+              // Only attach for same-origin API paths
+              if (token && typeof url === 'string' && url.includes('/api/')) {
+                // Build headers
+                const origHeaders = (init && init.headers) || (input && input.headers) || {};
+                const headers = new Headers(origHeaders);
+                if (!headers.has('Authorization')) {
+                  headers.set('Authorization', 'Bearer ' + token);
+                }
+
+                if (typeof input === 'string') {
+                  const newInit = Object.assign({}, init || {}, { headers });
+                  return originalFetch(input, newInit);
+                }
+
+                // input might be a Request
+                try {
+                  const newReq = new Request(input, Object.assign({}, init || {}, { headers }));
+                  return originalFetch(newReq);
+                } catch (e) {
+                  // fallback
+                  return originalFetch(input, init);
+                }
+              }
+            } catch (e) {
+              // ignore and call original
+            }
+            return originalFetch(input, init);
+          };
+        }
+
+        // Keep lightweight mocks for the Google OAuth flow in Swagger UI (GET only)
+        const originalFetchForMock = originalFetch;
+        if (originalFetchForMock) {
+          const wrapped = window.fetch;
+          window.fetch = (...args) => {
+            try {
+              const [input, init] = args;
+              const requestUrl = typeof input === 'string' ? input : input && input.url ? input.url : '';
+              const method = (init && init.method) || (input && input.method) || 'GET';
+              if (typeof requestUrl === 'string' && String(method).toUpperCase() === 'GET') {
+                if (requestUrl.includes('/auth/google/callback')) {
+                  return Promise.resolve(new Response(JSON.stringify({ status_code: 200, message: 'OAuth login successful', access_token: 'jwt.access.token', refresh_token: 'jwt.refresh.token', data: 
+                }
+                if (requestUrl.includes('/auth/google')) {
+                  return Promise.resolve(new Response('Redirect to Google OAuth consent screen', { status: 302, statusText: 'Redirect to Google OAuth consent screen', headers: { 'Content-Type': 'text/
+                }
+              }
+            } catch (e) {
+              // noop
+            }
+            return wrapped(...args);
+          };
+        }
       })();
     `);
   });
