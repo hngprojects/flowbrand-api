@@ -40,12 +40,9 @@ export const ONBOARDING_SESSION_RESUMED = 'ONBOARDING_SESSION_RESUMED';
 export const ONBOARDING_ALREADY_COMPLETE = 'ONBOARDING_ALREADY_COMPLETE';
 export const ONBOARDING_COMPLETE_SUCCESS = 'Onboarding completed successfully';
 export const ONBOARDING_INCOMPLETE = 'Onboarding incomplete';
-export const ONBOARDING_SESSION_NOT_FOUND = 'Session not found';
-export const ONBOARDING_SESSION_EXPIRED = 'Session expired';
 export const ONBOARDING_SESSION_RETRIEVED = 'Onboarding session retrieved successfully';
 export const ONBOARDING_SESSION_NOT_FOUND = 'Session not found. Please call POST /onboarding/start to begin the wizard.';
 export const ONBOARDING_SESSION_EXPIRED = 'Session has expired. Restart the onboarding process.';
-export const ONBOARDING_SESSION_RETRIEVED = 'Onboarding session retrieved successfully';
 export const ONBOARDING_UNKNOWN_CHANNEL = 'Unknown discovery channel, defaulting to awareness';
 
 // Error handling
