@@ -46,10 +46,15 @@ export class HealthController {
 
   private async checkQueue(): Promise<boolean> {
     try {
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 2000),
-      );
-      await Promise.race([this.funnelQueue.getJobCounts(), timeout]);
+      let timerId: ReturnType<typeof setTimeout>;
+      const timeout = new Promise<never>((_, reject) => {
+        timerId = setTimeout(() => reject(new Error('timeout')), 2000);
+      });
+      try {
+        await Promise.race([this.funnelQueue.getJobCounts(), timeout]);
+      } finally {
+        clearTimeout(timerId!);
+      }
       return true;
     } catch {
       return false;
@@ -58,10 +63,15 @@ export class HealthController {
 
   private async checkDb(): Promise<boolean> {
     try {
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 2000),
-      );
-      await Promise.race([this.dataSource.query('SELECT 1'), timeout]);
+      let timerId: ReturnType<typeof setTimeout>;
+      const timeout = new Promise<never>((_, reject) => {
+        timerId = setTimeout(() => reject(new Error('timeout')), 2000);
+      });
+      try {
+        await Promise.race([this.dataSource.query('SELECT 1'), timeout]);
+      } finally {
+        clearTimeout(timerId!);
+      }
       return true;
     } catch {
       return false;
