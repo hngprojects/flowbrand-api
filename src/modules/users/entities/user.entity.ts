@@ -43,13 +43,6 @@ export class User extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   provider_user_id: string | null;
 
-  @Exclude()
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  otp_hash: string | null;
-
-  @Column({ type: 'timestamptz', nullable: true })
-  expires_at: Date | null;
-
   @Column({ type: 'boolean', default: false, name: 'terms_accepted' })
   termsAccepted: boolean;
 
