@@ -1,5 +1,6 @@
 import { applyDecorators, HttpStatus } from '@nestjs/common';
 import { ApiBadRequestResponse, ApiCreatedResponse, ApiOperation, ApiTooManyRequestsResponse } from '@nestjs/swagger';
+import * as SYS_MSG from '../../../constants/system.messages';
 
 export const ContactSwaggerDocs = {
   create: () =>
@@ -9,12 +10,12 @@ export const ContactSwaggerDocs = {
         description: 'Accepts a contact form submission. Spam protection is applied automatically.',
       }),
       ApiCreatedResponse({
-        description: 'Contact message submitted successfully',
+        description: SYS_MSG.CONTACT_MESSAGE_SENT_SUCCESSFULLY,
         schema: {
           example: {
             success: true,
             statusCode: HttpStatus.CREATED,
-            message: 'Contact message submitted successfully',
+            message: SYS_MSG.CONTACT_MESSAGE_SENT_SUCCESSFULLY,
             data: {
               id: 'uuid',
               fullName: 'John Doe',

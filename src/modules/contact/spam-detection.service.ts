@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateContactDto } from './dto/create-contact.dto';
-
+import * as SYS_MSG from '../../constants/system.messages';
 @Injectable()
 export class SpamDetectionService {
   private readonly spamKeywords = [
@@ -40,7 +40,7 @@ export class SpamDetectionService {
     const foundKeywords = this.spamKeywords.filter((keyword) => content.includes(keyword.toLowerCase()));
 
     if (foundKeywords.length > 0) {
-      throw new BadRequestException('Submission contains prohibited content');
+      throw new BadRequestException(SYS_MSG.SPAM_PROHIBITED_CONTENT);
     }
   }
 
@@ -48,7 +48,7 @@ export class SpamDetectionService {
     const urls = dto.message.match(this.urlRegex) ?? [];
 
     if (urls.length > this.maxUrls) {
-      throw new BadRequestException('Message contains too many links. Please limit to 2 URLs.');
+      throw new BadRequestException(SYS_MSG.SPAM_TOO_MANY_LINKS);
     }
   }
 
@@ -58,7 +58,7 @@ export class SpamDetectionService {
     const uniqueRatio = uniqueWords.size / words.length;
 
     if (words.length >= 20 && uniqueRatio < this.minUniqueWordRatio) {
-      throw new BadRequestException('Message contains excessive repetition');
+      throw new BadRequestException(SYS_MSG.SPAM_EXCESSIVE_REPETITION);
     }
   }
 
@@ -66,20 +66,20 @@ export class SpamDetectionService {
     const upperCaseRatio = (dto.message.match(/[A-Z]/g) ?? []).length / dto.message.length;
 
     if (upperCaseRatio > 0.5 && dto.message.length > 20) {
-      throw new BadRequestException('Message contains excessive capitalization');
+      throw new BadRequestException(SYS_MSG.SPAM_EXCESSIVE_CAPITALIZATION);
     }
 
     const hasGibberish = /[bcdfghjklmnpqrstvwxyz]{8,}/i.test(dto.message);
 
     if (hasGibberish) {
-      throw new BadRequestException('Message contains invalid content');
+      throw new BadRequestException(SYS_MSG.SPAM_INVALID_CONTENT);
     }
 
     const emailPattern = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
     const emailsInMessage = (dto.message.match(emailPattern) ?? []).length;
 
     if (emailsInMessage > 1) {
-      throw new BadRequestException('Message contains multiple email addresses');
+      throw new BadRequestException(SYS_MSG.SPAM_MULTIPLE_EMAILS);
     }
   }
 }

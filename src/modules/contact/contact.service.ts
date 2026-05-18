@@ -4,7 +4,6 @@ import { ContactModelAction } from './actions/contact.action';
 import { CreateContactDto } from './dto/create-contact.dto';
 import { IContactResponse } from './interfaces/contact.interface';
 import { SpamDetectionService } from './spam-detection.service';
-import { ContactAdminNotificationPayload } from '../../email/interfaces/email-job.interface';
 
 @Injectable()
 export class ContactService {

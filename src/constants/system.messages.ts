@@ -92,3 +92,11 @@ export const WAITLIST_ALREADY_JOINED = 'You are already on the waitlist';
 export const CONTACT_MESSAGE_SENT_SUCCESSFULLY = 'Message sent successfully';
 export const CONTACT_CREATED = 'Contact message submitted successfully';
 export const CONTACT_SPAM_DETECTED = 'Submission contains prohibited content';
+
+// Spam Detection
+export const SPAM_PROHIBITED_CONTENT = 'Submission contains prohibited content';
+export const SPAM_TOO_MANY_LINKS = 'Message contains too many links. Please limit to 2 URLs.';
+export const SPAM_EXCESSIVE_REPETITION = 'Message contains excessive repetition';
+export const SPAM_EXCESSIVE_CAPITALIZATION = 'Message contains excessive capitalization';
+export const SPAM_INVALID_CONTENT = 'Message contains invalid content';
+export const SPAM_MULTIPLE_EMAILS = 'Message contains multiple email addresses';
