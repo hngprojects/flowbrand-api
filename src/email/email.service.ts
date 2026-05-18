@@ -37,6 +37,17 @@ export class EmailService {
     );
   }
 
+  async sendPasswordReset(
+    to: string,
+    payload: OtpPayload,
+    userId?: string,
+  ): Promise<string | undefined> {
+    return this.dispatch(
+      { to, type: 'password-reset', payload, userId },
+      DEFAULT_PRIORITY,
+    );
+  }
+
   private async dispatch(
     job: EmailJob,
     priority: number,
