@@ -71,3 +71,5 @@ export const REDIS_PATTERN_DELETE_SUCCESS = (count: number, pattern: string) =>
 export const ONBOARDING_SESSION_NOT_FOUND = 'Session not found. Please call POST /onboarding/start to begin the wizard.';
 export const ONBOARDING_SESSION_EXPIRED = 'Session has expired. Restart the onboarding process.';
 export const ONBOARDING_SESSION_RETRIEVED = 'Onboarding session retrieved successfully';
+export const STAGE_LOCKED = (stageName: string, priorStageName: string) =>
+  `The ${stageName} stage is locked. Complete all tasks in ${priorStageName} and mark it complete to unlock.`;

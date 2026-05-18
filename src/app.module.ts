@@ -20,6 +20,7 @@ import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { QueueModule } from './queue/queue.module';
 import { EmailModule } from './email/email.module';
+import { FunnelsModule } from './modules/funnels/funnels.module';
 
 function collectValidationErrors(
   errors: ValidationError[],
@@ -49,6 +50,7 @@ function collectValidationErrors(
     UsersModule,
     AuthModule,
     OnboardingModule,
+    FunnelsModule,
     RedisModule,
     QueueModule,
     EmailModule,
