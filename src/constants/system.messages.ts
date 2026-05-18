@@ -42,7 +42,7 @@ export const ONBOARDING_COMPLETE_SUCCESS = 'Onboarding completed successfully';
 export const ONBOARDING_INCOMPLETE = 'Onboarding incomplete';
 export const ONBOARDING_SESSION_NOT_FOUND = 'Session not found';
 export const ONBOARDING_SESSION_EXPIRED = 'Session expired';
-export const ONBOARDING_UNKNOWN_CHANNEL = 'Unknown discovery channel, defaulting to awareness';
+export const ONBOARDING_SESSION_RETRIEVED = 'Onboarding session retrieved successfully';
 
 // Error handling
 export const VALIDATION_FAILED = 'Validation failed';
@@ -89,6 +89,11 @@ export const REDIS_RECONNECT_ATTEMPT = (attempt: number, delay: number) =>
 export const REDIS_RETRY_LIMIT_REACHED = 'Redis retry limit reached';
 export const REDIS_PATTERN_DELETE_SUCCESS = (count: number, pattern: string) =>
   `Deleted ${count} keys matching pattern: ${pattern}`;
-export const ONBOARDING_SESSION_NOT_FOUND = 'Session not found. Please call POST /onboarding/start to begin the wizard.';
-export const ONBOARDING_SESSION_EXPIRED = 'Session has expired. Restart the onboarding process.';
-export const ONBOARDING_SESSION_RETRIEVED = 'Onboarding session retrieved successfully';
+
+// Password Reset Messages
+export const PASSWORD_RESET_OTP_SENT = 'If your email is registered, you will receive a password reset code.';
+export const PASSWORD_RESET_INVALID_OTP = 'Invalid or expired reset code.';
+export const PASSWORD_RESET_EXPIRED = 'Reset code has expired. Please request a new one.';
+export const PASSWORD_RESET_SUCCESSFUL = 'Password reset successful. You have been automatically logged in.';
+export const PASSWORD_RESET_RATE_LIMITED = 'Too many password reset requests. Please try again later.';
+export const PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED = 'Too many verification attempts. Please try again later.';
