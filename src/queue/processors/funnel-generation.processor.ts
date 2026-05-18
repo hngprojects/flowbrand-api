@@ -51,6 +51,10 @@ export class FunnelGenerationProcessor {
 
     // EC-05: skip if already completed (idempotency guard against duplicate delivery)
     const funnel = await this.funnelAction.get({ identifierOptions: { id: funnelId } });
+    if (!funnel) {
+      this.logger.error({ message: 'Funnel not found — aborting job', funnelId, jobId: job.id });
+      return;
+    }
     if (funnel.status === FunnelStatus.ACTIVE) {
       this.logger.log({ message: 'Funnel already active — skipping', funnelId, jobId: job.id });
       return;
@@ -63,11 +67,7 @@ export class FunnelGenerationProcessor {
 
       if (!stageData) {
         this.logger.log({ message: 'AI failed — using template fallback', funnelId });
-        stageData = this.templateService.getTemplate(
-          businessContext.businessType,
-          businessContext.discoveryChannel,
-          businessContext,
-        );
+        stageData = this.templateService.getTemplate(businessContext);
       }
 
       this.validateStageData(stageData);
@@ -84,6 +84,7 @@ export class FunnelGenerationProcessor {
       await this.funnelAction.update({
         identifierOptions: { id: funnelId },
         updatePayload: { status: FunnelStatus.FAILED },
+        transactionOptions: { useTransaction: false },
       });
       throw err;
     }
