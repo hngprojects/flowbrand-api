@@ -278,13 +278,40 @@ function registerSwaggerOAuthRedirectScript(app: INestApplication): void {
               const method = (init && init.method) || (input && input.method) || 'GET';
               if (typeof requestUrl === 'string' && String(method).toUpperCase() === 'GET') {
                 if (requestUrl.includes('/auth/google/callback')) {
-                  return Promise.resolve(new Response(JSON.stringify({ status_code: 200, message: 'OAuth login successful', access_token: 'jwt.access.token', refresh_token: 'jwt.refresh.token', data: 
-                }
+                   return Promise.resolve(
+                     new Response(
+                       JSON.stringify({
+                         status_code: 200,
+                         message: 'OAuth login successful',
+                         access_token: 'jwt.access.token',
+                         refresh_token: 'jwt.refresh.token',
+                         data: {
+                           id: 'uuid',
+                           email: 'user@example.com',
+                           full_name: 'Jane Doe',
+                         },
+                       }),
+                       {
+                         status: 200,
+                         headers: { 'Content-Type': 'application/json' },
+                       },
+                     ),
+                   );
+                 }
                 if (requestUrl.includes('/auth/google')) {
-                  return Promise.resolve(new Response('Redirect to Google OAuth consent screen', { status: 302, statusText: 'Redirect to Google OAuth consent screen', headers: { 'Content-Type': 'text/
-                }
-              }
-            } catch (e) {
+                  return Promise.resolve(
+                     new Response('Redirect to Google OAuth consent screen', {
+                       status: 302,
+                       statusText: 'Redirect to Google OAuth consent screen',
+                       headers: {
+                         'Content-Type': 'text/plain',
+                         Location: '/auth/google/callback',
+                       },
+                     }),
+                   );
+                 }
+               }
+             } catch (e) {
               // noop
             }
             return wrapped(...args);

@@ -31,7 +31,7 @@ export class FunnelStage extends BaseEntity {
   name: string;
 
   @Column({ type: 'varchar', length: 60, nullable: true })
-  channel: string;
+  channel: string | null;
 
   @Column({ type: 'enum', enum: FUNNEL_STAGE_STATUS, default: 'locked' })
   status: FunnelStageStatus;
