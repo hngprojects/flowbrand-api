@@ -391,7 +391,7 @@ export const ForgotPasswordDocs = () =>
       description: 'OTP sent if email exists (always returns 200 to prevent enumeration)',
       schema: {
         example: {
-          statusCode: 200,
+          statusCode: HttpStatus.OK,
           message: SYS_MSG.PASSWORD_RESET_OTP_SENT,
         },
       },
@@ -401,7 +401,7 @@ export const ForgotPasswordDocs = () =>
       description: 'Rate limit exceeded — max 3 OTP requests per 15 minutes per user',
       schema: {
         example: {
-          statusCode: 429,
+          statusCode: HttpStatus.TOO_MANY_REQUESTS,
           message: SYS_MSG.PASSWORD_RESET_RATE_LIMITED,
         },
       },
@@ -423,7 +423,7 @@ export const ResetPasswordDocs = () =>
       description: 'Password reset successful and user auto-logged in',
       schema: {
         example: {
-          statusCode: 200,
+          statusCode: HttpStatus.OK,
           message: SYS_MSG.PASSWORD_RESET_SUCCESSFUL,
           data: {
             accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
@@ -441,7 +441,7 @@ export const ResetPasswordDocs = () =>
       description: 'Invalid or expired OTP',
       schema: {
         example: {
-          statusCode: 400,
+          statusCode: HttpStatus.BAD_REQUEST,
           message: SYS_MSG.PASSWORD_RESET_INVALID_OTP,
         },
       },
@@ -450,7 +450,7 @@ export const ResetPasswordDocs = () =>
       description: 'Too many verification attempts (max 5 per 5 minutes)',
       schema: {
         example: {
-          statusCode: 429,
+          statusCode: HttpStatus.TOO_MANY_REQUESTS,
           message: SYS_MSG.PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED,
         },
       },
