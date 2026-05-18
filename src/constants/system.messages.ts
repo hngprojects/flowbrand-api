@@ -43,6 +43,10 @@ export const ONBOARDING_INCOMPLETE = 'Onboarding incomplete';
 export const ONBOARDING_SESSION_NOT_FOUND = 'Session not found';
 export const ONBOARDING_SESSION_EXPIRED = 'Session expired';
 export const ONBOARDING_SESSION_RETRIEVED = 'Onboarding session retrieved successfully';
+export const ONBOARDING_SESSION_NOT_FOUND = 'Session not found. Please call POST /onboarding/start to begin the wizard.';
+export const ONBOARDING_SESSION_EXPIRED = 'Session has expired. Restart the onboarding process.';
+export const ONBOARDING_SESSION_RETRIEVED = 'Onboarding session retrieved successfully';
+export const ONBOARDING_UNKNOWN_CHANNEL = 'Unknown discovery channel, defaulting to awareness';
 
 // Error handling
 export const VALIDATION_FAILED = 'Validation failed';
@@ -97,3 +101,7 @@ export const PASSWORD_RESET_EXPIRED = 'Reset code has expired. Please request a 
 export const PASSWORD_RESET_SUCCESSFUL = 'Password reset successful. You have been automatically logged in.';
 export const PASSWORD_RESET_RATE_LIMITED = 'Too many password reset requests. Please try again later.';
 export const PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED = 'Too many verification attempts. Please try again later.';
+
+// Waitlist
+export const WAITLIST_JOINED_SUCCESSFULLY = 'Successfully joined the waitlist';
+export const WAITLIST_ALREADY_JOINED = 'You are already on the waitlist';

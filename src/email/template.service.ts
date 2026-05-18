@@ -6,7 +6,7 @@ import type { EmailType } from './interfaces/email-job.interface';
 
 type CompiledTemplate = Handlebars.TemplateDelegate;
 
-const EMAIL_TYPES: EmailType[] = ['otp-verification', 'otp-reset', 'password-reset'];
+const EMAIL_TYPES: EmailType[] = ['otp-verification', 'otp-reset', 'password-reset', 'waitlist'];
 
 @Injectable()
 export class TemplateService implements OnModuleInit {
@@ -18,6 +18,7 @@ export class TemplateService implements OnModuleInit {
     'otp-verification': 'Your SEIL verification code',
     'otp-reset': 'Reset your SEIL account',
     'password-reset': 'Password Reset Request - Your OTP Code',
+    'waitlist': 'You are on the waitlist',
   };
 
   private compiledSubjects: Record<EmailType, Handlebars.TemplateDelegate>;
@@ -68,6 +69,7 @@ export class TemplateService implements OnModuleInit {
       body,
       year: new Date().getFullYear(),
       unsubscribeUrl: `${process.env.FRONTEND_URL ?? ''}/unsubscribe`,
+      privacyPolicyUrl: `${process.env.FRONTEND_URL ?? ''}/privacy-policy`,
     });
 
     const subject = this.compiledSubjects[type](payload);
