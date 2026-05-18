@@ -104,4 +104,4 @@ jobs:
           HUSKY: 0
 
       - name: Run unit tests
-        run: pnpm test --ci --forceExit --passWithNoTests
+        run: pnpm test -- --ci --forceExit --passWithNoTests
