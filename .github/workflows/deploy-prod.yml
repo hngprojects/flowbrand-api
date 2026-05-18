@@ -38,7 +38,7 @@ jobs:
             git reset --hard origin/main
 
             echo "==> Installing dependencies"
-            pnpm install --frozen-lockfile --prod
+            pnpm install --no-frozen-lockfile --prod
 
             echo "==> Building application"
             pnpm build
