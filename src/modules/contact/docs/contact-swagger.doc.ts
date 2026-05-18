@@ -13,7 +13,7 @@ export const ContactSwaggerDocs = {
         schema: {
           example: {
             success: true,
-            statusCode: 201,
+            statusCode: HttpStatus.CREATED,
             message: 'Contact message submitted successfully',
             data: {
               id: 'uuid',
