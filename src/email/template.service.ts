@@ -6,7 +6,7 @@ import type { EmailType } from './interfaces/email-job.interface';
 
 type CompiledTemplate = Handlebars.TemplateDelegate;
 
-const EMAIL_TYPES: EmailType[] = ['otp-verification', 'otp-reset'];
+const EMAIL_TYPES: EmailType[] = ['otp-verification', 'otp-reset', 'password-reset'];
 
 @Injectable()
 export class TemplateService implements OnModuleInit {
@@ -17,6 +17,7 @@ export class TemplateService implements OnModuleInit {
   private readonly SUBJECTS: Record<EmailType, string> = {
     'otp-verification': 'Your SEIL verification code',
     'otp-reset': 'Reset your SEIL account',
+    'password-reset': 'Password Reset Request - Your OTP Code',
   };
 
   private compiledSubjects: Record<EmailType, Handlebars.TemplateDelegate>;

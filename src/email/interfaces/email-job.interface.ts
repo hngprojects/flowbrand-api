@@ -1,4 +1,4 @@
-export type EmailType = 'otp-verification' | 'otp-reset';
+export type EmailType = 'otp-verification' | 'otp-reset' | 'password-reset';
 
 export interface OtpPayload {
   fullName: string;
