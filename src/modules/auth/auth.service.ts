@@ -69,6 +69,7 @@ export class AuthService {
   // Local minimal interface to avoid unsafe-call lint issues from third-party model action types
   private get userSessionAction(): {
     findById(id: string): Promise<UserSession | null>;
+    findByUserId(userId: string): Promise<UserSession[]>;
     updateById(
       id: string,
       payload: Partial<UserSession>,
@@ -534,9 +535,9 @@ export class AuthService {
   }
 
   private async revokeAllUserSessions(userId: string): Promise<void> {
-    const sessions = await this.userSessionAction.findById(userId);
+    const sessions = await this.userSessionAction.findByUserId(userId);
 
-    if (!sessions || !Array.isArray(sessions) || sessions.length === 0) {
+    if (!sessions || sessions.length === 0) {
       this.logger.debug({
         message: 'No active sessions found to revoke',
         userId,
