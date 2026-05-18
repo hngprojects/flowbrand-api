@@ -11,16 +11,16 @@ export class CreateFunnelTables1779086091363 implements MigrationInterface {
         await queryRunner.query(`DROP INDEX "public"."IDX_users_email"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_otp_tokens_user_id"`);
         await queryRunner.query(`CREATE TYPE "public"."wizard_sessions_status_enum" AS ENUM('in_progress', 'complete', 'expired')`);
-        await queryRunner.query(`CREATE TABLE "wizard_sessions" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WIT
+        await queryRunner.query(`CREATE TABLE "wizard_sessions" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "user_id" uuid NOT NULL, "status" "public"."wizard_sessions_status_enum" NOT NULL DEFAULT 'in_progress', "steps_completed" integer NOT NULL DEFAULT '0', "answers" jsonb NOT NULL DEFAULT '{}', "expires_at" TIMESTAMP WITH TIME ZONE NOT NULL, CONSTRAINT "PK_af618730a78295c551e28f99b37" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_2560089aa51d19bdd5e520a682" ON "wizard_sessions" ("user_id") `);
         await queryRunner.query(`CREATE TYPE "public"."funnels_status_enum" AS ENUM('generating', 'active', 'failed')`);
-        await queryRunner.query(`CREATE TABLE "funnels" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME Z
+        await queryRunner.query(`CREATE TABLE "funnels" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "user_id" uuid NOT NULL, "status" "public"."funnels_status_enum" NOT NULL DEFAULT 'generating', "idempotency_key" character varying(255) NOT NULL, "business_context" jsonb NOT NULL DEFAULT '{}', CONSTRAINT "PK_d4a12f72b8c7eb9074e20a415da" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_ffebdbbcff0d565c11f11ef416" ON "funnels" ("user_id") `);
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_97a0c9cc87a9ffe45bdb46456f" ON "funnels" ("idempotency_key") `);
         await queryRunner.query(`CREATE TYPE "public"."funnel_stages_status_enum" AS ENUM('locked', 'active', 'complete')`);
-        await queryRunner.query(`CREATE TABLE "funnel_stages" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH 
+        await queryRunner.query(`CREATE TABLE "funnel_stages" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "funnel_id" uuid NOT NULL, "position" integer NOT NULL, "name" character varying(100) NOT NULL, "channel" character varying(100) NOT NULL DEFAULT '', "explanation" text NOT NULL DEFAULT '', "action_prompt" text NOT NULL DEFAULT '', "status" "public"."funnel_stages_status_enum" NOT NULL DEFAULT 'locked', "unlocked_at" TIMESTAMP WITH TIME ZONE, CONSTRAINT "PK_4a0c461c532e1acb63ce6c44e32" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_142b9b0473faf7fd4d4f4da2d0" ON "funnel_stages" ("funnel_id") `);
-        await queryRunner.query(`CREATE TABLE "stage_tasks" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TI
+        await queryRunner.query(`CREATE TABLE "stage_tasks" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "stage_id" uuid NOT NULL, "task_text" text NOT NULL, "is_complete" boolean NOT NULL DEFAULT false, "completed_at" TIMESTAMP WITH TIME ZONE, CONSTRAINT "PK_a9c5f0fa5f644c76b5322b2034b" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_facb1a996194dc40dfd64b301e" ON "stage_tasks" ("stage_id") `);
         await queryRunner.query(`ALTER TYPE "public"."user_role_enum" RENAME TO "user_role_enum_old"`);
         await queryRunner.query(`CREATE TYPE "public"."user_roles_role_enum" AS ENUM('user', 'admin')`);
@@ -42,8 +42,8 @@ export class CreateFunnelTables1779086091363 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "auth_metadata" ADD CONSTRAINT "FK_ddd81470f2c5703341629008c83" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "wizard_sessions" ADD CONSTRAINT "FK_2560089aa51d19bdd5e520a6822" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "funnels" ADD CONSTRAINT "FK_ffebdbbcff0d565c11f11ef416e" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "funnel_stages" ADD CONSTRAINT "FK_142b9b0473faf7fd4d4f4da2d0b" FOREIGN KEY ("funnel_id") REFERENCES "funnels"("id") ON DELETE CASCADE ON UPDATE NO ACTION`
-        await queryRunner.query(`ALTER TABLE "stage_tasks" ADD CONSTRAINT "FK_facb1a996194dc40dfd64b301e9" FOREIGN KEY ("stage_id") REFERENCES "funnel_stages"("id") ON DELETE CASCADE ON UPDATE NO ACTI
+        await queryRunner.query(`ALTER TABLE "funnel_stages" ADD CONSTRAINT "FK_142b9b0473faf7fd4d4f4da2d0b" FOREIGN KEY ("funnel_id") REFERENCES "funnels"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "stage_tasks" ADD CONSTRAINT "FK_facb1a996194dc40dfd64b301e9" FOREIGN KEY ("stage_id") REFERENCES "funnel_stages"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {

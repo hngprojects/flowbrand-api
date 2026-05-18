@@ -1,7 +1,6 @@
 import type { BusinessContext } from '../../modules/funnels/interfaces/generate-funnel-job.interface';
 import type { LlmStageData } from '../../modules/funnels/interfaces/llm-stage-data.interface';
 
-// Abstract class used as the DI token so NestJS can inject it.
 // BE-304 provides the concrete implementation (Gemini + Groq).
 // API keys (GEMINI_API_KEY, GROQ_API_KEY) must NEVER appear in logs — enforce in concrete impl.
 export abstract class LlmService {

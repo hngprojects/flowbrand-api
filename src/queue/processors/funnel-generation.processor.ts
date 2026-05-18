@@ -124,7 +124,8 @@ export class FunnelGenerationProcessor {
 
   private validateStageData(data: LlmStageData[]): void {
     if (!Array.isArray(data) || data.length !== EXPECTED_STAGE_COUNT) {
-      throw new Error(`LLM output invalid: expected ${EXPECTED_STAGE_COUNT} stages, got ${Array.isArray(data) ? data.length : typeof data}`);
+      const actual = Array.isArray(data) ? data.length : typeof data;
+      throw new Error(`LLM output invalid: expected ${EXPECTED_STAGE_COUNT} stages, got ${actual}`);
     }
 
     for (const stage of data) {

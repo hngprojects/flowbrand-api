@@ -4,8 +4,6 @@ import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JOB_RETENTION, QUEUES } from '../common/constants/queue.constants';
 import { FunnelModelAction } from '../modules/funnels/actions/funnel.action';
-import { FunnelStageModelAction } from '../modules/funnels/actions/funnel-stage.action';
-import { StageTaskModelAction } from '../modules/funnels/actions/stage-task.action';
 import { Funnel } from '../modules/funnels/entities/funnel.entity';
 import { FunnelStage } from '../modules/funnels/entities/funnel-stage.entity';
 import { StageTask } from '../modules/funnels/entities/stage-task.entity';
@@ -38,8 +36,6 @@ import { QueueModule } from './queue.module';
     FunnelGenerationProcessor,
     FunnelTemplateService,
     FunnelModelAction,
-    FunnelStageModelAction,
-    StageTaskModelAction,
     // Swapped for the real implementation when BE-304 lands
     { provide: LlmService, useClass: NullLlmService },
   ],
