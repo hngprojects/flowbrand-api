@@ -109,12 +109,6 @@ describe('OnboardingService — getOnboardingSession (BE-009)', () => {
 
 // ── startWizardSession (BE-007) ───────────────────────────────────────────────
 
-const mockWizardSessionModelAction = {
-  resolveStartWizardSession: jest.fn(),
-  findActiveSession: jest.fn(),
-  markAsExpired: jest.fn(),
-};
-
 describe('OnboardingService — startWizardSession (edge cases)', () => {
   let service: OnboardingService;
   let mockDataSource: any;

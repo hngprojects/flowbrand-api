@@ -5,7 +5,8 @@ import {
   HttpStatus,
   Injectable,
   UnauthorizedException,
-  Logger
+  Logger,
+  Optional
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as crypto from 'crypto';
@@ -63,7 +64,7 @@ export class AuthService {
     private readonly authMetadataModelAction: AuthMetadataModelAction,
     private readonly otpTokenModelAction: OtpTokenModelAction,
     private readonly emailService: EmailService,
-    private readonly logger = new Logger(AuthService.name),
+    @Optional() private readonly logger = new Logger(AuthService.name),
   ) {}
 
   // Local minimal interface to avoid unsafe-call lint issues from third-party model action types
