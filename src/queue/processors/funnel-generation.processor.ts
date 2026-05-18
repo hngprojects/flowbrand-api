@@ -92,19 +92,29 @@ export class FunnelGenerationProcessor {
 
   private async tryAiGeneration(ctx: BusinessContext): Promise<LlmStageData[] | null> {
     try {
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Gemini timeout')), LLM_TIMEOUT_MS),
-      );
-      return await Promise.race([this.llmService.generateWithGemini(ctx), timeout]);
+      let geminiTimerId: ReturnType<typeof setTimeout>;
+      const timeout = new Promise<never>((_, reject) => {
+        geminiTimerId = setTimeout(() => reject(new Error('Gemini timeout')), LLM_TIMEOUT_MS);
+      });
+      try {
+        return await Promise.race([this.llmService.generateWithGemini(ctx), timeout]);
+      } finally {
+        clearTimeout(geminiTimerId!);
+      }
     } catch (err) {
       this.logger.warn({ message: 'Gemini failed', error: (err as Error).message });
     }
 
     try {
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Groq timeout')), LLM_TIMEOUT_MS),
-      );
-      return await Promise.race([this.llmService.generateWithGroq(ctx), timeout]);
+      let groqTimerId: ReturnType<typeof setTimeout>;
+      const timeout = new Promise<never>((_, reject) => {
+        groqTimerId = setTimeout(() => reject(new Error('Groq timeout')), LLM_TIMEOUT_MS);
+      });
+      try {
+        return await Promise.race([this.llmService.generateWithGroq(ctx), timeout]);
+      } finally {
+        clearTimeout(groqTimerId!);
+      }
     } catch (err) {
       this.logger.warn({ message: 'Groq failed', error: (err as Error).message });
     }
