@@ -40,8 +40,9 @@ export const ONBOARDING_SESSION_RESUMED = 'ONBOARDING_SESSION_RESUMED';
 export const ONBOARDING_ALREADY_COMPLETE = 'ONBOARDING_ALREADY_COMPLETE';
 export const ONBOARDING_COMPLETE_SUCCESS = 'Onboarding completed successfully';
 export const ONBOARDING_INCOMPLETE = 'Onboarding incomplete';
-export const ONBOARDING_SESSION_NOT_FOUND = 'Session not found';
-export const ONBOARDING_SESSION_EXPIRED = 'Session expired';
+export const ONBOARDING_SESSION_NOT_FOUND = 'Session not found. Please call POST /onboarding/start to begin the wizard.';
+export const ONBOARDING_SESSION_EXPIRED = 'Session has expired. Restart the onboarding process.';
+export const ONBOARDING_SESSION_RETRIEVED = 'Onboarding session retrieved successfully';
 export const ONBOARDING_UNKNOWN_CHANNEL = 'Unknown discovery channel, defaulting to awareness';
 
 // Error handling
@@ -89,6 +90,7 @@ export const REDIS_RECONNECT_ATTEMPT = (attempt: number, delay: number) =>
 export const REDIS_RETRY_LIMIT_REACHED = 'Redis retry limit reached';
 export const REDIS_PATTERN_DELETE_SUCCESS = (count: number, pattern: string) =>
   `Deleted ${count} keys matching pattern: ${pattern}`;
-export const ONBOARDING_SESSION_NOT_FOUND = 'Session not found. Please call POST /onboarding/start to begin the wizard.';
-export const ONBOARDING_SESSION_EXPIRED = 'Session has expired. Restart the onboarding process.';
-export const ONBOARDING_SESSION_RETRIEVED = 'Onboarding session retrieved successfully';
+
+// Waitlist
+export const WAITLIST_JOINED_SUCCESSFULLY = 'Successfully joined the waitlist';
+export const WAITLIST_ALREADY_JOINED = 'You are already on the waitlist';
