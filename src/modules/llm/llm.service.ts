@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import type { BusinessContext } from '../funnels/interfaces/generate-funnel-job.interface';
+import type { BusinessContext } from '../../modules/funnels/interfaces/generate-funnel-job.interface';
 import type { LlmStageData, StageTaskData } from '../funnels/interfaces/llm-stage-data.interface';
 import { LlmService } from '../../queue/interfaces/llm.service.interface';
 
