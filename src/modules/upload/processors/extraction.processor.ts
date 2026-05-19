@@ -60,12 +60,12 @@ export class ExtractionProcessor {
   }
 
   @OnQueueCompleted()
-  onCompleted(job: Job): void {
+  onCompleted(job: Job<ExtractionJobPayload>): void {
     this.logger.log({ event: 'extraction_job_completed', jobId: job.id, uploadId: job.data.uploadId });
   }
 
   @OnQueueFailed()
-  onFailed(job: Job, error: Error): void {
+  onFailed(job: Job<ExtractionJobPayload>, error: Error): void {
     this.logger.error({ event: 'extraction_job_failed', jobId: job.id, uploadId: job.data.uploadId, error: error.message });
   }
 }

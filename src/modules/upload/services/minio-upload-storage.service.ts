@@ -43,13 +43,13 @@ export class MinioUploadStorageService implements ObjectStorage, OnModuleInit {
       await this.ensureBucketExists();
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
-   
+
       if (process.env.NODE_ENV === 'production') {
         throw new InternalServerErrorException(
           `Upload object storage is unavailable: ${detail}`,
         );
       }
-   
+
       this.logger.warn(
         'Upload storage bucket check failed — uploads will fail until MinIO is running and env is set',
         detail,
@@ -69,16 +69,21 @@ export class MinioUploadStorageService implements ObjectStorage, OnModuleInit {
     );
   }
 
-  async getObject(storagePath: string): Promise<Buffer> {
-    const { client, bucket } = this.resolveClient();
-    const stream = await client.getObject(bucket, storagePath);
-    return new Promise((resolve, reject) => {
-      const chunks: Buffer[] = [];
-      stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
-      stream.on('error', reject);
-      stream.on('end', () => resolve(Buffer.concat(chunks)));
+ async getObject(storagePath: string): Promise<Buffer> {
+  const { client, bucket } = this.resolveClient();
+  const stream = await client.getObject(bucket, storagePath);
+
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+
+    stream.on('data', (chunk: Buffer) => {
+      chunks.push(chunk);
     });
-  }
+
+    stream.on('error', reject);
+    stream.on('end', () => resolve(Buffer.concat(chunks)));
+  });
+}
 
   async deleteObject(storagePath: string): Promise<void> {
     const { client, bucket } = this.resolveClient();
