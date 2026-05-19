@@ -102,4 +102,8 @@ export class WizardSessionModelAction extends AbstractModelAction<WizardSession>
       .andWhere('ws.user_id = :userId', { userId })
       .getOne()
   }
+
+  async saveSession(session: WizardSession): Promise<WizardSession> {
+    return this.repository.save(session)
+  }
 }
