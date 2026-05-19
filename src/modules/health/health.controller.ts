@@ -1,7 +1,7 @@
 import { InjectQueue } from '@nestjs/bull';
-import { Controller, Get, HttpStatus, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Queue } from 'bull';
 import type { Response } from 'express';
@@ -21,7 +21,6 @@ export class HealthController {
   ) {}
 
   @HealthCheckDocs()
-  @UseGuards(ThrottlerGuard)
   @Throttle({ default: HEALTH_RATE_LIMIT })
   @Public()
   @Get()
