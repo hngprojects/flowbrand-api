@@ -78,7 +78,7 @@ export class WizardSessionModelAction extends AbstractModelAction<WizardSession>
       .andWhere('ws.expires_at > :at', { at })
       .orderBy('ws.created_at', 'DESC');
   }
-
+  
   async findActiveSession(userId: string): Promise<WizardSession | null> {
     return this.repository
       .createQueryBuilder('ws')

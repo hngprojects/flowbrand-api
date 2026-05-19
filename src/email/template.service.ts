@@ -6,7 +6,13 @@ import type { EmailType } from './interfaces/email-job.interface';
 
 type CompiledTemplate = Handlebars.TemplateDelegate;
 
-const EMAIL_TYPES: EmailType[] = ['otp-verification', 'otp-reset'];
+const EMAIL_TYPES: EmailType[] = [
+  'otp-verification',
+  'otp-reset',
+  'waitlist',
+  'contact-confirmation',
+  'contact-admin-notification',
+];
 
 @Injectable()
 export class TemplateService implements OnModuleInit {
@@ -17,6 +23,9 @@ export class TemplateService implements OnModuleInit {
   private readonly SUBJECTS: Record<EmailType, string> = {
     'otp-verification': 'Your SEIL verification code',
     'otp-reset': 'Reset your SEIL account',
+    waitlist: 'You are on the waitlist',
+    'contact-confirmation': "We've received your message",
+    'contact-admin-notification': 'New contact form submission from {{fullName}}',
   };
 
   private compiledSubjects: Record<EmailType, Handlebars.TemplateDelegate>;
@@ -24,38 +33,26 @@ export class TemplateService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     const templatesDir = path.join(__dirname, 'templates');
 
-    const baseSource = await fs.readFile(
-      path.join(templatesDir, 'layouts', 'base.hbs'),
-      'utf8',
-    ).catch(() => {
+    const baseSource = await fs.readFile(path.join(templatesDir, 'layouts', 'base.hbs'), 'utf8').catch(() => {
       throw new Error('Missing email template: base layout');
     });
     this.baseLayout = Handlebars.compile(baseSource);
 
     for (const type of EMAIL_TYPES) {
-      const source = await fs.readFile(
-        path.join(templatesDir, `${type}.hbs`),
-        'utf8',
-      ).catch(() => {
+      const source = await fs.readFile(path.join(templatesDir, `${type}.hbs`), 'utf8').catch(() => {
         throw new Error(`Missing email template: ${type}`);
       });
       this.templates.set(type, Handlebars.compile(source));
     }
 
     this.compiledSubjects = Object.fromEntries(
-      Object.entries(this.SUBJECTS).map(([type, subject]) => [
-        type,
-        Handlebars.compile(subject),
-      ]),
+      Object.entries(this.SUBJECTS).map(([type, subject]) => [type, Handlebars.compile(subject)]),
     ) as Record<EmailType, Handlebars.TemplateDelegate>;
 
     this.logger.log('Email templates loaded successfully');
   }
 
-  render(
-    type: EmailType,
-    payload: Record<string, unknown>,
-  ): { html: string; subject: string } {
+  render(type: EmailType, payload: Record<string, unknown>): { html: string; subject: string } {
     const compiled = this.templates.get(type);
     if (!compiled) {
       throw new Error(`No compiled template found for type: ${type}`);
@@ -67,6 +64,7 @@ export class TemplateService implements OnModuleInit {
       body,
       year: new Date().getFullYear(),
       unsubscribeUrl: `${process.env.FRONTEND_URL ?? ''}/unsubscribe`,
+      privacyPolicyUrl: `${process.env.FRONTEND_URL ?? ''}/privacy-policy`,
     });
 
     const subject = this.compiledSubjects[type](payload);

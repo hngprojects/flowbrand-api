@@ -20,17 +20,17 @@ import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { QueueModule } from './queue/queue.module';
 import { EmailModule } from './email/email.module';
+import { FunnelGenerationQueueModule } from './queue/funnel-generation-queue.module';
+import { WaitlistModule } from './modules/waitlist/waitlist.module';
+import { ContactModule } from './modules/contact/contact.module';
 
-function collectValidationErrors(
-  errors: ValidationError[],
-  parentPath = '',
-): string[] {
+function collectValidationErrors(errors: ValidationError[], parentPath = ''): string[] {
   return errors.flatMap((error) => {
     const currentPath = parentPath ? `${parentPath}.${error.property}` : error.property;
-    const messages = error.constraints ? Object.values(error.constraints).map((message) => `${currentPath}: ${message}`) : [];
-    const children = error.children?.length
-      ? collectValidationErrors(error.children, currentPath)
+    const messages = error.constraints
+      ? Object.values(error.constraints).map((message) => `${currentPath}: ${message}`)
       : [];
+    const children = error.children?.length ? collectValidationErrors(error.children, currentPath) : [];
 
     return [...messages, ...children];
   });
@@ -52,6 +52,9 @@ function collectValidationErrors(
     RedisModule,
     QueueModule,
     EmailModule,
+    FunnelGenerationQueueModule,
+    WaitlistModule,
+    ContactModule,
   ],
   providers: [
     {
