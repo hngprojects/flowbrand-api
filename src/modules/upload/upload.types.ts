@@ -81,6 +81,11 @@ export interface PptxZip {
   files: Record<string, PptxZipFile>;
 }
 
+/** Typed subset of JSZip used for PPTX extraction (package ships without TS types). */
+export interface PptxZipLoader {
+  loadAsync(data: Buffer): Promise<PptxZip>;
+}
+
 /** Resolved MinIO client settings (cached after first use). */
 export interface MinioClientConfig {
   client: Client;

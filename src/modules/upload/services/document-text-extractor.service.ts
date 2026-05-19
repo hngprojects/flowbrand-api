@@ -3,9 +3,11 @@ import JSZip from 'jszip';
 import mammoth from 'mammoth';
 import { PDFParse } from 'pdf-parse';
 import * as SYS_MSG from '../../../constants/system.messages';
-import type { PptxZip, UploadFileType } from '../upload.types';
+import type { PptxZipLoader, UploadFileType } from '../upload.types';
 
 const MAX_PARSED_TEXT_CHARS = 2_000_000;
+
+const pptxZipLoader = JSZip as unknown as PptxZipLoader;
 
 @Injectable()
 export class DocumentTextExtractorService {
@@ -74,7 +76,7 @@ export class DocumentTextExtractorService {
 
   /** PPTX is a ZIP of slide XML files; extract visible text from `<a:t>` nodes. */
   private async extractPptx(buffer: Buffer): Promise<string> {
-    const zip = (await JSZip.loadAsync(buffer)) as PptxZip;
+    const zip = await pptxZipLoader.loadAsync(buffer);
     const slidePaths = Object.keys(zip.files)
       .filter((name) => /^ppt\/slides\/slide\d+\.xml$/i.test(name))
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
