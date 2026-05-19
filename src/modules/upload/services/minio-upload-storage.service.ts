@@ -69,6 +69,17 @@ export class MinioUploadStorageService implements ObjectStorage, OnModuleInit {
     );
   }
 
+  async getObject(storagePath: string): Promise<Buffer> {
+    const { client, bucket } = this.resolveClient();
+    const stream = await client.getObject(bucket, storagePath);
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+      stream.on('error', reject);
+      stream.on('end', () => resolve(Buffer.concat(chunks)));
+    });
+  }
+
   async deleteObject(storagePath: string): Promise<void> {
     const { client, bucket } = this.resolveClient();
     await client.removeObject(bucket, storagePath);

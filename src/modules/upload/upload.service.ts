@@ -8,6 +8,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import * as SYS_MSG from '../../constants/system.messages';
 import { UploadedDocumentModelAction } from './actions/uploaded-document.action';
@@ -85,9 +86,10 @@ export class UploadService {
     }
     return this.mapRowToProgress(row);
   }
-  private async processOneFile(userId: string, file: Express.Multer.File,index: number): Promise<UploadItemResponse> {
-    const validation = this.validateFile(file);
+  private async processOneFile(userId: string, file: Express.Multer.File, index: number): Promise<UploadItemResponse> {
+    const validation = await this.validateFile(file);
     if (!validation.ok) {
+      this.cleanupTempFile(file.path);
       return {
         fileName: file.originalname,
         fileSizeBytes: file.size,
@@ -113,20 +115,26 @@ export class UploadService {
         storage_path: storagePath,
         parsed_text: null,
       });
+
+      const fileStream = fs.createReadStream(file.path);
+
       await this.objectStorage.putObject({
         storagePath,
-        body: file.buffer,
+        body: fileStream,
         contentType: file.mimetype,
         contentLength: file.size,
       });
       objectWritten = true;
+      this.cleanupTempFile(file.path);
+
       row.percent_complete = UPLOAD_PROGRESS.STORED;
       await this.uploadedDocumentAction.saveDocument(row);
       row.status = UploadDocumentStatus.PARSING;
       row.percent_complete = UPLOAD_PROGRESS.PARSING;
       const parsing = await this.uploadedDocumentAction.saveDocument(row);
 
-      await this.completeParsing(parsing, file.buffer, fileType, storagePath);
+      // This is still sync-await for now, will move to queue in Phase 3
+      await this.completeParsing(parsing, fileType, storagePath);
 
       return this.mapRowToUploadItem(parsing);
     } catch (error) {
@@ -134,6 +142,7 @@ export class UploadService {
         `Upload failed for file index=${index} name=${file.originalname}`,
         error instanceof Error ? error.stack : undefined,
       );
+      this.cleanupTempFile(file.path);
       await this.rollbackSingleUpload(storagePath, row, objectWritten);
       return {
         fileName: file.originalname,
@@ -145,13 +154,25 @@ export class UploadService {
       };
     }
   }
+
+  private cleanupTempFile(filePath?: string): void {
+    if (filePath && fs.existsSync(filePath)) {
+      fs.unlink(filePath, (err) => {
+        if (err) this.logger.error(`Failed to delete temp file ${filePath}`, err);
+      });
+    }
+  }
   private async completeParsing(
     row: UploadedDocument,
-    buffer: Buffer,
     fileType: UploadFileType,
     storagePath: string,
   ): Promise<void> {
     try {
+      // In Phase 2 this is still called from processOneFile, but we fetch from S3 
+      // to simulate the async worker pattern where the buffer isn't in memory.
+      const buffer = await this.fetchFromStorage(storagePath);
+      if (!buffer) throw new Error('Could not fetch file from storage for parsing');
+
       const parsedText = await this.documentTextExtractor.extract(
         buffer,
         fileType,
@@ -184,21 +205,32 @@ export class UploadService {
       }
     }
   }
+  private async fetchFromStorage(storagePath: string): Promise<Buffer | null> {
+    try {
+      return await this.objectStorage.getObject(storagePath);
+    } catch {
+      return null;
+    }
+  }
+
   private buildStoragePath(userId: string, uploadId: string, fileType: UploadFileType): string {
     return path.posix.join('funnels', userId, `${uploadId}.${fileType}`);
   }
-  private validateFile(file: Express.Multer.File): FileValidationResult {
+  private async validateFile(file: Express.Multer.File): Promise<FileValidationResult> {
+    if (file.size === 0) {
+      return { ok: false, errorMessage: 'Uploaded file is empty.' };
+    }
     if (file.size > MAX_UPLOAD_BYTES) {
       return { ok: false, errorMessage: SYS_MSG.UPLOAD_FILE_TOO_LARGE };
     }
-    const fileType = this.detectFileType(file);
+    const fileType = await this.detectFileType(file);
     if (!fileType) {
       return { ok: false, errorMessage: SYS_MSG.UPLOAD_INVALID_FILE };
     }
     return { ok: true, fileType };
   }
 
-  private detectFileType(file: Express.Multer.File): UploadFileType | null {
+  private async detectFileType(file: Express.Multer.File): Promise<UploadFileType | null> {
     const extension = path.extname(file.originalname).toLowerCase();
     const candidates = (
       Object.entries(ALLOWED_UPLOAD_RULES) as [
@@ -206,15 +238,38 @@ export class UploadService {
         (typeof ALLOWED_UPLOAD_RULES)[UploadFileType],
       ][]
     ).filter(([, rule]) => rule.ext === extension);
+
+    if (candidates.length === 0) {
+      return null;
+    }
+
+    const buffer = await this.peekFile(file.path, 8);
+
     for (const [fileType, rule] of candidates) {
       if (!rule.mimes.includes(file.mimetype)) {
         continue;
       }
-      if (this.bufferMatchesFileType(file.buffer, fileType)) {
+      if (this.bufferMatchesFileType(buffer, fileType)) {
         return fileType;
       }
     }
     return null;
+  }
+
+  private async peekFile(filePath: string | undefined, bytes: number): Promise<Buffer> {
+    if (!filePath) return Buffer.alloc(0);
+    return new Promise((resolve) => {
+      const fd = fs.openSync(filePath, 'r');
+      const buffer = Buffer.alloc(bytes);
+      try {
+        fs.readSync(fd, buffer, 0, bytes, 0);
+        resolve(buffer);
+      } catch {
+        resolve(Buffer.alloc(0));
+      } finally {
+        fs.closeSync(fd);
+      }
+    });
   }
   private bufferMatchesFileType(buffer: Buffer, fileType: UploadFileType): boolean {
     if (fileType === 'pdf') {

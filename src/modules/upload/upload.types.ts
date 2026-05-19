@@ -1,5 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
 import type { Client } from 'minio';
+import type { Readable } from 'node:stream';
 
 // --- Domain types ---
 
@@ -53,13 +54,14 @@ export interface UploadProgressResponse {
 export interface StoragePutParams {
   /** Object key inside the bucket (persisted as `storage_path`). */
   storagePath: string;
-  body: Buffer;
+  body: Buffer | Readable;
   contentType: string;
   contentLength: number;
 }
 
 export interface ObjectStorage {
   putObject(params: StoragePutParams): Promise<void>;
+  getObject(storagePath: string): Promise<Buffer>;
   deleteObject(storagePath: string): Promise<void>;
 }
 

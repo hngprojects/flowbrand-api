@@ -5,7 +5,18 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import * as fs from 'node:fs';
 import * as SYS_MSG from '../../constants/system.messages';
+
+jest.mock('node:fs', () => ({
+  ...jest.requireActual('node:fs'),
+  existsSync: jest.fn(),
+  unlink: jest.fn(),
+  openSync: jest.fn(),
+  readSync: jest.fn(),
+  closeSync: jest.fn(),
+  createReadStream: jest.fn(),
+}));
 import { MAX_UPLOAD_BYTES, UPLOAD_PROGRESS } from './constants/upload.constants';
 import { UploadedDocument } from './entities/uploaded-document.entity';
 import { UploadedDocumentModelAction } from './actions/uploaded-document.action';
@@ -33,6 +44,7 @@ const mockDocumentTextExtractor = {
 
 const mockObjectStorage: jest.Mocked<ObjectStorage> = {
   putObject: jest.fn(),
+  getObject: jest.fn(),
   deleteObject: jest.fn(),
 };
 
@@ -69,8 +81,8 @@ function mockPdfFile(
     buffer,
     stream: null as never,
     destination: '',
-    filename: '',
-    path: '',
+    filename: 'pitch-deck.pdf',
+    path: '/tmp/pitch-deck.pdf',
     ...overrides,
   };
 }
@@ -94,7 +106,21 @@ describe('UploadService', () => {
     );
     mockObjectStorage.putObject.mockResolvedValue(undefined);
     mockObjectStorage.deleteObject.mockResolvedValue(undefined);
+    mockObjectStorage.getObject.mockResolvedValue(Buffer.from('%PDF-1.4 test content'));
     mockDocumentTextExtractor.extract.mockResolvedValue('extracted funnel text');
+
+    (fs.existsSync as jest.Mock).mockReturnValue(true);
+    (fs.unlink as jest.Mock).mockImplementation((_path, cb) => cb(null));
+    (fs.openSync as jest.Mock).mockReturnValue(1);
+    (fs.readSync as jest.Mock).mockImplementation((_fd, buffer) => {
+      Buffer.from('%PDF-1.4').copy(buffer as Buffer);
+      return 8;
+    });
+    (fs.closeSync as jest.Mock).mockReturnValue(undefined);
+    (fs.createReadStream as jest.Mock).mockReturnValue({
+      pipe: jest.fn(),
+      on: jest.fn().mockReturnThis(),
+    } as any);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -139,7 +165,8 @@ describe('UploadService', () => {
       const invalid = mockPdfFile({
         originalname: 'bad.exe',
         mimetype: 'application/octet-stream',
-        buffer: Buffer.from('not-a-real-doc'),
+        filename: 'bad.exe',
+        path: '/tmp/bad.exe',
       });
 
       const result = await service.handleUpload(USER_ID, [valid, invalid]);
@@ -148,14 +175,14 @@ describe('UploadService', () => {
       expect(result.message).toBe(SYS_MSG.FUNNEL_UPLOAD_PARTIAL);
       expect(result.data.uploads).toHaveLength(2);
       expect(result.data.uploads[0].uploadId).toBeDefined();
-      expect(result.data.uploads[0].status).toBe(UploadDocumentStatus.PARSING);
+      expect(result.data.uploads[0].status).toBe(UploadDocumentStatus.READY);
       expect(result.data.uploads[1].status).toBe(UploadDocumentStatus.FAILED);
       expect(result.data.uploads[1].errorMessage).toBe(
         SYS_MSG.UPLOAD_INVALID_FILE,
       );
     });
 
-    it('accepts a valid file, stores in MinIO, and returns parsing status', async () => {
+    it('accepts a valid file, stores in MinIO, and returns ready status', async () => {
       const file = mockPdfFile();
 
       const result = await service.handleUpload(USER_ID, [file]);
@@ -163,15 +190,15 @@ describe('UploadService', () => {
       expect(result.message).toBe(SYS_MSG.FUNNEL_UPLOAD_COMPLETED);
       expect(mockObjectStorage.putObject).toHaveBeenCalledWith(
         expect.objectContaining({
-          body: file.buffer,
+          body: expect.anything(),
           contentType: 'application/pdf',
         }),
       );
       expect(result.data.uploads[0]).toMatchObject({
         fileName: 'pitch-deck.pdf',
         fileType: 'pdf',
-        status: UploadDocumentStatus.PARSING,
-        percentComplete: UPLOAD_PROGRESS.PARSING,
+        status: UploadDocumentStatus.READY,
+        percentComplete: UPLOAD_PROGRESS.READY,
       });
     });
 
