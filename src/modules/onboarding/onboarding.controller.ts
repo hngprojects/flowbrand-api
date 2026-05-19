@@ -2,10 +2,11 @@ import { Body, Controller, Get, Post, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { GetSessionDocs, StartOnboardingDocs } from './docs/onboarding-swagger.doc';
+import { GetSessionDocs, PostStepDocs, StartOnboardingDocs } from './docs/onboarding-swagger.doc';
 import { CompleteOnboardingDocs } from './docs/complete-onboarding.swagger';
 import { OnboardingService } from './onboarding.service';
 import { CompleteOnboardingDto } from './dto/complete-onboarding.dto';
+import { StepAnswerDto } from './dto/step-answer.dto';
 
 @ApiTags('onboarding')
 @ApiBearerAuth('JWT')
@@ -42,5 +43,14 @@ export class OnboardingController {
   @GetSessionDocs()
   getSession(@CurrentUser('sub') id: string) {
     return this.onboardingService.getOnboardingSession(id)
+  }
+
+  @Post('step')
+  @PostStepDocs()
+  saveStep(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: StepAnswerDto
+  ) {
+    return this.onboardingService.saveStepAnswer(userId, dto)
   }
 }
