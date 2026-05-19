@@ -36,6 +36,14 @@ const envSchema = z.object({
 
   CONTACT_ADMIN_EMAIL: z.string().email().default('useseil@hng14.com'),
 
+  GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required'),
+  GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
+  GEMINI_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
+
+  GROQ_API_KEY: z.string().min(1, 'GROQ_API_KEY is required'),
+  GROQ_MODEL: z.string().default('llama-3.3-70b-versatile'),
+  GROQ_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
+
   QUEUE_CONCURRENCY: z.coerce
     .number()
     .int()
