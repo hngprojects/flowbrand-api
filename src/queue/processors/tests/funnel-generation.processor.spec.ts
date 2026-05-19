@@ -1,0 +1,273 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import type { Job } from 'bull';
+import { FunnelModelAction } from '../../../modules/funnels/actions/funnel.action';
+import { FunnelStatus } from '../../../modules/funnels/enums/funnel-status.enum';
+import type { BusinessContext, GenerateFunnelJobPayload } from '../../../modules/funnels/interfaces/generate-funnel-job.interface';
+import type { LlmStageData } from '../../../modules/funnels/interfaces/llm-stage-data.interface';
+import { FunnelTemplateService } from '../../../modules/funnels/services/funnel-template.service';
+import { LlmService } from '../../interfaces/llm.service.interface';
+import { FunnelGenerationProcessor } from '../funnel-generation.processor';
+
+// Mocks 
+
+const mockQueryRunner = {
+  connect: jest.fn().mockResolvedValue(undefined),
+  startTransaction: jest.fn().mockResolvedValue(undefined),
+  commitTransaction: jest.fn().mockResolvedValue(undefined),
+  rollbackTransaction: jest.fn().mockResolvedValue(undefined),
+  release: jest.fn().mockResolvedValue(undefined),
+  manager: {
+    update: jest.fn().mockResolvedValue(undefined),
+    findOne: jest.fn(),
+    create: jest.fn((_, data) => data),
+    save: jest.fn().mockResolvedValue(undefined),
+  },
+};
+
+const mockDataSource = {
+  createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
+};
+
+const mockFunnelAction = {
+  get: jest.fn(),
+  update: jest.fn().mockResolvedValue(null),
+};
+
+const mockLlmService = {
+  generateWithGemini: jest.fn(),
+  generateWithGroq: jest.fn(),
+};
+
+const mockTemplateService = {
+  getTemplate: jest.fn(),
+};
+
+// Helpers 
+
+const businessContext: BusinessContext = {
+  businessType: 'bakery',
+  discoveryChannel: 'Instagram',
+};
+
+function makeValidStageData(): LlmStageData[] {
+  return [1, 2, 3, 4].map((position) => ({
+    position,
+    channel: 'Instagram',
+    explanation: `Explanation for stage ${position}`,
+    actionPrompt: `Action for stage ${position}`,
+    tasks: [
+      { taskText: `Task A for stage ${position}` },
+      { taskText: `Task B for stage ${position}` },
+    ],
+  }));
+}
+
+function makeJob(overrides: Partial<Job<GenerateFunnelJobPayload>> = {}): Job<GenerateFunnelJobPayload> {
+  return {
+    id: 'job-1',
+    data: { funnelId: 'funnel-uuid', userId: 'user-uuid', businessContext },
+    progress: jest.fn().mockResolvedValue(undefined),
+    attemptsMade: 0,
+    opts: { attempts: 3 },
+    ...overrides,
+  } as unknown as Job<GenerateFunnelJobPayload>;
+}
+
+// Suite 
+
+describe('FunnelGenerationProcessor', () => {
+  let module: TestingModule;
+  let processor: FunnelGenerationProcessor;
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+
+    // Default: funnel exists in GENERATING state
+    mockFunnelAction.get.mockResolvedValue({ id: 'funnel-uuid', status: FunnelStatus.GENERATING });
+
+    // Default: findOne in queryRunner returns a stage record
+    mockQueryRunner.manager.findOne.mockResolvedValue({ id: 'stage-uuid', position: 1 });
+
+    module = await Test.createTestingModule({
+      providers: [
+        FunnelGenerationProcessor,
+        { provide: FunnelModelAction, useValue: mockFunnelAction },
+        { provide: LlmService, useValue: mockLlmService },
+        { provide: FunnelTemplateService, useValue: mockTemplateService },
+        { provide: getDataSourceToken(), useValue: mockDataSource },
+      ],
+    }).compile();
+
+    processor = module.get<FunnelGenerationProcessor>(FunnelGenerationProcessor);
+  });
+
+  afterEach(async () => {
+    await module.close();
+  });
+
+  // AC-01 / AC-07: Gemini success path 
+
+  describe('AC-01 — Gemini success path', () => {
+    it('commits transaction and sets funnel to ACTIVE', async () => {
+      const stageData = makeValidStageData();
+      mockLlmService.generateWithGemini.mockResolvedValue(stageData);
+      const job = makeJob();
+
+      await processor.handleGenerateFunnel(job);
+
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalledTimes(1);
+      expect(mockQueryRunner.rollbackTransaction).not.toHaveBeenCalled();
+      expect(mockQueryRunner.manager.update).toHaveBeenLastCalledWith(
+        expect.anything(),
+        { id: 'funnel-uuid' },
+        { status: FunnelStatus.ACTIVE },
+      );
+    });
+
+    it('AC-07: calls job.progress with 10, 70, 80, 100 in order', async () => {
+      mockLlmService.generateWithGemini.mockResolvedValue(makeValidStageData());
+      const job = makeJob();
+      const progressCalls: number[] = [];
+      (job.progress as jest.Mock).mockImplementation((v: number) => { progressCalls.push(v); return Promise.resolve(); });
+
+      await processor.handleGenerateFunnel(job);
+
+      expect(progressCalls).toEqual([10, 70, 80, 100]);
+    });
+  });
+
+  // AC-02: Groq fallback 
+
+  describe('AC-02 — Groq fallback', () => {
+    it('falls back to Groq when Gemini throws and still completes', async () => {
+      const stageData = makeValidStageData();
+      mockLlmService.generateWithGemini.mockRejectedValue(new Error('Gemini down'));
+      mockLlmService.generateWithGroq.mockResolvedValue(stageData);
+
+      await processor.handleGenerateFunnel(makeJob());
+
+      expect(mockLlmService.generateWithGroq).toHaveBeenCalledTimes(1);
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // AC-03: Template fallback 
+
+  describe('AC-03 — Template fallback', () => {
+    it('uses template when both Gemini and Groq fail', async () => {
+      mockLlmService.generateWithGemini.mockRejectedValue(new Error('Gemini down'));
+      mockLlmService.generateWithGroq.mockRejectedValue(new Error('Groq down'));
+      mockTemplateService.getTemplate.mockReturnValue(makeValidStageData());
+
+      await processor.handleGenerateFunnel(makeJob());
+
+      expect(mockTemplateService.getTemplate).toHaveBeenCalledWith(businessContext);
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // AC-04 / AC-09: DB failure + rollback + release 
+
+  describe('AC-04 — DB failure triggers rollback', () => {
+    it('calls rollbackTransaction and marks funnel FAILED when stage update throws', async () => {
+      mockLlmService.generateWithGemini.mockResolvedValue(makeValidStageData());
+      mockQueryRunner.manager.update.mockRejectedValueOnce(new Error('DB error'));
+
+      await expect(processor.handleGenerateFunnel(makeJob())).rejects.toThrow('DB error');
+
+      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalledTimes(1);
+      expect(mockFunnelAction.update).toHaveBeenCalledWith(
+        expect.objectContaining({ updatePayload: { status: FunnelStatus.FAILED } }),
+      );
+    });
+
+    it('AC-09: queryRunner.release() is always called even when rollback fires', async () => {
+      mockLlmService.generateWithGemini.mockResolvedValue(makeValidStageData());
+      mockQueryRunner.manager.update.mockRejectedValueOnce(new Error('DB error'));
+
+      await expect(processor.handleGenerateFunnel(makeJob())).rejects.toThrow();
+
+      expect(mockQueryRunner.release).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // AC-06: Full failure marks funnel FAILED 
+
+  describe('AC-06 — Full failure', () => {
+    it('marks funnel FAILED and re-throws when template also throws', async () => {
+      mockLlmService.generateWithGemini.mockRejectedValue(new Error('Gemini down'));
+      mockLlmService.generateWithGroq.mockRejectedValue(new Error('Groq down'));
+      mockTemplateService.getTemplate.mockImplementation(() => { throw new Error('Template broken'); });
+
+      await expect(processor.handleGenerateFunnel(makeJob())).rejects.toThrow('Template broken');
+
+      expect(mockFunnelAction.update).toHaveBeenCalledWith(
+        expect.objectContaining({ updatePayload: { status: FunnelStatus.FAILED } }),
+      );
+    });
+  });
+
+  // AC-08: LLM output validation 
+
+  describe('AC-08 — LLM output validation', () => {
+    it('rejects explanation > 2000 chars before DB write', async () => {
+      const invalid = makeValidStageData();
+      invalid[0].explanation = 'x'.repeat(2001);
+      mockLlmService.generateWithGemini.mockResolvedValue(invalid);
+
+      await expect(processor.handleGenerateFunnel(makeJob())).rejects.toThrow(/exceeds 2000/);
+
+      expect(mockQueryRunner.startTransaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects actionPrompt > 2000 chars before DB write', async () => {
+      const invalid = makeValidStageData();
+      invalid[1].actionPrompt = 'y'.repeat(2001);
+      mockLlmService.generateWithGemini.mockResolvedValue(invalid);
+
+      await expect(processor.handleGenerateFunnel(makeJob())).rejects.toThrow(/exceeds 2000/);
+    });
+
+    it('rejects LLM output with wrong number of stages', async () => {
+      mockLlmService.generateWithGemini.mockResolvedValue(makeValidStageData().slice(0, 3));
+
+      await expect(processor.handleGenerateFunnel(makeJob())).rejects.toThrow(/expected 4 stages/);
+    });
+
+    it('rejects unexpected fields in stage data', async () => {
+      const invalid = makeValidStageData() as unknown as Record<string, unknown>[];
+      (invalid[0] as Record<string, unknown>)['injectedField'] = 'DROP TABLE funnels';
+      mockLlmService.generateWithGemini.mockResolvedValue(invalid);
+
+      await expect(processor.handleGenerateFunnel(makeJob())).rejects.toThrow(/unexpected field/);
+    });
+  });
+
+  // EC-05: Idempotency guard 
+
+  describe('EC-05 — ACTIVE funnel skipped', () => {
+    it('returns early without calling LLM when funnel is already ACTIVE', async () => {
+      mockFunnelAction.get.mockResolvedValue({ id: 'funnel-uuid', status: FunnelStatus.ACTIVE });
+
+      await processor.handleGenerateFunnel(makeJob());
+
+      expect(mockLlmService.generateWithGemini).not.toHaveBeenCalled();
+      expect(mockQueryRunner.startTransaction).not.toHaveBeenCalled();
+    });
+  });
+
+  // EC-04: Stage not found in DB 
+
+  describe('EC-04 — Stage record not found triggers rollback', () => {
+    it('rolls back if a stage is missing from funnel_stages', async () => {
+      mockLlmService.generateWithGemini.mockResolvedValue(makeValidStageData());
+      mockQueryRunner.manager.findOne.mockResolvedValue(null);
+
+      await expect(processor.handleGenerateFunnel(makeJob())).rejects.toThrow(/Stage not found/);
+
+      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalledTimes(1);
+      expect(mockQueryRunner.release).toHaveBeenCalledTimes(1);
+    });
+  });
+});
