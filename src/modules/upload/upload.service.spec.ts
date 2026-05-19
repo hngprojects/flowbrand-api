@@ -38,6 +38,7 @@ const mockUploadedDocumentAction = {
   saveDocument: jest.fn(),
   findOwnedById: jest.fn(),
   deleteById: jest.fn(),
+  updateProgress: jest.fn(),
 };
 
 const mockDocumentTextExtractor = {
@@ -67,6 +68,7 @@ function buildRow(
     percent_complete: UPLOAD_PROGRESS.START,
     storage_path: `funnels/${USER_ID}/${UPLOAD_ID}.pdf`,
     parsed_text: null,
+    failure_reason: null,
     created_at: new Date('2026-05-16T12:00:00.000Z'),
     updated_at: new Date('2026-05-16T12:00:00.000Z'),
     user: undefined as never,
@@ -93,11 +95,6 @@ function mockPdfFile(
   };
 }
 
-/** Let void completeParsing() microtasks finish. */
-async function flushBackgroundWork(): Promise<void> {
-  await new Promise((resolve) => setImmediate(resolve));
-}
-
 describe('UploadService', () => {
   let service: UploadService;
 
@@ -110,13 +107,14 @@ describe('UploadService', () => {
     mockUploadedDocumentAction.saveDocument.mockImplementation((row) =>
       Promise.resolve(row),
     );
+    mockUploadedDocumentAction.updateProgress.mockResolvedValue(undefined);
     mockObjectStorage.putObject.mockResolvedValue(undefined);
     mockObjectStorage.deleteObject.mockResolvedValue(undefined);
     mockObjectStorage.getObject.mockResolvedValue(Buffer.from('%PDF-1.4 test content'));
     mockDocumentTextExtractor.extract.mockResolvedValue('extracted funnel text');
 
     (fs.existsSync as jest.Mock).mockReturnValue(true);
-    (fs.unlink as jest.Mock).mockImplementation((_path, cb) => cb(null));
+    (fs.unlink as unknown as jest.Mock).mockImplementation((_path, cb) => (cb as (e: null) => void)(null));
     (fs.openSync as jest.Mock).mockReturnValue(1);
     (fs.readSync as jest.Mock).mockImplementation((_fd, buffer) => {
       Buffer.from('%PDF-1.4').copy(buffer as Buffer);
@@ -218,6 +216,37 @@ describe('UploadService', () => {
       expect(mockObjectStorage.deleteObject).not.toHaveBeenCalled();
       expect(mockUploadedDocumentAction.deleteById).toHaveBeenCalledTimes(1);
       expect(mockUploadedDocumentAction.createDocument).toHaveBeenCalled();
+    });
+
+    it('FR-10: succeeds when updateProgress fails twice then recovers on third attempt', async () => {
+      mockUploadedDocumentAction.updateProgress
+        .mockRejectedValueOnce(new Error('DB hiccup'))
+        .mockRejectedValueOnce(new Error('DB hiccup'))
+        .mockResolvedValue(undefined);
+
+      const result = await service.handleUpload(USER_ID, [mockPdfFile()]);
+
+      expect(result.message).toBe(SYS_MSG.FUNNEL_UPLOAD_COMPLETED);
+      expect(mockUploadedDocumentAction.updateProgress).toHaveBeenCalledTimes(3);
+      expect(result.data.uploads[0].status).toBe(UploadDocumentStatus.PARSING);
+    });
+
+    it('FR-10: logs orphan_upload and throws when all retries are exhausted', async () => {
+      mockUploadedDocumentAction.updateProgress.mockRejectedValue(
+        new Error('DB down'),
+      );
+      const loggerErrorSpy = jest
+        .spyOn(service['logger'], 'error')
+        .mockImplementation(() => {});
+
+      await expect(
+        service.handleUpload(USER_ID, [mockPdfFile()]),
+      ).rejects.toThrow(UnprocessableEntityException);
+
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'orphan_upload' }),
+      );
+      expect(mockUploadedDocumentAction.deleteById).toHaveBeenCalledTimes(1);
     });
   });
 
