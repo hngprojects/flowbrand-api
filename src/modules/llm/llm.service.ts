@@ -4,8 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import type { BusinessContext } from '../../modules/funnels/interfaces/generate-funnel-job.interface';
 import type { LlmStageData, StageTaskData } from '../funnels/interfaces/llm-stage-data.interface';
 import { LlmService } from '../../queue/interfaces/llm.service.interface';
+import * as SYS_MSG from '../../constants/system.messages';
 
-// System prompt
 const SYSTEM_PROMPT = `You are a marketing strategist for SEIL, a guided marketing product for small businesses in Sub-Saharan Africa.
 Generate a 4-stage marketing funnel tailored to the business context supplied by the user.
 Return ONLY the JSON object described below. No text before or after. No markdown. No code fences.
@@ -34,7 +34,6 @@ Rules:
 - Plain text only inside field values — no nested JSON, no HTML.
 - Return ONLY the JSON object. No text before or after. No markdown.`;
 
-// Validation constants
 const EXPECTED_STAGE_COUNT = 4;
 const TASKS_MIN = 2;
 const TASKS_MAX = 3;
@@ -43,45 +42,25 @@ const EXPLANATION_MAX = 2000;
 const ACTION_PROMPT_MIN = 10;
 const ACTION_PROMPT_MAX = 500;
 
-// Gemini API types (structural)
-
 interface GeminiCandidate {
-  content: {
-    parts: Array<{ text?: string }>;
-  };
+  content: { parts: Array<{ text?: string }> };
 }
 
 interface GeminiResponse {
   candidates?: GeminiCandidate[];
 }
 
-// Groq / OpenAI-compatible types
-
 interface GroqChoice {
-  message: {
-    content: string | null;
-  };
+  message: { content: string | null };
 }
 
 interface GroqResponse {
   choices?: GroqChoice[];
 }
 
-// Raw validated stage shape (before mapping)
-
-interface RawTask {
-  taskText: string;
+interface LlmStageDataWithTasks extends LlmStageData {
+  tasks: StageTaskData[];
 }
-
-interface RawStage {
-  position: number;
-  channel: string;
-  explanation: string;
-  actionPrompt: string;
-  tasks: RawTask[];
-}
-
-// Service
 
 @Injectable()
 export class LlmServiceImpl extends LlmService {
@@ -91,15 +70,13 @@ export class LlmServiceImpl extends LlmService {
     super();
   }
 
-  // Public API
-
   async generateWithGemini(ctx: BusinessContext): Promise<LlmStageData[]> {
     const apiKey = this.config.get<string>('llm.geminiApiKey');
     const model = this.config.get<string>('llm.geminiModel') ?? 'gemini-2.5-flash';
     const timeoutMs = this.config.get<number>('llm.geminiTimeoutMs') ?? 60_000;
 
     if (!apiKey) {
-      throw new Error('GEMINI_API_KEY is not configured');
+      throw new Error(SYS_MSG.AI_GEMINI_API_KEY_MISSING);
     }
 
     const prompt = this.buildPrompt(ctx);
@@ -136,7 +113,7 @@ export class LlmServiceImpl extends LlmService {
     const stages = this.validateLlmOutput(text);
 
     if (!stages) {
-      throw new Error('Gemini output failed schema validation');
+      throw new Error(SYS_MSG.AI_GEMINI_OUTPUT_FAILED_SCHEMA_VALIDATION);
     }
 
     return stages;
@@ -148,7 +125,7 @@ export class LlmServiceImpl extends LlmService {
     const timeoutMs = this.config.get<number>('llm.groqTimeoutMs') ?? 60_000;
 
     if (!apiKey) {
-      throw new Error('GROQ_API_KEY is not configured');
+      throw new Error(SYS_MSG.AI_GROQ_API_KEY_MISSING);
     }
 
     const prompt = this.buildPrompt(ctx);
@@ -191,13 +168,11 @@ export class LlmServiceImpl extends LlmService {
     const stages = this.validateLlmOutput(text);
 
     if (!stages) {
-      throw new Error('Groq output failed schema validation');
+      throw new Error(SYS_MSG.AI_GROQ_OUTPUT_FAILED_SCHEMA_VALIDATION);
     }
 
     return stages;
   }
-
-  // Prompt builder
 
   buildPrompt(ctx: BusinessContext): string {
     return [
@@ -209,8 +184,6 @@ export class LlmServiceImpl extends LlmService {
       .filter(Boolean)
       .join('\n');
   }
-
-  // JSON schema validator
 
   validateLlmOutput(raw: string): LlmStageData[] | null {
     const stripped = this.stripCodeFences(raw);
@@ -238,7 +211,7 @@ export class LlmServiceImpl extends LlmService {
       return null;
     }
 
-    const validated: LlmStageData[] = [];
+    const validated: LlmStageDataWithTasks[] = [];
 
     for (const item of stages) {
       const stage = this.validateStage(item);
@@ -248,13 +221,10 @@ export class LlmServiceImpl extends LlmService {
       validated.push(stage);
     }
 
-    // EC-06: sort stages by position
     validated.sort((a, b) => a.position - b.position);
 
     return validated;
   }
-
-  // Private helpers
 
   private async fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number, provider: string): Promise<string> {
     const controller = new AbortController();
@@ -265,21 +235,20 @@ export class LlmServiceImpl extends LlmService {
 
       if (!res.ok) {
         const status = res.status;
-        // Read body for logging but never expose API keys — they're in headers, not here
         const errBody = await res.text().catch(() => '');
         this.logger.warn({
           provider,
           httpStatus: status,
-          error: `HTTP ${status}`,
-          context: errBody.slice(0, 200), // cap to avoid dumping full response
+          error: SYS_MSG.AI_PROVIDER_HTTP_ERROR(provider, status),
+          context: errBody.slice(0, 200),
         });
-        throw new Error(`${provider} HTTP ${status}`);
+        throw new Error(SYS_MSG.AI_PROVIDER_HTTP_ERROR(provider, status));
       }
 
       return res.text();
     } catch (err) {
       if ((err as Error).name === 'AbortError') {
-        throw new Error(`${provider} request timed out after ${timeoutMs} milliseconds`);
+        throw new Error(SYS_MSG.AI_PROVIDER_TIMEOUT(provider, timeoutMs));
       }
       throw err;
     } finally {
@@ -292,7 +261,7 @@ export class LlmServiceImpl extends LlmService {
     try {
       parsed = JSON.parse(raw);
     } catch {
-      throw new Error('Gemini returned non-JSON response body');
+      throw new Error(SYS_MSG.AI_GEMINI_NON_JSON_RESPONSE_BODY);
     }
 
     const res = parsed as GeminiResponse;
@@ -302,7 +271,7 @@ export class LlmServiceImpl extends LlmService {
       .trim();
 
     if (!text) {
-      throw new Error('Gemini response had no text content');
+      throw new Error(SYS_MSG.AI_GEMINI_RESPONSE_HAD_NO_TEXT_CONTENT);
     }
 
     return text;
@@ -313,14 +282,14 @@ export class LlmServiceImpl extends LlmService {
     try {
       parsed = JSON.parse(raw);
     } catch {
-      throw new Error('Groq returned non-JSON response body');
+      throw new Error(SYS_MSG.AI_GROQ_NON_JSON_RESPONSE_BODY);
     }
 
     const res = parsed as GroqResponse;
     const text = res.choices?.[0]?.message?.content?.trim();
 
     if (!text) {
-      throw new Error('Groq response had no text content');
+      throw new Error(SYS_MSG.AI_GROQ_RESPONSE_HAD_NO_TEXT_CONTENT);
     }
 
     return text;
@@ -337,7 +306,7 @@ export class LlmServiceImpl extends LlmService {
     return t;
   }
 
-  private validateStage(item: unknown): LlmStageData | null {
+  private validateStage(item: unknown): LlmStageDataWithTasks | null {
     if (typeof item !== 'object' || item === null) {
       return null;
     }

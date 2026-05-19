@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import type { BusinessContext } from '../funnels/interfaces/generate-funnel-job.interface';
 import { LlmServiceImpl } from './llm.service';
+import * as SYS_MSG from '../../constants/system.messages';
 
 const VALID_CTX: BusinessContext = {
   businessType: 'food vendor',
@@ -44,8 +45,6 @@ describe('LlmServiceImpl', () => {
 
     service = module.get(LlmServiceImpl);
   });
-
-  // validateLlmOutput
 
   describe('validateLlmOutput', () => {
     it('AC-01/AC-02: returns 4 stages for valid JSON', () => {
@@ -94,13 +93,11 @@ describe('LlmServiceImpl', () => {
 
     it('EC-06: sorts stages by position', () => {
       const shuffled = JSON.parse(VALID_STAGES_JSON);
-      shuffled.stages.reverse(); // positions 4,3,2,1
+      shuffled.stages.reverse();
       const result = service.validateLlmOutput(JSON.stringify(shuffled));
       expect(result?.map((s) => s.position)).toEqual([1, 2, 3, 4]);
     });
   });
-
-  // generateWithGemini
 
   describe('generateWithGemini', () => {
     it('AC-01: returns 4 stages on valid response', async () => {
@@ -127,7 +124,9 @@ describe('LlmServiceImpl', () => {
         text: () => Promise.resolve(geminiWrapped),
       } as unknown as Response);
 
-      await expect(service.generateWithGemini(VALID_CTX)).rejects.toThrow('Gemini output failed schema validation');
+      await expect(service.generateWithGemini(VALID_CTX)).rejects.toThrow(
+        SYS_MSG.AI_GEMINI_OUTPUT_FAILED_SCHEMA_VALIDATION,
+      );
     });
 
     it('AC-05: throws timeout error when fetch exceeds timeout', async () => {
@@ -136,7 +135,9 @@ describe('LlmServiceImpl', () => {
 
       global.fetch = jest.fn().mockRejectedValueOnce(abortError);
 
-      await expect(service.generateWithGemini(VALID_CTX)).rejects.toThrow(/timed out/i);
+      await expect(service.generateWithGemini(VALID_CTX)).rejects.toThrow(
+        SYS_MSG.AI_PROVIDER_TIMEOUT('Gemini', 60_000),
+      );
     });
 
     it('AC-10: max_tokens=2000 is in the request body', async () => {
@@ -156,8 +157,6 @@ describe('LlmServiceImpl', () => {
       expect(body.generationConfig.maxOutputTokens).toBe(2000);
     });
   });
-
-  // generateWithGroq
 
   describe('generateWithGroq', () => {
     it('AC-02: returns 4 stages on valid response', async () => {
@@ -184,7 +183,7 @@ describe('LlmServiceImpl', () => {
         text: () => Promise.resolve(groqWrapped),
       } as unknown as Response);
 
-      await expect(service.generateWithGroq(VALID_CTX)).rejects.toThrow();
+      await expect(service.generateWithGroq(VALID_CTX)).rejects.toThrow(SYS_MSG.AI_GROQ_NON_JSON_RESPONSE_BODY);
     });
 
     it('AC-10: max_tokens=2000 is in the request body', async () => {
