@@ -41,9 +41,14 @@ describe('LlmServiceImpl', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [LlmServiceImpl, { provide: ConfigService, useValue: makeConfigService() }],
-    }).compile();
+    })
+      .setLogger(false)
+      .compile();
 
     service = module.get(LlmServiceImpl);
+    // Silences the expected LlmServiceImpl error and warn logs during tests
+    jest.spyOn(service['logger'], 'error').mockImplementation(() => {});
+    jest.spyOn(service['logger'], 'warn').mockImplementation(() => {});
   });
 
   describe('validateLlmOutput', () => {
@@ -173,6 +178,15 @@ describe('LlmServiceImpl', () => {
       expect(result).toHaveLength(4);
     });
 
+    it('throws when Groq API returns non-JSON body', async () => {
+      global.fetch = jest.fn().mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('<html>502 Bad Gateway</html>'),
+      } as unknown as Response);
+
+      await expect(service.generateWithGroq(VALID_CTX)).rejects.toThrow(SYS_MSG.AI_GROQ_NON_JSON_RESPONSE_BODY);
+    });
+
     it('throws when Groq output fails schema validation', async () => {
       const groqWrapped = JSON.stringify({
         choices: [{ message: { content: 'not json' } }],
@@ -183,7 +197,9 @@ describe('LlmServiceImpl', () => {
         text: () => Promise.resolve(groqWrapped),
       } as unknown as Response);
 
-      await expect(service.generateWithGroq(VALID_CTX)).rejects.toThrow(SYS_MSG.AI_GROQ_NON_JSON_RESPONSE_BODY);
+      await expect(service.generateWithGroq(VALID_CTX)).rejects.toThrow(
+        SYS_MSG.AI_GROQ_OUTPUT_FAILED_SCHEMA_VALIDATION,
+      );
     });
 
     it('AC-10: max_tokens=2000 is in the request body', async () => {
