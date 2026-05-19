@@ -9,12 +9,16 @@ import {
   ApiUnauthorizedResponse,
   DocumentBuilder,
   SwaggerModule,
+  ApiBadRequestResponse,
+  ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { SendOtpDto } from '../dto/send-otp.dto';
 import { VerifyOtpDto } from '../dto/verify-otp.dto';
 import { ResendOtpDto } from '../dto/resend-otp.dto';
 import * as SYS_MSG from '../../../constants/system.messages';
+import { ForgotPasswordDto } from '../dto/forgot-password.dto';
+import { ResetPasswordDto } from '../dto/reset-password.dto';
 
 const authUserExample = {
   id: 'uuid',
@@ -135,10 +139,7 @@ export const LogoutDocs = () =>
   );
 
 export const MeDocs = () =>
-  applyDecorators(
-    ApiBearerAuth('JWT'),
-    ApiOperation({ summary: 'Return the current authenticated user' }),
-  );
+  applyDecorators(ApiBearerAuth('JWT'), ApiOperation({ summary: 'Return the current authenticated user' }));
 
 export const GoogleAuthDocs = () =>
   applyDecorators(
@@ -160,13 +161,12 @@ export const GoogleCallbackDocs = () =>
     ApiOperation({ summary: 'Handle Google OAuth callback' }),
     ApiResponse({
       status: HttpStatus.FOUND,
-      description:
-        'Redirects to client after successful OAuth; tokens are issued via cookie and redirect URL',
+      description: 'Redirects to client after successful OAuth; tokens are issued via cookie and redirect URL',
     }),
     ApiUnauthorizedResponse({
       description: 'Google OAuth failed or no email was provided',
       schema: {
-          example: {
+        example: {
           success: false,
           status_code: HttpStatus.UNAUTHORIZED,
           error: 'UnauthorizedException',
@@ -199,8 +199,7 @@ export const SendOtpDocs = () =>
     }),
     ApiResponse({
       status: HttpStatus.TOO_MANY_REQUESTS,
-      description:
-        'Rate limit exceeded — max 5 OTP requests per 15 minutes per user',
+      description: 'Rate limit exceeded — max 5 OTP requests per 15 minutes per user',
       schema: {
         example: {
           statusCode: 429,
@@ -289,10 +288,7 @@ export function setupSwagger(app: INestApplication): void {
     .setTitle('SEIL API')
     .setDescription('SEIL REST API documentation')
     .setVersion('1.0.0')
-    .addBearerAuth(
-      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-      'JWT',
-    )
+    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'JWT')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -375,6 +371,87 @@ export const ResendOtpDocs = () =>
           statusCode: 429,
           message: SYS_MSG.OTP_RESEND_RATE_LIMITED,
           retryAfter: 18,
+        },
+      },
+    }),
+  );
+
+export const ForgotPasswordDocs = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Request password reset OTP',
+      description:
+        "Generates a 6-digit OTP, stores it with 15-minute expiry, and sends it to the user's email. " +
+        'Rate limited to 3 requests per 15 minutes per user. ' +
+        'Returns 200 for unknown emails to prevent enumeration. ' +
+        'Only verified accounts can request password reset.',
+    }),
+    ApiBody({ type: ForgotPasswordDto }),
+    ApiOkResponse({
+      description: 'OTP sent if email exists (always returns 200 to prevent enumeration)',
+      schema: {
+        example: {
+          statusCode: HttpStatus.OK,
+          message: SYS_MSG.PASSWORD_RESET_OTP_SENT,
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.TOO_MANY_REQUESTS,
+      description: 'Rate limit exceeded — max 3 OTP requests per 15 minutes per user',
+      schema: {
+        example: {
+          statusCode: HttpStatus.TOO_MANY_REQUESTS,
+          message: SYS_MSG.PASSWORD_RESET_RATE_LIMITED,
+        },
+      },
+    }),
+  );
+
+export const ResetPasswordDocs = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Reset password using OTP and auto-login',
+      description:
+        'Validates the 6-digit OTP against the stored hash. On success: ' +
+        '1) Password is updated, 2) All existing sessions are revoked, 3) OTP token is deleted, ' +
+        '4) User is automatically logged in with new access/refresh tokens. ' +
+        'Rate limited to 5 verification attempts per 5 minutes.',
+    }),
+    ApiBody({ type: ResetPasswordDto }),
+    ApiOkResponse({
+      description: 'Password reset successful and user auto-logged in',
+      schema: {
+        example: {
+          statusCode: HttpStatus.OK,
+          message: SYS_MSG.PASSWORD_RESET_SUCCESSFUL,
+          data: {
+            accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+            user: {
+              id: 'uuid',
+              email: 'user@example.com',
+              full_name: 'Jane Doe',
+            },
+            redirectUrl: '/dashboard',
+          },
+        },
+      },
+    }),
+    ApiBadRequestResponse({
+      description: 'Invalid or expired OTP',
+      schema: {
+        example: {
+          statusCode: HttpStatus.BAD_REQUEST,
+          message: SYS_MSG.PASSWORD_RESET_INVALID_OTP,
+        },
+      },
+    }),
+    ApiTooManyRequestsResponse({
+      description: 'Too many verification attempts (max 5 per 5 minutes)',
+      schema: {
+        example: {
+          statusCode: HttpStatus.TOO_MANY_REQUESTS,
+          message: SYS_MSG.PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED,
         },
       },
     }),
