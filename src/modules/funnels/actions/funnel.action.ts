@@ -8,8 +8,8 @@ import { Funnel } from '../entities/funnel.entity';
 export class FunnelModelAction extends AbstractModelAction<Funnel> {
   constructor(
     @InjectRepository(Funnel)
-    repository: Repository<Funnel>,
+    private readonly funnelRepository: Repository<Funnel>,
   ) {
-    super(repository, Funnel);
+    super(funnelRepository, Funnel);
   }
 }

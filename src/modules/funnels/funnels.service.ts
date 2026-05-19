@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Funnel } from './entities/funnel.entity';
 import { FunnelStage } from './entities/funnel-stage.entity';
+import { StageStatus } from './enums/stage-status.enum';
 import { StageTask } from './entities/stage-task.entity';
 import * as SYS_MSG from '../../constants/system.messages';
 
@@ -171,7 +172,7 @@ export class FunnelsService {
     const stage = await this.stageRepo.findOne({ where: { id: stageId, funnel_id: funnelId } });
     if (!stage) throw new NotFoundException(SYS_MSG.ONBOARDING_SESSION_NOT_FOUND);
 
-    if (stage.status === 'locked') {
+    if (stage.status === StageStatus.LOCKED) {
       // find prior stage
       const prior = await this.stageRepo.findOne({ where: { funnel_id: funnelId, position: stage.position - 1 } });
       const priorName = prior ? prior.name : 'previous';
