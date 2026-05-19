@@ -22,6 +22,7 @@ import { RedisModule } from './modules/redis/redis.module';
 import { QueueModule } from './queue/queue.module';
 import { EmailModule } from './email/email.module';
 import { FunnelGenerationQueueModule } from './queue/funnel-generation-queue.module';
+import { FunnelsModule } from './modules/funnels/funnels.module';
 import { WaitlistModule } from './modules/waitlist/waitlist.module';
 import { ContactModule } from './modules/contact/contact.module';
 import { llmConfig } from './config/llm.config';
@@ -56,6 +57,7 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
     QueueModule,
     EmailModule,
     FunnelGenerationQueueModule,
+    FunnelsModule,
     WaitlistModule,
     ContactModule,
   ],
