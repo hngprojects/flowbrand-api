@@ -1,4 +1,4 @@
-import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { BeforeInsert, BeforeUpdate, Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from '../../../common/entities/base.entity';
 import { FunnelStage } from './funnel-stage.entity';
 
@@ -29,6 +29,19 @@ export class StageTask extends BaseEntity {
 
   @Column({ type: 'enum', enum: STAGE_TASK_STATUS, default: 'pending' })
   status: StageTaskStatus;
+
+  @BeforeInsert()
+  @BeforeUpdate()
+  syncCompletionState(): void {
+    if (this.status === 'complete') {
+      this.is_complete = true;
+      this.completed_at = this.completed_at ?? new Date();
+      return;
+    }
+
+    this.is_complete = false;
+    this.completed_at = null;
+  }
 
   // Relations
   @ManyToOne(() => FunnelStage, (stage) => stage.tasks, { onDelete: 'CASCADE' })

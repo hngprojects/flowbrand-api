@@ -159,7 +159,7 @@ export const notFoundExample = (path: string) => ({
   success: false,
   statusCode: HttpStatus.NOT_FOUND,
   error: 'NotFoundException',
-  message: SYS_MSG.FUNNEL_NOT_FOUND,
+  message: path.includes('/stages/') ? SYS_MSG.FUNNEL_OR_STAGE_NOT_FOUND : SYS_MSG.FUNNEL_NOT_FOUND,
   path,
   timestamp: '2026-05-18T12:00:00.000Z',
 });

@@ -107,6 +107,7 @@ export const FUNNELS_RETRIEVED_SUCCESSFULLY = 'Funnels retrieved successfully';
 export const FUNNEL_STAGES_RETRIEVED_SUCCESSFULLY = 'Funnel stages retrieved successfully';
 export const FUNNEL_STAGE_RETRIEVED_SUCCESSFULLY = 'Funnel stage retrieved successfully';
 export const FUNNEL_STAGE_NOT_FOUND = 'Funnel stage not found or not owned by you';
+export const FUNNEL_OR_STAGE_NOT_FOUND = 'Funnel or stage not found or not owned by you';
 export const FUNNEL_STAGE_LOCKED_MESSAGE = (stageName: string, priorStageName: string) =>
   `The ${stageName} stage is locked. Complete all tasks in ${priorStageName} and mark it complete to unlock.`;
 export const FUNNEL_UNAUTHORIZED_ACCESS = 'You do not have permission to access this funnel';
