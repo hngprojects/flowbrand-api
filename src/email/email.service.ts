@@ -3,7 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { Queue } from 'bull';
 import { JOBS, QUEUES } from '../common/constants/queue.constants';
 import { maskEmail, maskId } from '../utils/pii.utils';
-import type { EmailJob, OtpPayload } from './interfaces/email-job.interface';
+import type { EmailJob, OtpPayload, WaitlistPayload } from './interfaces/email-job.interface';
 
 const DEFAULT_PRIORITY = 5;
 
@@ -33,6 +33,16 @@ export class EmailService {
   ): Promise<string | undefined> {
     return this.dispatch(
       { to, type: 'otp-reset', payload, userId },
+      DEFAULT_PRIORITY,
+    );
+  }
+
+  async sendWaitlistConfirmation(
+    to: string,
+    payload: WaitlistPayload,
+  ): Promise<string | undefined> {
+    return this.dispatch(
+      { to, type: 'waitlist', payload },
       DEFAULT_PRIORITY,
     );
   }
