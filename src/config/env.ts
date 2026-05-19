@@ -34,6 +34,8 @@ const envSchema = z.object({
   REDIS_PORT: z.coerce.number().int().positive().default(6379),
   REDIS_TLS: boolEnv.default(false),
 
+  CONTACT_ADMIN_EMAIL: z.string().email().default('useseil@hng14.com'),
+
   GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required'),
   GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
   GEMINI_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),

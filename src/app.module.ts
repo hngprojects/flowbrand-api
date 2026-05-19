@@ -22,6 +22,7 @@ import { QueueModule } from './queue/queue.module';
 import { EmailModule } from './email/email.module';
 import { FunnelGenerationQueueModule } from './queue/funnel-generation-queue.module';
 import { WaitlistModule } from './modules/waitlist/waitlist.module';
+import { ContactModule } from './modules/contact/contact.module';
 import { llmConfig } from './config/llm.config';
 
 function collectValidationErrors(errors: ValidationError[], parentPath = ''): string[] {
@@ -54,6 +55,7 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
     EmailModule,
     FunnelGenerationQueueModule,
     WaitlistModule,
+    ContactModule,
   ],
   providers: [
     {
