@@ -125,8 +125,15 @@ export class UploadService {
       row.status = UploadDocumentStatus.PARSING;
       row.percent_complete = UPLOAD_PROGRESS.PARSING;
       const parsing = await this.uploadedDocumentAction.saveDocument(row);
-      // Fire-and-forget: durable parsing (e.g. BullMQ) is a follow-up; process crash can leave parsing at 50%.
-      void this.completeParsing(parsing, file.buffer, fileType, storagePath);
+     
+      void this.completeParsing(parsing, file.buffer, fileType, storagePath).catch(
+        (err: unknown) => {
+          this.logger.error(
+            `Unhandled parsing worker error uploadId=${parsing.id}`,
+            err instanceof Error ? err.stack : err,
+          );
+        },
+      );
       return this.mapRowToUploadItem(parsing);
     } catch (error) {
       this.logger.warn(
@@ -167,7 +174,14 @@ export class UploadService {
       row.status = UploadDocumentStatus.FAILED;
       row.percent_complete = 0;
       row.parsed_text = null;
-      await this.uploadedDocumentAction.saveDocument(row);
+      try {
+        await this.uploadedDocumentAction.saveDocument(row);
+      } catch (saveError) {
+        this.logger.error(
+          `Failed to persist parse-failure state uploadId=${row.id}`,
+          saveError instanceof Error ? saveError.stack : saveError,
+        );
+      }
       try {
         await this.objectStorage.deleteObject(storagePath);
       } catch {
@@ -208,11 +222,11 @@ export class UploadService {
     return null;
   }
   private bufferMatchesFileType(buffer: Buffer, fileType: UploadFileType): boolean {
+    if (fileType === 'pdf') {
+      return buffer.length >= 5 && buffer.subarray(0, 5).toString('utf8') === '%PDF-';
+    }
     if (buffer.length < 4) {
       return false;
-    }
-    if (fileType === 'pdf') {
-      return buffer.subarray(0, 4).toString('utf8') === '%PDF';
     }
     if (fileType === 'docx' || fileType === 'pptx') {
       return (

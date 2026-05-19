@@ -28,7 +28,7 @@ export interface UploadItemResponse {
 
 /** POST /funnels/upload response envelope. */
 export interface UploadBatchResponse {
-  statusCode: typeof HttpStatus.CREATED | typeof HttpStatus.UNPROCESSABLE_ENTITY;
+  statusCode: typeof HttpStatus.CREATED;
   message: string;
   data: {
     batchId: string;

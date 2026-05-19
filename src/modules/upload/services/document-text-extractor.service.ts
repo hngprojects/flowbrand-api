@@ -6,6 +6,10 @@ import * as SYS_MSG from '../../../constants/system.messages';
 import type { PptxZipLoader, UploadFileType } from '../upload.types';
 
 const MAX_PARSED_TEXT_CHARS = 2_000_000;
+/** Minimum length for coarse OLE (.doc/.ppt) text to be treated as usable. */
+const OLE_MIN_TEXT_LENGTH = 40;
+/** Minimum ratio of letters for OLE extraction (filters GUID/style noise). */
+const OLE_MIN_LETTER_RATIO = 0.4;
 
 const pptxZipLoader = JSZip as unknown as PptxZipLoader;
 
@@ -116,12 +120,25 @@ export class DocumentTextExtractorService {
     return this.extractOleLegacy(buffer);
   }
 
+  /**
+   * Coarse OLE (.doc/.ppt) extraction — best-effort only; not a full parser.
+   * Returns empty string when output looks like binary noise so callers mark failed.
+   */
   private extractOleLegacy(buffer: Buffer): string {
     const raw = buffer.toString('latin1');
     const runs = [...raw.matchAll(/[\x20-\x7E]{4,}/g)].map((m) => m[0]);
     const filtered = runs.filter(
       (chunk) => !/^(Arial|Times|Calibri|Helvetica)/i.test(chunk),
     );
-    return filtered.join(' ').trim();
+    const text = filtered.join(' ').trim();
+    return this.oleTextLooksUsable(text) ? text : '';
+  }
+
+  private oleTextLooksUsable(text: string): boolean {
+    if (text.length < OLE_MIN_TEXT_LENGTH) {
+      return false;
+    }
+    const letters = (text.match(/[a-zA-Z]/g) ?? []).length;
+    return letters / text.length >= OLE_MIN_LETTER_RATIO;
   }
 }
