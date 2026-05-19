@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -46,6 +46,7 @@ export class OnboardingController {
   }
 
   @Post('step')
+  @HttpCode(HttpStatus.OK)
   @PostStepDocs()
   saveStep(
     @CurrentUser('sub') userId: string,

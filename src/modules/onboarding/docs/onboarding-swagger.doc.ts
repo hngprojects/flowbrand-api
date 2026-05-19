@@ -163,7 +163,7 @@ export const PostStepDocs = () =>
       schema: {
         example: {
           success: false,
-          statusCode: 422,
+          statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
           error: 'UnprocessableEntityException',
           message: 'Validation failed',
           fields: {
