@@ -1,6 +1,7 @@
 import { BadRequestException, Module, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import type { ValidationError } from 'class-validator';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -47,6 +48,12 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
     TypeOrmModule.forRootAsync({
       useFactory: () => databaseConfig(),
     }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100,
+      },
+    ]),
     HealthModule,
     UsersModule,
     AuthModule,
@@ -77,6 +84,7 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
           }),
       }),
     },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
