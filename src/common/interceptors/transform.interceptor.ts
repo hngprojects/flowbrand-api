@@ -8,6 +8,7 @@ import { map, Observable } from 'rxjs';
 
 export interface ApiResponse<T> {
   success: true;
+  statusCode: number;
   data: T;
   meta?: Record<string, unknown>;
 }
@@ -19,8 +20,12 @@ export class TransformInterceptor<T>
     _context: ExecutionContext,
     next: CallHandler<T>,
   ): Observable<ApiResponse<T>> {
+    const httpResponse = _context.switchToHttp().getResponse<{ statusCode?: number }>();
+
     return next.handle().pipe(
       map((payload) => {
+        const statusCode = httpResponse?.statusCode ?? 200;
+
         if (
           payload &&
           typeof payload === 'object' &&
@@ -33,11 +38,12 @@ export class TransformInterceptor<T>
           };
           return {
             success: true,
+            statusCode,
             data: data,
             meta: { ...rest, ...paginationMeta },
           };
         }
-        return { success: true, data: payload };
+        return { success: true, statusCode, data: payload };
       }),
     );
   }
