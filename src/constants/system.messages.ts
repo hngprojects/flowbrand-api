@@ -1,10 +1,8 @@
 // Individual message constants (single-line exports)
 export const USER_CREATED_SUCCESSFULLY = 'User Created Successfully';
-export const FAILED_TO_CREATE_USER =
-  'Error Occurred while creating user, kindly try again';
+export const FAILED_TO_CREATE_USER = 'Error Occurred while creating user, kindly try again';
 export const USER_ACCOUNT_EXIST = 'Account with the specified email exists';
-export const USER_ACCOUNT_DOES_NOT_EXIST =
-  "Account with the specified email doesn't exist";
+export const USER_ACCOUNT_DOES_NOT_EXIST = "Account with the specified email doesn't exist";
 export const USER_ACCOUNT_LOCKED = 'Account with the specified email is locked';
 
 // Auth messages
@@ -14,12 +12,9 @@ export const AUTH_TOKEN_REFRESHED = 'Token refreshed successfully';
 export const AUTH_INVALID_CREDENTIALS = 'Invalid email or password';
 export const AUTH_INVALID_REFRESH_TOKEN = 'Invalid or expired refresh token';
 export const AUTH_UNAUTHENTICATED_MESSAGE = 'Unauthenticated';
-export const AUTH_TERMS_REQUIRED =
-  'You must accept the terms and conditions to register';
-export const AUTH_ACCOUNT_LOCKED =
-  'Account locked due to too many failed login attempts. Try again later.';
-export const AUTH_TOO_MANY_FAILED_ATTEMPTS =
-  'Too many failed login attempts. Your account has been locked for 1 hour.';
+export const AUTH_TERMS_REQUIRED = 'You must accept the terms and conditions to register';
+export const AUTH_ACCOUNT_LOCKED = 'Account locked due to too many failed login attempts. Try again later.';
+export const AUTH_TOO_MANY_FAILED_ATTEMPTS = 'Too many failed login attempts. Your account has been locked for 1 hour.';
 
 // User messages
 export const USER_EMAIL_IN_USE = 'Email already in use';
@@ -51,6 +46,25 @@ export const UPLOAD_FAILED = 'File upload failed';
 export const UPLOAD_FILE_TOO_LARGE = 'Uploaded file is too large';
 export const UPLOAD_INVALID_FILE = 'Uploaded file type is not allowed';
 export const UPLOAD_TOO_MANY_FILES = 'Too many files uploaded';
+
+// Funnel uploads
+export const FUNNEL_UPLOAD_COMPLETED = 'Funnel upload completed';
+export const FUNNEL_UPLOAD_PARTIAL =
+  'Some files were rejected; see uploads[].errorMessage for details';
+export const FUNNEL_UPLOAD_ALL_REJECTED =
+  'All files were rejected; see details[]';
+export const FUNNEL_UPLOAD_NOT_FOUND = 'Upload not found or not owned by user';
+export const FUNNEL_UPLOAD_FILES_REQUIRED =
+  'At least one file is required in the files field';
+export const FUNNEL_UPLOAD_PARSE_FAILED =
+  'Could not extract text from the uploaded document';
+export const FUNNEL_UPLOAD_UNSUPPORTED_FILE_TYPE =
+  'Unsupported file type for text extraction';
+export const FUNNEL_UPLOAD_NO_EXTRACTABLE_TEXT =
+  'No extractable text found in document';
+export const FUNNEL_UPLOAD_NO_SLIDES =
+  'No slides found in presentation';
+
 export const AI_GENERATION_FAILED = 'AI generation failed';
 
 // OTP
@@ -60,12 +74,10 @@ export const OTP_RATE_LIMITED = 'Too many OTP requests. Please try again later.'
 export const OTP_VERIFIED_SUCCESSFULLY = 'Email verified successfully';
 export const OTP_INVALID = 'The OTP code is invalid or has already been used';
 export const OTP_EXPIRED = 'Your OTP code has expired. Please request a new one.';
-export const OTP_RESENT_SUCCESSFULLY =
-  'A new verification code has been sent to your email address.';
+export const OTP_RESENT_SUCCESSFULLY = 'A new verification code has been sent to your email address.';
 export const OTP_RESEND_RATE_LIMITED = 'Please wait before requesting a new code.';
 export const OTP_RESEND_HOURLY_LIMIT = 'Too many resend requests. Please try again in an hour.';
-export const OTP_VERIFY_ATTEMPTS_EXCEEDED =
-  'Too many failed verification attempts. Please request a new OTP.';
+export const OTP_VERIFY_ATTEMPTS_EXCEEDED = 'Too many failed verification attempts. Please request a new OTP.';
 
 // Health
 export const HEALTH_OK = 'ok';
@@ -81,8 +93,7 @@ export const HTTP_INTERNAL_SERVER_ERROR_NAME = 'InternalServerError';
 export const REDIS_CONNECTION_ESTABLISHED = 'Redis connection established';
 export const REDIS_CLIENT_READY = 'Redis client ready';
 export const REDIS_CONNECTION_CLOSED = 'Redis connection closed';
-export const REDIS_INITIAL_CONNECTION_FAILED =
-  'Initial Redis connection failed';
+export const REDIS_INITIAL_CONNECTION_FAILED = 'Initial Redis connection failed';
 export const REDIS_CLIENT_ERROR = 'Redis client error';
 export const REDIS_CRITICAL_OOM = 'Critical Redis Out of Memory';
 export const REDIS_RECONNECT_ATTEMPT = (attempt: number, delay: number) =>
@@ -102,3 +113,32 @@ export const PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED = 'Too many verification at
 // Waitlist
 export const WAITLIST_JOINED_SUCCESSFULLY = 'Successfully joined the waitlist';
 export const WAITLIST_ALREADY_JOINED = 'You are already on the waitlist';
+
+// Contact
+export const CONTACT_MESSAGE_SENT_SUCCESSFULLY = 'Message sent successfully';
+export const CONTACT_CREATED = 'Contact message submitted successfully';
+export const CONTACT_SPAM_DETECTED = 'Submission contains prohibited content';
+
+// Spam Detection
+export const SPAM_PROHIBITED_CONTENT = 'Submission contains prohibited content';
+export const SPAM_TOO_MANY_LINKS = 'Message contains too many links. Please limit to 2 URLs.';
+export const SPAM_EXCESSIVE_REPETITION = 'Message contains excessive repetition';
+export const SPAM_EXCESSIVE_CAPITALIZATION = 'Message contains excessive capitalization';
+export const SPAM_INVALID_CONTENT = 'Message contains invalid content';
+export const SPAM_MULTIPLE_EMAILS = 'Message contains multiple email addresses';
+
+// AI Service Messages
+export const AI_GEMINI_API_KEY_MISSING = 'Gemini API key is not configured';
+export const AI_GEMINI_OUTPUT_FAILED_SCHEMA_VALIDATION = 'Gemini output failed schema validation';
+export const AI_GEMINI_NON_JSON_RESPONSE_BODY = 'Gemini returned non-JSON response body';
+export const AI_GEMINI_RESPONSE_HAD_NO_TEXT_CONTENT = 'Gemini response had no text content';
+
+export const AI_GROQ_API_KEY_MISSING = 'Groq API key is not configured';
+export const AI_GROQ_OUTPUT_FAILED_SCHEMA_VALIDATION = 'Groq output failed schema validation';
+export const AI_GROQ_NON_JSON_RESPONSE_BODY = 'Groq returned non-JSON response body';
+export const AI_GROQ_RESPONSE_HAD_NO_TEXT_CONTENT = 'Groq response had no text content';
+
+export const AI_PROVIDER_TIMEOUT = (provider: string, timeoutMs: number) =>
+  `${provider} request timed out after ${timeoutMs} milliseconds`;
+
+export const AI_PROVIDER_HTTP_ERROR = (provider: string, status: number) => `${provider} HTTP ${status}`;

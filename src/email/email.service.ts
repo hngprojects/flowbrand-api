@@ -3,7 +3,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { Queue } from 'bull';
 import { JOBS, QUEUES } from '../common/constants/queue.constants';
 import { maskEmail, maskId } from '../utils/pii.utils';
-import type { EmailJob, OtpPayload, WaitlistPayload } from './interfaces/email-job.interface';
+import type {
+  EmailJob,
+  OtpPayload,
+  WaitlistPayload,
+  ContactConfirmationPayload,
+  ContactAdminNotificationPayload,
+} from './interfaces/email-job.interface';
 
 const DEFAULT_PRIORITY = 5;
 
@@ -11,30 +17,14 @@ const DEFAULT_PRIORITY = 5;
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
 
-  constructor(
-    @InjectQueue(QUEUES.EMAIL) private readonly emailQueue: Queue<EmailJob>,
-  ) {}
+  constructor(@InjectQueue(QUEUES.EMAIL) private readonly emailQueue: Queue<EmailJob>) {}
 
-  async sendOtpVerification(
-    to: string,
-    payload: OtpPayload,
-    userId?: string,
-  ): Promise<string | undefined> {
-    return this.dispatch(
-      { to, type: 'otp-verification', payload, userId },
-      DEFAULT_PRIORITY,
-    );
+  async sendOtpVerification(to: string, payload: OtpPayload, userId?: string): Promise<string | undefined> {
+    return this.dispatch({ to, type: 'otp-verification', payload, userId }, DEFAULT_PRIORITY);
   }
 
-  async sendOtpReset(
-    to: string,
-    payload: OtpPayload,
-    userId?: string,
-  ): Promise<string | undefined> {
-    return this.dispatch(
-      { to, type: 'otp-reset', payload, userId },
-      DEFAULT_PRIORITY,
-    );
+  async sendOtpReset(to: string, payload: OtpPayload, userId?: string): Promise<string | undefined> {
+    return this.dispatch({ to, type: 'otp-reset', payload, userId }, DEFAULT_PRIORITY);
   }
 
   async sendPasswordReset(
@@ -49,19 +39,36 @@ export class EmailService {
   }
   
   async sendWaitlistConfirmation(
-    to: string,
-    payload: WaitlistPayload,
-  ): Promise<string | undefined> {
+     to: string, 
+     payload: WaitlistPayload
+   ): Promise<string | undefined> {
     return this.dispatch(
-      { to, type: 'waitlist', payload },
-      DEFAULT_PRIORITY,
+      { to, type: 'waitlist', payload }, 
+      DEFAULT_PRIORITY
     );
   }
 
-  private async dispatch(
-    job: EmailJob,
-    priority: number,
+  async sendContactConfirmation(
+    to: string, 
+    payload: ContactConfirmationPayload
+   ): Promise<string | undefined> {
+    return this.dispatch(
+      { to, type: 'contact-confirmation', payload }, 
+      DEFAULT_PRIORITY
+    );
+  }
+
+  async sendContactAdminNotification(
+    to: string,
+    payload: ContactAdminNotificationPayload,
   ): Promise<string | undefined> {
+    return this.dispatch(
+      { to, type: 'contact-admin-notification', payload }, 
+      DEFAULT_PRIORITY
+    );
+  }
+
+  private async dispatch(job: EmailJob, priority: number): Promise<string | undefined> {
     try {
       const queued = await this.emailQueue.add(JOBS.SEND_EMAIL, job, {
         priority,

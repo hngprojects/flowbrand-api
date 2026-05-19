@@ -3,14 +3,10 @@ import { z } from 'zod';
 
 dotenv.config();
 
-const boolEnv = z
-  .union([z.boolean(), z.enum(['true', 'false'])])
-  .transform((v) => v === true || v === 'true');
+const boolEnv = z.union([z.boolean(), z.enum(['true', 'false'])]).transform((v) => v === true || v === 'true');
 
 const envSchema = z.object({
-  NODE_ENV: z
-    .enum(['development', 'test', 'production'])
-    .default('development'),
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
 
   DATABASE_HOST: z.string().min(1),
@@ -22,13 +18,9 @@ const envSchema = z.object({
   DATABASE_LOGGING: boolEnv.default(false),
   DATABASE_SSL: boolEnv.default(false),
 
-  JWT_ACCESS_SECRET: z
-    .string()
-    .min(32, 'JWT_ACCESS_SECRET must be at least 32 chars'),
+  JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 chars'),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
-  JWT_REFRESH_SECRET: z
-    .string()
-    .min(32, 'JWT_REFRESH_SECRET must be at least 32 chars'),
+  JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 chars'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
 
   GOOGLE_CLIENT_ID: z.string().default(''),
@@ -41,6 +33,16 @@ const envSchema = z.object({
   REDIS_HOST: z.string().default('localhost'),
   REDIS_PORT: z.coerce.number().int().positive().default(6379),
   REDIS_TLS: boolEnv.default(false),
+
+  CONTACT_ADMIN_EMAIL: z.string().email().default('useseil@hng14.com'),
+
+  GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required'),
+  GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
+  GEMINI_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
+
+  GROQ_API_KEY: z.string().min(1, 'GROQ_API_KEY is required'),
+  GROQ_MODEL: z.string().default('llama-3.3-70b-versatile'),
+  GROQ_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
 
   QUEUE_CONCURRENCY: z.coerce
     .number()
@@ -58,10 +60,7 @@ const envSchema = z.object({
 const result = envSchema.safeParse(process.env);
 
 if (!result.success) {
-  console.error(
-    'Invalid environment variables:\n',
-    result.error.flatten().fieldErrors,
-  );
+  console.error('Invalid environment variables:\n', result.error.flatten().fieldErrors);
   process.exit(1);
 }
 
