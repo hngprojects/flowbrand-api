@@ -2,10 +2,12 @@ import { applyDecorators, HttpStatus } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiUnauthorizedResponse,
+  ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import * as SYS_MSG from '../../../constants/system.messages';
 
@@ -111,5 +113,63 @@ export const GetSessionDocs = () =>
           timestamp: '2026-05-15T12:00:00.000Z',
         },
       },
+    }),
+  );
+
+export const PostStepDocs = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Save a step answer in the onboarding wizard',
+      description:
+        'Saves the answer for a specific wizard step. ' +
+        'Each step has a different answer schema. ' +
+        'Calling the same step again overwrites the previous answer (idempotent). ' +
+        'Returns the full updated session.',
+    }),
+    ApiOkResponse({
+      description: 'Step answer saved successfully.',
+      schema: {
+        example: {
+          success: true,
+          data: {
+            session_id: '550e8400-e29b-41d4-a716-446655440001',
+            user_id: '550e8400-e29b-41d4-a716-446655440002',
+            status: 'in_progress',
+            steps_completed: 1,
+            answers: {
+              step_1: { business_description: 'We sell handmade shoes' }
+            },
+            expires_at: '2026-05-17T12:00:00.000Z',
+            created_at: '2026-05-16T12:00:00.000Z',
+            updated_at: '2026-05-16T12:00:00.000Z',
+          }
+        }
+      }
+    }),
+    ApiUnauthorizedResponse({
+      description: 'Missing or invalid bearer token.',
+    }),
+    ApiNotFoundResponse({
+      description: 'Session not found or does not belong to this user.',
+    }),
+    ApiForbiddenResponse({
+      description: 'Session has expired.',
+    }),
+    ApiConflictResponse({
+      description: 'Onboarding already complete.',
+    }),
+    ApiUnprocessableEntityResponse({
+      description: 'Answer validation failed.',
+      schema: {
+        example: {
+          success: false,
+          statusCode: 422,
+          error: 'UnprocessableEntityException',
+          message: 'Validation failed',
+          fields: {
+            business_description: 'must be shorter than or equal to 500 characters'
+          }
+        }
+      }
     }),
   );
