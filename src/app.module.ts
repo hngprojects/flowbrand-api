@@ -21,17 +21,15 @@ import { RedisModule } from './modules/redis/redis.module';
 import { QueueModule } from './queue/queue.module';
 import { EmailModule } from './email/email.module';
 import { WaitlistModule } from './modules/waitlist/waitlist.module';
+import { llmConfig } from './config/llm.config';
 
-function collectValidationErrors(
-  errors: ValidationError[],
-  parentPath = '',
-): string[] {
+function collectValidationErrors(errors: ValidationError[], parentPath = ''): string[] {
   return errors.flatMap((error) => {
     const currentPath = parentPath ? `${parentPath}.${error.property}` : error.property;
-    const messages = error.constraints ? Object.values(error.constraints).map((message) => `${currentPath}: ${message}`) : [];
-    const children = error.children?.length
-      ? collectValidationErrors(error.children, currentPath)
+    const messages = error.constraints
+      ? Object.values(error.constraints).map((message) => `${currentPath}: ${message}`)
       : [];
+    const children = error.children?.length ? collectValidationErrors(error.children, currentPath) : [];
 
     return [...messages, ...children];
   });
@@ -41,7 +39,7 @@ function collectValidationErrors(
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, jwtConfig, redisConfig],
+      load: [appConfig, databaseConfig, jwtConfig, redisConfig, llmConfig],
     }),
     TypeOrmModule.forRootAsync({
       useFactory: () => databaseConfig(),
