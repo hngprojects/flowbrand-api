@@ -8,13 +8,14 @@ import { Funnel } from '../modules/funnels/entities/funnel.entity';
 import { FunnelStage } from '../modules/funnels/entities/funnel-stage.entity';
 import { StageTask } from '../modules/funnels/entities/stage-task.entity';
 import { FunnelTemplateService } from '../modules/funnels/services/funnel-template.service';
-import { LlmService, NullLlmService } from './interfaces/llm.service.interface';
 import { FunnelGenerationProcessor } from './processors/funnel-generation.processor';
 import { QueueModule } from './queue.module';
+import { LlmModule } from '../modules/llm/llm.module';
 
 @Module({
   imports: [
     QueueModule,
+    LlmModule,
     BullModule.registerQueueAsync({
       name: QUEUES.FUNNEL_GENERATION,
       useFactory: (config: ConfigService) => ({
@@ -32,13 +33,7 @@ import { QueueModule } from './queue.module';
     }),
     TypeOrmModule.forFeature([Funnel, FunnelStage, StageTask]),
   ],
-  providers: [
-    FunnelGenerationProcessor,
-    FunnelTemplateService,
-    FunnelModelAction,
-    // Swapped for the real implementation when BE-304 lands
-    { provide: LlmService, useClass: NullLlmService },
-  ],
+  providers: [FunnelGenerationProcessor, FunnelTemplateService, FunnelModelAction],
   exports: [BullModule],
 })
 export class FunnelGenerationQueueModule {}

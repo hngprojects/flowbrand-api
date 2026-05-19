@@ -100,3 +100,19 @@ export const SPAM_EXCESSIVE_REPETITION = 'Message contains excessive repetition'
 export const SPAM_EXCESSIVE_CAPITALIZATION = 'Message contains excessive capitalization';
 export const SPAM_INVALID_CONTENT = 'Message contains invalid content';
 export const SPAM_MULTIPLE_EMAILS = 'Message contains multiple email addresses';
+
+// AI Service Messages
+export const AI_GEMINI_API_KEY_MISSING = 'Gemini API key is not configured';
+export const AI_GEMINI_OUTPUT_FAILED_SCHEMA_VALIDATION = 'Gemini output failed schema validation';
+export const AI_GEMINI_NON_JSON_RESPONSE_BODY = 'Gemini returned non-JSON response body';
+export const AI_GEMINI_RESPONSE_HAD_NO_TEXT_CONTENT = 'Gemini response had no text content';
+
+export const AI_GROQ_API_KEY_MISSING = 'Groq API key is not configured';
+export const AI_GROQ_OUTPUT_FAILED_SCHEMA_VALIDATION = 'Groq output failed schema validation';
+export const AI_GROQ_NON_JSON_RESPONSE_BODY = 'Groq returned non-JSON response body';
+export const AI_GROQ_RESPONSE_HAD_NO_TEXT_CONTENT = 'Groq response had no text content';
+
+export const AI_PROVIDER_TIMEOUT = (provider: string, timeoutMs: number) =>
+  `${provider} request timed out after ${timeoutMs} milliseconds`;
+
+export const AI_PROVIDER_HTTP_ERROR = (provider: string, status: number) => `${provider} HTTP ${status}`;

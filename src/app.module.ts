@@ -23,6 +23,7 @@ import { EmailModule } from './email/email.module';
 import { FunnelGenerationQueueModule } from './queue/funnel-generation-queue.module';
 import { WaitlistModule } from './modules/waitlist/waitlist.module';
 import { ContactModule } from './modules/contact/contact.module';
+import { llmConfig } from './config/llm.config';
 
 function collectValidationErrors(errors: ValidationError[], parentPath = ''): string[] {
   return errors.flatMap((error) => {
@@ -40,7 +41,7 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, jwtConfig, redisConfig],
+      load: [appConfig, databaseConfig, jwtConfig, redisConfig, llmConfig],
     }),
     TypeOrmModule.forRootAsync({
       useFactory: () => databaseConfig(),
