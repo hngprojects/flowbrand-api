@@ -50,7 +50,7 @@ export class CreateUploadedDocuments1780000003000
             name: 'file_type',
             type: 'varchar',
             length: '50',
-            isNullable: true,
+            isNullable: false,
           },
           {
             name: 'status',

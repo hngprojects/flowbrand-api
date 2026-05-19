@@ -19,8 +19,8 @@ export class UploadedDocument extends BaseEntity {
   @Column({ type: 'bigint' })
   file_size_bytes: string;
 
-  @Column({ type: 'varchar', length: 50, nullable: true })
-  file_type: UploadFileType | null;
+  @Column({ type: 'varchar', length: 50 })
+  file_type: UploadFileType;
 
   @Column({
     type: 'enum',

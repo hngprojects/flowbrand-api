@@ -267,7 +267,7 @@ export class UploadService {
     return {
       uploadId: row.id,
       fileName: row.file_name,
-      fileType: row.file_type as UploadFileType,
+      fileType: row.file_type,
       fileSizeBytes: Number(row.file_size_bytes),
       status: row.status,
       percentComplete: row.percent_complete,
@@ -277,7 +277,7 @@ export class UploadService {
     return {
       uploadId: row.id,
       fileName: row.file_name,
-      fileType: row.file_type as UploadFileType,
+      fileType: row.file_type,
       fileSizeBytes: Number(row.file_size_bytes),
       status: row.status,
       percentComplete: row.percent_complete,
