@@ -161,8 +161,9 @@ export class UploadService {
       await this.uploadedDocumentAction.saveDocument(row);
     } catch (error) {
       this.logger.warn(
-        `Parse failed for uploadId=${row.id} name=${row.file_name}`,
-        error instanceof Error ? error.message : error,
+        `Parse failed for uploadId=${row.id} name=${row.file_name}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       );
       row.status = UploadDocumentStatus.FAILED;
       row.percent_complete = 0;
