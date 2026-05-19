@@ -33,6 +33,7 @@ export class UploadedDocumentModelAction extends AbstractModelAction<UploadedDoc
         status: true,
         percent_complete: true,
         storage_path: true,
+        failure_reason: true,
         created_at: true,
         updated_at: true,
       },

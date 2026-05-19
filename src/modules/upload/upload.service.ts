@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   HttpStatus,
   Inject,
   Injectable,
@@ -45,8 +44,8 @@ export class UploadService {
 
   async handleUpload( userId: string, files: Express.Multer.File[] | undefined): Promise<UploadBatchResponse> {
     if (!files?.length) {
-      throw new BadRequestException({
-        error: 'BadRequestException',
+      throw new UnprocessableEntityException({
+        error: 'UnprocessableEntityException',
         message: SYS_MSG.FUNNEL_UPLOAD_FILES_REQUIRED,
       });
     }
@@ -64,6 +63,7 @@ export class UploadService {
           index,
           fileName: item.fileName,
           errorMessage: item.errorMessage,
+          fields: item.errorFields,
         })),
       });
     }
@@ -100,6 +100,7 @@ export class UploadService {
         status: UploadDocumentStatus.FAILED,
         percentComplete: 0,
         errorMessage: validation.errorMessage,
+        errorFields: validation.errorFields,
       };
     }
     const fileType = validation.fileType;
@@ -133,14 +134,14 @@ export class UploadService {
 
       await this.withDbRetry(
         () => this.uploadedDocumentAction.updateProgress(uploadId, UPLOAD_PROGRESS.STORED),
-        `uploadId=${uploadId}`,
+        `uploadId=${uploadId} storagePath=${storagePath}`,
       );
 
       row.status = UploadDocumentStatus.PARSING;
       row.percent_complete = UPLOAD_PROGRESS.PARSING;
       const parsing = await this.withDbRetry(
         () => this.uploadedDocumentAction.saveDocument(row!),
-        `uploadId=${uploadId}`,
+        `uploadId=${uploadId} storagePath=${storagePath}`,
       );
 
       // FR-06: Do NOT wait for extraction. Dispatch extraction job.
@@ -185,7 +186,11 @@ export class UploadService {
       return { ok: false, errorMessage: 'Uploaded file is empty.' };
     }
     if (file.size > MAX_UPLOAD_BYTES) {
-      return { ok: false, errorMessage: SYS_MSG.UPLOAD_FILE_TOO_LARGE };
+      return {
+        ok: false,
+        errorMessage: SYS_MSG.UPLOAD_FILE_TOO_LARGE,
+        errorFields: { file: { actualSize: file.size, maxSize: MAX_UPLOAD_BYTES } },
+      };
     }
     const fileType = await this.detectFileType(file);
     if (!fileType) {
@@ -320,6 +325,7 @@ export class UploadService {
       status: row.status,
       percentComplete: row.percent_complete,
       uploadedAt: row.created_at.toISOString(),
+      failureReason: row.failure_reason,
     };
   }
 }

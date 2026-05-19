@@ -17,7 +17,6 @@ export enum UploadDocumentStatus {
 
 // --- API responses (camelCase) ---
 export interface UploadItemResponse {
- 
   uploadId?: string;
   fileName: string;
   fileType?: UploadFileType;
@@ -25,6 +24,7 @@ export interface UploadItemResponse {
   status: UploadDocumentStatus;
   percentComplete: number;
   errorMessage?: string;
+  errorFields?: Record<string, unknown>;
 }
 
 /** POST /funnels/upload response envelope. */
@@ -46,7 +46,7 @@ export interface UploadProgressResponse {
   status: UploadDocumentStatus;
   percentComplete: number;
   uploadedAt: string;
-  errorMessage?: string;
+  failureReason?: string | null;
 }
 
 // --- Object storage port (MinIO) ---
@@ -72,7 +72,7 @@ export const UPLOAD_OBJECT_STORAGE = Symbol('UPLOAD_OBJECT_STORAGE');
 
 export type FileValidationResult =
   | { ok: true; fileType: UploadFileType }
-  | { ok: false; errorMessage: string };
+  | { ok: false; errorMessage: string; errorFields?: Record<string, unknown> };
 
 /** JSZip slide entry used when parsing PPTX. */
 export interface PptxZipFile {

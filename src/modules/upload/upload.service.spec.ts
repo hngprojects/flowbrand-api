@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   HttpStatus,
   NotFoundException,
   UnprocessableEntityException,
@@ -149,12 +148,12 @@ describe('UploadService', () => {
   });
 
   describe('handleUpload', () => {
-    it('throws BadRequestException when no files are provided', async () => {
+    it('throws UnprocessableEntityException when no files are provided', async () => {
       await expect(service.handleUpload(USER_ID, undefined)).rejects.toThrow(
-        BadRequestException,
+        UnprocessableEntityException,
       );
       await expect(service.handleUpload(USER_ID, [])).rejects.toThrow(
-        BadRequestException,
+        UnprocessableEntityException,
       );
     });
 
@@ -281,6 +280,7 @@ describe('UploadService', () => {
         status: UploadDocumentStatus.READY,
         percentComplete: UPLOAD_PROGRESS.READY,
         uploadedAt: '2026-05-16T12:00:00.000Z',
+        failureReason: null,
       });
     });
   });
