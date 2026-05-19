@@ -11,7 +11,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
+import type { Queue } from 'bull';
 import { JOBS, QUEUES } from '../../common/constants/queue.constants';
 import * as SYS_MSG from '../../constants/system.messages';
 import { UploadedDocumentModelAction } from './actions/uploaded-document.action';
@@ -131,11 +131,17 @@ export class UploadService {
       objectWritten = true;
       this.cleanupTempFile(file.path);
 
-      row.percent_complete = UPLOAD_PROGRESS.STORED;
-      await this.uploadedDocumentAction.saveDocument(row);
+      await this.withDbRetry(
+        () => this.uploadedDocumentAction.updateProgress(uploadId, UPLOAD_PROGRESS.STORED),
+        `uploadId=${uploadId}`,
+      );
+
       row.status = UploadDocumentStatus.PARSING;
       row.percent_complete = UPLOAD_PROGRESS.PARSING;
-      const parsing = await this.uploadedDocumentAction.saveDocument(row);
+      const parsing = await this.withDbRetry(
+        () => this.uploadedDocumentAction.saveDocument(row!),
+        `uploadId=${uploadId}`,
+      );
 
       // FR-06: Do NOT wait for extraction. Dispatch extraction job.
       await this.extractionQueue.add(JOBS.EXTRACT_TEXT, {
@@ -280,6 +286,31 @@ export class UploadService {
       percentComplete: row.percent_complete,
     };
   }
+  private async withDbRetry<T>(
+    operation: () => Promise<T>,
+    context: string,
+    maxRetries = 3,
+    delayMs = 1000,
+  ): Promise<T> {
+    let lastErr: unknown;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (err) {
+        lastErr = err;
+        if (attempt < maxRetries) {
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+      }
+    }
+    this.logger.error({
+      event: 'orphan_upload',
+      message: `DB update failed after ${maxRetries} attempts — storage object may be orphaned`,
+      context,
+    });
+    throw lastErr;
+  }
+
   private mapRowToProgress(row: UploadedDocument): UploadProgressResponse {
     return {
       uploadId: row.id,
