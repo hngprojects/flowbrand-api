@@ -10,6 +10,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import * as SYS_MSG from '../../constants/system.messages';
+import { STATUS_CODES } from 'node:http';
 
 /**
  * Decorator factories for Funnel Display API endpoints
@@ -64,6 +65,7 @@ export function GetStageDetailDecorators() {
 
 export const funnelListExample = {
   success: true,
+  statusCode: HttpStatus.OK,
   data: {
     funnels: [
       {
@@ -86,6 +88,7 @@ export const funnelListExample = {
 
 export const funnelFullExample = {
   success: true,
+  statusCode: HttpStatus.OK,
   data: {
     funnelId: '550e8400-e29b-41d4-a716-446655440001',
     businessName: 'Acme Studio',
@@ -113,6 +116,7 @@ export const funnelFullExample = {
 
 export const funnelStagesSummaryExample = {
   success: true,
+  statusCode: HttpStatus.OK,
   data: [
     {
       stageId: '550e8400-e29b-41d4-a716-446655440010',
@@ -130,6 +134,7 @@ export const funnelStagesSummaryExample = {
 
 export const funnelStageDetailExample = {
   success: true,
+  statusCode: HttpStatus.OK,
   data: {
     stageId: '550e8400-e29b-41d4-a716-446655440010',
     position: 2,
