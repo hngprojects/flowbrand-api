@@ -102,7 +102,6 @@ export const STAGE_LOCKED = (stageName: string, priorStageName: string) =>
   `The ${stageName} stage is locked. Complete all tasks in ${priorStageName} and mark it complete to unlock.`;
 
 // Funnel Display APIs
-export const FUNNEL_NOT_FOUND = 'Funnel not found or not owned by you';
 export const FUNNEL_RETRIEVED_SUCCESSFULLY = 'Funnel retrieved successfully';
 export const FUNNELS_RETRIEVED_SUCCESSFULLY = 'Funnels retrieved successfully';
 export const FUNNEL_STAGES_RETRIEVED_SUCCESSFULLY = 'Funnel stages retrieved successfully';
@@ -153,3 +152,21 @@ export const AI_PROVIDER_TIMEOUT = (provider: string, timeoutMs: number) =>
   `${provider} request timed out after ${timeoutMs} milliseconds`;
 
 export const AI_PROVIDER_HTTP_ERROR = (provider: string, status: number) => `${provider} HTTP ${status}`;
+
+// Funnel generation (BE-305)
+export const FUNNEL_GENERATION_STARTED = 'Funnel generation started.';
+export const FUNNEL_ALREADY_EXISTS = 'Funnel already exists.';
+export const GENERATION_IN_PROGRESS =
+  'A funnel is already being generated for your account.';
+export const FUNNEL_NOT_FOUND = 'Funnel not found.';
+export const FUNNEL_STATUS_RETRIEVED = 'Funnel status retrieved.';
+export const GENERATION_SERVICE_UNAVAILABLE =
+  'Funnel generation service is temporarily unavailable. Please try again shortly.';
+export const GENERATION_RATE_LIMIT_EXCEEDED =
+  'You have started too many funnel generations recently. Please wait and try again.';
+export const UPLOAD_NOT_READY =
+  'One or more uploaded documents are not yet ready for funnel generation.';
+export const UPLOAD_OWNERSHIP_INVALID =
+  'One or more uploaded documents do not belong to you.';
+export const GENERATION_FAILED =
+  'Funnel generation failed. Please retry from the dashboard.';
