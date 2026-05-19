@@ -21,16 +21,13 @@ import { UploadDocumentStatus } from './upload.types';
 import { DocumentTextExtractorService } from './services/document-text-extractor.service';
 import {
   UPLOAD_OBJECT_STORAGE,
+  type FileValidationResult,
   type ObjectStorage,
   type UploadBatchResponse,
   type UploadItemResponse,
   type UploadProgressResponse,
   type UploadFileType,
 } from './upload.types';
-
-type FileValidationResult =
-  | { ok: true; fileType: UploadFileType }
-  | { ok: false; errorMessage: string };
 @Injectable()
 export class UploadService {
   private readonly logger = new Logger(UploadService.name);
@@ -89,7 +86,7 @@ export class UploadService {
     return this.mapRowToProgress(row);
   }
   private async processOneFile(userId: string, file: Express.Multer.File,index: number): Promise<UploadItemResponse> {
-    const validation = this.validateFile(file, index);
+    const validation = this.validateFile(file);
     if (!validation.ok) {
       return {
         fileName: file.originalname,
@@ -123,9 +120,12 @@ export class UploadService {
         contentLength: file.size,
       });
       objectWritten = true;
+      row.percent_complete = UPLOAD_PROGRESS.STORED;
+      await this.uploadedDocumentAction.saveDocument(row);
       row.status = UploadDocumentStatus.PARSING;
       row.percent_complete = UPLOAD_PROGRESS.PARSING;
       const parsing = await this.uploadedDocumentAction.saveDocument(row);
+      // Fire-and-forget: durable parsing (e.g. BullMQ) is a follow-up; process crash can leave parsing at 50%.
       void this.completeParsing(parsing, file.buffer, fileType, storagePath);
       return this.mapRowToUploadItem(parsing);
     } catch (error) {
@@ -178,7 +178,7 @@ export class UploadService {
   private buildStoragePath(userId: string, uploadId: string, fileType: UploadFileType): string {
     return path.posix.join('funnels', userId, `${uploadId}.${fileType}`);
   }
-  private validateFile(file: Express.Multer.File, _index: number): FileValidationResult {
+  private validateFile(file: Express.Multer.File): FileValidationResult {
     if (file.size > MAX_UPLOAD_BYTES) {
       return { ok: false, errorMessage: SYS_MSG.UPLOAD_FILE_TOO_LARGE };
     }

@@ -1,7 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
+import JSZip from 'jszip';
 import mammoth from 'mammoth';
 import { PDFParse } from 'pdf-parse';
-import type { UploadFileType } from '../upload.types';
+import * as SYS_MSG from '../../../constants/system.messages';
+import type { PptxZip, UploadFileType } from '../upload.types';
 
 const MAX_PARSED_TEXT_CHARS = 2_000_000;
 
@@ -20,21 +22,27 @@ export class DocumentTextExtractorService {
         text = await this.extractDocx(buffer);
         break;
       case 'doc':
-        text = await this.extractDocx(buffer);
+        text = this.extractDocLegacy(buffer);
         break;
       case 'pptx':
         text = await this.extractPptx(buffer);
         break;
       case 'ppt':
-        text = await this.extractPptLegacy(buffer);
+        text = this.extractPptLegacy(buffer);
         break;
       default:
-        throw new Error(`Unsupported file type for parsing: ${fileType}`);
+        throw new UnprocessableEntityException({
+          error: 'UnprocessableEntityException',
+          message: SYS_MSG.FUNNEL_UPLOAD_UNSUPPORTED_FILE_TYPE,
+        });
     }
 
     const normalized = text.replace(/\s+/g, ' ').trim();
     if (!normalized) {
-      throw new Error('No extractable text found in document');
+      throw new UnprocessableEntityException({
+        error: 'UnprocessableEntityException',
+        message: SYS_MSG.FUNNEL_UPLOAD_NO_EXTRACTABLE_TEXT,
+      });
     }
 
     if (normalized.length > MAX_PARSED_TEXT_CHARS) {
@@ -66,21 +74,27 @@ export class DocumentTextExtractorService {
 
   /** PPTX is a ZIP of slide XML files; extract visible text from `<a:t>` nodes. */
   private async extractPptx(buffer: Buffer): Promise<string> {
-    const { default: JSZip } = await import('jszip');
-    const zip = await JSZip.loadAsync(buffer);
+    const zip = (await JSZip.loadAsync(buffer)) as PptxZip;
     const slidePaths = Object.keys(zip.files)
       .filter((name) => /^ppt\/slides\/slide\d+\.xml$/i.test(name))
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
     if (!slidePaths.length) {
-      throw new Error('No slides found in presentation');
+      throw new UnprocessableEntityException({
+        error: 'UnprocessableEntityException',
+        message: SYS_MSG.FUNNEL_UPLOAD_NO_SLIDES,
+      });
     }
 
     const chunks: string[] = [];
     for (const path of slidePaths) {
-      const xml = await zip.files[path].async('string');
+      const entry = zip.files[path];
+      if (!entry) {
+        continue;
+      }
+      const xml = await entry.async('string');
       const slideText = [...xml.matchAll(/<a:t[^>]*>([^<]*)<\/a:t>/g)]
-        .map((match) => match[1])
+        .map((match) => match[1] ?? '')
         .join(' ')
         .trim();
       if (slideText) {
@@ -91,10 +105,16 @@ export class DocumentTextExtractorService {
     return chunks.join('\n\n');
   }
 
-  /**
-   * Legacy `.ppt` (OLE) has no reliable parser in-repo; use coarse text extraction.
-   */
+
+  private extractDocLegacy(buffer: Buffer): string {
+    return this.extractOleLegacy(buffer);
+  }
+  
   private extractPptLegacy(buffer: Buffer): string {
+    return this.extractOleLegacy(buffer);
+  }
+
+  private extractOleLegacy(buffer: Buffer): string {
     const raw = buffer.toString('latin1');
     const runs = [...raw.matchAll(/[\x20-\x7E]{4,}/g)].map((m) => m[0]);
     const filtered = runs.filter(

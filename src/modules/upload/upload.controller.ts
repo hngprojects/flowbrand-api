@@ -1,26 +1,11 @@
-import {
-  Controller,
-  Get,
-  Param,
-  ParseUUIDPipe,
-  Post,
-  Res,
-  UploadedFiles,
-  UseInterceptors,
-} from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Post, Res, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { memoryStorage } from 'multer';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import {
-  MAX_FILES_PER_UPLOAD,
-  MAX_UPLOAD_BYTES,
-} from './constants/upload.constants';
-import {
-  GetFunnelUploadProgressDocs,
-  UploadFunnelDocumentsDocs,
-} from './docs/upload-swagger.doc';
+import { MAX_FILES_PER_UPLOAD, MAX_UPLOAD_BYTES } from './constants/upload.constants';
+import { GetFunnelUploadProgressDocs, UploadFunnelDocumentsDocs } from './docs/upload-swagger.doc';
 import { UploadService } from './upload.service';
 
 const uploadInterceptor = FilesInterceptor('files', MAX_FILES_PER_UPLOAD, {
@@ -45,8 +30,7 @@ export class UploadController {
     @UploadedFiles() files: Express.Multer.File[] | undefined,
     @Res() res: Response,
   ): Promise<void> {
-    const { statusCode, message, data } =
-      await this.uploadService.handleUpload(userId, files);
+    const { statusCode, message, data } = await this.uploadService.handleUpload(userId, files);
 
     res.status(statusCode).json({
       statusCode,
@@ -57,10 +41,7 @@ export class UploadController {
 
   @Get('upload/progress/:uploadId')
   @GetFunnelUploadProgressDocs()
-  getProgress(
-    @CurrentUser('sub') userId: string,
-    @Param('uploadId', ParseUUIDPipe) uploadId: string,
-  ) {
+  getProgress(@CurrentUser('sub') userId: string, @Param('uploadId', ParseUUIDPipe) uploadId: string) {
     return this.uploadService.getProgress(userId, uploadId);
   }
 }

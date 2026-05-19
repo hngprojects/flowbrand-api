@@ -78,18 +78,17 @@ export const GetFunnelUploadProgressDocs = () =>
     }),
     ApiResponse({
       status: HttpStatus.OK,
+      description:
+        'Flat progress object (no statusCode/message/data envelope — unlike POST /funnels/upload).',
       schema: {
         example: {
-          success: true,
-          data: {
-            uploadId: uploadItemExample.uploadId,
-            fileName: uploadItemExample.fileName,
-            fileType: uploadItemExample.fileType,
-            fileSizeBytes: uploadItemExample.fileSizeBytes,
-            status: UploadDocumentStatus.READY,
-            percentComplete: 100,
-            uploadedAt: '2026-05-16T12:00:00.000Z',
-          },
+          uploadId: uploadItemExample.uploadId,
+          fileName: uploadItemExample.fileName,
+          fileType: uploadItemExample.fileType,
+          fileSizeBytes: uploadItemExample.fileSizeBytes,
+          status: UploadDocumentStatus.READY,
+          percentComplete: 100,
+          uploadedAt: '2026-05-16T12:00:00.000Z',
         },
       },
     }),

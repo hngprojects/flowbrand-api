@@ -14,24 +14,17 @@ export const UPLOAD_PROGRESS = {
   READY: 100,
 } as const;
 
-export const ALLOWED_UPLOAD_RULES: Record<
-  UploadFileType,
-  { ext: string; mimes: readonly string[] }
-> = {
+export const ALLOWED_UPLOAD_RULES: Record<UploadFileType, { ext: string; mimes: readonly string[] }> = {
   pdf: { ext: '.pdf', mimes: ['application/pdf'] },
   doc: { ext: '.doc', mimes: ['application/msword'] },
   docx: {
     ext: '.docx',
-    mimes: [
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    ],
+    mimes: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
   },
   ppt: { ext: '.ppt', mimes: ['application/vnd.ms-powerpoint'] },
   pptx: {
     ext: '.pptx',
-    mimes: [
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    ],
+    mimes: ['application/vnd.openxmlformats-officedocument.presentationml.presentation'],
   },
 };
 

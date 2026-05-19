@@ -13,9 +13,7 @@ export class UploadedDocumentModelAction extends AbstractModelAction<UploadedDoc
     super(uploadedDocumentRepository, UploadedDocument);
   }
 
-  async createDocument(
-    partial: Partial<UploadedDocument>,
-  ): Promise<UploadedDocument> {
+  async createDocument(partial: Partial<UploadedDocument>): Promise<UploadedDocument> {
     const row = this.uploadedDocumentRepository.create(partial);
     return this.uploadedDocumentRepository.save(row);
   }
@@ -24,10 +22,7 @@ export class UploadedDocumentModelAction extends AbstractModelAction<UploadedDoc
     return this.uploadedDocumentRepository.save(document);
   }
 
-  async findOwnedById(
-    uploadId: string,
-    userId: string,
-  ): Promise<UploadedDocument | null> {
+  async findOwnedById(uploadId: string, userId: string): Promise<UploadedDocument | null> {
     return this.uploadedDocumentRepository.findOne({
       select: {
         id: true,

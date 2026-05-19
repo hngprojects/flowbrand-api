@@ -61,6 +61,12 @@ export const FUNNEL_UPLOAD_FILES_REQUIRED =
   'At least one file is required in the files field';
 export const FUNNEL_UPLOAD_PARSE_FAILED =
   'Could not extract text from the uploaded document';
+export const FUNNEL_UPLOAD_UNSUPPORTED_FILE_TYPE =
+  'Unsupported file type for text extraction';
+export const FUNNEL_UPLOAD_NO_EXTRACTABLE_TEXT =
+  'No extractable text found in document';
+export const FUNNEL_UPLOAD_NO_SLIDES =
+  'No slides found in presentation';
 
 export const AI_GENERATION_FAILED = 'AI generation failed';
 

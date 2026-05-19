@@ -1,4 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
+import type { Client } from 'minio';
 
 // --- Domain types ---
 
@@ -63,3 +64,33 @@ export interface ObjectStorage {
 
 /** Nest injection token for `ObjectStorage`. */
 export const UPLOAD_OBJECT_STORAGE = Symbol('UPLOAD_OBJECT_STORAGE');
+
+// --- Service-internal types ---
+
+export type FileValidationResult =
+  | { ok: true; fileType: UploadFileType }
+  | { ok: false; errorMessage: string };
+
+/** JSZip slide entry used when parsing PPTX. */
+export interface PptxZipFile {
+  async(type: 'string'): Promise<string>;
+}
+
+/** Loaded PPTX archive (ZIP) handle. */
+export interface PptxZip {
+  files: Record<string, PptxZipFile>;
+}
+
+/** Resolved MinIO client settings (cached after first use). */
+export interface MinioClientConfig {
+  client: Client;
+  bucket: string;
+  region: string;
+}
+
+/** Parsed `UPLOAD_STORAGE_ENDPOINT` URL parts for the MinIO client. */
+export interface StorageEndpointConfig {
+  endPoint: string;
+  port: number;
+  useSSL: boolean;
+}

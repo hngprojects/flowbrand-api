@@ -9,19 +9,14 @@ import {
   UPLOAD_STORAGE_DEFAULT_REGION,
   UPLOAD_STORAGE_ENV,
 } from '../constants/upload.constants';
-import type { ObjectStorage, StoragePutParams } from '../upload.types';
+import type {
+  MinioClientConfig,
+  ObjectStorage,
+  StorageEndpointConfig,
+  StoragePutParams,
+} from '../upload.types';
 
-interface MinioClientConfig {
-  client: Minio.Client;
-  bucket: string;
-  region: string;
-}
-
-function parseStorageEndpoint(endpoint: string): {
-  endPoint: string;
-  port: number;
-  useSSL: boolean;
-} {
+function parseStorageEndpoint(endpoint: string): StorageEndpointConfig {
   const url = new URL(endpoint);
   const useSSL = url.protocol === 'https:';
   const port = url.port
@@ -47,9 +42,17 @@ export class MinioUploadStorageService implements ObjectStorage, OnModuleInit {
     try {
       await this.ensureBucketExists();
     } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+   
+      if (process.env.NODE_ENV === 'production') {
+        throw new InternalServerErrorException(
+          `Upload object storage is unavailable: ${detail}`,
+        );
+      }
+   
       this.logger.warn(
         'Upload storage bucket check failed — uploads will fail until MinIO is running and env is set',
-        error instanceof Error ? error.message : error,
+        detail,
       );
     }
   }
