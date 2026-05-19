@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class InitialSchema1779182593888 implements MigrationInterface {
-    name = 'InitialSchema1779182593888'
+export class InitialSchema1779184094833 implements MigrationInterface {
+    name = 'InitialSchema1779184094833'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`CREATE TABLE "waitlists" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "email" character varying(255) NOT NULL, "is_notified" boolean NOT NULL DEFAULT false, CONSTRAINT "PK_d825b8fcdb753fda136c4039b3a" PRIMARY KEY ("id"))`);
@@ -28,6 +28,8 @@ export class InitialSchema1779182593888 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_142b9b0473faf7fd4d4f4da2d0" ON "funnel_stages" ("funnel_id") `);
         await queryRunner.query(`CREATE TABLE "stage_tasks" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "stage_id" uuid NOT NULL, "task_text" text NOT NULL, "is_complete" boolean NOT NULL DEFAULT false, "completed_at" TIMESTAMP WITH TIME ZONE, CONSTRAINT "PK_a9c5f0fa5f644c76b5322b2034b" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_facb1a996194dc40dfd64b301e" ON "stage_tasks" ("stage_id") `);
+        await queryRunner.query(`CREATE TYPE "public"."contacts_status_enum" AS ENUM('pending', 'reviewed', 'resolved')`);
+        await queryRunner.query(`CREATE TABLE "contacts" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "full_name" character varying(255) NOT NULL, "email" character varying(255) NOT NULL, "business_name" character varying(255), "message" text NOT NULL, "status" "public"."contacts_status_enum" NOT NULL DEFAULT 'pending', CONSTRAINT "PK_b99cd40cfd66a99f1571f4f72e6" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TYPE "public"."otp_tokens_type_enum" AS ENUM('email_verification', 'password_reset')`);
         await queryRunner.query(`CREATE TABLE "otp_tokens" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "user_id" uuid NOT NULL, "type" "public"."otp_tokens_type_enum" NOT NULL, "token_hash" text NOT NULL, "expires_at" TIMESTAMP WITH TIME ZONE NOT NULL, CONSTRAINT "PK_424fa4c4152eafc0b2d929e138d" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_7003728e208144a06a974b2dbe" ON "otp_tokens" ("user_id") `);
@@ -53,6 +55,8 @@ export class InitialSchema1779182593888 implements MigrationInterface {
         await queryRunner.query(`DROP INDEX "public"."IDX_7003728e208144a06a974b2dbe"`);
         await queryRunner.query(`DROP TABLE "otp_tokens"`);
         await queryRunner.query(`DROP TYPE "public"."otp_tokens_type_enum"`);
+        await queryRunner.query(`DROP TABLE "contacts"`);
+        await queryRunner.query(`DROP TYPE "public"."contacts_status_enum"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_facb1a996194dc40dfd64b301e"`);
         await queryRunner.query(`DROP TABLE "stage_tasks"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_142b9b0473faf7fd4d4f4da2d0"`);
