@@ -246,7 +246,7 @@ describe('FunnelGenerationProcessor', () => {
 
   // EC-05: Idempotency guard 
 
-  describe('EC-05 — ACTIVE funnel skipped', () => {
+  describe('EC-05 — Idempotency guard', () => {
     it('returns early without calling LLM when funnel is already ACTIVE', async () => {
       mockFunnelAction.get.mockResolvedValue({ id: 'funnel-uuid', status: FunnelStatus.ACTIVE });
 
@@ -255,9 +255,16 @@ describe('FunnelGenerationProcessor', () => {
       expect(mockLlmService.generateWithGemini).not.toHaveBeenCalled();
       expect(mockQueryRunner.startTransaction).not.toHaveBeenCalled();
     });
-  });
 
-  // EC-04: Stage not found in DB 
+    it('returns early without calling LLM when funnel is already FAILED', async () => {
+      mockFunnelAction.get.mockResolvedValue({ id: 'funnel-uuid', status: FunnelStatus.FAILED });
+
+      await processor.handleGenerateFunnel(makeJob());
+
+      expect(mockLlmService.generateWithGemini).not.toHaveBeenCalled();
+      expect(mockQueryRunner.startTransaction).not.toHaveBeenCalled();
+    });
+  });
 
   describe('EC-04 — Stage record not found triggers rollback', () => {
     it('rolls back if a stage is missing from funnel_stages', async () => {
@@ -268,6 +275,27 @@ describe('FunnelGenerationProcessor', () => {
 
       expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalledTimes(1);
       expect(mockQueryRunner.release).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // Hook logging 
+
+  describe('Hook logging', () => {
+    it('FR-11: onCompleted logs duration', () => {
+      const loggerSpy = jest.spyOn((processor as any).logger, 'log');
+      const job = makeJob({
+        processedOn: 1000,
+        finishedOn: 2500,
+      });
+
+      processor.onCompleted(job);
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'funnel_job_completed',
+          duration: 1500,
+        }),
+      );
     });
   });
 });
