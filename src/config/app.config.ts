@@ -6,4 +6,5 @@ export const appConfig = registerAs('app', () => ({
   port: env.PORT,
   corsOrigin: env.CORS_ORIGIN,
   swaggerEnabled: env.SWAGGER_ENABLED,
+  contactAdminEmail: env.CONTACT_ADMIN_EMAIL,
 }));
