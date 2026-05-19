@@ -22,6 +22,7 @@ const SESSION_1 = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const mockWizardSessionModelAction = {
   resolveStartWizardSession: jest.fn(),
   findSessionById: jest.fn(),
+  markAsExpired: jest.fn(),
 };
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -67,6 +68,7 @@ describe('OnboardingService — getOnboardingSession (BE-009)', () => {
       providers: [
         OnboardingService,
         { provide: WizardSessionModelAction, useValue: mockAction },
+        { provide: DataSource, useValue: { transaction: jest.fn() } },
       ],
     }).compile();
 
@@ -106,14 +108,6 @@ describe('OnboardingService — getOnboardingSession (BE-009)', () => {
     expect(Object.values(result.answers).every(v => v !== null)).toBe(true);
   });
 });
-
-// ── startWizardSession (BE-007) ───────────────────────────────────────────────
-
-const mockWizardSessionModelAction = {
-  resolveStartWizardSession: jest.fn(),
-  findActiveSession: jest.fn(),
-  markAsExpired: jest.fn(),
-};
 
 describe('OnboardingService — startWizardSession (edge cases)', () => {
   let service: OnboardingService;
@@ -351,7 +345,7 @@ describe('OnboardingService — completeOnboarding', () => {
     const result = await service.completeOnboarding(USER_ID, SESSION_ID);
 
     expect(result).toEqual({
-      status_code: HttpStatus.OK,
+      statusCode: HttpStatus.OK,
       message: SYS_MSG.ONBOARDING_COMPLETE_SUCCESS,
       data: { redirect: { to: 'funnel_generation' } },
     });
@@ -572,5 +566,155 @@ describe('OnboardingService — completeOnboarding', () => {
     await expect(
       service.completeOnboarding(USER_ID, SESSION_ID),
     ).rejects.toThrow('DB failure');
+  });
+});
+
+describe('OnboardingService — saveStepAnswer (BE-008)', () => {
+  let service: OnboardingService;
+  let mockDataSource: any;
+
+  const USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const SESSION_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+
+  const mockSaveSessionAction = {
+    findSessionById: jest.fn(),
+    saveSession: jest.fn(),
+    findActiveSession: jest.fn(),
+    markAsExpired: jest.fn(),
+    resolveStartWizardSession: jest.fn(),
+  };
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+
+    mockDataSource = { transaction: jest.fn() };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OnboardingService,
+        { provide: WizardSessionModelAction, useValue: mockSaveSessionAction },
+        { provide: DataSource, useValue: mockDataSource },
+      ],
+    }).compile();
+
+    service = module.get<OnboardingService>(OnboardingService);
+  });
+
+  it('AC-01: throws 404 when session does not belong to user', async () => {
+    mockSaveSessionAction.findSessionById.mockResolvedValue(null);
+    await expect(
+      service.saveStepAnswer(USER_ID, {
+        session_id: SESSION_ID, step: 1, answer: { business_description: 'test' }
+      } as any)
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('AC-02: throws 403 when session is expired', async () => {
+    mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession({ status: WizardStatus.EXPIRED }));
+    await expect(
+      service.saveStepAnswer(USER_ID, {
+        session_id: SESSION_ID, step: 1, answer: { business_description: 'test' }
+      } as any)
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('AC-03: throws 409 when session is already complete', async () => {
+    mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession({ status: WizardStatus.COMPLETE }));
+    await expect(
+      service.saveStepAnswer(USER_ID, {
+        session_id: SESSION_ID, step: 1, answer: { business_description: 'test' }
+      } as any)
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('AC-04: saves step 1 answer and returns 200 with steps_completed = 1', async () => {
+    mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession());
+    mockSaveSessionAction.saveSession.mockResolvedValue(undefined);
+
+    const result = await service.saveStepAnswer(USER_ID, {
+      session_id: SESSION_ID, step: 1, answer: { business_description: 'We sell handmade shoes' }
+    } as any);
+
+    expect(result.statusCode).toBe(HttpStatus.OK);
+    expect(result.message).toBe(SYS_MSG.ONBOARDING_STEP_SAVED);
+    expect(result.data.answers).toHaveProperty('step_1');
+    expect(result.data.steps_completed).toBe(1);
+  });
+
+  it('AC-05: saves step 2 answer and returns 200 with steps_completed = 2', async () => {
+    mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession({
+      answers: { step_1: { business_description: 'We sell shoes' } },
+      steps_completed: 1,
+    }));
+    mockSaveSessionAction.saveSession.mockResolvedValue(undefined);
+
+    const result = await service.saveStepAnswer(USER_ID, {
+      session_id: SESSION_ID, step: 2, answer: { customer_tags: { type: ['retail'] } }
+    } as any);
+
+    expect(result.statusCode).toBe(HttpStatus.OK);
+    expect(result.data.answers).toHaveProperty('step_2');
+    expect(result.data.steps_completed).toBe(2);
+  });
+
+  it('AC-06: saves step 3 answer and returns 200 with steps_completed = 3', async () => {
+    mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession({
+      answers: {
+        step_1: { business_description: 'We sell shoes' },
+        step_2: { customer_tags: { type: ['retail'] } },
+      },
+      steps_completed: 2,
+    }));
+    mockSaveSessionAction.saveSession.mockResolvedValue(undefined);
+
+    const result = await service.saveStepAnswer(USER_ID, {
+      session_id: SESSION_ID, step: 3, answer: { discovery_channel: 'Instagram' }
+    } as any);
+
+    expect(result.statusCode).toBe(HttpStatus.OK);
+    expect(result.data.answers).toHaveProperty('step_3');
+    expect(result.data.steps_completed).toBe(3);
+  });
+
+  it('AC-07: calling step 1 again overwrites previous answer — steps_completed stays same', async () => {
+    mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession({
+      answers: { step_1: { business_description: 'Old answer' } },
+      steps_completed: 1,
+    }));
+    mockSaveSessionAction.saveSession.mockResolvedValue(undefined);
+
+    const result = await service.saveStepAnswer(USER_ID, {
+      session_id: SESSION_ID, step: 1, answer: { business_description: 'New answer' }
+    } as any);
+
+    expect((result.data.answers as any).step_1).toEqual({ business_description: 'New answer' });
+    expect(result.data.steps_completed).toBe(1);
+  });
+
+  it('AC-08: throws 422 when step 1 business_description exceeds 500 characters', async () => {
+    mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession());
+    await expect(
+      service.saveStepAnswer(USER_ID, {
+        session_id: SESSION_ID, step: 1, answer: { business_description: 'x'.repeat(501) }
+      } as any)
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('AC-09: throws 422 when step 2 customer_tags.type is empty array', async () => {
+    mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession());
+    await expect(
+      service.saveStepAnswer(USER_ID, {
+        session_id: SESSION_ID, step: 2, answer: { customer_tags: { type: [] } }
+      } as any)
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('AC-10: throws 422 when step 3 discovery_channel is invalid', async () => {
+    mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession());
+    await expect(
+      service.saveStepAnswer(USER_ID, {
+        session_id: SESSION_ID, step: 3, answer: { discovery_channel: 'Twitter' }
+      } as any)
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 });
