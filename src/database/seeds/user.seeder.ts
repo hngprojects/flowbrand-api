@@ -1,7 +1,9 @@
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
-import { User, UserRole } from '../../modules/users/entities/user.entity';
+import { User } from '../../modules/users/entities/user.entity';
 import { Seeder } from './seeder.interface';
+import { UserRole } from '../../modules/users/enums/user-role.enum';
+import { UserRoleEntity } from '../../modules/users/entities/user-role.entity';
 
 export const userSeeder: Seeder = {
   name: 'UserSeeder',
@@ -17,11 +19,13 @@ export const userSeeder: Seeder = {
 
     const admin = repository.create({
       email: adminEmail,
-      password: await bcrypt.hash('Admin@123456', 10),
-      fullName: 'Admin User',
-      role: UserRole.ADMIN,
+      password_hash: await bcrypt.hash('Admin@123456', 10),
+      full_name: 'Admin User',
+      termsAccepted: true,
     });
-    await repository.save(admin);
-    console.log(`[UserSeeder] created admin user → ${adminEmail} / Admin@123456`);
+    const savedAdmin = await repository.save(admin);
+
+    const roleRepostory = dataSource.getRepository(UserRoleEntity);
+    await roleRepostory.save({ user_id: savedAdmin.id, role: UserRole.ADMIN });
   },
 };

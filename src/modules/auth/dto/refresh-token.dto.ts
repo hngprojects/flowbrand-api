@@ -1,8 +1,12 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsJWT } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsJWT, IsOptional } from 'class-validator';
 
 export class RefreshTokenDto {
-  @ApiProperty()
+  @ApiPropertyOptional({
+    description:
+      'Optional. If omitted, the server falls back to the HttpOnly `refreshToken` cookie set on login.',
+  })
+  @IsOptional()
   @IsJWT()
-  refreshToken: string;
+  refreshToken?: string;
 }

@@ -42,6 +42,7 @@ lerna-debug.log*
 .env.test.local
 .env.production.local
 .env.local
+.env.github
 
 # temp directory
 .temp
@@ -53,3 +54,4 @@ pids
 *.seed
 *.pid.lock
 
+pnpm-lock.yaml
