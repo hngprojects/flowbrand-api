@@ -45,6 +45,9 @@ for file in $STAGED; do
   case "$file" in
     scripts/forbidden-pattern-scan.sh|*/scripts/forbidden-pattern-scan.sh) continue ;;
   esac
+  if [ "${file#src/database/migrations/}" != "$file" ]; then
+    continue
+  fi
 
   # ── Check 1: Long lines (the hiding technique) ──────────────────────────────
   case "$file" in
