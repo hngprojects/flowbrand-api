@@ -1,6 +1,7 @@
 export type EmailType =
   | 'otp-verification'
   | 'otp-reset'
+  | 'password-reset'
   | 'waitlist'
   | 'contact-confirmation'
   | 'contact-admin-notification';
@@ -37,7 +38,7 @@ interface BaseEmailJob {
 
 export type EmailJob = BaseEmailJob &
   (
-    | { type: 'otp-verification' | 'otp-reset'; payload: OtpPayload }
+    | { type: 'otp-verification' | 'otp-reset' | 'password-reset'; payload: OtpPayload }
     | { type: 'waitlist'; payload: WaitlistPayload }
     | { type: 'contact-confirmation'; payload: ContactConfirmationPayload }
     | { type: 'contact-admin-notification'; payload: ContactAdminNotificationPayload }

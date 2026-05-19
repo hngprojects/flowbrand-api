@@ -5,6 +5,8 @@ import {
   HttpStatus,
   Injectable,
   UnauthorizedException,
+  Logger,
+  Optional
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as crypto from 'crypto';
@@ -62,11 +64,13 @@ export class AuthService {
     private readonly authMetadataModelAction: AuthMetadataModelAction,
     private readonly otpTokenModelAction: OtpTokenModelAction,
     private readonly emailService: EmailService,
+    @Optional() private readonly logger = new Logger(AuthService.name),
   ) {}
 
   // Local minimal interface to avoid unsafe-call lint issues from third-party model action types
   private get userSessionAction(): {
     findById(id: string): Promise<UserSession | null>;
+    findByUserId(userId: string): Promise<UserSession[]>;
     updateById(
       id: string,
       payload: Partial<UserSession>,
@@ -389,6 +393,178 @@ export class AuthService {
     await this.redisService.set(cooldownKey, String(Date.now() + 30_000), 30);
 
     return { message: SYS_MSG.OTP_RESENT_SUCCESSFULLY };
+  }
+
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const user = await this.usersService.findByEmail(email);
+    
+    if (!user) {
+      this.logger.debug({ message: 'Password reset requested for non-existent email', email });
+      return { message: SYS_MSG.PASSWORD_RESET_OTP_SENT };
+    }
+    
+    if (!user.is_verified) {
+      this.logger.debug({ message: 'Password reset requested for unverified account', userId: user.id });
+      return { message: SYS_MSG.PASSWORD_RESET_OTP_SENT };
+    }
+    
+    const rateKey = `password-reset:rate:${user.id}`;
+    const newCount = await this.redisService.incr(rateKey);
+    if (newCount !== null) {
+      if (newCount === 1) {
+        await this.redisService.expire(rateKey, 900);
+      }
+      if (newCount > 3) {
+        this.logger.warn({ 
+          message: 'Password reset rate limit exceeded', 
+          userId: user.id, 
+          attempts: newCount 
+        });
+        throw new HttpException(
+          SYS_MSG.PASSWORD_RESET_RATE_LIMITED,
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+    }
+    
+    await this.generateAndSendPasswordResetOtp(user);
+    
+    return { message: SYS_MSG.PASSWORD_RESET_OTP_SENT };
+  }
+
+  private async generateAndSendPasswordResetOtp(user: User): Promise<void> {
+    const otpCode = crypto.randomInt(100000, 1000000);
+    const token_hash = await bcrypt.hash(String(otpCode), 10);
+   
+    await this.otpTokenAction.replaceToken({
+      user_id: user.id,
+      type: 'password_reset',
+      token_hash,
+      expires_at: new Date(Date.now() + 15 * 60 * 1000), 
+    });
+    
+    await this.emailService.sendPasswordReset(
+      user.email,
+      {
+        fullName: user.full_name,
+        otpCode: String(otpCode),
+        expiryMins: 15,
+      },
+      user.id,
+    );
+    
+    this.logger.log({
+      message: 'Password reset OTP generated and queued',
+      userId: user.id,
+      email: user.email,
+      expiresIn: '15 minutes',
+    });
+  }
+
+  async resetPassword(
+    email: string,
+    otpCode: string,
+    newPassword: string,
+  ): Promise<AuthResponse> {
+    const user = await this.usersService.findByEmail(email);
+    
+    if (!user) {
+      throw new BadRequestException(SYS_MSG.PASSWORD_RESET_INVALID_OTP);
+    }
+    
+    const attemptsKey = `password-reset:verify:${user.id}`;
+    const { exceeded } = await this.redisService.rateLimit(attemptsKey, 5, 300);
+    if (exceeded) {
+      this.logger.warn({ 
+        message: 'Password reset verify attempts exceeded', 
+        userId: user.id 
+      });
+      throw new HttpException(
+        SYS_MSG.PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    
+    const token = await this.otpTokenModelAction.findByUserAndType(
+      user.id,
+      'password_reset',
+    );
+    
+    if (!token) {
+      throw new BadRequestException(SYS_MSG.PASSWORD_RESET_INVALID_OTP);
+    }
+    
+    if (token.expires_at < new Date()) {
+      await this.otpTokenAction.delete({
+        identifierOptions: { user_id: user.id, type: 'password_reset' },
+        transactionOptions: { useTransaction: false },
+      });
+      this.logger.debug({ 
+        message: 'Expired password reset OTP used', 
+        userId: user.id,
+        expiredAt: token.expires_at
+      });
+      throw new BadRequestException(SYS_MSG.PASSWORD_RESET_EXPIRED);
+    }
+    
+    const codeMatches = await bcrypt.compare(otpCode, token.token_hash);
+    if (!codeMatches) {
+      throw new BadRequestException(SYS_MSG.PASSWORD_RESET_INVALID_OTP);
+    }
+    
+    await this.usersService.update(user.id, { password: newPassword });
+   
+    await this.otpTokenAction.delete({
+      identifierOptions: { user_id: user.id, type: 'password_reset' },
+      transactionOptions: { useTransaction: false },
+    });
+  
+    await this.revokeAllUserSessions(user.id);
+
+    await this.redisService.del(attemptsKey);
+    await this.redisService.del(`password-reset:rate:${user.id}`);
+   
+    const authResponse = await this.issueTokens(user);
+    
+    this.logger.log({
+      message: 'Password reset successful with auto-login',
+      userId: user.id,
+      email: user.email,
+    });
+    
+    return authResponse;
+  }
+
+  private async revokeAllUserSessions(userId: string): Promise<void> {
+    const sessions = await this.userSessionAction.findByUserId(userId);
+
+    if (!sessions || sessions.length === 0) {
+      this.logger.debug({
+        message: 'No active sessions found to revoke',
+        userId,
+      });
+      return;
+    }
+    
+    for (const session of sessions) {
+      if (!session.is_revoked) {
+        await this.userSessionAction.updateById(session.id, {
+          is_revoked: true,
+          revoked_at: new Date(),
+        });
+        
+        await Promise.all([
+          this.redisService.del(`active_session:${userId}:${session.id}`),
+          this.redisService.del(`sess:${userId}:${session.id}`),
+        ]);
+      }
+    }
+    
+    this.logger.debug({
+      message: `Revoked ${sessions.length} sessions for user`,
+      userId,
+      sessionCount: sessions.length,
+    });
   }
 
   private async generateAndSendOtp(user: User): Promise<void> {
