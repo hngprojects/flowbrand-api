@@ -10,7 +10,6 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import * as SYS_MSG from '../../constants/system.messages';
-import { STATUS_CODES } from 'node:http';
 
 /**
  * Decorator factories for Funnel Display API endpoints
