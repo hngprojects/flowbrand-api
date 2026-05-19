@@ -74,39 +74,54 @@ jobs:
           echo "APP_PATH=${{ vars.APP_PATH }}" >> "$GITHUB_ENV"
           echo "APP_NAME=${{ vars.APP_NAME }}" >> "$GITHUB_ENV"
 
-      - name: Set up SSH
-        run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "${{ secrets.HOST }}" >> ~/.ssh/known_hosts
-
       - name: Create app directory
-        run: |
-          ssh -i ~/.ssh/deploy_key "${{ secrets.USERNAME }}@${{ secrets.HOST }}" \
-            "mkdir -p '${{ env.APP_PATH }}'"
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: mkdir -p "${{ env.APP_PATH }}"
+
+      - name: Clean app directory
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            find "${{ env.APP_PATH }}" -mindepth 1 \
+              -maxdepth 1 \
+              ! -name ".env" \
+              ! -name "node_modules" \
+              -exec rm -rf {} +
 
       - name: Copy project files
-        run: |
-          rsync -az --delete \
-            --exclude=".git" \
-            --exclude="node_modules" \
-            --exclude="dist" \
-            --exclude=".env" \
-            -e "ssh -i ~/.ssh/deploy_key" \
-            ./ "${{ secrets.USERNAME }}@${{ secrets.HOST }}:${{ env.APP_PATH }}/"
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "."
+          target: ${{ env.APP_PATH }}
+          overwrite: true
+          strip_components: 0
+          exclude: ".git,node_modules,dist,.env"
 
       - name: Install, build, and restart app
-        run: |
-          ssh -i ~/.ssh/deploy_key "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "set -e
-            cd '${{ env.APP_PATH }}'
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -e
+            cd "${{ env.APP_PATH }}"
             if [ ! -f .env ]; then
-              echo '.env file is missing on the server.'
+              echo ".env file is missing on the server."
               exit 1
             fi
             corepack enable
             pnpm install --frozen-lockfile --prod=false
             pnpm build
-            pm2 restart '${{ env.APP_NAME }}' || pm2 start pnpm --name '${{ env.APP_NAME }}' -- start:prod
-            pm2 save"
+            pm2 restart "${{ env.APP_NAME }}" || pm2 start pnpm --name "${{ env.APP_NAME }}" -- start:prod
+            pm2 save
