@@ -10,6 +10,9 @@ import {
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
+import { JOBS, QUEUES } from '../../common/constants/queue.constants';
 import * as SYS_MSG from '../../constants/system.messages';
 import { UploadedDocumentModelAction } from './actions/uploaded-document.action';
 import {
@@ -19,7 +22,6 @@ import {
 } from './constants/upload.constants';
 import { UploadedDocument } from './entities/uploaded-document.entity';
 import { UploadDocumentStatus } from './upload.types';
-import { DocumentTextExtractorService } from './services/document-text-extractor.service';
 import {
   UPLOAD_OBJECT_STORAGE,
   type FileValidationResult,
@@ -29,12 +31,14 @@ import {
   type UploadProgressResponse,
   type UploadFileType,
 } from './upload.types';
+
 @Injectable()
 export class UploadService {
   private readonly logger = new Logger(UploadService.name);
   constructor(
     private readonly uploadedDocumentAction: UploadedDocumentModelAction,
-    private readonly documentTextExtractor: DocumentTextExtractorService,
+    @InjectQueue(QUEUES.DOCUMENT_EXTRACTION)
+    private readonly extractionQueue: Queue,
     @Inject(UPLOAD_OBJECT_STORAGE)
     private readonly objectStorage: ObjectStorage,
   ) {}
@@ -133,8 +137,13 @@ export class UploadService {
       row.percent_complete = UPLOAD_PROGRESS.PARSING;
       const parsing = await this.uploadedDocumentAction.saveDocument(row);
 
-      // This is still sync-await for now, will move to queue in Phase 3
-      await this.completeParsing(parsing, fileType, storagePath);
+      // FR-06: Do NOT wait for extraction. Dispatch extraction job.
+      await this.extractionQueue.add(JOBS.EXTRACT_TEXT, {
+        uploadId,
+        userId,
+        fileType,
+        storagePath,
+      });
 
       return this.mapRowToUploadItem(parsing);
     } catch (error) {
@@ -162,57 +171,6 @@ export class UploadService {
       });
     }
   }
-  private async completeParsing(
-    row: UploadedDocument,
-    fileType: UploadFileType,
-    storagePath: string,
-  ): Promise<void> {
-    try {
-      // In Phase 2 this is still called from processOneFile, but we fetch from S3 
-      // to simulate the async worker pattern where the buffer isn't in memory.
-      const buffer = await this.fetchFromStorage(storagePath);
-      if (!buffer) throw new Error('Could not fetch file from storage for parsing');
-
-      const parsedText = await this.documentTextExtractor.extract(
-        buffer,
-        fileType,
-      );
-      row.parsed_text = parsedText;
-      row.status = UploadDocumentStatus.READY;
-      row.percent_complete = UPLOAD_PROGRESS.READY;
-      await this.uploadedDocumentAction.saveDocument(row);
-    } catch (error) {
-      this.logger.warn(
-        `Parse failed for uploadId=${row.id} name=${row.file_name}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-      row.status = UploadDocumentStatus.FAILED;
-      row.percent_complete = 0;
-      row.parsed_text = null;
-      try {
-        await this.uploadedDocumentAction.saveDocument(row);
-      } catch (saveError) {
-        this.logger.error(
-          `Failed to persist parse-failure state uploadId=${row.id}`,
-          saveError instanceof Error ? saveError.stack : saveError,
-        );
-      }
-      try {
-        await this.objectStorage.deleteObject(storagePath);
-      } catch {
-        /* best-effort cleanup */
-      }
-    }
-  }
-  private async fetchFromStorage(storagePath: string): Promise<Buffer | null> {
-    try {
-      return await this.objectStorage.getObject(storagePath);
-    } catch {
-      return null;
-    }
-  }
-
   private buildStoragePath(userId: string, uploadId: string, fileType: UploadFileType): string {
     return path.posix.join('funnels', userId, `${uploadId}.${fileType}`);
   }

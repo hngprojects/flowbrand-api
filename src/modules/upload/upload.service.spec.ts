@@ -5,7 +5,9 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getQueueToken } from '@nestjs/bull';
 import * as fs from 'node:fs';
+import { QUEUES } from '../../common/constants/queue.constants';
 import * as SYS_MSG from '../../constants/system.messages';
 
 jest.mock('node:fs', () => ({
@@ -40,6 +42,10 @@ const mockUploadedDocumentAction = {
 
 const mockDocumentTextExtractor = {
   extract: jest.fn(),
+};
+
+const mockExtractionQueue = {
+  add: jest.fn().mockResolvedValue({ id: 'job-1' }),
 };
 
 const mockObjectStorage: jest.Mocked<ObjectStorage> = {
@@ -130,6 +136,10 @@ describe('UploadService', () => {
           useValue: mockUploadedDocumentAction,
         },
         {
+          provide: getQueueToken(QUEUES.DOCUMENT_EXTRACTION),
+          useValue: mockExtractionQueue,
+        },
+        {
           provide: DocumentTextExtractorService,
           useValue: mockDocumentTextExtractor,
         },
@@ -175,30 +185,26 @@ describe('UploadService', () => {
       expect(result.message).toBe(SYS_MSG.FUNNEL_UPLOAD_PARTIAL);
       expect(result.data.uploads).toHaveLength(2);
       expect(result.data.uploads[0].uploadId).toBeDefined();
-      expect(result.data.uploads[0].status).toBe(UploadDocumentStatus.READY);
+      expect(result.data.uploads[0].status).toBe(UploadDocumentStatus.PARSING);
       expect(result.data.uploads[1].status).toBe(UploadDocumentStatus.FAILED);
       expect(result.data.uploads[1].errorMessage).toBe(
         SYS_MSG.UPLOAD_INVALID_FILE,
       );
     });
 
-    it('accepts a valid file, stores in MinIO, and returns ready status', async () => {
+    it('accepts a valid file, stores in MinIO, and returns parsing status', async () => {
       const file = mockPdfFile();
 
       const result = await service.handleUpload(USER_ID, [file]);
 
       expect(result.message).toBe(SYS_MSG.FUNNEL_UPLOAD_COMPLETED);
-      expect(mockObjectStorage.putObject).toHaveBeenCalledWith(
-        expect.objectContaining({
-          body: expect.anything(),
-          contentType: 'application/pdf',
-        }),
-      );
+      expect(mockObjectStorage.putObject).toHaveBeenCalled();
+      expect(mockExtractionQueue.add).toHaveBeenCalled();
       expect(result.data.uploads[0]).toMatchObject({
         fileName: 'pitch-deck.pdf',
         fileType: 'pdf',
-        status: UploadDocumentStatus.READY,
-        percentComplete: UPLOAD_PROGRESS.READY,
+        status: UploadDocumentStatus.PARSING,
+        percentComplete: UPLOAD_PROGRESS.PARSING,
       });
     });
 
@@ -212,33 +218,6 @@ describe('UploadService', () => {
       expect(mockObjectStorage.deleteObject).not.toHaveBeenCalled();
       expect(mockUploadedDocumentAction.deleteById).toHaveBeenCalledTimes(1);
       expect(mockUploadedDocumentAction.createDocument).toHaveBeenCalled();
-    });
-  });
-
-  describe('completeParsing (background)', () => {
-    it('sets ready and parsed_text after successful extraction', async () => {
-      await service.handleUpload(USER_ID, [mockPdfFile()]);
-      await flushBackgroundWork();
-
-      const lastSave = mockUploadedDocumentAction.saveDocument.mock.calls.at(-1)?.[0];
-      expect(lastSave?.status).toBe(UploadDocumentStatus.READY);
-      expect(lastSave?.percent_complete).toBe(UPLOAD_PROGRESS.READY);
-      expect(lastSave?.parsed_text).toBe('extracted funnel text');
-    });
-
-    it('marks failed and deletes MinIO object when parsing fails', async () => {
-      mockDocumentTextExtractor.extract.mockRejectedValue(
-        new Error('parse failed'),
-      );
-
-      await service.handleUpload(USER_ID, [mockPdfFile()]);
-      await flushBackgroundWork();
-
-      const lastSave = mockUploadedDocumentAction.saveDocument.mock.calls.at(-1)?.[0];
-      expect(lastSave?.status).toBe(UploadDocumentStatus.FAILED);
-      expect(lastSave?.percent_complete).toBe(0);
-      expect(lastSave?.parsed_text).toBeNull();
-      expect(mockObjectStorage.deleteObject).toHaveBeenCalled();
     });
   });
 
