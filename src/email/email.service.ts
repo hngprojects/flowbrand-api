@@ -27,19 +27,45 @@ export class EmailService {
     return this.dispatch({ to, type: 'otp-reset', payload, userId }, DEFAULT_PRIORITY);
   }
 
-  async sendWaitlistConfirmation(to: string, payload: WaitlistPayload): Promise<string | undefined> {
-    return this.dispatch({ to, type: 'waitlist', payload }, DEFAULT_PRIORITY);
+  async sendPasswordReset(
+    to: string,
+    payload: OtpPayload,
+    userId?: string,
+  ): Promise<string | undefined> {
+    return this.dispatch(
+      { to, type: 'password-reset', payload, userId },
+      DEFAULT_PRIORITY,
+    );
+  }
+  
+  async sendWaitlistConfirmation(
+     to: string, 
+     payload: WaitlistPayload
+   ): Promise<string | undefined> {
+    return this.dispatch(
+      { to, type: 'waitlist', payload }, 
+      DEFAULT_PRIORITY
+    );
   }
 
-  async sendContactConfirmation(to: string, payload: ContactConfirmationPayload): Promise<string | undefined> {
-    return this.dispatch({ to, type: 'contact-confirmation', payload }, DEFAULT_PRIORITY);
+  async sendContactConfirmation(
+    to: string, 
+    payload: ContactConfirmationPayload
+   ): Promise<string | undefined> {
+    return this.dispatch(
+      { to, type: 'contact-confirmation', payload }, 
+      DEFAULT_PRIORITY
+    );
   }
 
   async sendContactAdminNotification(
     to: string,
     payload: ContactAdminNotificationPayload,
   ): Promise<string | undefined> {
-    return this.dispatch({ to, type: 'contact-admin-notification', payload }, DEFAULT_PRIORITY);
+    return this.dispatch(
+      { to, type: 'contact-admin-notification', payload }, 
+      DEFAULT_PRIORITY
+    );
   }
 
   private async dispatch(job: EmailJob, priority: number): Promise<string | undefined> {

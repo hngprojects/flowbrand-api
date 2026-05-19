@@ -17,6 +17,13 @@ export class UserSessionModelAction extends AbstractModelAction<UserSession> {
     return (await this.get({ identifierOptions: { id } }));
   }
 
+  async findByUserId(userId: string): Promise<UserSession[]> {
+    const result = await this.repository.find({
+      where: { user_id: userId, is_revoked: false },
+    });
+    return result || [];
+  }
+
   async updateById(
     id: string,
     updatePayload: Partial<UserSession>,

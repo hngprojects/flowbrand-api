@@ -9,6 +9,7 @@ type CompiledTemplate = Handlebars.TemplateDelegate;
 const EMAIL_TYPES: EmailType[] = [
   'otp-verification',
   'otp-reset',
+  'password-reset',
   'waitlist',
   'contact-confirmation',
   'contact-admin-notification',
@@ -23,7 +24,8 @@ export class TemplateService implements OnModuleInit {
   private readonly SUBJECTS: Record<EmailType, string> = {
     'otp-verification': 'Your SEIL verification code',
     'otp-reset': 'Reset your SEIL account',
-    waitlist: 'You are on the waitlist',
+    'password-reset': 'Password Reset Request - Your OTP Code',
+    'waitlist': 'You are on the waitlist',
     'contact-confirmation': "We've received your message",
     'contact-admin-notification': 'New contact form submission from {{fullName}}',
   };
