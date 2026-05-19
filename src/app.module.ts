@@ -16,6 +16,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { AuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { HealthModule } from './modules/health/health.module';
 import { UsersModule } from './modules/users/users.module';
+import { UploadModule } from './modules/upload/upload.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { QueueModule } from './queue/queue.module';
@@ -50,6 +51,7 @@ function collectValidationErrors(
     UsersModule,
     AuthModule,
     OnboardingModule,
+    UploadModule,
     RedisModule,
     QueueModule,
     EmailModule,
