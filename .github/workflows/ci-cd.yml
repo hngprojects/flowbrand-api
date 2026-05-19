@@ -27,8 +27,6 @@ jobs:
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -121,6 +119,9 @@ jobs:
               exit 1
             fi
             corepack enable
+            corepack prepare pnpm@9.15.9 --activate
+            pnpm --version
+
             pnpm install --frozen-lockfile --prod=false
             pnpm build
             pm2 restart "${{ env.APP_NAME }}" || pm2 start pnpm --name "${{ env.APP_NAME }}" -- start:prod
