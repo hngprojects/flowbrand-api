@@ -16,6 +16,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { AuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { HealthModule } from './modules/health/health.module';
 import { UsersModule } from './modules/users/users.module';
+import { UploadModule } from './modules/upload/upload.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { QueueModule } from './queue/queue.module';
@@ -24,6 +25,7 @@ import { FunnelsModule } from './modules/funnels/funnels.module';
 import { FunnelGenerationQueueModule } from './queue/funnel-generation-queue.module';
 import { WaitlistModule } from './modules/waitlist/waitlist.module';
 import { ContactModule } from './modules/contact/contact.module';
+import { llmConfig } from './config/llm.config';
 
 function collectValidationErrors(errors: ValidationError[], parentPath = ''): string[] {
   return errors.flatMap((error) => {
@@ -41,7 +43,7 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, jwtConfig, redisConfig],
+      load: [appConfig, databaseConfig, jwtConfig, redisConfig, llmConfig],
     }),
     TypeOrmModule.forRootAsync({
       useFactory: () => databaseConfig(),
@@ -51,6 +53,7 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
     AuthModule,
     OnboardingModule,
     FunnelsModule,
+    UploadModule,
     RedisModule,
     QueueModule,
     EmailModule,

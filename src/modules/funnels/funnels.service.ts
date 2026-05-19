@@ -78,7 +78,7 @@ export class FunnelsService {
 
   async getFullFunnel(userId: string, funnelId: string) {
     const funnel = await this.funnelRepo.findOne({ where: { id: funnelId, user_id: userId } });
-    if (!funnel) throw new NotFoundException(SYS_MSG.ONBOARDING_SESSION_NOT_FOUND);
+    if (!funnel) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
 
     // load stages with tasks ordered
     const stages = await this.stageRepo.createQueryBuilder('s')
@@ -130,7 +130,7 @@ export class FunnelsService {
 
   async getStagesSummary(userId: string, funnelId: string) {
     const funnel = await this.funnelRepo.findOne({ where: { id: funnelId, user_id: userId } });
-    if (!funnel) throw new NotFoundException(SYS_MSG.ONBOARDING_SESSION_NOT_FOUND);
+    if (!funnel) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
 
     const stages = await this.stageRepo.createQueryBuilder('s')
       .where('s.funnel_id = :funnelId', { funnelId })
@@ -167,16 +167,16 @@ export class FunnelsService {
 
   async getStageDetail(userId: string, funnelId: string, stageId: string) {
     const funnel = await this.funnelRepo.findOne({ where: { id: funnelId, user_id: userId } });
-    if (!funnel) throw new NotFoundException(SYS_MSG.ONBOARDING_SESSION_NOT_FOUND);
+    if (!funnel) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
 
     const stage = await this.stageRepo.findOne({ where: { id: stageId, funnel_id: funnelId } });
-    if (!stage) throw new NotFoundException(SYS_MSG.ONBOARDING_SESSION_NOT_FOUND);
+    if (!stage) throw new NotFoundException(SYS_MSG.FUNNEL_STAGE_NOT_FOUND);
 
     if (stage.status === StageStatus.LOCKED) {
       // find prior stage
       const prior = await this.stageRepo.findOne({ where: { funnel_id: funnelId, position: stage.position - 1 } });
       const priorName = prior ? prior.name : 'previous';
-      throw new ForbiddenException(SYS_MSG.STAGE_LOCKED(stage.name, priorName));
+      throw new ForbiddenException(SYS_MSG.FUNNEL_STAGE_LOCKED_MESSAGE(stage.name, priorName));
     }
 
     // load tasks ordered

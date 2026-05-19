@@ -18,6 +18,9 @@ import {
   WizardAnswers,
   OnboardingCompleteResult
 } from './interfaces/onboarding.interface';
+import { Step1AnswerDto, Step2AnswerDto, Step3AnswerDto, StepAnswerDto } from './dto/step-answer.dto';
+import { ClassConstructor, plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 
 @Injectable()
 export class OnboardingService {
@@ -69,7 +72,7 @@ export class OnboardingService {
   }
 
   async completeOnboarding(userId: string, sessionId: string): Promise<OnboardingCompleteResult> {
-    const session = await this.wizardSessionModelAction.findSessionById(sessionId);
+    const session = await this.wizardSessionModelAction.findSessionById(sessionId, userId);
 
     if (!session || session.user_id !== userId) {
       throw new NotFoundException(SYS_MSG.ONBOARDING_SESSION_NOT_FOUND);
@@ -174,6 +177,71 @@ export class OnboardingService {
       created_at: session.created_at,
       expires_at: session.expires_at,
       steps_completed: session.steps_completed
+    }
+  }
+
+  async saveStepAnswer(userId: string, dto: StepAnswerDto) {
+    const session = await this.wizardSessionModelAction.findSessionById(dto.session_id, userId)
+
+    if(!session) {
+      throw new NotFoundException({
+        code: 'RESOURCE_NOT_FOUND',
+        message: SYS_MSG.ONBOARDING_SESSION_NOT_BELONG
+      })
+    }
+    
+    if(session.status === WizardStatus.EXPIRED || session.expires_at < new Date()) {
+      throw new ForbiddenException({
+        code: 'RESOURCE_FORBIDDEN',
+        message: SYS_MSG.ONBOARDING_SESSION_FORBIDDEN
+      })
+    }
+
+    if(session.status === WizardStatus.COMPLETE) {
+      throw new ConflictException({
+        code: 'ONBOARDING_ALREADY_COMPLETE',
+        message: SYS_MSG.ONBOARDING_ALREADY_COMPLETE
+      })
+    }
+
+    type StepDtoClass = ClassConstructor<Step1AnswerDto | Step2AnswerDto | Step3AnswerDto>
+
+    const stepDtoMap: Record<number, StepDtoClass> = {
+      1: Step1AnswerDto,
+      2: Step2AnswerDto,
+      3: Step3AnswerDto
+    }
+
+    const StepDto = stepDtoMap[dto.step]
+    const answerInstance = plainToInstance(StepDto, dto.answer)
+    const errors = await validate(answerInstance)
+
+    if(errors.length > 0) {
+      throw new UnprocessableEntityException({
+        code: 'VALIDATION_ERROR',
+        message: SYS_MSG.VALIDATION_FAILED,
+        fields: errors.reduce((acc, e) => {
+          acc[e.property] = Object.values(e.constraints ?? {}).join(', ')
+          return acc
+        }, {} as Record<string, string>)
+      })
+    }
+
+    session.answers = {
+      ...session.answers,
+      [`step_${dto.step}`]: dto.answer
+    }
+
+    session.steps_completed = Object.keys(session.answers).filter(
+      key => session.answers[key] !== null
+    ).length
+
+    await this.wizardSessionModelAction.saveSession(session)
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.ONBOARDING_STEP_SAVED,
+      data: this.mapSessionToResponse(session)
     }
   }
 }
