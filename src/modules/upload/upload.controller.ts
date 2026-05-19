@@ -20,7 +20,7 @@ import {
 import {
   GetFunnelUploadProgressDocs,
   UploadFunnelDocumentsDocs,
-} from './docs/funnels-swagger.doc';
+} from './docs/upload-swagger.doc';
 import { UploadService } from './upload.service';
 
 const uploadInterceptor = FilesInterceptor('files', MAX_FILES_PER_UPLOAD, {

@@ -14,8 +14,11 @@ import { UploadedDocumentModelAction } from './actions/uploaded-document.action'
 import {
   ALLOWED_UPLOAD_RULES,
   MAX_UPLOAD_BYTES,
+  UPLOAD_PROGRESS,
 } from './constants/upload.constants';
 import { UploadedDocument } from './entities/uploaded-document.entity';
+import { UploadDocumentStatus } from './upload.types';
+import { DocumentTextExtractorService } from './services/document-text-extractor.service';
 import {
   UPLOAD_OBJECT_STORAGE,
   type ObjectStorage,
@@ -28,40 +31,30 @@ import {
 type FileValidationResult =
   | { ok: true; fileType: UploadFileType }
   | { ok: false; errorMessage: string };
-
 @Injectable()
 export class UploadService {
   private readonly logger = new Logger(UploadService.name);
-
   constructor(
     private readonly uploadedDocumentAction: UploadedDocumentModelAction,
+    private readonly documentTextExtractor: DocumentTextExtractorService,
     @Inject(UPLOAD_OBJECT_STORAGE)
     private readonly objectStorage: ObjectStorage,
   ) {}
 
-  /**
-   * Each file is validated and uploaded independently in parallel.
-   * A failure on one file does not cancel the others.
-   */
-  async handleUpload(
-    userId: string,
-    files: Express.Multer.File[] | undefined,
-  ): Promise<UploadBatchResponse> {
+  async handleUpload( userId: string, files: Express.Multer.File[] | undefined): Promise<UploadBatchResponse> {
     if (!files?.length) {
       throw new BadRequestException({
         error: 'BadRequestException',
         message: SYS_MSG.FUNNEL_UPLOAD_FILES_REQUIRED,
       });
     }
-
     const batchId = randomUUID();
     const uploads = await Promise.all(
       files.map((file, index) => this.processOneFile(userId, file, index)),
     );
 
-    const storedCount = uploads.filter((item) => item.status === 'stored').length;
-
-    if (storedCount === 0) {
+    const acceptedCount = uploads.filter((item) => item.uploadId).length;
+    if (acceptedCount === 0) {
       throw new UnprocessableEntityException({
         error: 'UnprocessableEntityException',
         message: SYS_MSG.FUNNEL_UPLOAD_ALL_REJECTED,
@@ -72,61 +65,45 @@ export class UploadService {
         })),
       });
     }
-
-    const allStored = storedCount === uploads.length;
-
+    const allAccepted = acceptedCount === uploads.length;
     return {
       statusCode: HttpStatus.CREATED,
-      message: allStored
+      message: allAccepted
         ? SYS_MSG.FUNNEL_UPLOAD_COMPLETED
         : SYS_MSG.FUNNEL_UPLOAD_PARTIAL,
       data: { batchId, uploads },
     };
   }
-
-  /** Owner-scoped progress for polling after POST /funnels/upload. */
-  async getProgress(
-    userId: string,
-    uploadId: string,
-  ): Promise<UploadProgressResponse> {
+  async getProgress(userId: string, uploadId: string):
+   Promise<UploadProgressResponse> {
     const row = await this.uploadedDocumentAction.findOwnedById(
       uploadId,
       userId,
     );
-
     if (!row) {
       throw new NotFoundException({
         error: 'NotFoundException',
         message: SYS_MSG.FUNNEL_UPLOAD_NOT_FOUND,
       });
     }
-
     return this.mapRowToProgress(row);
   }
-
-  /** Validate, persist metadata, and push bytes to object storage for one file. */
-  private async processOneFile(
-    userId: string,
-    file: Express.Multer.File,
-    index: number,
-  ): Promise<UploadItemResponse> {
+  private async processOneFile(userId: string, file: Express.Multer.File,index: number): Promise<UploadItemResponse> {
     const validation = this.validateFile(file, index);
     if (!validation.ok) {
       return {
         fileName: file.originalname,
         fileSizeBytes: file.size,
-        status: 'failed',
+        status: UploadDocumentStatus.FAILED,
         percentComplete: 0,
         errorMessage: validation.errorMessage,
       };
     }
-
     const fileType = validation.fileType;
     const uploadId = randomUUID();
     const storagePath = this.buildStoragePath(userId, uploadId, fileType);
     let row: UploadedDocument | null = null;
     let objectWritten = false;
-
     try {
       row = await this.uploadedDocumentAction.createDocument({
         id: uploadId,
@@ -134,11 +111,11 @@ export class UploadService {
         file_name: file.originalname,
         file_size_bytes: String(file.size),
         file_type: fileType,
-        status: 'uploading',
-        percent_complete: 0,
+        status: UploadDocumentStatus.UPLOADING,
+        percent_complete: UPLOAD_PROGRESS.START,
         storage_path: storagePath,
+        parsed_text: null,
       });
-
       await this.objectStorage.putObject({
         storagePath,
         body: file.buffer,
@@ -146,11 +123,11 @@ export class UploadService {
         contentLength: file.size,
       });
       objectWritten = true;
-
-      row.status = 'stored';
-      row.percent_complete = 100;
-      const saved = await this.uploadedDocumentAction.saveDocument(row);
-      return this.mapRowToUploadItem(saved);
+      row.status = UploadDocumentStatus.PARSING;
+      row.percent_complete = UPLOAD_PROGRESS.PARSING;
+      const parsing = await this.uploadedDocumentAction.saveDocument(row);
+      void this.completeParsing(parsing, file.buffer, fileType, storagePath);
+      return this.mapRowToUploadItem(parsing);
     } catch (error) {
       this.logger.warn(
         `Upload failed for file index=${index} name=${file.originalname}`,
@@ -161,38 +138,57 @@ export class UploadService {
         fileName: file.originalname,
         fileType,
         fileSizeBytes: file.size,
-        status: 'failed',
+        status: UploadDocumentStatus.FAILED,
         percentComplete: 0,
         errorMessage: SYS_MSG.UPLOAD_FAILED,
       };
     }
   }
-
-  private buildStoragePath(
-    userId: string,
-    uploadId: string,
+  private async completeParsing(
+    row: UploadedDocument,
+    buffer: Buffer,
     fileType: UploadFileType,
-  ): string {
+    storagePath: string,
+  ): Promise<void> {
+    try {
+      const parsedText = await this.documentTextExtractor.extract(
+        buffer,
+        fileType,
+      );
+      row.parsed_text = parsedText;
+      row.status = UploadDocumentStatus.READY;
+      row.percent_complete = UPLOAD_PROGRESS.READY;
+      await this.uploadedDocumentAction.saveDocument(row);
+    } catch (error) {
+      this.logger.warn(
+        `Parse failed for uploadId=${row.id} name=${row.file_name}`,
+        error instanceof Error ? error.message : error,
+      );
+      row.status = UploadDocumentStatus.FAILED;
+      row.percent_complete = 0;
+      row.parsed_text = null;
+      await this.uploadedDocumentAction.saveDocument(row);
+      try {
+        await this.objectStorage.deleteObject(storagePath);
+      } catch {
+        /* best-effort cleanup */
+      }
+    }
+  }
+  private buildStoragePath(userId: string, uploadId: string, fileType: UploadFileType): string {
     return path.posix.join('funnels', userId, `${uploadId}.${fileType}`);
   }
-
-  private validateFile(
-    file: Express.Multer.File,
-    _index: number,
-  ): FileValidationResult {
+  private validateFile(file: Express.Multer.File, _index: number): FileValidationResult {
     if (file.size > MAX_UPLOAD_BYTES) {
       return { ok: false, errorMessage: SYS_MSG.UPLOAD_FILE_TOO_LARGE };
     }
-
     const fileType = this.detectFileType(file);
     if (!fileType) {
       return { ok: false, errorMessage: SYS_MSG.UPLOAD_INVALID_FILE };
     }
-
     return { ok: true, fileType };
   }
 
-  /** Extension, MIME, and magic-byte checks must agree before upload. */
   private detectFileType(file: Express.Multer.File): UploadFileType | null {
     const extension = path.extname(file.originalname).toLowerCase();
     const candidates = (
@@ -201,7 +197,6 @@ export class UploadService {
         (typeof ALLOWED_UPLOAD_RULES)[UploadFileType],
       ][]
     ).filter(([, rule]) => rule.ext === extension);
-
     for (const [fileType, rule] of candidates) {
       if (!rule.mimes.includes(file.mimetype)) {
         continue;
@@ -210,22 +205,15 @@ export class UploadService {
         return fileType;
       }
     }
-
     return null;
   }
-
-  private bufferMatchesFileType(
-    buffer: Buffer,
-    fileType: UploadFileType,
-  ): boolean {
+  private bufferMatchesFileType(buffer: Buffer, fileType: UploadFileType): boolean {
     if (buffer.length < 4) {
       return false;
     }
-
     if (fileType === 'pdf') {
       return buffer.subarray(0, 4).toString('utf8') === '%PDF';
     }
-
     if (fileType === 'docx' || fileType === 'pptx') {
       return (
         buffer[0] === 0x50 &&
@@ -234,7 +222,6 @@ export class UploadService {
         buffer[3] === 0x04
       );
     }
-
     if (fileType === 'doc' || fileType === 'ppt') {
       return (
         buffer[0] === 0xd0 &&
@@ -243,15 +230,9 @@ export class UploadService {
         buffer[3] === 0xe0
       );
     }
-
     return false;
   }
-
-  private async rollbackSingleUpload(
-    storagePath: string,
-    row: UploadedDocument | null,
-    objectWritten: boolean,
-  ): Promise<void> {
+  private async rollbackSingleUpload(storagePath: string, row: UploadedDocument | null, objectWritten: boolean): Promise<void> {
     if (objectWritten) {
       try {
         await this.objectStorage.deleteObject(storagePath);
@@ -259,7 +240,6 @@ export class UploadService {
         /* best-effort cleanup */
       }
     }
-
     if (row) {
       try {
         await this.uploadedDocumentAction.deleteById(row.id);
@@ -268,26 +248,24 @@ export class UploadService {
       }
     }
   }
-
   private mapRowToUploadItem(row: UploadedDocument): UploadItemResponse {
     return {
       uploadId: row.id,
       fileName: row.file_name,
       fileType: row.file_type as UploadFileType,
       fileSizeBytes: Number(row.file_size_bytes),
-      status: row.status ?? 'failed',
-      percentComplete: row.percent_complete ?? 0,
+      status: row.status,
+      percentComplete: row.percent_complete,
     };
   }
-
   private mapRowToProgress(row: UploadedDocument): UploadProgressResponse {
     return {
       uploadId: row.id,
       fileName: row.file_name,
       fileType: row.file_type as UploadFileType,
       fileSizeBytes: Number(row.file_size_bytes),
-      status: row.status ?? 'failed',
-      percentComplete: row.percent_complete ?? 0,
+      status: row.status,
+      percentComplete: row.percent_complete,
       uploadedAt: row.created_at.toISOString(),
     };
   }

@@ -5,21 +5,23 @@ import { HttpStatus } from '@nestjs/common';
 /** Allowed document extensions stored in `uploaded_documents.file_type`. */
 export type UploadFileType = 'pdf' | 'doc' | 'docx' | 'ppt' | 'pptx';
 
-/** Row lifecycle while bytes are sent to object storage. */
-export type UploadDocumentStatus = 'uploading' | 'stored' | 'failed';
+/** Row lifecycle: storage then text extraction before ready. */
+export enum UploadDocumentStatus {
+  UPLOADING = 'uploading',
+  PARSING = 'parsing',
+  READY = 'ready',
+  FAILED = 'failed',
+}
 
 // --- API responses (camelCase) ---
-
-/** Per-file outcome from POST /funnels/upload (success or rejected for that file only). */
 export interface UploadItemResponse {
-  /** Present when the file was stored; omitted when validation/storage failed early. */
+ 
   uploadId?: string;
   fileName: string;
   fileType?: UploadFileType;
   fileSizeBytes: number;
   status: UploadDocumentStatus;
   percentComplete: number;
-  /** Set when `status` is `failed` for this file. */
   errorMessage?: string;
 }
 
@@ -28,7 +30,6 @@ export interface UploadBatchResponse {
   statusCode: typeof HttpStatus.CREATED | typeof HttpStatus.UNPROCESSABLE_ENTITY;
   message: string;
   data: {
-    /** Groups files from one request; not stored in the database. */
     batchId: string;
     uploads: UploadItemResponse[];
   };

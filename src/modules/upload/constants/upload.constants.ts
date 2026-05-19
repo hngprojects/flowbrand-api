@@ -6,6 +6,14 @@ export const MAX_UPLOAD_BYTES = 5_242_880;
 /** Maximum number of files accepted on POST /funnels/upload. */
 export const MAX_FILES_PER_UPLOAD = 3;
 
+/** Progress values returned by POST / progress polling. */
+export const UPLOAD_PROGRESS = {
+  START: 0,
+  STORED: 45,
+  PARSING: 50,
+  READY: 100,
+} as const;
+
 export const ALLOWED_UPLOAD_RULES: Record<
   UploadFileType,
   { ext: string; mimes: readonly string[] }

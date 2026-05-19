@@ -5,6 +5,7 @@ import { UploadedDocument } from './entities/uploaded-document.entity';
 import { UploadController } from './upload.controller';
 import { UploadService } from './upload.service';
 import { UPLOAD_OBJECT_STORAGE } from './upload.types';
+import { DocumentTextExtractorService } from './services/document-text-extractor.service';
 import { MinioUploadStorageService } from './services/minio-upload-storage.service';
 
 @Module({
@@ -13,6 +14,7 @@ import { MinioUploadStorageService } from './services/minio-upload-storage.servi
   providers: [
     UploadService,
     UploadedDocumentModelAction,
+    DocumentTextExtractorService,
     MinioUploadStorageService,
     {
       provide: UPLOAD_OBJECT_STORAGE,

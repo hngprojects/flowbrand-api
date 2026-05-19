@@ -29,6 +29,18 @@ export class UploadedDocumentModelAction extends AbstractModelAction<UploadedDoc
     userId: string,
   ): Promise<UploadedDocument | null> {
     return this.uploadedDocumentRepository.findOne({
+      select: {
+        id: true,
+        user_id: true,
+        file_name: true,
+        file_size_bytes: true,
+        file_type: true,
+        status: true,
+        percent_complete: true,
+        storage_path: true,
+        created_at: true,
+        updated_at: true,
+      },
       where: { id: uploadId, user_id: userId },
     });
   }

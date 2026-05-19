@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
 import * as Minio from 'minio';
 import {
   UPLOAD_STORAGE_DEFAULT_REGION,
@@ -86,7 +91,7 @@ export class MinioUploadStorageService implements ObjectStorage, OnModuleInit {
         !bucket && UPLOAD_STORAGE_ENV.bucket,
       ].filter(Boolean);
 
-      throw new Error(
+      throw new InternalServerErrorException(
         `Upload object storage is not configured. Set: ${missing.join(', ')}`,
       );
     }
