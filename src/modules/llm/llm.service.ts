@@ -248,7 +248,7 @@ export class LlmServiceImpl extends LlmService {
       return res.text();
     } catch (err) {
       if ((err as Error).name === 'AbortError') {
-        throw new Error(SYS_MSG.AI_PROVIDER_TIMEOUT(provider, timeoutMs));
+        throw new Error(SYS_MSG.AI_PROVIDER_TIMEOUT(provider, timeoutMs), { cause: err });
       }
       throw err;
     } finally {
