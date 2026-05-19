@@ -20,7 +20,9 @@ const AGRO_INPUT_SUPPLIER: TemplateDefinition = {
       name: 'Get Noticed',
       channel: CHANNEL,
       explanation:
-        'Before-and-after crop content is the strongest trust signal in agriculture. {{business_name}} needs {{target_customer}} farmers to see higher yield, healthier plants, and improved soil with {
+        'Before-and-after crop content is the strongest trust signal in agriculture. ' +
+        '{{business_name}} needs {{target_customer}} farmers to see higher yield, healthier plants, ' +
+        'and improved soil with {{product}} visible in every result photo.',
       actionPrompt:
         'Post 3 before-and-after crop photos this week showing {{product}} results. Include price and ordering instructions.',
       tasks: [
@@ -84,7 +86,9 @@ const LIVESTOCK_POULTRY: TemplateDefinition = {
       name: 'Get Noticed',
       channel: CHANNEL,
       explanation:
-        'Livestock farmers trust visible results: weight gain in broilers, egg-laying improvements, herd health gains. {{business_name}} needs {{target_customer}} to see these consistently on {{discov
+        'Livestock farmers trust visible results: weight gain in broilers, egg-laying improvements, ' +
+        'and herd health gains. {{business_name}} needs {{target_customer}} to see these consistently ' +
+        'on {{discovery_channel}}.',
       actionPrompt:
         'Post 3 before-and-after livestock photos this week. Share one daily livestock care reel.',
       tasks: [
@@ -148,7 +152,9 @@ const FRESH_PRODUCE: TemplateDefinition = {
       name: 'Get Noticed',
       channel: CHANNEL,
       explanation:
-        'Fresh produce sells on the visibility of the harvest. {{business_name}} needs {{target_customer}} - restaurants, markets, households - to see the produce, the day it was harvested, and the pr
+        'Fresh produce sells on the visibility of the harvest. {{business_name}} needs ' +
+        '{{target_customer}} (restaurants, markets, households) to see the produce, the day it was ' +
+        'harvested, and the price.',
       actionPrompt:
         'Post 3 harvest photos this week with prices. Share one farm-to-market video.',
       tasks: [
@@ -212,7 +218,9 @@ const CROP_PROCESSING: TemplateDefinition = {
       name: 'Get Noticed',
       channel: CHANNEL,
       explanation:
-        'Processed products (palm oil, garri, dried fruit, ground nut paste) sell on packaging and provenance. {{business_name}} needs {{target_customer}} to see the source farm and the finished produ
+        'Processed products (palm oil, garri, dried fruit, ground nut paste) sell on packaging and ' +
+        'provenance. {{business_name}} needs {{target_customer}} to see the source farm and the ' +
+        'finished product side by side.',
       actionPrompt:
         'Post 3 product photos this week showing packaging and farm source. Share one processing video.',
       tasks: [

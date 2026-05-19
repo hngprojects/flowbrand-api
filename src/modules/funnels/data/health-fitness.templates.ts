@@ -12,7 +12,9 @@ const GYM_FITNESS_COACH: TemplateDefinition = {
       name: 'Get Noticed',
       channel: CHANNEL,
       explanation:
-        'Before-and-after transformation photos are the strongest trust signal in fitness. {{business_name}} needs {{target_customer}} to see real results - weight lost, muscle gained, posture improve
+        'Before-and-after transformation photos are the strongest trust signal in fitness. ' +
+        '{{business_name}} needs {{target_customer}} to see real results (weight lost, muscle gained, ' +
+        'posture improved) with permission and clear pricing.',
       actionPrompt:
         'Post 3 before-and-after photos this week. Create one workout-of-the-day reel and share daily fitness tips on WhatsApp Status.',
       tasks: [
@@ -76,7 +78,9 @@ const NUTRITION_WEIGHT_LOSS: TemplateDefinition = {
       name: 'Get Noticed',
       channel: CHANNEL,
       explanation:
-        'Real client transformations (weight lost, bloating reduced, energy improved) build credibility. {{business_name}} needs {{target_customer}} to see specific, measurable results - "9kg lost in 
+        'Real client transformations (weight lost, bloating reduced, energy improved) build ' +
+        'credibility. {{business_name}} needs {{target_customer}} to see specific, measurable ' +
+        'results: "9kg lost in 6 weeks" beats generic healthy living content.',
       actionPrompt:
         'Post 3 before-and-after transformation photos this week with real client quotes. Share local-ingredient meal prep reels.',
       tasks: [
@@ -140,7 +144,9 @@ const WELLNESS_COACH: TemplateDefinition = {
       name: 'Get Noticed',
       channel: CHANNEL,
       explanation:
-        'Wellness transformation is emotional and life-quality based, not physical. {{business_name}} earns trust with authentic client stories (with consent), gentle daily content, and visible care f
+        'Wellness transformation is emotional and life-quality based, not physical. ' +
+        '{{business_name}} earns trust with authentic client stories (with consent), gentle daily ' +
+        'content, and visible care for {{target_customer}}.',
       actionPrompt:
         'Post 3 anonymised client transformation stories this week with consent. Share daily grounding tips.',
       tasks: [

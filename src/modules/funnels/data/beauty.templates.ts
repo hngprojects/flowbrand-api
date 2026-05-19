@@ -26,7 +26,9 @@ const BEAUTY_GENERAL: TemplateDefinition = {
       name: 'Get Noticed',
       channel: CHANNEL,
       explanation:
-        'Before-and-after content is the strongest trust signal in beauty. {{business_name}} needs {{target_customer}} to see real results - skincare glow, brow shaping, lip colour - with {{product}} 
+        'Before-and-after content is the strongest trust signal in beauty. {{business_name}} needs ' +
+        '{{target_customer}} to see real results (skincare glow, brow shaping, lip colour) with ' +
+        '{{product}} visible in the photo and price stated clearly.',
       actionPrompt:
         'Post 3 before-and-after transformation photos this week on {{discovery_channel}}. Always include your price and how to order.',
       tasks: [
@@ -40,7 +42,9 @@ const BEAUTY_GENERAL: TemplateDefinition = {
       name: 'Spark Interest',
       channel: CHANNEL,
       explanation:
-        'Speed of reply is a conversion factor. A {{target_customer}} who messages at 10am and hears back at 6pm has already bought elsewhere. {{business_name}} wins by combining polls, fast replies, 
+        'Speed of reply is a conversion factor. A {{target_customer}} who messages at 10am and hears ' +
+        'back at 6pm has already bought elsewhere. {{business_name}} wins by combining polls, fast ' +
+        'replies, and visible testimonials.',
       actionPrompt:
         'Run a 3-question skin or beauty quiz on Stories this week. DM every respondent a personalised product recommendation.',
       tasks: [
@@ -54,7 +58,9 @@ const BEAUTY_GENERAL: TemplateDefinition = {
       name: 'Make First Sale',
       channel: CHANNEL,
       explanation:
-        'The number one reason {{target_customer}} does not buy is confusion. Simplify ordering, show price openly, and add a time-limited first-buyer incentive to push hesitant prospects over the lin
+        'The number one reason {{target_customer}} does not buy is confusion. Simplify ordering, show ' +
+        'price openly, and add a time-limited first-buyer incentive to push hesitant prospects over ' +
+        'the line.',
       actionPrompt:
         'Pin a one-message order flow to WhatsApp this week. Display prices on every post and offer a first-time buyer incentive.',
       tasks: [
@@ -68,7 +74,9 @@ const BEAUTY_GENERAL: TemplateDefinition = {
       name: 'Bring Them Back',
       channel: CHANNEL,
       explanation:
-        'Most beauty sellers never follow up. {{business_name}} stands out by checking in personally, running a referral programme, and building a VIP WhatsApp group where customers feel like insiders
+        'Most beauty sellers never follow up. {{business_name}} stands out by checking in personally, ' +
+        'running a referral programme, and building a VIP WhatsApp group where customers feel like ' +
+        'insiders.',
       actionPrompt:
         'Send a post-purchase check-in 7-10 days after every order. Launch a refer-a-friend reward and invite customers to a VIP group.',
       tasks: [

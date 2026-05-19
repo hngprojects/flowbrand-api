@@ -12,7 +12,9 @@ const SOLAR_INSTALLATION: TemplateDefinition = {
       name: 'Get Noticed',
       channel: CHANNEL,
       explanation:
-        '{{target_customer}} dealing with power cuts and high generator costs is the buyer. {{business_name}} needs the alternative visible: real bills before and after, real installations on real roo
+        '{{target_customer}} dealing with power cuts and high generator costs is the buyer. ' +
+        '{{business_name}} needs the alternative visible: real bills before and after, and real ' +
+        'installations on real roofs.',
       actionPrompt:
         'Publish 3 educational posts this week including one electricity-bill comparison. Run targeted ads in areas with frequent outages.',
       tasks: [
@@ -76,7 +78,9 @@ const BIOGAS: TemplateDefinition = {
       name: 'Get Noticed',
       channel: CHANNEL,
       explanation:
-        'Most {{target_customer}} - farmers, rural households, agro-processors - have never heard of biogas or assume it is too technical. {{business_name}} earns awareness by making the concept feel 
+        'Most {{target_customer}} (farmers, rural households, agro-processors) have never heard of ' +
+        'biogas or assume it is too technical. {{business_name}} earns awareness by making the ' +
+        'concept feel familiar.',
       actionPrompt:
         'Publish content this week showing a working digester and a cost comparison versus firewood or LPG. Attend at least one farming cooperative meeting.',
       tasks: [

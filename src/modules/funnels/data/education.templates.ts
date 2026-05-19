@@ -19,7 +19,9 @@ const ONLINE_COURSE: TemplateDefinition = {
       name: 'Get Noticed',
       channel: CHANNEL,
       explanation:
-        '{{target_customer}} who could enrol in {{business_name}} has never heard of you yet. This stage is about showing up consistently with content that speaks to the pain or aspiration they bring 
+        '{{target_customer}} who could enrol in {{business_name}} has never heard of you yet. ' +
+        'This stage is about showing up consistently with content that speaks to the pain or ' +
+        'aspiration they bring to {{discovery_channel}}.',
       actionPrompt:
         'Publish one awareness piece this week tied to a specific pain (exam prep, career switch, skill gap). Ask current students to tag one friend.',
       tasks: [
@@ -33,7 +35,9 @@ const ONLINE_COURSE: TemplateDefinition = {
       name: 'Spark Interest',
       channel: CHANNEL,
       explanation:
-        'Once {{target_customer}} has seen {{business_name}}, give them enough proof and value to feel confident reaching out. They are evaluating you against other options and against doing nothing.'
+        'Once {{target_customer}} has seen {{business_name}}, give them enough proof and value to feel ' +
+        'confident reaching out. They are evaluating you against other options and against doing ' +
+        'nothing.',
       actionPrompt:
         'Publish one student result or testimonial this week and one free value piece (mini-lesson, checklist, or tip).',
       tasks: [

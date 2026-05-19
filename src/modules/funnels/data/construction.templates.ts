@@ -12,9 +12,13 @@ const BUILDING_CONTRACTOR: TemplateDefinition = {
       name: 'Get Noticed',
       channel: DEFAULT_CHANNEL,
       explanation:
-        '{{business_name}} needs to be visible to {{target_customer}} who is actively planning a construction project. Most contractors win jobs through word of mouth, but that is not scalable on its 
+        '{{business_name}} needs to be visible to {{target_customer}} who is actively planning a ' +
+        'construction project. Most contractors win jobs through word of mouth, but that is not ' +
+        'scalable on its own. This stage builds a presence so new clients can find you.',
       actionPrompt:
-        'Document one current or completed project this week with photos and a short caption stating what was built, where, and how long it took. Share on every channel where {{target_customer}} is li
+        'Document one current or completed project this week with photos and a short caption stating ' +
+        'what was built, where, and how long it took. Share on every channel where {{target_customer}} ' +
+        'is likely to scroll.',
       tasks: [
         'Take photos of your most recent completed project and post them on {{discovery_channel}} with project details',
         'Ask 3 past clients to recommend you to one person planning to build',
@@ -26,7 +30,9 @@ const BUILDING_CONTRACTOR: TemplateDefinition = {
       name: 'Spark Interest',
       channel: DEFAULT_CHANNEL,
       explanation:
-        'Someone has seen your work or heard about {{business_name}}. This stage is about responding well, showing your team in action, and building enough trust that {{target_customer}} wants to meet
+        'Someone has seen your work or heard about {{business_name}}. This stage is about responding ' +
+        'well, showing your team in action, and building enough trust that {{target_customer}} wants ' +
+        'to meet you.',
       actionPrompt:
         'Reply to every enquiry within 2 hours this week and share at least one short video or photo series of your team working on site.',
       tasks: [
@@ -76,7 +82,9 @@ const ARCHITECTURE_DESIGN: TemplateDefinition = {
       name: 'Get Noticed',
       channel: DEFAULT_CHANNEL,
       explanation:
-        'Architects and designers win clients through the quality of their portfolio. {{business_name}} needs that portfolio visible to {{target_customer}} - property developers, business owners plann
+        'Architects and designers win clients through the quality of their portfolio. {{business_name}} ' +
+        'needs that portfolio visible to {{target_customer}} (property developers, business owners ' +
+        'planning to build, and individuals planning their homes).',
       actionPrompt:
         'Publish one completed project this week with before-and-after images. Submit your portfolio to one local property directory and reach out to 3 developers you have not worked with.',
       tasks: [
@@ -90,7 +98,9 @@ const ARCHITECTURE_DESIGN: TemplateDefinition = {
       name: 'Spark Interest',
       channel: DEFAULT_CHANNEL,
       explanation:
-        'Design clients take time to decide. {{business_name}} stays relevant and trusted while {{target_customer}} is planning by sharing process insight, case studies, and offering low-friction firs
+        'Design clients take time to decide. {{business_name}} stays relevant and trusted while ' +
+        '{{target_customer}} is planning by sharing process insight, case studies, and offering ' +
+        'low-friction first conversations.',
       actionPrompt:
         'Publish one short case study this week. Offer a free 30-minute consultation to any enquirer. Follow up anyone who enquired but has not booked.',
       tasks: [
@@ -140,7 +150,9 @@ const BUILDING_MATERIALS: TemplateDefinition = {
       name: 'Get Noticed',
       channel: DEFAULT_CHANNEL,
       explanation:
-        'Building materials buyers buy on price, availability, and trust. {{business_name}} needs to be visible to {{target_customer}} in the locations and channels where contractors, site managers, a
+        'Building materials buyers buy on price, availability, and trust. {{business_name}} needs to ' +
+        'be visible to {{target_customer}} in the locations and channels where contractors, site ' +
+        'managers, and self-builders already are.',
       actionPrompt:
         'Post your product list and current prices on {{discovery_channel}} and contractor groups twice this week. Visit 3 active construction sites and leave a price list.',
       tasks: [
@@ -204,9 +216,13 @@ const REAL_ESTATE_DEVELOPER: TemplateDefinition = {
       name: 'Get Noticed',
       channel: DEFAULT_CHANNEL,
       explanation:
-        'Property buyers in Sub-Saharan Africa research for 3 to 12 months before committing. {{business_name}} must appear during that research phase wherever {{target_customer}} looks: search, socia
+        'Property buyers in Sub-Saharan Africa research for 3 to 12 months before committing. ' +
+        '{{business_name}} must appear during that research phase wherever {{target_customer}} looks: ' +
+        'search, social, and property portals.',
       actionPrompt:
-        'Post one property photo or render this week with location, size, price range, and payment plan. Run one targeted ad pointing to your WhatsApp and list the development on at least one property
+        'Post one property photo or render this week with location, size, price range, and payment ' +
+        'plan. Run one targeted ad pointing to your WhatsApp and list the development on at least ' +
+        'one property portal.',
       tasks: [
         'Post one property photo or render with location, size, price range, and payment plan',
         'Run one targeted ad pointing to your WhatsApp at a small budget (5,000-10,000)',

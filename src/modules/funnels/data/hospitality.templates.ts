@@ -12,7 +12,9 @@ const LOCAL_RESTAURANT: TemplateDefinition = {
       name: 'Get Noticed',
       channel: CHANNEL,
       explanation:
-        'Local restaurants live on local visibility. {{business_name}} needs {{target_customer}} to see food photos, behind-the-scenes content, and location tags multiple times before the first visit.
+        'Local restaurants live on local visibility. {{business_name}} needs {{target_customer}} to ' +
+        'see food photos, behind-the-scenes content, and location tags multiple times before the ' +
+        'first visit.',
       actionPrompt:
         'Publish 4 food photos or videos on {{discovery_channel}} this week. Upload one behind-the-scenes kitchen clip and run location tags on every post.',
       tasks: [
@@ -76,7 +78,9 @@ const EVENT_CATERING: TemplateDefinition = {
       name: 'Get Noticed',
       channel: CHANNEL,
       explanation:
-        'Event planners and clients pick caterers based on visible execution. {{business_name}} needs setup photos, transformation content, and testimonials in front of {{target_customer}} every week.
+        'Event planners and clients pick caterers based on visible execution. {{business_name}} needs ' +
+        'setup photos, transformation content, and testimonials in front of {{target_customer}} ' +
+        'every week.',
       actionPrompt:
         'Publish event setup photos and one transformation reel this week. Upload one client testimonial.',
       tasks: [
