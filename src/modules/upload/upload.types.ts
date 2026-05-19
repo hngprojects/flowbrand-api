@@ -45,6 +45,7 @@ export interface UploadProgressResponse {
   status: UploadDocumentStatus;
   percentComplete: number;
   uploadedAt: string;
+  errorMessage?: string;
 }
 
 // --- Object storage port (MinIO) ---

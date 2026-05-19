@@ -125,15 +125,9 @@ export class UploadService {
       row.status = UploadDocumentStatus.PARSING;
       row.percent_complete = UPLOAD_PROGRESS.PARSING;
       const parsing = await this.uploadedDocumentAction.saveDocument(row);
-     
-      void this.completeParsing(parsing, file.buffer, fileType, storagePath).catch(
-        (err: unknown) => {
-          this.logger.error(
-            `Unhandled parsing worker error uploadId=${parsing.id}`,
-            err instanceof Error ? err.stack : err,
-          );
-        },
-      );
+
+      await this.completeParsing(parsing, file.buffer, fileType, storagePath);
+
       return this.mapRowToUploadItem(parsing);
     } catch (error) {
       this.logger.warn(

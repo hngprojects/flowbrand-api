@@ -50,9 +50,11 @@ export const UPLOAD_TOO_MANY_FILES = 'Too many files uploaded';
 
 // Funnel uploads
 export const FUNNEL_UPLOAD_COMPLETED = 'Funnel upload completed';
-export const FUNNEL_UPLOAD_PARTIAL = 'Funnel upload partial';
-export const FUNNEL_UPLOAD_ALL_REJECTED = 'Funnel upload all rejected';
-export const FUNNEL_UPLOAD_NOT_FOUND = 'Funnel upload not found';
+export const FUNNEL_UPLOAD_PARTIAL =
+  'Some files were rejected; see uploads[].errorMessage for details';
+export const FUNNEL_UPLOAD_ALL_REJECTED =
+  'All files were rejected; see details[]';
+export const FUNNEL_UPLOAD_NOT_FOUND = 'Upload not found or not owned by user';
 export const FUNNEL_UPLOAD_FILES_REQUIRED =
   'At least one file is required in the files field';
 export const FUNNEL_UPLOAD_PARSE_FAILED =
