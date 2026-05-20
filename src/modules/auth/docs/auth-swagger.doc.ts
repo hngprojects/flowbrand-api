@@ -233,31 +233,22 @@ function registerSwaggerOAuthRedirectScript(app: INestApplication): void {
               : 'GET');
 
           if (typeof requestUrl === 'string' && String(method).toUpperCase() === 'GET') {
-            if (requestUrl.includes('/auth/google/callback')) {
-              return Promise.resolve(
-                new Response(
-                  JSON.stringify({
-                    status_code: 200,
-                    message: 'OAuth login successful',
-                    access_token: 'jwt.access.token',
-                    refresh_token: 'jwt.refresh.token',
-                    data: {
-                      user: {
-                        id: 'uuid',
-                        full_name: 'Jane Doe',
-                        email: 'user@example.com',
-                        avatar_url: null,
-                      },
+              if (requestUrl.includes('/auth/google/callback')) {
+                // Simulate the server redirect after successful OAuth login.
+                // The real endpoint sets an HttpOnly refresh cookie and issues a
+                // 302 redirect to the frontend onboarding URL with access token in hash.
+                const redirectUrl = 'http://localhost:3000/onboarding#access_token=jwt.access.token';
+                return Promise.resolve(
+                  new Response('Redirecting', {
+                    status: 302,
+                    statusText: 'Found',
+                    headers: {
+                      'Content-Type': 'text/plain; charset=utf-8',
+                      'Location': redirectUrl,
                     },
                   }),
-                  {
-                    status: 200,
-                    statusText: 'OK',
-                    headers: { 'Content-Type': 'application/json' },
-                  },
-                ),
-              );
-            }
+                );
+              }
 
             if (requestUrl.includes('/auth/google')) {
               return Promise.resolve(
