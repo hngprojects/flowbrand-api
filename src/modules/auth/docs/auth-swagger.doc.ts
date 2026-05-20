@@ -40,8 +40,7 @@ export const RegisterDocs = () =>
       schema: {
         example: {
           statusCode: 201,
-          message: 'User Created Successfully',
-          data: authResponseExample,
+          message: SYS_MSG.REGISTRATION_SUCCESSFUL_VERIFY_EMAIL,
         },
       },
     }),
