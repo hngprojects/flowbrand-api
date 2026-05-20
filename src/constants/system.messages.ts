@@ -49,6 +49,7 @@ export const VALIDATION_FAILED = 'Validation failed';
 export const UPLOAD_FAILED = 'File upload failed';
 export const UPLOAD_FILE_TOO_LARGE = 'Uploaded file is too large';
 export const UPLOAD_INVALID_FILE = 'Uploaded file type is not allowed';
+export const UPLOAD_INTERRUPTED = 'Upload incomplete: received bytes do not match expected size.';
 export const UPLOAD_TOO_MANY_FILES = 'Too many files uploaded';
 
 // Funnel uploads
@@ -105,6 +106,19 @@ export const REDIS_RECONNECT_ATTEMPT = (attempt: number, delay: number) =>
 export const REDIS_RETRY_LIMIT_REACHED = 'Redis retry limit reached';
 export const REDIS_PATTERN_DELETE_SUCCESS = (count: number, pattern: string) =>
   `Deleted ${count} keys matching pattern: ${pattern}`;
+export const STAGE_LOCKED = (stageName: string, priorStageName: string) =>
+  `The ${stageName} stage is locked. Complete all tasks in ${priorStageName} and mark it complete to unlock.`;
+
+// Funnel Display APIs
+export const FUNNEL_RETRIEVED_SUCCESSFULLY = 'Funnel retrieved successfully';
+export const FUNNELS_RETRIEVED_SUCCESSFULLY = 'Funnels retrieved successfully';
+export const FUNNEL_STAGES_RETRIEVED_SUCCESSFULLY = 'Funnel stages retrieved successfully';
+export const FUNNEL_STAGE_RETRIEVED_SUCCESSFULLY = 'Funnel stage retrieved successfully';
+export const FUNNEL_STAGE_NOT_FOUND = 'Funnel stage not found or not owned by you';
+export const FUNNEL_OR_STAGE_NOT_FOUND = 'Funnel or stage not found or not owned by you';
+export const FUNNEL_STAGE_LOCKED_MESSAGE = (stageName: string, priorStageName: string) =>
+  `The ${stageName} stage is locked. Complete all tasks in ${priorStageName} and mark it complete to unlock.`;
+export const FUNNEL_UNAUTHORIZED_ACCESS = 'You do not have permission to access this funnel';
 
 // Password Reset Messages
 export const PASSWORD_RESET_OTP_SENT = 'If your email is registered, you will receive a password reset code.';

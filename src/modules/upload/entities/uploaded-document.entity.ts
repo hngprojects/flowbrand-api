@@ -39,6 +39,10 @@ export class UploadedDocument extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   parsed_text: string | null;
 
+  /** Brief explanation if status is 'failed' (max 200 chars). */
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  failure_reason: string | null;
+
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;

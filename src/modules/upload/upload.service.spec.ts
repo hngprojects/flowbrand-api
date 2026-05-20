@@ -1,11 +1,24 @@
 import {
-  BadRequestException,
   HttpStatus,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getQueueToken } from '@nestjs/bull';
+import * as fs from 'node:fs';
+import { QUEUES } from '../../common/constants/queue.constants';
 import * as SYS_MSG from '../../constants/system.messages';
+
+jest.mock('node:fs', () => ({
+  ...jest.requireActual('node:fs'),
+  existsSync: jest.fn(),
+  statSync: jest.fn(),
+  unlink: jest.fn(),
+  openSync: jest.fn(),
+  readSync: jest.fn(),
+  closeSync: jest.fn(),
+  createReadStream: jest.fn(),
+}));
 import { MAX_UPLOAD_BYTES, UPLOAD_PROGRESS } from './constants/upload.constants';
 import { UploadedDocument } from './entities/uploaded-document.entity';
 import { UploadedDocumentModelAction } from './actions/uploaded-document.action';
@@ -25,14 +38,20 @@ const mockUploadedDocumentAction = {
   saveDocument: jest.fn(),
   findOwnedById: jest.fn(),
   deleteById: jest.fn(),
+  updateProgress: jest.fn(),
 };
 
 const mockDocumentTextExtractor = {
   extract: jest.fn(),
 };
 
+const mockExtractionQueue = {
+  add: jest.fn().mockResolvedValue({ id: 'job-1' }),
+};
+
 const mockObjectStorage: jest.Mocked<ObjectStorage> = {
   putObject: jest.fn(),
+  getObject: jest.fn(),
   deleteObject: jest.fn(),
 };
 
@@ -49,6 +68,7 @@ function buildRow(
     percent_complete: UPLOAD_PROGRESS.START,
     storage_path: `funnels/${USER_ID}/${UPLOAD_ID}.pdf`,
     parsed_text: null,
+    failure_reason: null,
     created_at: new Date('2026-05-16T12:00:00.000Z'),
     updated_at: new Date('2026-05-16T12:00:00.000Z'),
     user: undefined as never,
@@ -69,15 +89,10 @@ function mockPdfFile(
     buffer,
     stream: null as never,
     destination: '',
-    filename: '',
-    path: '',
+    filename: 'pitch-deck.pdf',
+    path: '/tmp/pitch-deck.pdf',
     ...overrides,
   };
-}
-
-/** Let void completeParsing() microtasks finish. */
-async function flushBackgroundWork(): Promise<void> {
-  await new Promise((resolve) => setImmediate(resolve));
 }
 
 describe('UploadService', () => {
@@ -92,9 +107,26 @@ describe('UploadService', () => {
     mockUploadedDocumentAction.saveDocument.mockImplementation((row) =>
       Promise.resolve(row),
     );
+    mockUploadedDocumentAction.updateProgress.mockResolvedValue(undefined);
     mockObjectStorage.putObject.mockResolvedValue(undefined);
     mockObjectStorage.deleteObject.mockResolvedValue(undefined);
+    mockObjectStorage.getObject.mockResolvedValue(Buffer.from('%PDF-1.4 test content'));
     mockDocumentTextExtractor.extract.mockResolvedValue('extracted funnel text');
+
+    (fs.existsSync as jest.Mock).mockReturnValue(true);
+    // Default: disk size matches valid PDF buffer (EC-04 passes for normal files)
+    (fs.statSync as jest.Mock).mockReturnValue({ size: Buffer.from('%PDF-1.4 test content').length });
+    (fs.unlink as unknown as jest.Mock).mockImplementation((_path, cb) => (cb as (e: null) => void)(null));
+    (fs.openSync as jest.Mock).mockReturnValue(1);
+    (fs.readSync as jest.Mock).mockImplementation((_fd, buffer) => {
+      Buffer.from('%PDF-1.4').copy(buffer as Buffer);
+      return 8;
+    });
+    (fs.closeSync as jest.Mock).mockReturnValue(undefined);
+    (fs.createReadStream as jest.Mock).mockReturnValue({
+      pipe: jest.fn(),
+      on: jest.fn().mockReturnThis(),
+    } as any);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -102,6 +134,10 @@ describe('UploadService', () => {
         {
           provide: UploadedDocumentModelAction,
           useValue: mockUploadedDocumentAction,
+        },
+        {
+          provide: getQueueToken(QUEUES.DOCUMENT_EXTRACTION),
+          useValue: mockExtractionQueue,
         },
         {
           provide: DocumentTextExtractorService,
@@ -115,19 +151,18 @@ describe('UploadService', () => {
   });
 
   describe('handleUpload', () => {
-    it('throws BadRequestException when no files are provided', async () => {
+    it('throws UnprocessableEntityException when no files are provided', async () => {
       await expect(service.handleUpload(USER_ID, undefined)).rejects.toThrow(
-        BadRequestException,
+        UnprocessableEntityException,
       );
       await expect(service.handleUpload(USER_ID, [])).rejects.toThrow(
-        BadRequestException,
+        UnprocessableEntityException,
       );
     });
 
     it('throws UnprocessableEntityException when every file is rejected', async () => {
-      const oversized = mockPdfFile({
-        size: MAX_UPLOAD_BYTES + 1,
-      });
+      const oversized = mockPdfFile({ size: MAX_UPLOAD_BYTES + 1 });
+      (fs.statSync as jest.Mock).mockReturnValue({ size: MAX_UPLOAD_BYTES + 1 });
 
       await expect(
         service.handleUpload(USER_ID, [oversized]),
@@ -139,7 +174,8 @@ describe('UploadService', () => {
       const invalid = mockPdfFile({
         originalname: 'bad.exe',
         mimetype: 'application/octet-stream',
-        buffer: Buffer.from('not-a-real-doc'),
+        filename: 'bad.exe',
+        path: '/tmp/bad.exe',
       });
 
       const result = await service.handleUpload(USER_ID, [valid, invalid]);
@@ -148,7 +184,7 @@ describe('UploadService', () => {
       expect(result.message).toBe(SYS_MSG.FUNNEL_UPLOAD_PARTIAL);
       expect(result.data.uploads).toHaveLength(2);
       expect(result.data.uploads[0].uploadId).toBeDefined();
-      expect(result.data.uploads[0].status).toBe(UploadDocumentStatus.READY);
+      expect(result.data.uploads[0].status).toBe(UploadDocumentStatus.UPLOADING);
       expect(result.data.uploads[1].status).toBe(UploadDocumentStatus.FAILED);
       expect(result.data.uploads[1].errorMessage).toBe(
         SYS_MSG.UPLOAD_INVALID_FILE,
@@ -161,17 +197,13 @@ describe('UploadService', () => {
       const result = await service.handleUpload(USER_ID, [file]);
 
       expect(result.message).toBe(SYS_MSG.FUNNEL_UPLOAD_COMPLETED);
-      expect(mockObjectStorage.putObject).toHaveBeenCalledWith(
-        expect.objectContaining({
-          body: file.buffer,
-          contentType: 'application/pdf',
-        }),
-      );
+      expect(mockObjectStorage.putObject).toHaveBeenCalled();
+      expect(mockExtractionQueue.add).toHaveBeenCalled();
       expect(result.data.uploads[0]).toMatchObject({
         fileName: 'pitch-deck.pdf',
         fileType: 'pdf',
-        status: UploadDocumentStatus.READY,
-        percentComplete: UPLOAD_PROGRESS.READY,
+        status: UploadDocumentStatus.UPLOADING,
+        percentComplete: UPLOAD_PROGRESS.PARSING,
       });
     });
 
@@ -186,32 +218,36 @@ describe('UploadService', () => {
       expect(mockUploadedDocumentAction.deleteById).toHaveBeenCalledTimes(1);
       expect(mockUploadedDocumentAction.createDocument).toHaveBeenCalled();
     });
-  });
 
-  describe('completeParsing (background)', () => {
-    it('sets ready and parsed_text after successful extraction', async () => {
-      await service.handleUpload(USER_ID, [mockPdfFile()]);
-      await flushBackgroundWork();
+    it('FR-10: succeeds when updateProgress fails twice then recovers on third attempt', async () => {
+      mockUploadedDocumentAction.updateProgress
+        .mockRejectedValueOnce(new Error('DB hiccup'))
+        .mockRejectedValueOnce(new Error('DB hiccup'))
+        .mockResolvedValue(undefined);
 
-      const lastSave = mockUploadedDocumentAction.saveDocument.mock.calls.at(-1)?.[0];
-      expect(lastSave?.status).toBe(UploadDocumentStatus.READY);
-      expect(lastSave?.percent_complete).toBe(UPLOAD_PROGRESS.READY);
-      expect(lastSave?.parsed_text).toBe('extracted funnel text');
+      const result = await service.handleUpload(USER_ID, [mockPdfFile()]);
+
+      expect(result.message).toBe(SYS_MSG.FUNNEL_UPLOAD_COMPLETED);
+      expect(mockUploadedDocumentAction.updateProgress).toHaveBeenCalledTimes(3);
+      expect(result.data.uploads[0].status).toBe(UploadDocumentStatus.UPLOADING);
     });
 
-    it('marks failed and deletes MinIO object when parsing fails', async () => {
-      mockDocumentTextExtractor.extract.mockRejectedValue(
-        new Error('parse failed'),
+    it('FR-10: logs orphan_upload and throws when all retries are exhausted', async () => {
+      mockUploadedDocumentAction.updateProgress.mockRejectedValue(
+        new Error('DB down'),
       );
+      const loggerErrorSpy = jest
+        .spyOn(service['logger'], 'error')
+        .mockImplementation(() => {});
 
-      await service.handleUpload(USER_ID, [mockPdfFile()]);
-      await flushBackgroundWork();
+      await expect(
+        service.handleUpload(USER_ID, [mockPdfFile()]),
+      ).rejects.toThrow(UnprocessableEntityException);
 
-      const lastSave = mockUploadedDocumentAction.saveDocument.mock.calls.at(-1)?.[0];
-      expect(lastSave?.status).toBe(UploadDocumentStatus.FAILED);
-      expect(lastSave?.percent_complete).toBe(0);
-      expect(lastSave?.parsed_text).toBeNull();
-      expect(mockObjectStorage.deleteObject).toHaveBeenCalled();
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'orphan_upload' }),
+      );
+      expect(mockUploadedDocumentAction.deleteById).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -246,6 +282,7 @@ describe('UploadService', () => {
         status: UploadDocumentStatus.READY,
         percentComplete: UPLOAD_PROGRESS.READY,
         uploadedAt: '2026-05-16T12:00:00.000Z',
+        failureReason: null,
       });
     });
   });
