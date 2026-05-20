@@ -1,8 +1,4 @@
-import {
-  ExecutionContext,
-  HttpStatus,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { ExecutionContext, HttpStatus, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -81,9 +77,7 @@ describe('AuthGuard', () => {
     it('throws 401 when Authorization header is absent', async () => {
       const { ctx } = buildContext();
 
-      await expect(guard.canActivate(ctx)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
       await expect(guard.canActivate(ctx)).rejects.toMatchObject({
         status: HttpStatus.UNAUTHORIZED,
       });
@@ -92,9 +86,7 @@ describe('AuthGuard', () => {
     it('throws 401 when scheme is not Bearer', async () => {
       const { ctx } = buildContext('Basic somebase64value');
 
-      await expect(guard.canActivate(ctx)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     });
 
     it('throws 401 when header is "Bearer" with no token string', async () => {
@@ -102,9 +94,7 @@ describe('AuthGuard', () => {
 
       mockJwtService.verifyAsync.mockResolvedValue(null);
 
-      await expect(guard.canActivate(ctx)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     });
   });
 
@@ -115,27 +105,21 @@ describe('AuthGuard', () => {
       mockJwtService.verifyAsync.mockRejectedValue(new Error('jwt expired'));
       const { ctx } = buildContext(bearerHeader('expired.jwt.token'));
 
-      await expect(guard.canActivate(ctx)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     });
 
     it('throws 401 when verifyAsync resolves to null (catch returns null)', async () => {
       mockJwtService.verifyAsync.mockResolvedValue(null);
       const { ctx } = buildContext(bearerHeader('bad.token'));
 
-      await expect(guard.canActivate(ctx)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     });
 
     it('throws 401 when payload is missing sessionId', async () => {
       mockJwtService.verifyAsync.mockResolvedValue({ sub: 'user-123' }); // no sessionId
       const { ctx } = buildContext(bearerHeader('no-session.token'));
 
-      await expect(guard.canActivate(ctx)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     });
 
     it('throws 401 when payload is missing sub (userId)', async () => {
@@ -144,9 +128,7 @@ describe('AuthGuard', () => {
 
       const { ctx } = buildContext(bearerHeader('no-sub.token'));
 
-      await expect(guard.canActivate(ctx)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     });
   });
 
@@ -159,9 +141,7 @@ describe('AuthGuard', () => {
 
       const { ctx } = buildContext(bearerHeader('valid.token'));
 
-      await expect(guard.canActivate(ctx)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     });
 
     it('throws 401 when Redis is unreachable (get returns null after error)', async () => {
@@ -171,9 +151,7 @@ describe('AuthGuard', () => {
 
       const { ctx } = buildContext(bearerHeader('valid.token'));
 
-      await expect(guard.canActivate(ctx)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     });
 
     it('constructs the session key as sess:{userId}:{sessionId}', async () => {
@@ -183,9 +161,7 @@ describe('AuthGuard', () => {
       const { ctx } = buildContext(bearerHeader('valid.token'));
 
       await expect(guard.canActivate(ctx)).rejects.toThrow();
-      expect(mockRedisService.get).toHaveBeenCalledWith(
-        `sess:${VALID_PAYLOAD.sub}:${VALID_PAYLOAD.sessionId}`,
-      );
+      expect(mockRedisService.get).toHaveBeenCalledWith(`sess:${VALID_PAYLOAD.sub}:${VALID_PAYLOAD.sessionId}`);
     });
   });
 
@@ -201,18 +177,14 @@ describe('AuthGuard', () => {
       mockUserService.findById.mockResolvedValue(null);
       const { ctx } = buildContext(bearerHeader('valid.token'));
 
-      await expect(guard.canActivate(ctx)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     });
 
     it('throws 401 when findById rejects (DB error)', async () => {
       mockUserService.findById.mockRejectedValue(new Error('DB down'));
       const { ctx } = buildContext(bearerHeader('valid.token'));
 
-      await expect(guard.canActivate(ctx)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     });
 
     it('throws 401 when user is soft-deleted (deletedAt is set)', async () => {
@@ -222,9 +194,7 @@ describe('AuthGuard', () => {
       });
       const { ctx } = buildContext(bearerHeader('valid.token'));
 
-      await expect(guard.canActivate(ctx)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     });
 
     it('throws 401 when user is deactivated (is_active = false)', async () => {
@@ -234,9 +204,7 @@ describe('AuthGuard', () => {
       });
       const { ctx } = buildContext(bearerHeader('valid.token'));
 
-      await expect(guard.canActivate(ctx)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     });
 
     it('throws 401 when user is both soft-deleted and inactive', async () => {
@@ -247,9 +215,7 @@ describe('AuthGuard', () => {
       });
       const { ctx } = buildContext(bearerHeader('valid.token'));
 
-      await expect(guard.canActivate(ctx)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     });
   });
 

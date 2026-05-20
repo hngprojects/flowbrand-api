@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleDestroy,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import Redis, { RedisOptions } from 'ioredis';
 import { redisConfig } from '../../config/redis.config';
 import * as SYS_MSG from '../../constants/system.messages';
@@ -12,7 +7,6 @@ import * as SYS_MSG from '../../constants/system.messages';
 export class RedisService implements OnModuleInit, OnModuleDestroy {
   private client: Redis;
   private readonly logger = new Logger(RedisService.name);
-
 
   onModuleInit() {
     const { host, port, password, username } = redisConfig();
@@ -31,31 +25,20 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
           return null;
         }
         const delay = Math.min(times * 200, 2000); // 2s max delay
-        this.logger.warn(
-          SYS_MSG.REDIS_RECONNECT_ATTEMPT(times, delay),
-        );
+        this.logger.warn(SYS_MSG.REDIS_RECONNECT_ATTEMPT(times, delay));
         return delay;
       },
     };
 
     this.client = new Redis(options);
 
-    this.client.on('connect', () =>
-      this.logger.log(SYS_MSG.REDIS_CONNECTION_ESTABLISHED),
-    );
-    this.client.on('ready', () =>
-      this.logger.log(SYS_MSG.REDIS_CLIENT_READY),
-    );
-    this.client.on('close', () =>
-      this.logger.warn(SYS_MSG.REDIS_CONNECTION_CLOSED),
-    );
+    this.client.on('connect', () => this.logger.log(SYS_MSG.REDIS_CONNECTION_ESTABLISHED));
+    this.client.on('ready', () => this.logger.log(SYS_MSG.REDIS_CLIENT_READY));
+    this.client.on('close', () => this.logger.warn(SYS_MSG.REDIS_CONNECTION_CLOSED));
     this.client.on('error', (err: Error) => {
       const error = err;
       if (error.message.includes('OOM')) {
-        this.logger.error(
-          SYS_MSG.REDIS_CRITICAL_OOM,
-          error.message,
-        );
+        this.logger.error(SYS_MSG.REDIS_CRITICAL_OOM, error.message);
       } else {
         this.logger.error(SYS_MSG.REDIS_CLIENT_ERROR, error.message);
       }
@@ -63,10 +46,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
     this.client.connect().catch((err) => {
       const error = err as Error;
-      this.logger.error(
-        SYS_MSG.REDIS_INITIAL_CONNECTION_FAILED,
-        error.message,
-      );
+      this.logger.error(SYS_MSG.REDIS_INITIAL_CONNECTION_FAILED, error.message);
     });
   }
 
@@ -144,11 +124,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async rateLimit(
-    key: string,
-    limit: number,
-    windowSeconds: number,
-  ): Promise<{ count: number; exceeded: boolean }> {
+  async rateLimit(key: string, limit: number, windowSeconds: number): Promise<{ count: number; exceeded: boolean }> {
     try {
       // SET NX initializes the key with a TTL atomically on first use;
       // INCR then always operates on a key that already has a TTL.
@@ -167,25 +143,14 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       const keysToDelete: string[] = [];
 
       do {
-        const [nextCursor, keys] = await this.client.scan(
-          cursor,
-          'MATCH',
-          pattern,
-          'COUNT',
-          100,
-        );
+        const [nextCursor, keys] = await this.client.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
         cursor = nextCursor;
         keysToDelete.push(...keys);
       } while (cursor !== '0');
 
       if (keysToDelete.length > 0) {
         await this.client.del(...keysToDelete);
-        this.logger.log(
-          SYS_MSG.REDIS_PATTERN_DELETE_SUCCESS(
-            keysToDelete.length,
-            pattern,
-          ),
-        );
+        this.logger.log(SYS_MSG.REDIS_PATTERN_DELETE_SUCCESS(keysToDelete.length, pattern));
       }
     } catch (err) {
       this.logger.error(`delByPattern failed`, (err as Error).message);

@@ -48,7 +48,7 @@ const LOCAL_RESTAURANT: TemplateDefinition = {
       tasks: [
         'Promote one limited-time meal offer or combo meal discount weekly',
         'Add a direct order CTA link to every post on {{discovery_channel}}',
-        'Send WhatsApp order reminders to people who engaged with this week\'s posts',
+        "Send WhatsApp order reminders to people who engaged with this week's posts",
       ],
     },
     {
@@ -57,8 +57,7 @@ const LOCAL_RESTAURANT: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Repeat visits drive profit. Loyalty offers, birthday discounts, and a VIP list make {{target_customer}} feel chosen rather than processed.',
-      actionPrompt:
-        'Send a weekly loyalty offer to past customers and build a VIP customer list this week.',
+      actionPrompt: 'Send a weekly loyalty offer to past customers and build a VIP customer list this week.',
       tasks: [
         'Send a weekly loyalty offer to past customers (discount, free side, priority booking)',
         'Build a VIP customer list and send a birthday discount or surprise treat',
@@ -81,8 +80,7 @@ const EVENT_CATERING: TemplateDefinition = {
         'Event planners and clients pick caterers based on visible execution. {{business_name}} needs ' +
         'setup photos, transformation content, and testimonials in front of {{target_customer}} ' +
         'every week.',
-      actionPrompt:
-        'Publish event setup photos and one transformation reel this week. Upload one client testimonial.',
+      actionPrompt: 'Publish event setup photos and one transformation reel this week. Upload one client testimonial.',
       tasks: [
         'Post event setup photos and videos on {{discovery_channel}}',
         'Share one catering transformation reel (before, during, after) per week',
@@ -159,10 +157,9 @@ const BAKERY: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Build emotional connection. {{target_customer}} buys cake for moments, not nutrition. Polls, voting, and unboxing content turn followers into buyers.',
-      actionPrompt:
-        'Run one flavour voting poll this week and share two unboxing videos from real customers.',
+      actionPrompt: 'Run one flavour voting poll this week and share two unboxing videos from real customers.',
       tasks: [
-        'Run one flavour voting poll inviting followers to choose next week\'s flavour',
+        "Run one flavour voting poll inviting followers to choose next week's flavour",
         'Share two customer unboxing or first-bite videos',
         'Reply to every comment and DM within a few hours',
       ],
@@ -187,12 +184,11 @@ const BAKERY: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Customers come back for birthdays, anniversaries, and small celebrations. {{business_name}} stays top of mind with a loyalty card and seasonal offers.',
-      actionPrompt:
-        'Launch a loyalty card or stamp programme this week and send holiday offers to past customers.',
+      actionPrompt: 'Launch a loyalty card or stamp programme this week and send holiday offers to past customers.',
       tasks: [
         'Launch a loyalty card system (buy 5, get 1 free or equivalent)',
         'Offer repeat-customer discounts and birthday treats',
-        'Send seasonal offers to past customers (Christmas, Eid, Mother\'s Day)',
+        "Send seasonal offers to past customers (Christmas, Eid, Mother's Day)",
       ],
     },
   ],
@@ -223,8 +219,7 @@ const FOOD_DELIVERY: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Move {{target_customer}} from passive scrolling to an inquiry. Discount codes, customer reviews, and giveaways accelerate engagement.',
-      actionPrompt:
-        'Share one discount code this week and run one giveaway. Repost two customer reviews.',
+      actionPrompt: 'Share one discount code this week and run one giveaway. Repost two customer reviews.',
       tasks: [
         'Share one limited-time discount code with a 48-hour window',
         'Repost two genuine customer reviews on {{discovery_channel}}',
@@ -251,8 +246,7 @@ const FOOD_DELIVERY: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Repeat orders are the unit economics of delivery. Loyalty discounts, subscription meal plans, and referral bonuses all push {{target_customer}} toward ordering again.',
-      actionPrompt:
-        'Send personalised meal offers to past customers and offer a referral bonus this week.',
+      actionPrompt: 'Send personalised meal offers to past customers and offer a referral bonus this week.',
       tasks: [
         'Send a loyalty meal discount to customers who have ordered 3+ times',
         'Offer a referral bonus where both giver and receiver get credit',
@@ -287,8 +281,7 @@ const FOOD_TRUCK: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Build community engagement. {{target_customer}} who feels they have a say in where you park next week will come and bring friends.',
-      actionPrompt:
-        'Run a "vote for next location" poll this week and share two customer reaction videos.',
+      actionPrompt: 'Run a "vote for next location" poll this week and share two customer reaction videos.',
       tasks: [
         'Run a weekly "vote for next location" poll on {{discovery_channel}}',
         'Share two customer reaction videos showing real reactions to your food',
@@ -301,8 +294,7 @@ const FOOD_TRUCK: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Daily sales depend on urgency. Lunchtime windows, QR-coded ordering, and real-time queue updates turn passers-by into customers.',
-      actionPrompt:
-        'Offer one lunchtime combo deal this week. Print and display QR codes for faster ordering.',
+      actionPrompt: 'Offer one lunchtime combo deal this week. Print and display QR codes for faster ordering.',
       tasks: [
         'Offer one lunchtime combo deal with a clear time-limited window',
         'Use QR codes at the truck for faster ordering and payment',
@@ -314,9 +306,8 @@ const FOOD_TRUCK: TemplateDefinition = {
       name: 'Bring Them Back',
       channel: CHANNEL,
       explanation:
-        'Repeat customers are a food truck\'s lifeblood. A loyalty stamp system and location-reminder broadcasts keep {{target_customer}} returning week after week.',
-      actionPrompt:
-        'Launch a loyalty stamp system this week. Send location reminders to your top 20 customers.',
+        "Repeat customers are a food truck's lifeblood. A loyalty stamp system and location-reminder broadcasts keep {{target_customer}} returning week after week.",
+      actionPrompt: 'Launch a loyalty stamp system this week. Send location reminders to your top 20 customers.',
       tasks: [
         'Launch a loyalty stamp or reward system (buy 5, get 1 free)',
         'Send location reminders to repeat customers when you park near them',

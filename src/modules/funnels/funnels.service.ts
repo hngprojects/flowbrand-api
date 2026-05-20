@@ -15,8 +15,8 @@ function mapStageCounts(raw: RawCountRow[] | undefined) {
 
   for (const row of raw) {
     const stageId = (row.stage_id ?? row.stageId) as string | undefined;
-    const total = Number((row.total ?? row.total_count ?? 0));
-    const complete = Number((row.complete ?? row.complete_count ?? 0));
+    const total = Number(row.total ?? row.total_count ?? 0);
+    const complete = Number(row.complete ?? row.complete_count ?? 0);
 
     if (stageId) {
       map.set(stageId, {
@@ -50,7 +50,8 @@ export class FunnelsService {
 
   async listForUser(userId: string, page?: number, perPage?: number) {
     const { page: p, per_page: per } = this.normalizePagination(page, perPage);
-    const qb = this.funnelRepo.createQueryBuilder('f')
+    const qb = this.funnelRepo
+      .createQueryBuilder('f')
       .where('f.user_id = :userId', { userId })
       .orderBy('f.created_at', 'DESC')
       .skip((p - 1) * per)
@@ -81,7 +82,8 @@ export class FunnelsService {
     if (!funnel) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
 
     // load stages with tasks ordered
-    const stages = await this.stageRepo.createQueryBuilder('s')
+    const stages = await this.stageRepo
+      .createQueryBuilder('s')
       .where('s.funnel_id = :funnelId', { funnelId })
       .orderBy('s.position', 'ASC')
       .leftJoinAndSelect('s.tasks', 't')
@@ -91,14 +93,14 @@ export class FunnelsService {
     const stageIds = stages.map((s) => s.id);
     let countsMap = new Map<string, { total: number; complete: number }>();
     if (stageIds.length) {
-      const rawCounts = (await this.taskRepo
+      const rawCounts = await this.taskRepo
         .createQueryBuilder('t')
         .select('t.stage_id', 'stage_id')
         .addSelect('COUNT(*)', 'total')
         .addSelect("SUM(CASE WHEN t.status = 'complete' THEN 1 ELSE 0 END)", 'complete')
         .where('t.stage_id IN (:...ids)', { ids: stageIds })
         .groupBy('t.stage_id')
-        .getRawMany());
+        .getRawMany();
 
       countsMap = mapStageCounts(rawCounts);
     }
@@ -115,7 +117,7 @@ export class FunnelsService {
       actionPrompt: s.action_prompt,
       tasks: (s.tasks ?? []).map((t) => ({ id: t.id, position: t.position, name: t.name, status: t.status })),
       tasksTotal: countsMap.get(s.id)?.total ?? (s.tasks ?? []).length,
-      tasksComplete: countsMap.get(s.id)?.complete ?? ((s.tasks ?? []).filter((t) => t.status === 'complete').length),
+      tasksComplete: countsMap.get(s.id)?.complete ?? (s.tasks ?? []).filter((t) => t.status === 'complete').length,
     }));
 
     return {
@@ -132,7 +134,8 @@ export class FunnelsService {
     const funnel = await this.funnelRepo.findOne({ where: { id: funnelId, user_id: userId } });
     if (!funnel) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
 
-    const stages = await this.stageRepo.createQueryBuilder('s')
+    const stages = await this.stageRepo
+      .createQueryBuilder('s')
       .where('s.funnel_id = :funnelId', { funnelId })
       .orderBy('s.position', 'ASC')
       .getMany();
@@ -140,14 +143,14 @@ export class FunnelsService {
     const stageIds = stages.map((s) => s.id);
     let countsSummary = new Map<string, { total: number; complete: number }>();
     if (stageIds.length) {
-      const rawCounts = (await this.taskRepo
+      const rawCounts = await this.taskRepo
         .createQueryBuilder('t')
         .select('t.stage_id', 'stage_id')
         .addSelect('COUNT(*)', 'total')
         .addSelect("SUM(CASE WHEN t.status = 'complete' THEN 1 ELSE 0 END)", 'complete')
         .where('t.stage_id IN (:...ids)', { ids: stageIds })
         .groupBy('t.stage_id')
-        .getRawMany());
+        .getRawMany();
 
       countsSummary = mapStageCounts(rawCounts);
     }
@@ -180,12 +183,12 @@ export class FunnelsService {
     }
 
     // load tasks ordered
-    const tasks = await this.taskRepo.createQueryBuilder('t')
+    const tasks = await this.taskRepo
+      .createQueryBuilder('t')
       .where('t.stage_id = :stageId', { stageId })
       .orderBy('t.position', 'ASC')
       .getMany();
 
-     
     const raw = (await this.taskRepo
       .createQueryBuilder('t')
       .select('COUNT(*)', 'total')

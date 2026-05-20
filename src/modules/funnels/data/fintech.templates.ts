@@ -13,8 +13,7 @@ const DIGITAL_WALLET: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         '{{target_customer}} who has never used a digital wallet needs to discover {{business_name}} and quickly understand what they would gain. Education comes before promotion in fintech.',
-      actionPrompt:
-        'Publish 3 educational posts this week on cashless payments, transfer speed, and payment security.',
+      actionPrompt: 'Publish 3 educational posts this week on cashless payments, transfer speed, and payment security.',
       tasks: [
         'Post one educational piece on the benefits of cashless payments',
         'Share a short video showing how fast transfers work end-to-end',
@@ -27,8 +26,7 @@ const DIGITAL_WALLET: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Convince {{target_customer}} the platform is safe and reliable. Fintech trust is built through visible reviews, transparent fraud-prevention, and honest comparisons.',
-      actionPrompt:
-        'Share customer testimonials this week and one comparison post versus traditional banks.',
+      actionPrompt: 'Share customer testimonials this week and one comparison post versus traditional banks.',
       tasks: [
         'Share 3 customer reviews and testimonials with names or initials',
         'Publish a post explaining your fraud prevention systems in plain language',
@@ -77,8 +75,7 @@ const LOAN_FINTECH: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         '{{target_customer}} business owners who could benefit from financing often do not know structured loan options exist. {{business_name}} needs to make funding visible and aspirational.',
-      actionPrompt:
-        'Publish 3 awareness pieces this week on funding tips, loan use-cases, and SMB success stories.',
+      actionPrompt: 'Publish 3 awareness pieces this week on funding tips, loan use-cases, and SMB success stories.',
       tasks: [
         'Publish one funding tip aimed at SMBs (what to use a loan for, what to avoid)',
         'Share one video explaining business loans without jargon',
@@ -119,8 +116,7 @@ const LOAN_FINTECH: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Help approved borrowers complete verification and receive funds. Drop-off after approval is a silent killer; {{business_name}} stays present until money hits the account.',
-      actionPrompt:
-        'Send document upload reminders this week. Trigger support for any stuck applicant.',
+      actionPrompt: 'Send document upload reminders this week. Trigger support for any stuck applicant.',
       tasks: [
         'Send document upload reminders within 24 hours of approval',
         'Provide an onboarding checklist showing what is needed from approval to disbursement',
@@ -169,8 +165,7 @@ const INVESTMENT_SAVINGS: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Increase savings or investment account signups. The lowest-friction message is "start small": a single low minimum often unlocks the first account.',
-      actionPrompt:
-        'Offer signup rewards this week. Send reminders to anyone who started signup but did not complete.',
+      actionPrompt: 'Offer signup rewards this week. Send reminders to anyone who started signup but did not complete.',
       tasks: [
         'Offer a signup reward (matched first deposit, bonus interest) for new accounts',
         'Send abandoned-signup reminders within 24 hours of incomplete registration',
@@ -183,8 +178,7 @@ const INVESTMENT_SAVINGS: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Activate users by encouraging the first deposit or investment. {{business_name}} keeps {{target_customer}} engaged with milestone rewards and progress tracking.',
-      actionPrompt:
-        'Send deposit reminders to registered users this week. Trigger beginner walkthrough tutorials.',
+      actionPrompt: 'Send deposit reminders to registered users this week. Trigger beginner walkthrough tutorials.',
       tasks: [
         'Send first-deposit reminders to registered users who have not funded yet',
         'Trigger beginner walkthrough tutorials in-app for first-time investors',
@@ -219,8 +213,7 @@ const CROSS_COUNTRY_PAYMENT: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Build confidence in transaction safety and speed. {{target_customer}} switches to a new payment platform only after seeing real reviews and verifiable transaction times.',
-      actionPrompt:
-        'Share customer reviews and transaction-speed data this week. Publish a security explainer.',
+      actionPrompt: 'Share customer reviews and transaction-speed data this week. Publish a security explainer.',
       tasks: [
         'Share 3 customer reviews focused on transfer speed and reliability',
         'Publish transaction speed statistics (median completion time, success rate)',
@@ -233,8 +226,7 @@ const CROSS_COUNTRY_PAYMENT: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Increase transfer account registrations. Discounted transfer fees on the first send remove the perceived cost of trying.',
-      actionPrompt:
-        'Offer discounted transfer fees for new users this week. Send onboarding reminders.',
+      actionPrompt: 'Offer discounted transfer fees for new users this week. Send onboarding reminders.',
       tasks: [
         'Offer discounted transfer fees for the first 1-3 transfers per new user',
         'Send onboarding reminders to incomplete registrations within 24 hours',
@@ -247,8 +239,7 @@ const CROSS_COUNTRY_PAYMENT: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Activate first international transfers and repeat use. {{business_name}} converts curious signups into active senders with reminders and promotional FX rates.',
-      actionPrompt:
-        'Send first-transfer reminders to registered users this week. Offer promotional exchange rates.',
+      actionPrompt: 'Send first-transfer reminders to registered users this week. Offer promotional exchange rates.',
       tasks: [
         'Send first-transfer reminders to registered users who have not transferred yet',
         'Offer promotional exchange rates on the first scheduled transfer',

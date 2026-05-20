@@ -25,10 +25,7 @@ export class HealthController {
   @Public()
   @Get()
   async check(@Res({ passthrough: true }) res: Response) {
-    const [queueHealthy, dbHealthy] = await Promise.all([
-      this.checkQueue(),
-      this.checkDb(),
-    ]);
+    const [queueHealthy, dbHealthy] = await Promise.all([this.checkQueue(), this.checkDb()]);
 
     const healthy = queueHealthy && dbHealthy;
     res.status(healthy ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE);

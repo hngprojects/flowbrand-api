@@ -11,15 +11,7 @@ const CHANNEL = '{{discovery_channel}}';
 const BEAUTY_GENERAL: TemplateDefinition = {
   id: 'beauty:general',
   industry: 'beauty',
-  businessType: [
-    'beauty',
-    'cosmetics',
-    'skincare',
-    'salon',
-    'beauty_brand',
-    'beauty_service',
-    'makeup',
-  ],
+  businessType: ['beauty', 'cosmetics', 'skincare', 'salon', 'beauty_brand', 'beauty_service', 'makeup'],
   stages: [
     {
       position: 1,
@@ -88,6 +80,4 @@ const BEAUTY_GENERAL: TemplateDefinition = {
   ],
 };
 
-export const BEAUTY_TEMPLATES: readonly TemplateDefinition[] = [
-  BEAUTY_GENERAL,
-] as const;
+export const BEAUTY_TEMPLATES: readonly TemplateDefinition[] = [BEAUTY_GENERAL] as const;

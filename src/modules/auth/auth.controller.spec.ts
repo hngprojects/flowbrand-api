@@ -54,16 +54,11 @@ describe('AuthController Google OAuth', () => {
       'refresh.jwt',
       expect.objectContaining({ httpOnly: true, sameSite: 'strict' }),
     );
-    expect(redirect).toHaveBeenCalledWith(
-      HttpStatus.FOUND,
-      'http://localhost:3000/onboarding#access_token=access.jwt',
-    );
+    expect(redirect).toHaveBeenCalledWith(HttpStatus.FOUND, 'http://localhost:3000/onboarding#access_token=access.jwt');
   });
 
   it('throws unauthorized when Google callback has no payload', async () => {
-    await expect(
-      controller.googleAuthRedirect({} as never, {} as never),
-    ).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(controller.googleAuthRedirect({} as never, {} as never)).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });
 
@@ -146,9 +141,9 @@ describe('AuthController - Password Reset Flow (BE-012)', () => {
         new HttpException(SYS_MSG.PASSWORD_RESET_RATE_LIMITED, HttpStatus.TOO_MANY_REQUESTS),
       );
 
-      await expect(
-        controller.forgotPassword(forgotPasswordDto, mockResponse as Response)
-      ).rejects.toThrow(HttpException);
+      await expect(controller.forgotPassword(forgotPasswordDto, mockResponse as Response)).rejects.toThrow(
+        HttpException,
+      );
     });
 
     it('calls service with correct email parameter', async () => {
@@ -179,18 +174,14 @@ describe('AuthController - Password Reset Flow (BE-012)', () => {
 
       await controller.resetPassword(resetPasswordDto, mockResponse as Response);
 
-      expect(mockAuthService.resetPassword).toHaveBeenCalledWith(
-        USER_EMAIL,
-        OTP_CODE,
-        NEW_PASSWORD
-      );
+      expect(mockAuthService.resetPassword).toHaveBeenCalledWith(USER_EMAIL, OTP_CODE, NEW_PASSWORD);
       expect(mockResponse.cookie).toHaveBeenCalledWith(
         'refreshToken',
         REFRESH_TOKEN,
         expect.objectContaining({
           httpOnly: true,
           sameSite: 'strict',
-        })
+        }),
       );
       expect(mockResponse.json).toHaveBeenCalledWith({
         statusCode: HttpStatus.OK,
@@ -208,10 +199,8 @@ describe('AuthController - Password Reset Flow (BE-012)', () => {
         new HttpException(SYS_MSG.PASSWORD_RESET_INVALID_OTP, HttpStatus.BAD_REQUEST),
       );
 
-      await expect(
-        controller.resetPassword(resetPasswordDto, mockResponse as Response)
-      ).rejects.toThrow(HttpException);
-      
+      await expect(controller.resetPassword(resetPasswordDto, mockResponse as Response)).rejects.toThrow(HttpException);
+
       expect(mockResponse.cookie).not.toHaveBeenCalled();
     });
 
@@ -220,9 +209,7 @@ describe('AuthController - Password Reset Flow (BE-012)', () => {
         new HttpException(SYS_MSG.PASSWORD_RESET_EXPIRED, HttpStatus.BAD_REQUEST),
       );
 
-      await expect(
-        controller.resetPassword(resetPasswordDto, mockResponse as Response)
-      ).rejects.toThrow(HttpException);
+      await expect(controller.resetPassword(resetPasswordDto, mockResponse as Response)).rejects.toThrow(HttpException);
     });
 
     it('AC-05: returns 429 when rate limit exceeded', async () => {
@@ -230,15 +217,13 @@ describe('AuthController - Password Reset Flow (BE-012)', () => {
         new HttpException(SYS_MSG.PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS),
       );
 
-      await expect(
-        controller.resetPassword(resetPasswordDto, mockResponse as Response)
-      ).rejects.toThrow(HttpException);
+      await expect(controller.resetPassword(resetPasswordDto, mockResponse as Response)).rejects.toThrow(HttpException);
     });
 
     it('sets secure cookie options in production', async () => {
       const originalEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'production';
-      
+
       mockAuthService.resetPassword.mockResolvedValue(authResponse);
 
       await controller.resetPassword(resetPasswordDto, mockResponse as Response);
@@ -250,27 +235,25 @@ describe('AuthController - Password Reset Flow (BE-012)', () => {
           httpOnly: true,
           secure: true,
           sameSite: 'strict',
-        })
+        }),
       );
 
       process.env.NODE_ENV = originalEnv;
     });
 
     it('handles service errors without setting cookie', async () => {
-      mockAuthService.resetPassword.mockRejectedValue(
-        new Error('Database connection failed'),
+      mockAuthService.resetPassword.mockRejectedValue(new Error('Database connection failed'));
+
+      await expect(controller.resetPassword(resetPasswordDto, mockResponse as Response)).rejects.toThrow(
+        'Database connection failed',
       );
 
-      await expect(
-        controller.resetPassword(resetPasswordDto, mockResponse as Response)
-      ).rejects.toThrow('Database connection failed');
-      
       expect(mockResponse.cookie).not.toHaveBeenCalled();
     });
 
     it('validates DTO - missing email', async () => {
       const invalidDto = { otp: OTP_CODE, password: NEW_PASSWORD };
-      
+
       // This should be caught by validation pipe, not the controller
       expect(invalidDto).not.toHaveProperty('email');
     });
@@ -281,7 +264,7 @@ describe('AuthController - Password Reset Flow (BE-012)', () => {
         otp: '12345', // 5 digits instead of 6
         password: NEW_PASSWORD,
       };
-      
+
       expect(invalidDto.otp.length).toBeLessThan(6);
     });
   });
@@ -293,12 +276,12 @@ describe('AuthController - Password Reset Flow (BE-012)', () => {
         refreshToken: REFRESH_TOKEN,
         user: mockUser,
       };
-      
+
       mockAuthService.resetPassword.mockResolvedValue(authResponse);
 
       await controller.resetPassword(
         { email: USER_EMAIL, otp_code: OTP_CODE, password: NEW_PASSWORD },
-        mockResponse as Response
+        mockResponse as Response,
       );
 
       const jsonCall = (mockResponse.json as jest.Mock).mock.calls[0][0];

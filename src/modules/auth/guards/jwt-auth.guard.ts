@@ -1,10 +1,4 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  Logger,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
@@ -35,19 +29,17 @@ export class AuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const token = this.extractTokenFromHeader(request);
 
-    const isPublicRoute = this.reflector.getAllAndOverride<boolean>(
-      IS_PUBLIC_KEY,
-      [context.getHandler(), context.getClass()],
-    );
+    const isPublicRoute = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
     if (isPublicRoute) {
       return true;
     }
 
     if (!token) {
-      throw new UnauthorizedException(
-        SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE,
-      );
+      throw new UnauthorizedException(SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE);
     }
 
     let payload: JwtPayload | null;
@@ -57,23 +49,17 @@ export class AuthGuard implements CanActivate {
         secret: jwtConfig().accessSecret,
       });
     } catch {
-      throw new UnauthorizedException(
-        SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE,
-      );
+      throw new UnauthorizedException(SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE);
     }
 
     if (!payload) {
-      throw new UnauthorizedException(
-        SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE,
-      );
+      throw new UnauthorizedException(SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE);
     }
 
     const { sessionId, sub: userId } = payload;
 
     if (!sessionId) {
-      throw new UnauthorizedException(
-        SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE,
-      );
+      throw new UnauthorizedException(SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE);
     }
 
     const sessionKey = `sess:${userId}:${sessionId}`;
@@ -81,16 +67,12 @@ export class AuthGuard implements CanActivate {
 
     if (!sessionData) {
       this.logger.warn('Session not found or Redis unreachable');
-      throw new UnauthorizedException(
-        SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE,
-      );
+      throw new UnauthorizedException(SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE);
     }
 
     const user = await this.userService.findById(userId).catch(() => null);
     if (!user || user.deleted_at !== null || !user.is_active) {
-      throw new UnauthorizedException(
-        SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE,
-      );
+      throw new UnauthorizedException(SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE);
     }
 
     request.user = payload;

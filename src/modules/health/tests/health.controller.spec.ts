@@ -130,7 +130,7 @@ describe('HealthController', () => {
 
     it('marks queue as down when getJobCounts does not resolve within 2 seconds', async () => {
       mockFunnelQueue.getJobCounts.mockImplementation(
-        () => new Promise(() => {}),  // never resolves
+        () => new Promise(() => {}), // never resolves
       );
       mockDataSource.query.mockResolvedValue([]);
 
@@ -158,7 +158,7 @@ describe('HealthController', () => {
     it('marks db as down when query does not resolve within 2 seconds', async () => {
       mockFunnelQueue.getJobCounts.mockResolvedValue({});
       mockDataSource.query.mockImplementation(
-        () => new Promise(() => {}),  // never resolves
+        () => new Promise(() => {}), // never resolves
       );
 
       const resultPromise = controller.check(buildMockRes());

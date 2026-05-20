@@ -18,10 +18,7 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
   // idempotency_key) already exists, otherwise null. The global UNIQUE
   // constraint on idempotency_key plus the user_id filter together prevent
   // cross-user reuse.
-  async findByIdempotency(
-    userId: string,
-    idempotencyKey: string,
-  ): Promise<Funnel | null> {
+  async findByIdempotency(userId: string, idempotencyKey: string): Promise<Funnel | null> {
     return this.funnelRepository.findOne({
       where: { user_id: userId, idempotency_key: idempotencyKey },
     });

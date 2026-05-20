@@ -87,11 +87,13 @@ describe('auth-swagger.doc.ts', () => {
     handler({} as never, res as never);
 
     expect(type).toHaveBeenCalledWith('application/javascript');
-    expect(send).toHaveBeenCalledWith(expect.stringContaining("/auth/google/callback"));
+    expect(send).toHaveBeenCalledWith(expect.stringContaining('/auth/google/callback'));
     expect(send).toHaveBeenCalledWith(expect.stringContaining(`status: 302`));
     expect(send).toHaveBeenCalledWith(expect.stringContaining(`Response.redirect(callbackRedirectUrl, 302)`));
     // The injected script now uses a server-provided FRONTEND_BASE value instead of window.location.origin
-    expect(send).toHaveBeenCalledWith(expect.stringContaining(`FRONTEND_BASE + '/onboarding#access_token=jwt.access.token'`));
+    expect(send).toHaveBeenCalledWith(
+      expect.stringContaining(`FRONTEND_BASE + '/onboarding#access_token=jwt.access.token'`),
+    );
   });
 
   it('EC-01 — skips the Swagger OAuth mock registration in production mode', () => {

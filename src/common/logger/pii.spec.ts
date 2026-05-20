@@ -22,7 +22,7 @@ describe('maskId', () => {
   });
 
   it('returns safe fallback for null-ish input', () => {
-    expect(maskId(null as any)).toBe('usr_****');
+    expect(maskId(null)).toBe('usr_****');
   });
 });
 

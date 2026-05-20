@@ -29,7 +29,7 @@ export class ExtractionProcessor {
   @Process(JOBS.EXTRACT_TEXT)
   async handleExtraction(job: Job<ExtractionJobPayload>): Promise<void> {
     const { uploadId, fileType, storagePath } = job.data;
-    
+
     this.logger.log({ message: 'extraction_start', uploadId });
 
     const row = await this.uploadedDocumentAction.get({ identifierOptions: { id: uploadId } });
@@ -66,6 +66,11 @@ export class ExtractionProcessor {
 
   @OnQueueFailed()
   onFailed(job: Job<ExtractionJobPayload>, error: Error): void {
-    this.logger.error({ event: 'extraction_job_failed', jobId: job.id, uploadId: job.data.uploadId, error: error.message });
+    this.logger.error({
+      event: 'extraction_job_failed',
+      jobId: job.id,
+      uploadId: job.data.uploadId,
+      error: error.message,
+    });
   }
 }

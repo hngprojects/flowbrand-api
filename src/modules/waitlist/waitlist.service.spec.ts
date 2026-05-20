@@ -79,10 +79,9 @@ describe('WaitlistService', () => {
           },
         }),
       );
-      expect(mockEmailService.sendWaitlistConfirmation).toHaveBeenCalledWith(
-        NEW_USER.email,
-        { user: { name: 'testuser' } },
-      );
+      expect(mockEmailService.sendWaitlistConfirmation).toHaveBeenCalledWith(NEW_USER.email, {
+        user: { name: 'testuser' },
+      });
 
       expect(result).toEqual({ user: NEW_USER, isNew: true });
     });
@@ -90,35 +89,31 @@ describe('WaitlistService', () => {
     it('should extract name properly from email for the email payload', async () => {
       const weirdEmailDto = { email: 'john.doe.123@domain.co.uk' };
       const weirdUser = { id: 'uuid-3', email: weirdEmailDto.email, is_notified: false };
-      
+
       mockWaitlistAction.findByEmail.mockResolvedValue(null);
       mockWaitlistAction.create.mockResolvedValue(weirdUser);
 
       await service.joinWaitlist(weirdEmailDto);
 
-      expect(mockEmailService.sendWaitlistConfirmation).toHaveBeenCalledWith(
-        weirdUser.email,
-        { user: { name: 'john.doe.123' } },
-      );
+      expect(mockEmailService.sendWaitlistConfirmation).toHaveBeenCalledWith(weirdUser.email, {
+        user: { name: 'john.doe.123' },
+      });
     });
 
     it('should swallow email service errors but still return the created user', async () => {
       mockWaitlistAction.findByEmail.mockResolvedValue(null);
       mockWaitlistAction.create.mockResolvedValue(NEW_USER);
-      
+
       const error = new Error('Redis connection failed');
       mockEmailService.sendWaitlistConfirmation.mockRejectedValue(error);
-      
+
       const loggerSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
 
       const result = await service.joinWaitlist(DTO);
 
       expect(mockEmailService.sendWaitlistConfirmation).toHaveBeenCalled();
-      expect(loggerSpy).toHaveBeenCalledWith(
-        `Failed to queue waitlist email for te***@example.com`,
-        error.stack,
-      );
-      
+      expect(loggerSpy).toHaveBeenCalledWith(`Failed to queue waitlist email for te***@example.com`, error.stack);
+
       // Still returns success for the user
       expect(result).toEqual({ user: NEW_USER, isNew: true });
     });

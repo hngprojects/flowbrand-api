@@ -379,7 +379,7 @@ describe('AuthService - Password Reset Flow (BE-012)', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-   
+
     mockUsersService = {
       findByEmail: jest.fn(),
       update: jest.fn(),
@@ -398,7 +398,7 @@ describe('AuthService - Password Reset Flow (BE-012)', () => {
       del: jest.fn(),
       set: jest.fn().mockResolvedValue('OK'),
       get: jest.fn(),
-      setNx: jest.fn().mockResolvedValue(1),  
+      setNx: jest.fn().mockResolvedValue(1),
       setStrict: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -491,7 +491,7 @@ describe('AuthService - Password Reset Flow (BE-012)', () => {
       const replaceCall = mockOtpTokenModelAction.replaceToken.mock.calls[0][0];
       const expiresAt = replaceCall.expires_at.getTime();
       const after = Date.now();
-      
+
       expect(expiresAt).toBeGreaterThanOrEqual(before + 15 * 60 * 1000 - 1000);
       expect(expiresAt).toBeLessThanOrEqual(after + 15 * 60 * 1000 + 1000);
     });
@@ -500,142 +500,135 @@ describe('AuthService - Password Reset Flow (BE-012)', () => {
       mockUsersService.findByEmail.mockResolvedValue(validUser);
       mockRedisService.incr.mockResolvedValue(4);
 
-      await expect(service.forgotPassword(USER_EMAIL)).rejects.toThrow(
-        SYS_MSG.PASSWORD_RESET_RATE_LIMITED
-      );
+      await expect(service.forgotPassword(USER_EMAIL)).rejects.toThrow(SYS_MSG.PASSWORD_RESET_RATE_LIMITED);
     });
   });
 
   describe('resetPassword', () => {
-  beforeEach(() => {
-    mockRedisService.rateLimit.mockResolvedValue({ exceeded: false });
-    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-    (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
-    mockUserSessionModelAction.findByUserId.mockResolvedValue([]);
-    mockJwtService.signAsync.mockResolvedValue('new.jwt.token');
-    mockUserSessionModelAction.createSession.mockResolvedValue({ id: 'new-session' });
-    mockUsersService.update.mockResolvedValue({ ...validUser });
-    mockRedisService.setStrict.mockResolvedValue(undefined);
-  });
-
-  it('AC-06: successfully resets password and auto-logs in user', async () => {
-    mockUsersService.findByEmail.mockResolvedValue(validUser);
-    mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
-
-    const result = await service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD);
-
-    expect(result).toHaveProperty('accessToken');
-    expect(result).toHaveProperty('refreshToken');
-    expect(result).toHaveProperty('user');
-  });
-
-  it('AC-07: throws 400 when OTP is invalid', async () => {
-    mockUsersService.findByEmail.mockResolvedValue(validUser);
-    mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(null);
-
-    await expect(
-      service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD)
-    ).rejects.toThrow(SYS_MSG.PASSWORD_RESET_INVALID_OTP);
-  });
-
-  it('AC-07: throws 400 when OTP code does not match', async () => {
-    mockUsersService.findByEmail.mockResolvedValue(validUser);
-    mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
-    (bcrypt.compare as jest.Mock).mockResolvedValue(false);
-
-    await expect(
-      service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD)
-    ).rejects.toThrow(SYS_MSG.PASSWORD_RESET_INVALID_OTP);
-  });
-
-  it('AC-08: throws 400 when OTP is expired', async () => {
-    mockUsersService.findByEmail.mockResolvedValue(validUser);
-    mockOtpTokenModelAction.findByUserAndType.mockResolvedValue({
-      ...validOtpToken,
-      expires_at: new Date(Date.now() - 1000),
+    beforeEach(() => {
+      mockRedisService.rateLimit.mockResolvedValue({ exceeded: false });
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
+      mockUserSessionModelAction.findByUserId.mockResolvedValue([]);
+      mockJwtService.signAsync.mockResolvedValue('new.jwt.token');
+      mockUserSessionModelAction.createSession.mockResolvedValue({ id: 'new-session' });
+      mockUsersService.update.mockResolvedValue({ ...validUser });
+      mockRedisService.setStrict.mockResolvedValue(undefined);
     });
 
-    await expect(
-      service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD)
-    ).rejects.toThrow(SYS_MSG.PASSWORD_RESET_EXPIRED);
+    it('AC-06: successfully resets password and auto-logs in user', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(validUser);
+      mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
+
+      const result = await service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD);
+
+      expect(result).toHaveProperty('accessToken');
+      expect(result).toHaveProperty('refreshToken');
+      expect(result).toHaveProperty('user');
+    });
+
+    it('AC-07: throws 400 when OTP is invalid', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(validUser);
+      mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(null);
+
+      await expect(service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD)).rejects.toThrow(
+        SYS_MSG.PASSWORD_RESET_INVALID_OTP,
+      );
+    });
+
+    it('AC-07: throws 400 when OTP code does not match', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(validUser);
+      mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      await expect(service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD)).rejects.toThrow(
+        SYS_MSG.PASSWORD_RESET_INVALID_OTP,
+      );
+    });
+
+    it('AC-08: throws 400 when OTP is expired', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(validUser);
+      mockOtpTokenModelAction.findByUserAndType.mockResolvedValue({
+        ...validOtpToken,
+        expires_at: new Date(Date.now() - 1000),
+      });
+
+      await expect(service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD)).rejects.toThrow(
+        SYS_MSG.PASSWORD_RESET_EXPIRED,
+      );
+    });
+
+    it('AC-09: throws 400 when email does not exist (prevents enumeration)', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(null);
+
+      await expect(service.resetPassword('nonexistent@example.com', OTP_CODE, NEW_PASSWORD)).rejects.toThrow(
+        SYS_MSG.PASSWORD_RESET_INVALID_OTP,
+      );
+    });
+
+    it('AC-10: rate limits verification attempts to 5 per 5 minutes', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(validUser);
+      mockRedisService.rateLimit.mockResolvedValue({ exceeded: true });
+
+      await expect(service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD)).rejects.toThrow(
+        SYS_MSG.PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED,
+      );
+    });
+
+    it('AC-11: revokes all existing user sessions after password change', async () => {
+      const sessions = [
+        { id: 'session-1', is_revoked: false },
+        { id: 'session-2', is_revoked: false },
+      ];
+
+      mockUsersService.findByEmail.mockResolvedValue(validUser);
+      mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
+      mockUsersService.update.mockResolvedValue({ ...validUser });
+      mockUserSessionModelAction.findByUserId.mockResolvedValue(sessions);
+      mockUserSessionModelAction.updateById.mockResolvedValue({});
+
+      await service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD);
+
+      // Check that updateById was called with is_revoked: true for each session
+      const updateCalls = mockUserSessionModelAction.updateById.mock.calls;
+      const revokedSessionUpdates = updateCalls.filter((call) => call[1]?.is_revoked === true);
+      expect(revokedSessionUpdates.length).toBe(2);
+    });
+
+    it('AC-12: deletes the OTP token after successful reset', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(validUser);
+      mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
+      mockUsersService.update.mockResolvedValue({ ...validUser });
+      mockUserSessionModelAction.findByUserId.mockResolvedValue([]);
+
+      await service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD);
+
+      expect(mockOtpTokenModelAction.delete).toHaveBeenCalled();
+    });
+
+    it('AC-13: issues new access and refresh tokens for auto-login', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(validUser);
+      mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
+      mockUsersService.update.mockResolvedValue({ ...validUser });
+      mockUserSessionModelAction.findByUserId.mockResolvedValue([]);
+      mockJwtService.signAsync.mockResolvedValue('brand-new-jwt-token');
+
+      const result = await service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD);
+
+      expect(mockJwtService.signAsync).toHaveBeenCalled();
+      expect(result.accessToken).toBe('brand-new-jwt-token');
+    });
+
+    it('AC-14: updates password with bcrypt hash', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(validUser);
+      mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
+      mockUserSessionModelAction.findByUserId.mockResolvedValue([]);
+
+      mockUsersService.update.mockResolvedValue({ ...validUser });
+
+      await service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD);
+
+      expect(mockUsersService.update).toHaveBeenCalledWith(USER_ID, { password: NEW_PASSWORD });
+    });
   });
-
-  it('AC-09: throws 400 when email does not exist (prevents enumeration)', async () => {
-    mockUsersService.findByEmail.mockResolvedValue(null);
-
-    await expect(
-      service.resetPassword('nonexistent@example.com', OTP_CODE, NEW_PASSWORD)
-    ).rejects.toThrow(SYS_MSG.PASSWORD_RESET_INVALID_OTP);
-  });
-
-  it('AC-10: rate limits verification attempts to 5 per 5 minutes', async () => {
-    mockUsersService.findByEmail.mockResolvedValue(validUser);
-    mockRedisService.rateLimit.mockResolvedValue({ exceeded: true });
-
-    await expect(
-      service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD)
-    ).rejects.toThrow(SYS_MSG.PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED);
-  });
-
-  it('AC-11: revokes all existing user sessions after password change', async () => {
-    const sessions = [
-      { id: 'session-1', is_revoked: false },
-      { id: 'session-2', is_revoked: false },
-    ];
-    
-    mockUsersService.findByEmail.mockResolvedValue(validUser);
-    mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
-    mockUsersService.update.mockResolvedValue({ ...validUser });
-    mockUserSessionModelAction.findByUserId.mockResolvedValue(sessions);
-    mockUserSessionModelAction.updateById.mockResolvedValue({});
-
-    await service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD);
-
-    // Check that updateById was called with is_revoked: true for each session
-    const updateCalls = mockUserSessionModelAction.updateById.mock.calls;
-    const revokedSessionUpdates = updateCalls.filter(call => 
-      call[1]?.is_revoked === true
-    );
-    expect(revokedSessionUpdates.length).toBe(2);
-  });
-
-  it('AC-12: deletes the OTP token after successful reset', async () => {
-    mockUsersService.findByEmail.mockResolvedValue(validUser);
-    mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
-    mockUsersService.update.mockResolvedValue({ ...validUser });
-    mockUserSessionModelAction.findByUserId.mockResolvedValue([]);
-
-    await service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD);
-
-    expect(mockOtpTokenModelAction.delete).toHaveBeenCalled();
-  });
-
-  it('AC-13: issues new access and refresh tokens for auto-login', async () => {
-    mockUsersService.findByEmail.mockResolvedValue(validUser);
-    mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
-    mockUsersService.update.mockResolvedValue({ ...validUser });
-    mockUserSessionModelAction.findByUserId.mockResolvedValue([]);
-    mockJwtService.signAsync.mockResolvedValue('brand-new-jwt-token');
-
-    const result = await service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD);
-
-    expect(mockJwtService.signAsync).toHaveBeenCalled();
-    expect(result.accessToken).toBe('brand-new-jwt-token');
-  });
-
-  it('AC-14: updates password with bcrypt hash', async () => {
-    mockUsersService.findByEmail.mockResolvedValue(validUser);
-    mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
-    mockUserSessionModelAction.findByUserId.mockResolvedValue([]);
-    
-    mockUsersService.update.mockResolvedValue({ ...validUser });
-
-    await service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD);
-
-    expect(mockUsersService.update).toHaveBeenCalledWith(
-      USER_ID,
-      { password: NEW_PASSWORD }
-    );
-  });
-});
 });

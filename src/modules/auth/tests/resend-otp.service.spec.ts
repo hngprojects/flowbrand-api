@@ -219,11 +219,7 @@ describe('AuthService.resendOtp (BE-004)', () => {
       await service.resendOtp(USER_EMAIL);
       const after = Date.now();
 
-      expect(mockRedisService.set).toHaveBeenCalledWith(
-        `otp:cooldown:${USER_ID}`,
-        expect.any(String),
-        30,
-      );
+      expect(mockRedisService.set).toHaveBeenCalledWith(`otp:cooldown:${USER_ID}`, expect.any(String), 30);
 
       const setCall = mockRedisService.set.mock.calls[0];
       const storedTimestamp = parseInt(setCall[1] as string);

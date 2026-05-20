@@ -1,29 +1,12 @@
-import {
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, OnModuleInit } from '@nestjs/common';
 import * as Minio from 'minio';
-import {
-  UPLOAD_STORAGE_DEFAULT_REGION,
-  UPLOAD_STORAGE_ENV,
-} from '../constants/upload.constants';
-import type {
-  MinioClientConfig,
-  ObjectStorage,
-  StorageEndpointConfig,
-  StoragePutParams,
-} from '../upload.types';
+import { UPLOAD_STORAGE_DEFAULT_REGION, UPLOAD_STORAGE_ENV } from '../constants/upload.constants';
+import type { MinioClientConfig, ObjectStorage, StorageEndpointConfig, StoragePutParams } from '../upload.types';
 
 function parseStorageEndpoint(endpoint: string): StorageEndpointConfig {
   const url = new URL(endpoint);
   const useSSL = url.protocol === 'https:';
-  const port = url.port
-    ? Number(url.port)
-    : useSSL
-      ? 443
-      : 80;
+  const port = url.port ? Number(url.port) : useSSL ? 443 : 80;
 
   return {
     endPoint: url.hostname,
@@ -45,9 +28,7 @@ export class MinioUploadStorageService implements ObjectStorage, OnModuleInit {
       const detail = error instanceof Error ? error.message : String(error);
 
       if (process.env.NODE_ENV === 'production') {
-        throw new InternalServerErrorException(
-          `Upload object storage is unavailable: ${detail}`,
-        );
+        throw new InternalServerErrorException(`Upload object storage is unavailable: ${detail}`);
       }
 
       this.logger.warn(
@@ -60,30 +41,26 @@ export class MinioUploadStorageService implements ObjectStorage, OnModuleInit {
   async putObject(params: StoragePutParams): Promise<void> {
     const { client, bucket } = this.resolveClient();
 
-    await client.putObject(
-      bucket,
-      params.storagePath,
-      params.body,
-      params.contentLength,
-      { 'Content-Type': params.contentType },
-    );
+    await client.putObject(bucket, params.storagePath, params.body, params.contentLength, {
+      'Content-Type': params.contentType,
+    });
   }
 
- async getObject(storagePath: string): Promise<Buffer> {
-  const { client, bucket } = this.resolveClient();
-  const stream = await client.getObject(bucket, storagePath);
+  async getObject(storagePath: string): Promise<Buffer> {
+    const { client, bucket } = this.resolveClient();
+    const stream = await client.getObject(bucket, storagePath);
 
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
 
-    stream.on('data', (chunk: Buffer) => {
-      chunks.push(chunk);
+      stream.on('data', (chunk: Buffer) => {
+        chunks.push(chunk);
+      });
+
+      stream.on('error', reject);
+      stream.on('end', () => resolve(Buffer.concat(chunks)));
     });
-
-    stream.on('error', reject);
-    stream.on('end', () => resolve(Buffer.concat(chunks)));
-  });
-}
+  }
 
   async deleteObject(storagePath: string): Promise<void> {
     const { client, bucket } = this.resolveClient();
@@ -99,8 +76,7 @@ export class MinioUploadStorageService implements ObjectStorage, OnModuleInit {
     const accessKey = process.env[UPLOAD_STORAGE_ENV.accessKey];
     const secretKey = process.env[UPLOAD_STORAGE_ENV.secretKey];
     const bucket = process.env[UPLOAD_STORAGE_ENV.bucket];
-    const region =
-      process.env[UPLOAD_STORAGE_ENV.region] ?? UPLOAD_STORAGE_DEFAULT_REGION;
+    const region = process.env[UPLOAD_STORAGE_ENV.region] ?? UPLOAD_STORAGE_DEFAULT_REGION;
 
     if (!endpoint || !accessKey || !secretKey || !bucket) {
       const missing = [
@@ -110,9 +86,7 @@ export class MinioUploadStorageService implements ObjectStorage, OnModuleInit {
         !bucket && UPLOAD_STORAGE_ENV.bucket,
       ].filter(Boolean);
 
-      throw new InternalServerErrorException(
-        `Upload object storage is not configured. Set: ${missing.join(', ')}`,
-      );
+      throw new InternalServerErrorException(`Upload object storage is not configured. Set: ${missing.join(', ')}`);
     }
 
     const { endPoint, port, useSSL } = parseStorageEndpoint(endpoint);
@@ -125,9 +99,7 @@ export class MinioUploadStorageService implements ObjectStorage, OnModuleInit {
     });
 
     this.config = { client, bucket, region };
-    this.logger.log(
-      `Upload storage client ready (endpoint=${endpoint}, bucket=${bucket})`,
-    );
+    this.logger.log(`Upload storage client ready (endpoint=${endpoint}, bucket=${bucket})`);
 
     return this.config;
   }

@@ -12,10 +12,7 @@ import { PinoLoggerService } from './common/logger/pino-logger.service';
 const bootstrapLogger = new Logger('Bootstrap');
 
 process.on('unhandledRejection', (reason) => {
-  bootstrapLogger.error(
-    'Unhandled promise rejection',
-    reason instanceof Error ? reason.stack : String(reason),
-  );
+  bootstrapLogger.error('Unhandled promise rejection', reason instanceof Error ? reason.stack : String(reason));
 });
 
 process.on('uncaughtException', (error) => {
@@ -28,7 +25,7 @@ async function bootstrap() {
   });
 
   const pinoLogger = app.get(PinoLoggerService);
-  app.useLogger(pinoLogger)
+  app.useLogger(pinoLogger);
 
   app.use(helmet());
   app.use(compression());

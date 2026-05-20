@@ -43,6 +43,7 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
 
 @Module({
   imports: [
+    LoggerModule,
     ConfigModule.forRoot({
       isGlobal: true,
       load: [appConfig, databaseConfig, jwtConfig, redisConfig, llmConfig],
@@ -56,7 +57,7 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
         limit: 100,
       },
     ]),
-    LoggerModule,
+
     HealthModule,
     UsersModule,
     AuthModule,

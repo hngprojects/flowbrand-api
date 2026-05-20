@@ -1,8 +1,4 @@
-import {
-  HttpStatus,
-  NotFoundException,
-  UnprocessableEntityException,
-} from '@nestjs/common';
+import { HttpStatus, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bull';
 import * as fs from 'node:fs';
@@ -24,11 +20,7 @@ import { UploadedDocument } from './entities/uploaded-document.entity';
 import { UploadedDocumentModelAction } from './actions/uploaded-document.action';
 import { DocumentTextExtractorService } from './services/document-text-extractor.service';
 import { UploadService } from './upload.service';
-import {
-  UPLOAD_OBJECT_STORAGE,
-  UploadDocumentStatus,
-  type ObjectStorage,
-} from './upload.types';
+import { UPLOAD_OBJECT_STORAGE, UploadDocumentStatus, type ObjectStorage } from './upload.types';
 
 const USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const UPLOAD_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
@@ -55,9 +47,7 @@ const mockObjectStorage: jest.Mocked<ObjectStorage> = {
   deleteObject: jest.fn(),
 };
 
-function buildRow(
-  overrides: Partial<UploadedDocument> = {},
-): UploadedDocument {
+function buildRow(overrides: Partial<UploadedDocument> = {}): UploadedDocument {
   return {
     id: UPLOAD_ID,
     user_id: USER_ID,
@@ -76,9 +66,7 @@ function buildRow(
   };
 }
 
-function mockPdfFile(
-  overrides: Partial<Express.Multer.File> = {},
-): Express.Multer.File {
+function mockPdfFile(overrides: Partial<Express.Multer.File> = {}): Express.Multer.File {
   const buffer = Buffer.from('%PDF-1.4 test content');
   return {
     fieldname: 'files',
@@ -104,9 +92,7 @@ describe('UploadService', () => {
     mockUploadedDocumentAction.createDocument.mockImplementation((partial) =>
       Promise.resolve(buildRow(partial as Partial<UploadedDocument>)),
     );
-    mockUploadedDocumentAction.saveDocument.mockImplementation((row) =>
-      Promise.resolve(row),
-    );
+    mockUploadedDocumentAction.saveDocument.mockImplementation((row) => Promise.resolve(row));
     mockUploadedDocumentAction.updateProgress.mockResolvedValue(undefined);
     mockObjectStorage.putObject.mockResolvedValue(undefined);
     mockObjectStorage.deleteObject.mockResolvedValue(undefined);
@@ -152,21 +138,15 @@ describe('UploadService', () => {
 
   describe('handleUpload', () => {
     it('throws UnprocessableEntityException when no files are provided', async () => {
-      await expect(service.handleUpload(USER_ID, undefined)).rejects.toThrow(
-        UnprocessableEntityException,
-      );
-      await expect(service.handleUpload(USER_ID, [])).rejects.toThrow(
-        UnprocessableEntityException,
-      );
+      await expect(service.handleUpload(USER_ID, undefined)).rejects.toThrow(UnprocessableEntityException);
+      await expect(service.handleUpload(USER_ID, [])).rejects.toThrow(UnprocessableEntityException);
     });
 
     it('throws UnprocessableEntityException when every file is rejected', async () => {
       const oversized = mockPdfFile({ size: MAX_UPLOAD_BYTES + 1 });
       (fs.statSync as jest.Mock).mockReturnValue({ size: MAX_UPLOAD_BYTES + 1 });
 
-      await expect(
-        service.handleUpload(USER_ID, [oversized]),
-      ).rejects.toThrow(UnprocessableEntityException);
+      await expect(service.handleUpload(USER_ID, [oversized])).rejects.toThrow(UnprocessableEntityException);
     });
 
     it('returns partial message when some files fail validation', async () => {
@@ -186,9 +166,7 @@ describe('UploadService', () => {
       expect(result.data.uploads[0].uploadId).toBeDefined();
       expect(result.data.uploads[0].status).toBe(UploadDocumentStatus.UPLOADING);
       expect(result.data.uploads[1].status).toBe(UploadDocumentStatus.FAILED);
-      expect(result.data.uploads[1].errorMessage).toBe(
-        SYS_MSG.UPLOAD_INVALID_FILE,
-      );
+      expect(result.data.uploads[1].errorMessage).toBe(SYS_MSG.UPLOAD_INVALID_FILE);
     });
 
     it('accepts a valid file, stores in MinIO, and returns parsing status', async () => {
@@ -210,9 +188,7 @@ describe('UploadService', () => {
     it('rolls back DB row and object when MinIO putObject fails', async () => {
       mockObjectStorage.putObject.mockRejectedValue(new Error('storage down'));
 
-      await expect(
-        service.handleUpload(USER_ID, [mockPdfFile()]),
-      ).rejects.toThrow(UnprocessableEntityException);
+      await expect(service.handleUpload(USER_ID, [mockPdfFile()])).rejects.toThrow(UnprocessableEntityException);
 
       expect(mockObjectStorage.deleteObject).not.toHaveBeenCalled();
       expect(mockUploadedDocumentAction.deleteById).toHaveBeenCalledTimes(1);
@@ -233,20 +209,12 @@ describe('UploadService', () => {
     });
 
     it('FR-10: logs orphan_upload and throws when all retries are exhausted', async () => {
-      mockUploadedDocumentAction.updateProgress.mockRejectedValue(
-        new Error('DB down'),
-      );
-      const loggerErrorSpy = jest
-        .spyOn(service['logger'], 'error')
-        .mockImplementation(() => {});
+      mockUploadedDocumentAction.updateProgress.mockRejectedValue(new Error('DB down'));
+      const loggerErrorSpy = jest.spyOn(service['logger'], 'error').mockImplementation(() => {});
 
-      await expect(
-        service.handleUpload(USER_ID, [mockPdfFile()]),
-      ).rejects.toThrow(UnprocessableEntityException);
+      await expect(service.handleUpload(USER_ID, [mockPdfFile()])).rejects.toThrow(UnprocessableEntityException);
 
-      expect(loggerErrorSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ event: 'orphan_upload' }),
-      );
+      expect(loggerErrorSpy).toHaveBeenCalledWith(expect.objectContaining({ event: 'orphan_upload' }));
       expect(mockUploadedDocumentAction.deleteById).toHaveBeenCalledTimes(1);
     });
   });
@@ -255,9 +223,7 @@ describe('UploadService', () => {
     it('throws NotFoundException when upload is not owned by user', async () => {
       mockUploadedDocumentAction.findOwnedById.mockResolvedValue(null);
 
-      await expect(
-        service.getProgress(USER_ID, UPLOAD_ID),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getProgress(USER_ID, UPLOAD_ID)).rejects.toThrow(NotFoundException);
     });
 
     it('returns progress payload for an owned upload', async () => {
@@ -270,10 +236,7 @@ describe('UploadService', () => {
 
       const result = await service.getProgress(USER_ID, UPLOAD_ID);
 
-      expect(mockUploadedDocumentAction.findOwnedById).toHaveBeenCalledWith(
-        UPLOAD_ID,
-        USER_ID,
-      );
+      expect(mockUploadedDocumentAction.findOwnedById).toHaveBeenCalledWith(UPLOAD_ID, USER_ID);
       expect(result).toEqual({
         uploadId: UPLOAD_ID,
         fileName: 'pitch-deck.pdf',

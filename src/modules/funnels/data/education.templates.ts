@@ -294,8 +294,7 @@ const EDTECH_APP: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Show what the app does without forcing a download. Comparison content, sample lessons, and result-driven testimonials lower the activation barrier.',
-      actionPrompt:
-        'Publish one sample lesson clip and one student-result testimonial this week.',
+      actionPrompt: 'Publish one sample lesson clip and one student-result testimonial this week.',
       tasks: [
         'Share one sample lesson or past-question reel per week',
         'Post one student result or improvement testimonial every 3 days',

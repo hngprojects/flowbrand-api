@@ -16,12 +16,8 @@ export class OnboardingController {
 
   @Post('start')
   @StartOnboardingDocs()
-  async start(
-    @CurrentUser('sub') userId: string,
-    @Res() res: Response,
-  ): Promise<void> {
-    const { statusCode, message, data } =
-      await this.onboardingService.startWizardSession(userId);
+  async start(@CurrentUser('sub') userId: string, @Res() res: Response): Promise<void> {
+    const { statusCode, message, data } = await this.onboardingService.startWizardSession(userId);
 
     res.status(statusCode).json({
       statusCode,
@@ -32,26 +28,20 @@ export class OnboardingController {
 
   @Post('complete')
   @CompleteOnboardingDocs()
-  async completeOnboarding(
-    @CurrentUser('sub') userId: string,
-    @Body() body: CompleteOnboardingDto,
-  ) {
-    return this.onboardingService.completeOnboarding(userId, body.session_id)
+  async completeOnboarding(@CurrentUser('sub') userId: string, @Body() body: CompleteOnboardingDto) {
+    return this.onboardingService.completeOnboarding(userId, body.session_id);
   }
-  
+
   @Get('session')
   @GetSessionDocs()
   getSession(@CurrentUser('sub') id: string) {
-    return this.onboardingService.getOnboardingSession(id)
+    return this.onboardingService.getOnboardingSession(id);
   }
 
   @Post('step')
   @HttpCode(HttpStatus.OK)
   @PostStepDocs()
-  saveStep(
-    @CurrentUser('sub') userId: string,
-    @Body() dto: StepAnswerDto
-  ) {
-    return this.onboardingService.saveStepAnswer(userId, dto)
+  saveStep(@CurrentUser('sub') userId: string, @Body() dto: StepAnswerDto) {
+    return this.onboardingService.saveStepAnswer(userId, dto);
   }
 }

@@ -137,14 +137,14 @@ export const PostStepDocs = () =>
             status: 'in_progress',
             steps_completed: 1,
             answers: {
-              step_1: { business_description: 'We sell handmade shoes' }
+              step_1: { business_description: 'We sell handmade shoes' },
             },
             expires_at: '2026-05-17T12:00:00.000Z',
             created_at: '2026-05-16T12:00:00.000Z',
             updated_at: '2026-05-16T12:00:00.000Z',
-          }
-        }
-      }
+          },
+        },
+      },
     }),
     ApiUnauthorizedResponse({
       description: 'Missing or invalid bearer token.',
@@ -167,9 +167,9 @@ export const PostStepDocs = () =>
           error: 'UnprocessableEntityException',
           message: 'Validation failed',
           fields: {
-            business_description: 'must be shorter than or equal to 500 characters'
-          }
-        }
-      }
+            business_description: 'must be shorter than or equal to 500 characters',
+          },
+        },
+      },
     }),
   );

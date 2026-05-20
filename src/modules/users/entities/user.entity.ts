@@ -1,11 +1,4 @@
-import {
-  Column,
-  DeleteDateColumn,
-  Entity,
-  Index,
-  OneToMany,
-  OneToOne,
-} from 'typeorm';
+import { Column, DeleteDateColumn, Entity, Index, OneToMany, OneToOne } from 'typeorm';
 import { Exclude } from 'class-transformer';
 import { BaseEntity } from '../../../common/entities/base.entity';
 import { UserRoleEntity } from './user-role.entity';

@@ -32,7 +32,7 @@ import {
   ResendOtpDocs,
   SendOtpDocs,
   VerifyOtpDocs,
-  ForgotPasswordDocs, 
+  ForgotPasswordDocs,
   ResetPasswordDocs,
 } from './docs/auth-swagger.doc';
 import { SendOtpDto } from './dto/send-otp.dto';
@@ -40,7 +40,6 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { ResendOtpDto } from './dto/resend-otp.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-
 
 @ApiTags('auth')
 @Controller('auth')
@@ -85,7 +84,7 @@ export class AuthController {
   @RegisterDocs()
   async register(@Body() dto: RegisterDto, @Res() res: Response) {
     const { message } = await this.authService.register(dto);
-    
+
     res.status(HttpStatus.CREATED).json({
       success: true,
       statusCode: HttpStatus.CREATED,
@@ -100,32 +99,17 @@ export class AuthController {
   async login(@Body() dto: LoginDto, @Res() res: Response) {
     const result = await this.authService.login(dto);
 
-    res.cookie(
-      'refreshToken',
-      result.refreshToken,
-      this.getRefreshCookieOptions(),
-    );
+    res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
 
-    return res.json(
-      this.buildAuthResponse(
-        HttpStatus.OK,
-        SYS_MSG.AUTH_LOGIN_SUCCESSFUL,
-        result,
-      ),
-    );
+    return res.json(this.buildAuthResponse(HttpStatus.OK, SYS_MSG.AUTH_LOGIN_SUCCESSFUL, result));
   }
 
   @Public()
   @Post('refresh-token')
   @HttpCode(HttpStatus.OK)
   @RefreshDocs()
-  async refresh(
-    @Body() dto: RefreshTokenDto,
-    @Req() req: Request,
-    @Res() res: Response,
-  ) {
-    const refreshToken =
-      dto.refreshToken ?? (req.cookies?.refreshToken as string | undefined);
+  async refresh(@Body() dto: RefreshTokenDto, @Req() req: Request, @Res() res: Response) {
+    const refreshToken = dto.refreshToken ?? (req.cookies?.refreshToken as string | undefined);
 
     if (!refreshToken) {
       throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_REFRESH_TOKEN);
@@ -133,29 +117,15 @@ export class AuthController {
 
     const result = await this.authService.refresh(refreshToken);
 
-    res.cookie(
-      'refreshToken',
-      result.refreshToken,
-      this.getRefreshCookieOptions(),
-    );
+    res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
 
-    return res.json(
-      this.buildAuthResponse(
-        HttpStatus.OK,
-        SYS_MSG.AUTH_TOKEN_REFRESHED,
-        result,
-      ),
-    );
+    return res.json(this.buildAuthResponse(HttpStatus.OK, SYS_MSG.AUTH_TOKEN_REFRESHED, result));
   }
 
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
   @LogoutDocs()
-  async logout(
-    @CurrentUser('sub') userId: string,
-    @CurrentUser('sessionId') sessionId: string,
-    @Res() res: Response,
-  ) {
+  async logout(@CurrentUser('sub') userId: string, @CurrentUser('sessionId') sessionId: string, @Res() res: Response) {
     await this.authService.logout(userId, sessionId);
 
     res.clearCookie('refreshToken', {
@@ -210,17 +180,11 @@ export class AuthController {
   @ResetPasswordDocs()
   async resetPassword(@Body() dto: ResetPasswordDto, @Res() res: Response): Promise<void> {
     const result = await this.authService.resetPassword(dto.email, dto.otp_code, dto.password);
-    
+
     // Set refresh token cookie for auto-login
     res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
-    
-    res.json(
-      this.buildAuthResponse(
-        HttpStatus.OK,
-        SYS_MSG.PASSWORD_RESET_SUCCESSFUL,
-        result,
-      )
-    );
+
+    res.json(this.buildAuthResponse(HttpStatus.OK, SYS_MSG.PASSWORD_RESET_SUCCESSFUL, result));
   }
 
   @Get('me')
@@ -241,10 +205,7 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   @GoogleCallbackDocs()
-  async googleAuthRedirect(
-    @Req() req: Request & { user?: GoogleOAuthProfile },
-    @Res() res: Response,
-  ): Promise<void> {
+  async googleAuthRedirect(@Req() req: Request & { user?: GoogleOAuthProfile }, @Res() res: Response): Promise<void> {
     const payload = req.user;
 
     if (!payload) {

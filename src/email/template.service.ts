@@ -25,7 +25,7 @@ export class TemplateService implements OnModuleInit {
     'otp-verification': 'Your SEIL verification code',
     'otp-reset': 'Reset your SEIL account',
     'password-reset': 'Password Reset Request - Your OTP Code',
-    'waitlist': 'You are on the waitlist',
+    waitlist: 'You are on the waitlist',
     'contact-confirmation': "We've received your message",
     'contact-admin-notification': 'New contact form submission from {{fullName}}',
   };

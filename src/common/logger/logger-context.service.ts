@@ -14,10 +14,10 @@ export interface LogContext {
 export class LoggerContextService {
   private readonly als = new AsyncLocalStorage<LogContext>();
 
-  run(context: LogContext, callback: () => void): void;
-  run<T>(context: LogContext, callback: () => Promise<T>): Promise<T>;
-  run<T>(context: LogContext, callback: () => T | Promise<T>): T | Promise<T> {
-    return this.als.run(context, callback);
+  async run<T>(context: LogContext, callback: () => T | Promise<T>): Promise<T> {
+    return this.als.run(context, async () => {
+      return await callback();
+    });
   }
 
   getContext(): LogContext | undefined {

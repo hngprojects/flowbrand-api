@@ -11,12 +11,7 @@
  * industry -> default template.
  */
 
-export const STAGE_NAMES = [
-  'Get Noticed',
-  'Spark Interest',
-  'Make First Sale',
-  'Bring Them Back',
-] as const;
+export const STAGE_NAMES = ['Get Noticed', 'Spark Interest', 'Make First Sale', 'Bring Them Back'] as const;
 
 export type StageName = (typeof STAGE_NAMES)[number];
 
@@ -36,10 +31,5 @@ export interface TemplateDefinition {
   industry: string;
   businessType: readonly string[];
   channelMatch?: readonly string[];
-  stages: readonly [
-    TemplateStageDefinition,
-    TemplateStageDefinition,
-    TemplateStageDefinition,
-    TemplateStageDefinition,
-  ];
+  stages: readonly [TemplateStageDefinition, TemplateStageDefinition, TemplateStageDefinition, TemplateStageDefinition];
 }

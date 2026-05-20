@@ -17,10 +17,7 @@ export class AuthMetadataModelAction extends AbstractModelAction<AuthMetadata> {
     return await this.get({ identifierOptions: { user_id: userId } });
   }
 
-  async updateByUserId(
-    userId: string,
-    updatePayload: Partial<AuthMetadata>,
-  ): Promise<AuthMetadata | null> {
+  async updateByUserId(userId: string, updatePayload: Partial<AuthMetadata>): Promise<AuthMetadata | null> {
     return await this.update({
       identifierOptions: { user_id: userId },
       updatePayload,
@@ -28,9 +25,7 @@ export class AuthMetadataModelAction extends AbstractModelAction<AuthMetadata> {
     });
   }
 
-  async createForUser(
-    createPayload: Partial<AuthMetadata>,
-  ): Promise<AuthMetadata> {
+  async createForUser(createPayload: Partial<AuthMetadata>): Promise<AuthMetadata> {
     return await this.create({
       createPayload,
       transactionOptions: { useTransaction: false },

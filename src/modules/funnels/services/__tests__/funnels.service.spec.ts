@@ -122,8 +122,11 @@ describe('FunnelsService', () => {
 
       expect(queryRunner.manager.save).toHaveBeenCalledWith(Funnel, expect.any(Object));
       expect(queryRunner.manager.save).toHaveBeenCalledWith(FunnelStage, expect.any(Array));
-      const stagesArg = (queryRunner.manager.save.mock.calls.find((c) => c[0] === FunnelStage) ??
-        [])[1] as Array<{ position: number; name: string; status: string }>;
+      const stagesArg = (queryRunner.manager.save.mock.calls.find((c) => c[0] === FunnelStage) ?? [])[1] as Array<{
+        position: number;
+        name: string;
+        status: string;
+      }>;
       expect(stagesArg).toHaveLength(4);
       expect(stagesArg.map((s) => s.position)).toEqual([1, 2, 3, 4]);
       expect(stagesArg.map((s) => s.name)).toEqual([
@@ -180,9 +183,7 @@ describe('FunnelsService', () => {
       funnelAction.findGeneratingForUser.mockResolvedValue(null);
       wizardRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.createGeneration(USER_ID, BASE_DTO)).rejects.toThrow(
-        UnprocessableEntityException,
-      );
+      await expect(service.createGeneration(USER_ID, BASE_DTO)).rejects.toThrow(UnprocessableEntityException);
     });
   });
 
@@ -285,9 +286,7 @@ describe('FunnelsService', () => {
       wizardRepo.findOne.mockResolvedValue(COMPLETE_WIZARD);
       queue.add.mockRejectedValueOnce(new Error('Redis is down'));
 
-      await expect(service.createGeneration(USER_ID, BASE_DTO)).rejects.toThrow(
-        ServiceUnavailableException,
-      );
+      await expect(service.createGeneration(USER_ID, BASE_DTO)).rejects.toThrow(ServiceUnavailableException);
 
       expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
       expect(queryRunner.commitTransaction).not.toHaveBeenCalled();

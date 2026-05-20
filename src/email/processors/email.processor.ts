@@ -1,11 +1,4 @@
-import {
-  OnQueueActive,
-  OnQueueCompleted,
-  OnQueueFailed,
-  OnQueueStalled,
-  Process,
-  Processor,
-} from '@nestjs/bull';
+import { OnQueueActive, OnQueueCompleted, OnQueueFailed, OnQueueStalled, Process, Processor } from '@nestjs/bull';
 import { Inject, Logger } from '@nestjs/common';
 import type { Job } from 'bull';
 import { Resend } from 'resend';
@@ -40,10 +33,7 @@ export class EmailProcessor {
       attempt: job.attemptsMade + 1,
     });
 
-    const { html, subject } = this.templateService.render(
-      type,
-      payload as unknown as Record<string, unknown>,
-    );
+    const { html, subject } = this.templateService.render(type, payload as unknown as Record<string, unknown>);
 
     const result = await this.resend.emails.send({
       from: this.from,

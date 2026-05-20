@@ -119,9 +119,7 @@ describe('TemplateService', () => {
       service = module.get<TemplateService>(TemplateService);
       // onModuleInit intentionally NOT called — templates map stays empty
 
-      expect(() =>
-        service.render('otp-verification' as never, {}),
-      ).toThrow('No compiled template found for type');
+      expect(() => service.render('otp-verification' as never, {})).toThrow('No compiled template found for type');
     });
   });
 });

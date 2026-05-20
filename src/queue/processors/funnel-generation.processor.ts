@@ -1,11 +1,4 @@
-import {
-  OnQueueActive,
-  OnQueueCompleted,
-  OnQueueFailed,
-  OnQueueStalled,
-  Process,
-  Processor,
-} from '@nestjs/bull';
+import { OnQueueActive, OnQueueCompleted, OnQueueFailed, OnQueueStalled, Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Job } from 'bull';
@@ -16,7 +9,10 @@ import { Funnel } from '../../modules/funnels/entities/funnel.entity';
 import { FunnelStage } from '../../modules/funnels/entities/funnel-stage.entity';
 import { StageTask } from '../../modules/funnels/entities/stage-task.entity';
 import { FunnelStatus } from '../../modules/funnels/enums/funnel-status.enum';
-import type { BusinessContext, GenerateFunnelJobPayload } from '../../modules/funnels/interfaces/generate-funnel-job.interface';
+import type {
+  BusinessContext,
+  GenerateFunnelJobPayload,
+} from '../../modules/funnels/interfaces/generate-funnel-job.interface';
 import type { LlmStageData } from '../../modules/funnels/interfaces/llm-stage-data.interface';
 import { FunnelTemplateService } from '../../modules/funnels/services/funnel-template.service';
 import { LlmService } from '../interfaces/llm.service.interface';

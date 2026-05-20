@@ -3,13 +3,16 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 import type { Job } from 'bull';
 import { FunnelModelAction } from '../../../modules/funnels/actions/funnel.action';
 import { FunnelStatus } from '../../../modules/funnels/enums/funnel-status.enum';
-import type { BusinessContext, GenerateFunnelJobPayload } from '../../../modules/funnels/interfaces/generate-funnel-job.interface';
+import type {
+  BusinessContext,
+  GenerateFunnelJobPayload,
+} from '../../../modules/funnels/interfaces/generate-funnel-job.interface';
 import type { LlmStageData } from '../../../modules/funnels/interfaces/llm-stage-data.interface';
 import { FunnelTemplateService } from '../../../modules/funnels/services/funnel-template.service';
 import { LlmService } from '../../interfaces/llm.service.interface';
 import { FunnelGenerationProcessor } from '../funnel-generation.processor';
 
-// Mocks 
+// Mocks
 
 const mockQueryRunner = {
   connect: jest.fn().mockResolvedValue(undefined),
@@ -43,7 +46,7 @@ const mockTemplateService = {
   getTemplate: jest.fn(),
 };
 
-// Helpers 
+// Helpers
 
 const businessContext: BusinessContext = {
   businessType: 'bakery',
@@ -56,10 +59,7 @@ function makeValidStageData(): LlmStageData[] {
     channel: 'Instagram',
     explanation: `Explanation for stage ${position}`,
     actionPrompt: `Action for stage ${position}`,
-    tasks: [
-      { taskText: `Task A for stage ${position}` },
-      { taskText: `Task B for stage ${position}` },
-    ],
+    tasks: [{ taskText: `Task A for stage ${position}` }, { taskText: `Task B for stage ${position}` }],
   }));
 }
 
@@ -74,7 +74,7 @@ function makeJob(overrides: Partial<Job<GenerateFunnelJobPayload>> = {}): Job<Ge
   } as unknown as Job<GenerateFunnelJobPayload>;
 }
 
-// Suite 
+// Suite
 
 describe('FunnelGenerationProcessor', () => {
   let module: TestingModule;
@@ -106,7 +106,7 @@ describe('FunnelGenerationProcessor', () => {
     await module.close();
   });
 
-  // AC-01 / AC-07: Gemini success path 
+  // AC-01 / AC-07: Gemini success path
 
   describe('AC-01 — Gemini success path', () => {
     it('commits transaction and sets funnel to ACTIVE', async () => {
@@ -129,7 +129,10 @@ describe('FunnelGenerationProcessor', () => {
       mockLlmService.generateWithGemini.mockResolvedValue(makeValidStageData());
       const job = makeJob();
       const progressCalls: number[] = [];
-      (job.progress as jest.Mock).mockImplementation((v: number) => { progressCalls.push(v); return Promise.resolve(); });
+      (job.progress as jest.Mock).mockImplementation((v: number) => {
+        progressCalls.push(v);
+        return Promise.resolve();
+      });
 
       await processor.handleGenerateFunnel(job);
 
@@ -137,7 +140,7 @@ describe('FunnelGenerationProcessor', () => {
     });
   });
 
-  // AC-02: Groq fallback 
+  // AC-02: Groq fallback
 
   describe('AC-02 — Groq fallback', () => {
     it('falls back to Groq when Gemini throws and still completes', async () => {
@@ -152,7 +155,7 @@ describe('FunnelGenerationProcessor', () => {
     });
   });
 
-  // AC-03: Template fallback 
+  // AC-03: Template fallback
 
   describe('AC-03 — Template fallback', () => {
     it('uses template when both Gemini and Groq fail', async () => {
@@ -167,7 +170,7 @@ describe('FunnelGenerationProcessor', () => {
     });
   });
 
-  // AC-04 / AC-09: DB failure + rollback + release 
+  // AC-04 / AC-09: DB failure + rollback + release
 
   describe('AC-04 — DB failure triggers rollback', () => {
     it('calls rollbackTransaction and marks funnel FAILED when stage update throws', async () => {
@@ -192,13 +195,15 @@ describe('FunnelGenerationProcessor', () => {
     });
   });
 
-  // AC-06: Full failure marks funnel FAILED 
+  // AC-06: Full failure marks funnel FAILED
 
   describe('AC-06 — Full failure', () => {
     it('marks funnel FAILED and re-throws when template also throws', async () => {
       mockLlmService.generateWithGemini.mockRejectedValue(new Error('Gemini down'));
       mockLlmService.generateWithGroq.mockRejectedValue(new Error('Groq down'));
-      mockTemplateService.getTemplate.mockImplementation(() => { throw new Error('Template broken'); });
+      mockTemplateService.getTemplate.mockImplementation(() => {
+        throw new Error('Template broken');
+      });
 
       await expect(processor.handleGenerateFunnel(makeJob())).rejects.toThrow('Template broken');
 
@@ -208,7 +213,7 @@ describe('FunnelGenerationProcessor', () => {
     });
   });
 
-  // AC-08: LLM output validation 
+  // AC-08: LLM output validation
 
   describe('AC-08 — LLM output validation', () => {
     it('rejects explanation > 2000 chars before DB write', async () => {
@@ -244,7 +249,7 @@ describe('FunnelGenerationProcessor', () => {
     });
   });
 
-  // EC-05: Idempotency guard 
+  // EC-05: Idempotency guard
 
   describe('EC-05 — Idempotency guard', () => {
     it('returns early without calling LLM when funnel is already ACTIVE', async () => {
@@ -278,7 +283,7 @@ describe('FunnelGenerationProcessor', () => {
     });
   });
 
-  // Hook logging 
+  // Hook logging
 
   describe('Hook logging', () => {
     it('FR-11: onCompleted logs duration', () => {

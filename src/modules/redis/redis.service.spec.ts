@@ -49,21 +49,13 @@ describe('RedisService (unit)', () => {
   it('set stores value without TTL', async () => {
     mockRedisInstance.set.mockResolvedValue('OK');
     await service.set('sess:user1:abc', '{"role":"user"}');
-    expect(mockRedisInstance.set).toHaveBeenCalledWith(
-      'sess:user1:abc',
-      '{"role":"user"}',
-    );
+    expect(mockRedisInstance.set).toHaveBeenCalledWith('sess:user1:abc', '{"role":"user"}');
   });
 
   it('set stores value with TTL using EX', async () => {
     mockRedisInstance.set.mockResolvedValue('OK');
     await service.set('otp:user1:login', '123456', 300);
-    expect(mockRedisInstance.set).toHaveBeenCalledWith(
-      'otp:user1:login',
-      '123456',
-      'EX',
-      300,
-    );
+    expect(mockRedisInstance.set).toHaveBeenCalledWith('otp:user1:login', '123456', 'EX', 300);
   });
 
   it('get returns value for existing key', async () => {
@@ -99,25 +91,13 @@ describe('RedisService (unit)', () => {
   });
 
   it('delByPattern scans and deletes matching keys only', async () => {
-    mockRedisInstance.scan.mockResolvedValueOnce([
-      '0',
-      ['sess:user99:s1', 'sess:user99:s2'],
-    ]);
+    mockRedisInstance.scan.mockResolvedValueOnce(['0', ['sess:user99:s1', 'sess:user99:s2']]);
     mockRedisInstance.del.mockResolvedValue(2);
 
     await service.delByPattern('sess:user99:*');
 
-    expect(mockRedisInstance.scan).toHaveBeenCalledWith(
-      '0',
-      'MATCH',
-      'sess:user99:*',
-      'COUNT',
-      100,
-    );
-    expect(mockRedisInstance.del).toHaveBeenCalledWith(
-      'sess:user99:s1',
-      'sess:user99:s2',
-    );
+    expect(mockRedisInstance.scan).toHaveBeenCalledWith('0', 'MATCH', 'sess:user99:*', 'COUNT', 100);
+    expect(mockRedisInstance.del).toHaveBeenCalledWith('sess:user99:s1', 'sess:user99:s2');
   });
 
   it('get returns null and logs error when Redis is down', async () => {

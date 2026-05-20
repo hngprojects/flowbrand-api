@@ -1,10 +1,10 @@
-import { 
+import {
   ConflictException,
   ForbiddenException,
   NotFoundException,
   UnprocessableEntityException,
   HttpStatus,
- } from '@nestjs/common';
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as SYS_MSG from '../../constants/system.messages';
 import { WizardSessionModelAction } from './actions/wizard-session.action';
@@ -105,7 +105,7 @@ describe('OnboardingService — getOnboardingSession (BE-009)', () => {
   it('AC-02: should omit null answer keys', async () => {
     mockAction.findActiveSession.mockResolvedValue(mockSession);
     const result = await service.getOnboardingSession('user-uuid');
-    expect(Object.values(result.answers).every(v => v !== null)).toBe(true);
+    expect(Object.values(result.answers).every((v) => v !== null)).toBe(true);
   });
 });
 
@@ -202,9 +202,7 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
 
       const result = await service.startWizardSession(USER_A);
 
-      expect(
-        mockWizardSessionModelAction.resolveStartWizardSession,
-      ).toHaveBeenCalledWith(
+      expect(mockWizardSessionModelAction.resolveStartWizardSession).toHaveBeenCalledWith(
         USER_A,
         new Date('2026-05-15T10:00:00.000Z'),
         new Date('2026-05-16T10:00:00.000Z'),
@@ -229,27 +227,25 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
 
     await service.startWizardSession(USER_A);
 
-    expect(
-      mockWizardSessionModelAction.resolveStartWizardSession,
-    ).toHaveBeenCalledWith(USER_A, expect.any(Date), expect.any(Date));
+    expect(mockWizardSessionModelAction.resolveStartWizardSession).toHaveBeenCalledWith(
+      USER_A,
+      expect.any(Date),
+      expect.any(Date),
+    );
   });
 
   it('isolates users: completed for user A does not block user B', async () => {
-    mockWizardSessionModelAction.resolveStartWizardSession.mockImplementation(
-      async (userId: string) => {
-        if (userId === USER_A) {
-          return { status: 'already_complete' };
-        }
-        return {
-          status: 'created',
-          session: buildSession({ id: 'new-for-b', user_id: USER_B }),
-        };
-      },
-    );
+    mockWizardSessionModelAction.resolveStartWizardSession.mockImplementation(async (userId: string) => {
+      if (userId === USER_A) {
+        return { status: 'already_complete' };
+      }
+      return {
+        status: 'created',
+        session: buildSession({ id: 'new-for-b', user_id: USER_B }),
+      };
+    });
 
-    await expect(service.startWizardSession(USER_A)).rejects.toBeInstanceOf(
-      ConflictException,
-    );
+    await expect(service.startWizardSession(USER_A)).rejects.toBeInstanceOf(ConflictException);
 
     const result = await service.startWizardSession(USER_B);
     expect(result.statusCode).toBe(HttpStatus.CREATED);
@@ -264,9 +260,7 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
 
     await service.startWizardSession(USER_A);
 
-    expect(
-      mockWizardSessionModelAction.resolveStartWizardSession,
-    ).toHaveBeenCalledTimes(1);
+    expect(mockWizardSessionModelAction.resolveStartWizardSession).toHaveBeenCalledTimes(1);
   });
 
   it('maps entity id to response session_id (no duplicate id field)', async () => {
@@ -313,33 +307,32 @@ describe('OnboardingService — completeOnboarding', () => {
   };
 
   beforeEach(async () => {
-  jest.clearAllMocks();
+    jest.clearAllMocks();
 
+    mockWizardSessionModelAction.findSessionById = jest.fn();
 
-  mockWizardSessionModelAction.findSessionById = jest.fn();
+    mockDataSource = {
+      transaction: jest.fn().mockImplementation(async (callback) => {
+        return callback(mockManager);
+      }),
+    };
 
-  mockDataSource = {
-    transaction: jest.fn().mockImplementation(async (callback) => {
-      return callback(mockManager);
-    }),
-  };
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OnboardingService,
+        {
+          provide: WizardSessionModelAction,
+          useValue: mockWizardSessionModelAction,
+        },
+        {
+          provide: DataSource,
+          useValue: mockDataSource,
+        },
+      ],
+    }).compile();
 
-  const module: TestingModule = await Test.createTestingModule({
-    providers: [
-      OnboardingService,
-      {
-        provide: WizardSessionModelAction,
-        useValue: mockWizardSessionModelAction,
-      },
-      {
-        provide: DataSource,  
-        useValue: mockDataSource,
-      },
-    ],
-  }).compile();
-
-  service = module.get<OnboardingService>(OnboardingService);
-});
+    service = module.get<OnboardingService>(OnboardingService);
+  });
 
   it('AC-01: returns 200 with redirect on success', async () => {
     mockWizardSessionModelAction.findSessionById.mockResolvedValue(validSession);
@@ -356,9 +349,7 @@ describe('OnboardingService — completeOnboarding', () => {
   it('AC-02: throws 404 when session does not exist', async () => {
     mockWizardSessionModelAction.findSessionById.mockResolvedValue(null);
 
-    await expect(
-      service.completeOnboarding(USER_ID, SESSION_ID),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.completeOnboarding(USER_ID, SESSION_ID)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('AC-02: throws 404 when session belongs to a different user', async () => {
@@ -367,17 +358,13 @@ describe('OnboardingService — completeOnboarding', () => {
       user_id: 'different-user',
     });
 
-    await expect(
-      service.completeOnboarding(USER_ID, SESSION_ID),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.completeOnboarding(USER_ID, SESSION_ID)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('AC-02: 404 contains correct message', async () => {
     mockWizardSessionModelAction.findSessionById.mockResolvedValue(null);
 
-    await expect(
-      service.completeOnboarding(USER_ID, SESSION_ID),
-    ).rejects.toThrow(SYS_MSG.ONBOARDING_SESSION_NOT_FOUND);
+    await expect(service.completeOnboarding(USER_ID, SESSION_ID)).rejects.toThrow(SYS_MSG.ONBOARDING_SESSION_NOT_FOUND);
   });
 
   it('AC-03: throws 403 when session is expired', async () => {
@@ -386,9 +373,7 @@ describe('OnboardingService — completeOnboarding', () => {
       status: WizardStatus.EXPIRED,
     });
 
-    await expect(
-      service.completeOnboarding(USER_ID, SESSION_ID),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.completeOnboarding(USER_ID, SESSION_ID)).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('AC-03: 403 contains correct message', async () => {
@@ -397,9 +382,7 @@ describe('OnboardingService — completeOnboarding', () => {
       status: WizardStatus.EXPIRED,
     });
 
-    await expect(
-      service.completeOnboarding(USER_ID, SESSION_ID),
-    ).rejects.toThrow(SYS_MSG.ONBOARDING_SESSION_EXPIRED);
+    await expect(service.completeOnboarding(USER_ID, SESSION_ID)).rejects.toThrow(SYS_MSG.ONBOARDING_SESSION_EXPIRED);
   });
 
   it('AC-04: throws 409 when session is already complete', async () => {
@@ -408,9 +391,7 @@ describe('OnboardingService — completeOnboarding', () => {
       status: WizardStatus.COMPLETE,
     });
 
-    await expect(
-      service.completeOnboarding(USER_ID, SESSION_ID),
-    ).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.completeOnboarding(USER_ID, SESSION_ID)).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('AC-04: 409 contains correct message', async () => {
@@ -437,9 +418,7 @@ describe('OnboardingService — completeOnboarding', () => {
       answers: { ...validAnswers, step_1: null },
     });
 
-    await expect(
-      service.completeOnboarding(USER_ID, SESSION_ID),
-    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    await expect(service.completeOnboarding(USER_ID, SESSION_ID)).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 
   it('AC-05: throws 422 when step_2 is missing', async () => {
@@ -448,9 +427,7 @@ describe('OnboardingService — completeOnboarding', () => {
       answers: { ...validAnswers, step_2: null },
     });
 
-    await expect(
-      service.completeOnboarding(USER_ID, SESSION_ID),
-    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    await expect(service.completeOnboarding(USER_ID, SESSION_ID)).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 
   it('AC-05: throws 422 when step_3 is missing', async () => {
@@ -459,9 +436,7 @@ describe('OnboardingService — completeOnboarding', () => {
       answers: { ...validAnswers, step_3: null },
     });
 
-    await expect(
-      service.completeOnboarding(USER_ID, SESSION_ID),
-    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    await expect(service.completeOnboarding(USER_ID, SESSION_ID)).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 
   it('AC-05: 422 lists all missing steps when answers is empty', async () => {
@@ -470,9 +445,7 @@ describe('OnboardingService — completeOnboarding', () => {
       answers: {},
     });
 
-    await expect(
-      service.completeOnboarding(USER_ID, SESSION_ID),
-    ).rejects.toMatchObject({
+    await expect(service.completeOnboarding(USER_ID, SESSION_ID)).rejects.toMatchObject({
       response: {
         message: SYS_MSG.ONBOARDING_INCOMPLETE,
         missing_fields: expect.arrayContaining(['step_1', 'step_2', 'step_3']),
@@ -489,47 +462,41 @@ describe('OnboardingService — completeOnboarding', () => {
       },
     });
 
-    await expect(
-      service.completeOnboarding(USER_ID, SESSION_ID),
-    ).rejects.toMatchObject({
+    await expect(service.completeOnboarding(USER_ID, SESSION_ID)).rejects.toMatchObject({
       response: { missing_fields: ['step_1'] },
     });
   });
 
-  it('should throw 422 when discovery channel is empty string',
-    async () => {
-      mockWizardSessionModelAction.findSessionById.mockResolvedValue({
-    ...validSession,
-    answers: { ...validAnswers, step_3: { discovery_channel: '' } },
+  it('should throw 422 when discovery channel is empty string', async () => {
+    mockWizardSessionModelAction.findSessionById.mockResolvedValue({
+      ...validSession,
+      answers: { ...validAnswers, step_3: { discovery_channel: '' } },
+    });
+
+    await expect(service.completeOnboarding(USER_ID, SESSION_ID)).rejects.toThrow(UnprocessableEntityException);
   });
 
-  await expect(
-    service.completeOnboarding(USER_ID, SESSION_ID),
-  ).rejects.toThrow(UnprocessableEntityException);
-    },
-  );
-
   it('updates user profile with correct fields inside transaction', async () => {
-  mockWizardSessionModelAction.findSessionById.mockResolvedValue(validSession);
+    mockWizardSessionModelAction.findSessionById.mockResolvedValue(validSession);
 
-  await service.completeOnboarding(USER_ID, SESSION_ID);
+    await service.completeOnboarding(USER_ID, SESSION_ID);
 
-  expect(mockDataSource.transaction).toHaveBeenCalled();
-  
-  const transactionCallback = mockDataSource.transaction.mock.calls[0][0];
-  expect(transactionCallback).toBeDefined();
-});
+    expect(mockDataSource.transaction).toHaveBeenCalled();
+
+    const transactionCallback = mockDataSource.transaction.mock.calls[0][0];
+    expect(transactionCallback).toBeDefined();
+  });
 
   it('marks session as COMPLETE inside transaction', async () => {
-     mockWizardSessionModelAction.findSessionById.mockResolvedValue(validSession);
+    mockWizardSessionModelAction.findSessionById.mockResolvedValue(validSession);
 
-  await service.completeOnboarding(USER_ID, SESSION_ID);
+    await service.completeOnboarding(USER_ID, SESSION_ID);
 
-  const updateCall = mockManager.update.mock.calls.find(
-    call => call[1] === SESSION_ID && call[2]?.status === WizardStatus.COMPLETE
-  );
-  
-  expect(updateCall).toBeDefined();
+    const updateCall = mockManager.update.mock.calls.find(
+      (call) => call[1] === SESSION_ID && call[2]?.status === WizardStatus.COMPLETE,
+    );
+
+    expect(updateCall).toBeDefined();
   });
 
   it('calls transaction exactly once', async () => {
@@ -554,9 +521,7 @@ describe('OnboardingService — completeOnboarding', () => {
       status: WizardStatus.EXPIRED,
     });
 
-    await expect(
-      service.completeOnboarding(USER_ID, SESSION_ID),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.completeOnboarding(USER_ID, SESSION_ID)).rejects.toBeInstanceOf(ForbiddenException);
 
     expect(mockDataSource.transaction).not.toHaveBeenCalled();
   });
@@ -565,9 +530,7 @@ describe('OnboardingService — completeOnboarding', () => {
     mockWizardSessionModelAction.findSessionById.mockResolvedValue(validSession);
     mockDataSource.transaction.mockRejectedValueOnce(new Error('DB failure'));
 
-    await expect(
-      service.completeOnboarding(USER_ID, SESSION_ID),
-    ).rejects.toThrow('DB failure');
+    await expect(service.completeOnboarding(USER_ID, SESSION_ID)).rejects.toThrow('DB failure');
   });
 });
 
@@ -606,8 +569,10 @@ describe('OnboardingService — saveStepAnswer (BE-008)', () => {
     mockSaveSessionAction.findSessionById.mockResolvedValue(null);
     await expect(
       service.saveStepAnswer(USER_ID, {
-        session_id: SESSION_ID, step: 1, answer: { business_description: 'test' }
-      } as any)
+        session_id: SESSION_ID,
+        step: 1,
+        answer: { business_description: 'test' },
+      } as any),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -615,8 +580,10 @@ describe('OnboardingService — saveStepAnswer (BE-008)', () => {
     mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession({ status: WizardStatus.EXPIRED }));
     await expect(
       service.saveStepAnswer(USER_ID, {
-        session_id: SESSION_ID, step: 1, answer: { business_description: 'test' }
-      } as any)
+        session_id: SESSION_ID,
+        step: 1,
+        answer: { business_description: 'test' },
+      } as any),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
@@ -624,8 +591,10 @@ describe('OnboardingService — saveStepAnswer (BE-008)', () => {
     mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession({ status: WizardStatus.COMPLETE }));
     await expect(
       service.saveStepAnswer(USER_ID, {
-        session_id: SESSION_ID, step: 1, answer: { business_description: 'test' }
-      } as any)
+        session_id: SESSION_ID,
+        step: 1,
+        answer: { business_description: 'test' },
+      } as any),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
@@ -634,7 +603,9 @@ describe('OnboardingService — saveStepAnswer (BE-008)', () => {
     mockSaveSessionAction.saveSession.mockResolvedValue(undefined);
 
     const result = await service.saveStepAnswer(USER_ID, {
-      session_id: SESSION_ID, step: 1, answer: { business_description: 'We sell handmade shoes' }
+      session_id: SESSION_ID,
+      step: 1,
+      answer: { business_description: 'We sell handmade shoes' },
     } as any);
 
     expect(result.statusCode).toBe(HttpStatus.OK);
@@ -644,14 +615,18 @@ describe('OnboardingService — saveStepAnswer (BE-008)', () => {
   });
 
   it('AC-05: saves step 2 answer and returns 200 with steps_completed = 2', async () => {
-    mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession({
-      answers: { step_1: { business_description: 'We sell shoes' } },
-      steps_completed: 1,
-    }));
+    mockSaveSessionAction.findSessionById.mockResolvedValue(
+      buildSession({
+        answers: { step_1: { business_description: 'We sell shoes' } },
+        steps_completed: 1,
+      }),
+    );
     mockSaveSessionAction.saveSession.mockResolvedValue(undefined);
 
     const result = await service.saveStepAnswer(USER_ID, {
-      session_id: SESSION_ID, step: 2, answer: { customer_tags: { type: ['retail'] } }
+      session_id: SESSION_ID,
+      step: 2,
+      answer: { customer_tags: { type: ['retail'] } },
     } as any);
 
     expect(result.statusCode).toBe(HttpStatus.OK);
@@ -660,17 +635,21 @@ describe('OnboardingService — saveStepAnswer (BE-008)', () => {
   });
 
   it('AC-06: saves step 3 answer and returns 200 with steps_completed = 3', async () => {
-    mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession({
-      answers: {
-        step_1: { business_description: 'We sell shoes' },
-        step_2: { customer_tags: { type: ['retail'] } },
-      },
-      steps_completed: 2,
-    }));
+    mockSaveSessionAction.findSessionById.mockResolvedValue(
+      buildSession({
+        answers: {
+          step_1: { business_description: 'We sell shoes' },
+          step_2: { customer_tags: { type: ['retail'] } },
+        },
+        steps_completed: 2,
+      }),
+    );
     mockSaveSessionAction.saveSession.mockResolvedValue(undefined);
 
     const result = await service.saveStepAnswer(USER_ID, {
-      session_id: SESSION_ID, step: 3, answer: { discovery_channel: 'Instagram' }
+      session_id: SESSION_ID,
+      step: 3,
+      answer: { discovery_channel: 'Instagram' },
     } as any);
 
     expect(result.statusCode).toBe(HttpStatus.OK);
@@ -679,14 +658,18 @@ describe('OnboardingService — saveStepAnswer (BE-008)', () => {
   });
 
   it('AC-07: calling step 1 again overwrites previous answer — steps_completed stays same', async () => {
-    mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession({
-      answers: { step_1: { business_description: 'Old answer' } },
-      steps_completed: 1,
-    }));
+    mockSaveSessionAction.findSessionById.mockResolvedValue(
+      buildSession({
+        answers: { step_1: { business_description: 'Old answer' } },
+        steps_completed: 1,
+      }),
+    );
     mockSaveSessionAction.saveSession.mockResolvedValue(undefined);
 
     const result = await service.saveStepAnswer(USER_ID, {
-      session_id: SESSION_ID, step: 1, answer: { business_description: 'New answer' }
+      session_id: SESSION_ID,
+      step: 1,
+      answer: { business_description: 'New answer' },
     } as any);
 
     expect((result.data.answers as any).step_1).toEqual({ business_description: 'New answer' });
@@ -697,8 +680,10 @@ describe('OnboardingService — saveStepAnswer (BE-008)', () => {
     mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession());
     await expect(
       service.saveStepAnswer(USER_ID, {
-        session_id: SESSION_ID, step: 1, answer: { business_description: 'x'.repeat(501) }
-      } as any)
+        session_id: SESSION_ID,
+        step: 1,
+        answer: { business_description: 'x'.repeat(501) },
+      } as any),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 
@@ -706,8 +691,10 @@ describe('OnboardingService — saveStepAnswer (BE-008)', () => {
     mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession());
     await expect(
       service.saveStepAnswer(USER_ID, {
-        session_id: SESSION_ID, step: 2, answer: { customer_tags: { type: [] } }
-      } as any)
+        session_id: SESSION_ID,
+        step: 2,
+        answer: { customer_tags: { type: [] } },
+      } as any),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 
@@ -715,8 +702,10 @@ describe('OnboardingService — saveStepAnswer (BE-008)', () => {
     mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession());
     await expect(
       service.saveStepAnswer(USER_ID, {
-        session_id: SESSION_ID, step: 3, answer: { discovery_channel: 'Twitter' }
-      } as any)
+        session_id: SESSION_ID,
+        step: 3,
+        answer: { discovery_channel: 'Twitter' },
+      } as any),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 });

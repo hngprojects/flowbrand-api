@@ -89,8 +89,7 @@ const LIVESTOCK_POULTRY: TemplateDefinition = {
         'Livestock farmers trust visible results: weight gain in broilers, egg-laying improvements, ' +
         'and herd health gains. {{business_name}} needs {{target_customer}} to see these consistently ' +
         'on {{discovery_channel}}.',
-      actionPrompt:
-        'Post 3 before-and-after livestock photos this week. Share one daily livestock care reel.',
+      actionPrompt: 'Post 3 before-and-after livestock photos this week. Share one daily livestock care reel.',
       tasks: [
         'Post 3 before-and-after livestock photos showing weight, growth, or health improvements',
         'Create a 30-60 second daily-care reel on a specific topic (vaccination, feeding, disease signs)',
@@ -115,8 +114,7 @@ const LIVESTOCK_POULTRY: TemplateDefinition = {
       position: 3,
       name: 'Make First Sale',
       channel: CHANNEL,
-      explanation:
-        'Convert interest into orders with clear pricing, simple ordering, and a low-risk first purchase.',
+      explanation: 'Convert interest into orders with clear pricing, simple ordering, and a low-risk first purchase.',
       actionPrompt:
         'Pin an order flow on WhatsApp this week. Show prices on every post and offer a first-time buyer incentive.',
       tasks: [
@@ -155,8 +153,7 @@ const FRESH_PRODUCE: TemplateDefinition = {
         'Fresh produce sells on the visibility of the harvest. {{business_name}} needs ' +
         '{{target_customer}} (restaurants, markets, households) to see the produce, the day it was ' +
         'harvested, and the price.',
-      actionPrompt:
-        'Post 3 harvest photos this week with prices. Share one farm-to-market video.',
+      actionPrompt: 'Post 3 harvest photos this week with prices. Share one farm-to-market video.',
       tasks: [
         'Post 3 harvest photos with the date harvested and the price per kg or bunch',
         'Share one farm-to-market video showing the produce journey',
@@ -169,8 +166,7 @@ const FRESH_PRODUCE: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Build trust with chefs, traders, and individual households through educational content on freshness, storage, and seasonal pricing.',
-      actionPrompt:
-        'Run a poll on what {{target_customer}} wants in season. Share two customer testimonials.',
+      actionPrompt: 'Run a poll on what {{target_customer}} wants in season. Share two customer testimonials.',
       tasks: [
         'Run a poll on which produce {{target_customer}} wants this season',
         'Reply to every comment and DM within 2 hours',
@@ -197,8 +193,7 @@ const FRESH_PRODUCE: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Repeat buyers are everything in produce. Restaurants and households reorder weekly when {{business_name}} makes it predictable and easy.',
-      actionPrompt:
-        'Set up a weekly recurring order option. Launch a referral programme for restaurant introductions.',
+      actionPrompt: 'Set up a weekly recurring order option. Launch a referral programme for restaurant introductions.',
       tasks: [
         'Set up a weekly recurring order option with reminders the day before delivery',
         'Launch a referral programme rewarding restaurant or market introductions',
@@ -221,8 +216,7 @@ const CROP_PROCESSING: TemplateDefinition = {
         'Processed products (palm oil, garri, dried fruit, ground nut paste) sell on packaging and ' +
         'provenance. {{business_name}} needs {{target_customer}} to see the source farm and the ' +
         'finished product side by side.',
-      actionPrompt:
-        'Post 3 product photos this week showing packaging and farm source. Share one processing video.',
+      actionPrompt: 'Post 3 product photos this week showing packaging and farm source. Share one processing video.',
       tasks: [
         'Post 3 product photos showing packaging, source, and price',
         'Share one processing video (raw input to finished product) on {{discovery_channel}}',
@@ -235,8 +229,7 @@ const CROP_PROCESSING: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Differentiate on quality and traceability. {{target_customer}} reaching for processed food wants to know it is clean, fresh, and locally produced.',
-      actionPrompt:
-        'Run a taste test or recipe poll this week. Share two customer testimonials.',
+      actionPrompt: 'Run a taste test or recipe poll this week. Share two customer testimonials.',
       tasks: [
         'Run a recipe or taste-test poll asking {{target_customer}} how they use {{product}}',
         'Reply to every comment and DM within 2 hours',
@@ -249,8 +242,7 @@ const CROP_PROCESSING: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Convert browsers into first-time buyers with a sampler pack, clear prices, and a simple ordering flow.',
-      actionPrompt:
-        'Offer a sampler bundle this week. Pin a WhatsApp order flow with clear prices.',
+      actionPrompt: 'Offer a sampler bundle this week. Pin a WhatsApp order flow with clear prices.',
       tasks: [
         'Offer a first-time sampler bundle at a discount',
         'Pin a structured WhatsApp order flow on your business profile',
@@ -263,10 +255,9 @@ const CROP_PROCESSING: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Processed-food buyers reorder when freshness and convenience are consistent. {{business_name}} stays useful by remembering reorder cycles and rewarding loyalty.',
-      actionPrompt:
-        'Set reorder reminders for past customers. Launch a referral programme.',
+      actionPrompt: 'Set reorder reminders for past customers. Launch a referral programme.',
       tasks: [
-        'Send a WhatsApp reorder reminder based on each customer\'s usage rhythm',
+        "Send a WhatsApp reorder reminder based on each customer's usage rhythm",
         'Launch a refer-a-friend reward (discount or free pack) for both parties',
         'Build a VIP customer WhatsApp group for limited-batch and seasonal releases',
       ],

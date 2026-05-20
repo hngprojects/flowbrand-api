@@ -1,11 +1,4 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  HttpException,
-  HttpStatus,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import type { Request } from 'express';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { RedisService } from '../../redis/redis.service';
@@ -56,10 +49,7 @@ export class FunnelRateLimitGuard implements CanActivate {
     if (count === null) return true;
 
     if (count > MAX_REQUESTS_PER_HOUR) {
-      throw new HttpException(
-        SYS_MSG.GENERATION_RATE_LIMIT_EXCEEDED,
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
+      throw new HttpException(SYS_MSG.GENERATION_RATE_LIMIT_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS);
     }
 
     return true;

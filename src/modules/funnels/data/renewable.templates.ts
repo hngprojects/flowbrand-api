@@ -29,8 +29,7 @@ const SOLAR_INSTALLATION: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Build the case with case studies, warranties, and honest comparisons. Solar is a multi-year commitment; trust must be earned with proof, not promises.',
-      actionPrompt:
-        'Publish one case study this week and one FAQ addressing common objections (cost, theft, weather).',
+      actionPrompt: 'Publish one case study this week and one FAQ addressing common objections (cost, theft, weather).',
       tasks: [
         'Share one case study with customer name (with permission), location, system size, and monthly savings',
         'Publish one FAQ post addressing cost, roof damage, theft, or weather objections',
@@ -57,8 +56,7 @@ const SOLAR_INSTALLATION: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Every installation is a long-term relationship. {{business_name}} grows through referrals from happy installations and add-on services for the same customer.',
-      actionPrompt:
-        'Send a 30-day check-in message after every installation. Share monthly energy reports.',
+      actionPrompt: 'Send a 30-day check-in message after every installation. Share monthly energy reports.',
       tasks: [
         'Send a personal check-in message 30 days after every installation',
         'Share monthly or quarterly energy reports showing power generated and money saved',
@@ -109,8 +107,7 @@ const BIOGAS: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Convert interest into installation. Group discounts, clear financials, and subsidies bring the commitment within reach.',
-      actionPrompt:
-        'Offer a community group discount this week. Provide a financial summary covering payback period.',
+      actionPrompt: 'Offer a community group discount this week. Provide a financial summary covering payback period.',
       tasks: [
         'Offer community group discounts where 2+ farms installing together get a reduced rate',
         'Provide a financial summary covering installation cost, monthly savings, payback period',
@@ -123,8 +120,7 @@ const BIOGAS: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Retain customers with maintenance subscriptions and grow within communities through endorsements and upsells.',
-      actionPrompt:
-        'Offer monthly maintenance subscriptions this week. Launch a referral programme.',
+      actionPrompt: 'Offer monthly maintenance subscriptions this week. Launch a referral programme.',
       tasks: [
         'Offer a monthly maintenance and performance check subscription',
         'Create a referral programme where customers earn a free service visit per successful referral',
@@ -173,8 +169,7 @@ const CLEAN_COOKSTOVE: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Remove the barriers that stop interested {{target_customer}} from a first purchase. A starter bundle plus a weekly payment option converts hesitant buyers.',
-      actionPrompt:
-        'Launch a starter bundle this week (stove plus one week of briquettes) at a promotional price.',
+      actionPrompt: 'Launch a starter bundle this week (stove plus one week of briquettes) at a promotional price.',
       tasks: [
         'Offer a starter bundle (stove plus one week of briquettes) at a promotional first-time price',
         'Set up sales points in markets, near food vendor clusters, and through kiosk networks',
@@ -191,7 +186,7 @@ const CLEAN_COOKSTOVE: TemplateDefinition = {
         'Launch a monthly briquette delivery subscription this week. Send fuel-low reminders based on purchase history.',
       tasks: [
         'Introduce a monthly briquette delivery subscription with a loyalty discount',
-        'Send WhatsApp reminders when a customer\'s fuel is likely running low',
+        "Send WhatsApp reminders when a customer's fuel is likely running low",
         'Run a referral programme for food vendors (refer one vendor, get free briquettes)',
       ],
     },
@@ -223,8 +218,7 @@ const MINI_GRID: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Earn trust before anyone pays. {{target_customer}} communities have legitimate concerns about reliability, pricing, and infrastructure ownership.',
-      actionPrompt:
-        'Publish all regulatory approvals this week. Host an open Q&A session.',
+      actionPrompt: 'Publish all regulatory approvals this week. Host an open Q&A session.',
       tasks: [
         'Share all regulatory licences and government approvals publicly',
         'Publish the tariff structure clearly: what each tier costs and what it can power',
@@ -237,8 +231,7 @@ const MINI_GRID: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Convert community interest into signed connection agreements. A free trial period for early adopters seeds the first subscribers.',
-      actionPrompt:
-        'Offer a 30-day free trial connection for the first 20 sign-ups this week.',
+      actionPrompt: 'Offer a 30-day free trial connection for the first 20 sign-ups this week.',
       tasks: [
         'Offer a free 30-day trial connection for early adopters (first 20 sign-ups)',
         'Make sign-up as simple as possible: name, phone, and a mobile money payment',
@@ -251,8 +244,7 @@ const MINI_GRID: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Retain subscribers and grow revenue. {{business_name}} keeps {{target_customer}} engaged with monthly summaries and increases value through appliance financing.',
-      actionPrompt:
-        'Send monthly energy summaries to every subscriber. Offer solar-powered appliance loans.',
+      actionPrompt: 'Send monthly energy summaries to every subscriber. Offer solar-powered appliance loans.',
       tasks: [
         'Send monthly energy summaries showing usage and savings versus a generator',
         'Offer solar-powered appliance loans (TV, fan, fridge) repaid through monthly bills',

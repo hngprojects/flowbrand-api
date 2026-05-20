@@ -1,9 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  InternalServerErrorException,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { QueryFailedError } from 'typeorm';
 import { UserModelAction } from './actions/user.action';
@@ -51,8 +46,7 @@ export class UsersService {
     } catch (error) {
       if (
         error instanceof QueryFailedError &&
-        (error as { driverError?: { code?: string } }).driverError?.code ===
-          '23505'
+        (error as { driverError?: { code?: string } }).driverError?.code === '23505'
       ) {
         throw new ConflictException(SYS_MSG.USER_EMAIL_IN_USE);
       }
@@ -89,8 +83,7 @@ export class UsersService {
     } catch (error) {
       if (
         error instanceof QueryFailedError &&
-        (error as { driverError?: { code?: string } }).driverError?.code ===
-          '23505'
+        (error as { driverError?: { code?: string } }).driverError?.code === '23505'
       ) {
         throw new ConflictException(SYS_MSG.USER_EMAIL_IN_USE);
       }
@@ -132,9 +125,7 @@ export class UsersService {
       updatePayload: payload,
     });
     if (!updated) {
-      throw new InternalServerErrorException(
-        SYS_MSG.USER_UPDATE_FAILED,
-      );
+      throw new InternalServerErrorException(SYS_MSG.USER_UPDATE_FAILED);
     }
     return updated;
   }
@@ -160,9 +151,7 @@ export class UsersService {
     });
 
     if (!updated) {
-      throw new InternalServerErrorException(
-        SYS_MSG.USER_UPDATE_FAILED,
-      );
+      throw new InternalServerErrorException(SYS_MSG.USER_UPDATE_FAILED);
     }
     return updated;
   }

@@ -15,44 +15,36 @@ export class WizardSessionModelAction extends AbstractModelAction<WizardSession>
     super(wizardSessionRepository, WizardSession);
   }
 
-  async resolveStartWizardSession(
-    userId: string,
-    at: Date,
-    expiresAt: Date,
-  ): Promise<WizardStartResolveResult> {
-    return this.wizardSessionRepository.manager.transaction(
-      async (manager) => {
-        await manager.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
-          userId,
-        ]);
+  async resolveStartWizardSession(userId: string, at: Date, expiresAt: Date): Promise<WizardStartResolveResult> {
+    return this.wizardSessionRepository.manager.transaction(async (manager) => {
+      await manager.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [userId]);
 
-        const repo = manager.getRepository(WizardSession);
+      const repo = manager.getRepository(WizardSession);
 
-        const completed = await repo.findOne({
-          where: { user_id: userId, status: WizardStatus.COMPLETE },
-        });
-        if (completed) {
-          return { status: 'already_complete' };
-        }
+      const completed = await repo.findOne({
+        where: { user_id: userId, status: WizardStatus.COMPLETE },
+      });
+      if (completed) {
+        return { status: 'already_complete' };
+      }
 
-        const active = await this.findActiveInProgress(repo, userId, at);
-        if (active) {
-          return { status: 'active', session: active };
-        }
+      const active = await this.findActiveInProgress(repo, userId, at);
+      if (active) {
+        return { status: 'active', session: active };
+      }
 
-        const created = await repo.save(
-          repo.create({
-            user_id: userId,
-            status: WizardStatus.IN_PROGRESS,
-            steps_completed: 0,
-            answers: {},
-            expires_at: expiresAt,
-          }),
-        );
+      const created = await repo.save(
+        repo.create({
+          user_id: userId,
+          status: WizardStatus.IN_PROGRESS,
+          steps_completed: 0,
+          answers: {},
+          expires_at: expiresAt,
+        }),
+      );
 
-        return { status: 'created', session: created };
-      },
-    );
+      return { status: 'created', session: created };
+    });
   }
 
   private findActiveInProgress(
@@ -60,11 +52,7 @@ export class WizardSessionModelAction extends AbstractModelAction<WizardSession>
     userId: string,
     at: Date,
   ): Promise<WizardSession | null> {
-    return this.applyActiveInProgressFilters(
-      repo.createQueryBuilder('ws'),
-      userId,
-      at,
-    ).getOne();
+    return this.applyActiveInProgressFilters(repo.createQueryBuilder('ws'), userId, at).getOne();
   }
 
   private applyActiveInProgressFilters(
@@ -78,13 +66,13 @@ export class WizardSessionModelAction extends AbstractModelAction<WizardSession>
       .andWhere('ws.expires_at > :at', { at })
       .orderBy('ws.created_at', 'DESC');
   }
-  
+
   async findActiveSession(userId: string): Promise<WizardSession | null> {
     return this.repository
       .createQueryBuilder('ws')
       .where('ws.user_id = :userId', { userId })
       .andWhere('ws.status IN (:...statuses)', {
-        statuses: ['in_progress', 'complete']
+        statuses: ['in_progress', 'complete'],
       })
       .orderBy('ws.created_at', 'DESC')
       .limit(1)
@@ -92,7 +80,7 @@ export class WizardSessionModelAction extends AbstractModelAction<WizardSession>
   }
 
   async markAsExpired(id: string): Promise<void> {
-    await this.repository.update(id, { status: WizardStatus.EXPIRED })
+    await this.repository.update(id, { status: WizardStatus.EXPIRED });
   }
 
   async findSessionById(sessionId: string, userId: string): Promise<WizardSession | null> {
@@ -100,10 +88,10 @@ export class WizardSessionModelAction extends AbstractModelAction<WizardSession>
       .createQueryBuilder('ws')
       .where('ws.id = :sessionId', { sessionId })
       .andWhere('ws.user_id = :userId', { userId })
-      .getOne()
+      .getOne();
   }
 
   async saveSession(session: WizardSession): Promise<WizardSession> {
-    return this.repository.save(session)
+    return this.repository.save(session);
   }
 }

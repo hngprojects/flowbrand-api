@@ -57,8 +57,7 @@ export const CreateFunnelDocs = () =>
       },
     }),
     ApiUnprocessableEntityResponse({
-      description:
-        'Source validation failed: wizard session not complete, or upload(s) not ready / not owned.',
+      description: 'Source validation failed: wizard session not complete, or upload(s) not ready / not owned.',
       schema: {
         example: {
           success: false,

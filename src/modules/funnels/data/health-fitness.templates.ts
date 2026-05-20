@@ -109,8 +109,7 @@ const NUTRITION_WEIGHT_LOSS: TemplateDefinition = {
       channel: CHANNEL,
       explanation:
         'Convert interested leads into paying meal plan or coaching clients. Frictionless ordering, visible pricing, and a first-time incentive remove the friction.',
-      actionPrompt:
-        'Pin a meal-plan ordering flow on WhatsApp this week. Show prices three times this week.',
+      actionPrompt: 'Pin a meal-plan ordering flow on WhatsApp this week. Show prices three times this week.',
       tasks: [
         'Pin a "send name, goal, food preferences, budget" order flow to WhatsApp',
         'Post pricing publicly at least 3 times per week (custom plan, 30-day programme, monthly coaching)',

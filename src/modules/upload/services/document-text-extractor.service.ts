@@ -71,9 +71,7 @@ export class DocumentTextExtractorService {
   private async extractDocx(buffer: Buffer): Promise<string> {
     const result = await mammoth.extractRawText({ buffer });
     if (result.messages.length) {
-      this.logger.debug(
-        `mammoth messages for docx: ${result.messages.map((m) => m.message).join('; ')}`,
-      );
+      this.logger.debug(`mammoth messages for docx: ${result.messages.map((m) => m.message).join('; ')}`);
     }
     return result.value ?? '';
   }
@@ -111,11 +109,10 @@ export class DocumentTextExtractorService {
     return chunks.join('\n\n');
   }
 
-
   private extractDocLegacy(buffer: Buffer): string {
     return this.extractOleLegacy(buffer);
   }
-  
+
   private extractPptLegacy(buffer: Buffer): string {
     return this.extractOleLegacy(buffer);
   }
@@ -127,9 +124,7 @@ export class DocumentTextExtractorService {
   private extractOleLegacy(buffer: Buffer): string {
     const raw = buffer.toString('latin1');
     const runs = [...raw.matchAll(/[\x20-\x7E]{4,}/g)].map((m) => m[0]);
-    const filtered = runs.filter(
-      (chunk) => !/^(Arial|Times|Calibri|Helvetica)/i.test(chunk),
-    );
+    const filtered = runs.filter((chunk) => !/^(Arial|Times|Calibri|Helvetica)/i.test(chunk));
     const text = filtered.join(' ').trim();
     return this.oleTextLooksUsable(text) ? text : '';
   }

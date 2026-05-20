@@ -15,14 +15,21 @@ export class PinoLoggerService implements LoggerService {
   }
 
   runWithContext(
-    context: Partial<{ requestId: string | null; userId?: string; sessionId?: string; jobId?: string; attempt?: number }>, 
+    context: Partial<{
+      requestId: string | null;
+      userId?: string;
+      sessionId?: string;
+      jobId?: string | number;
+      attempt?: number;
+    }>,
     callback: () => void | Promise<void>,
-  ): void | Promise<void> {
+  ): Promise<void> {
     const existingContext = this.contextService.getContext() ?? {};
-    return this.contextService.run(
-      { requestId: null, ...existingContext, ...context },
-      () => Promise.resolve(callback()),
-    );
+    const mergedContext = { requestId: null, ...existingContext, ...context };
+
+    return this.contextService.run(mergedContext, async () => {
+      await callback();
+    });
   }
 
   private getContextFields(): Record<string, unknown> {
@@ -43,16 +50,12 @@ export class PinoLoggerService implements LoggerService {
     return fields;
   }
 
-  private buildPayload(
-    event: string,
-    data?: Record<string, unknown>,
-    err?: Error,
-  ): Record<string, unknown> {
+  private buildPayload(event: string, data?: Record<string, unknown>, err?: Error): Record<string, unknown> {
     const fields = this.getContextFields();
     const maskedData = { ...data };
 
     if (maskedData.email && typeof maskedData.email === 'string') {
-      maskedData.email = maskEmail(maskedData.email)
+      maskedData.email = maskEmail(maskedData.email);
     }
 
     if (err instanceof Error) {
@@ -62,7 +65,7 @@ export class PinoLoggerService implements LoggerService {
       maskedData.stack = maskedData.error.stack;
       maskedData.error = maskedData.error.message;
     }
-    return { event, ...fields, ...maskedData }
+    return { event, ...fields, ...maskedData };
   }
 
   info(event: string, data?: Record<string, unknown>): void {
@@ -74,7 +77,7 @@ export class PinoLoggerService implements LoggerService {
   }
 
   error(event: string, data?: Record<string, unknown>, err?: Error): void {
-    this.logger.error(this.buildPayload(event, data,err));
+    this.logger.error(this.buildPayload(event, data, err));
   }
 
   debug(event: string, data?: Record<string, unknown>): void {

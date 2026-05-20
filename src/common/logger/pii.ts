@@ -1,4 +1,4 @@
-export function maskId(id: string, prefix: string = 'usr'): string {
+export function maskId(id: string | null | undefined, prefix: string = 'usr'): string {
   if (!id) return `${prefix}_****`;
 
   const underscoreIndex = id.indexOf('_');
@@ -11,7 +11,6 @@ export function maskId(id: string, prefix: string = 'usr'): string {
 
   if (id.length < 4) return `${prefix}_****`;
   return `${prefix}_****${id.slice(-4)}`;
-  
 }
 
 export function maskEmail(email: string): string {

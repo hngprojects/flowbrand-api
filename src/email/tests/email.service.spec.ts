@@ -11,10 +11,7 @@ describe('EmailService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        EmailService,
-        { provide: getQueueToken(QUEUES.EMAIL), useValue: mockQueue },
-      ],
+      providers: [EmailService, { provide: getQueueToken(QUEUES.EMAIL), useValue: mockQueue }],
     }).compile();
 
     service = module.get<EmailService>(EmailService);
@@ -39,9 +36,7 @@ describe('EmailService', () => {
     it('resolves without throwing when Redis is unavailable', async () => {
       mockQueue.add.mockRejectedValue(new Error('Redis connection refused'));
 
-      await expect(
-        service.sendOtpVerification('ada@test.com', otpPayload),
-      ).resolves.toBeUndefined();
+      await expect(service.sendOtpVerification('ada@test.com', otpPayload)).resolves.toBeUndefined();
     });
   });
 
@@ -62,9 +57,7 @@ describe('EmailService', () => {
     it('resolves without throwing when Redis is unavailable', async () => {
       mockQueue.add.mockRejectedValue(new Error('Redis connection refused'));
 
-      await expect(
-        service.sendOtpReset('ada@test.com', otpPayload),
-      ).resolves.toBeUndefined();
+      await expect(service.sendOtpReset('ada@test.com', otpPayload)).resolves.toBeUndefined();
     });
   });
 

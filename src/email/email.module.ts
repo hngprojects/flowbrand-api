@@ -13,8 +13,7 @@ import { TemplateService } from './template.service';
     EmailService,
     {
       provide: 'RESEND_CLIENT',
-      useFactory: (config: ConfigService) =>
-        new Resend(config.get<string>('RESEND_API_KEY')),
+      useFactory: (config: ConfigService) => new Resend(config.get<string>('RESEND_API_KEY')),
       inject: [ConfigService],
     },
     EmailProcessor,

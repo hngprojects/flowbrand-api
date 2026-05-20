@@ -78,8 +78,7 @@ export const GetFunnelUploadProgressDocs = () =>
     }),
     ApiResponse({
       status: HttpStatus.OK,
-      description:
-        'Flat progress object (no statusCode/message/data envelope — unlike POST /funnels/upload).',
+      description: 'Flat progress object (no statusCode/message/data envelope — unlike POST /funnels/upload).',
       schema: {
         example: {
           uploadId: uploadItemExample.uploadId,

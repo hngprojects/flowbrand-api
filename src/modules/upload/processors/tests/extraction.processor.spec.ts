@@ -91,10 +91,7 @@ describe('ExtractionProcessor', () => {
       await processor.handleExtraction(makeJob());
 
       expect(mockObjectStorage.getObject).toHaveBeenCalledWith(STORAGE_PATH);
-      expect(mockExtractor.extract).toHaveBeenCalledWith(
-        expect.any(Buffer),
-        'pdf',
-      );
+      expect(mockExtractor.extract).toHaveBeenCalledWith(expect.any(Buffer), 'pdf');
       expect(mockDocumentAction.saveDocument).toHaveBeenCalledWith(
         expect.objectContaining({
           status: UploadDocumentStatus.READY,
@@ -148,9 +145,7 @@ describe('ExtractionProcessor', () => {
     it('throws before attempting extraction when upload record is missing', async () => {
       mockDocumentAction.get.mockResolvedValue(null);
 
-      await expect(processor.handleExtraction(makeJob())).rejects.toThrow(
-        `Upload record not found: ${UPLOAD_ID}`,
-      );
+      await expect(processor.handleExtraction(makeJob())).rejects.toThrow(`Upload record not found: ${UPLOAD_ID}`);
 
       expect(mockObjectStorage.getObject).not.toHaveBeenCalled();
       expect(mockExtractor.extract).not.toHaveBeenCalled();

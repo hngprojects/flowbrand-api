@@ -68,9 +68,7 @@ export class FunnelTemplateService {
       }
 
       // 1b: exact businessType match without channel
-      const businessHit = TEMPLATE_LIBRARY.find((t) =>
-        t.businessType.some((b) => b.toLowerCase() === businessKey),
-      );
+      const businessHit = TEMPLATE_LIBRARY.find((t) => t.businessType.some((b) => b.toLowerCase() === businessKey));
       if (businessHit) return businessHit;
 
       // 2: industry-level match (treat businessType as an industry id)
@@ -109,9 +107,7 @@ export class FunnelTemplateService {
 
     // Final sweep: any remaining {{token}} becomes a readable fallback.
     // AC-03 requires no {{variable}} tokens in output.
-    out = out.replace(VARIABLE_TOKEN, (_, token: string) =>
-      this.humanizeToken(typeof token === 'string' ? token : ''),
-    );
+    out = out.replace(VARIABLE_TOKEN, (_, token: string) => this.humanizeToken(typeof token === 'string' ? token : ''));
 
     return out;
   }
@@ -128,14 +124,9 @@ export class FunnelTemplateService {
     // snake_case (business_description, target_customer) so we read both
     // snake_case and camelCase to be tolerant of either caller convention.
     const businessName = this.readString(safe, 'business_name', 'businessName') || 'your business';
-    const targetCustomer =
-      this.readString(safe, 'target_customer', 'targetCustomer') || 'your ideal customer';
+    const targetCustomer = this.readString(safe, 'target_customer', 'targetCustomer') || 'your ideal customer';
     const discoveryChannel = this.sanitize(safe.discoveryChannel) || 'your main channel';
-    const businessDescription = this.readString(
-      safe,
-      'business_description',
-      'businessDescription',
-    );
+    const businessDescription = this.readString(safe, 'business_description', 'businessDescription');
     const derivedProductService = this.deriveProductService(businessDescription);
     return {
       businessType: this.sanitize(safe.businessType) ?? '',
@@ -147,20 +138,14 @@ export class FunnelTemplateService {
     };
   }
 
-  private readString(
-    ctx: BusinessContext,
-    snake: string,
-    camel: string,
-  ): string {
+  private readString(ctx: BusinessContext, snake: string, camel: string): string {
     const raw = ctx[snake] ?? ctx[camel];
     return typeof raw === 'string' ? this.sanitize(raw) : '';
   }
 
   private deriveProductService(description: string): string {
     if (!description || !description.trim()) return 'your product/service';
-    const firstNoun = description
-      .split(/[\s,.;:!?]+/)
-      .find((word) => /^[A-Za-z][A-Za-z-]{2,}$/.test(word));
+    const firstNoun = description.split(/[\s,.;:!?]+/).find((word) => /^[A-Za-z][A-Za-z-]{2,}$/.test(word));
     return firstNoun ? firstNoun.toLowerCase() : 'your product/service';
   }
 
@@ -173,12 +158,10 @@ export class FunnelTemplateService {
 
   private emergencyTemplate(ctx: BusinessContext | null | undefined): LlmStageData[] {
     const safe = ctx ?? ({} as BusinessContext);
-    const businessName =
-      this.readString(safe, 'business_name', 'businessName') || 'your business';
+    const businessName = this.readString(safe, 'business_name', 'businessName') || 'your business';
     const channel = this.sanitize(safe.discoveryChannel) || 'your main channel';
 
-    const toTasks = (lines: readonly string[]): StageTaskData[] =>
-      lines.map((taskText) => ({ taskText }));
+    const toTasks = (lines: readonly string[]): StageTaskData[] => lines.map((taskText) => ({ taskText }));
 
     return [
       {

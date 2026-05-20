@@ -24,10 +24,7 @@ import { FunnelStage } from '../entities/funnel-stage.entity';
 import { FunnelCreationPath } from '../enums/funnel-creation-path.enum';
 import { FunnelStatus } from '../enums/funnel-status.enum';
 import { StageStatus } from '../enums/stage-status.enum';
-import type {
-  BusinessContext,
-  GenerateFunnelJobPayload,
-} from '../interfaces/generate-funnel-job.interface';
+import type { BusinessContext, GenerateFunnelJobPayload } from '../interfaces/generate-funnel-job.interface';
 
 const STAGE_NAMES = ['Get Noticed', 'Spark Interest', 'Make First Sale', 'Bring Them Back'] as const;
 const QUEUE_DELAY_MS = 250;
@@ -81,10 +78,7 @@ export class FunnelsService {
     }
 
     // 3. Source-specific validation + business context derivation.
-    const { businessName, businessContext } = await this.validateSourceAndDeriveContext(
-      userId,
-      dto,
-    );
+    const { businessName, businessContext } = await this.validateSourceAndDeriveContext(userId, dto);
 
     // 4. Transaction: insert funnel + 4 stages, dispatch queue job
     //    BEFORE commit. Any failure rolls back DB.
@@ -246,6 +240,9 @@ export class FunnelsService {
   private deriveNameFromFiles(docs: UploadedDocument[]): string {
     const first = docs[0]?.file_name;
     if (!first) return '';
-    return first.replace(/\.[a-zA-Z0-9]+$/, '').slice(0, 100).trim();
+    return first
+      .replace(/\.[a-zA-Z0-9]+$/, '')
+      .slice(0, 100)
+      .trim();
   }
 }

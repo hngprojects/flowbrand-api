@@ -28,13 +28,7 @@ import { FunnelsService as FunnelsGenService } from './services/funnels.service'
     RedisModule,
   ],
   controllers: [FunnelsController],
-  providers: [
-    FunnelsReadService,
-    FunnelsGenService,
-    FunnelModelAction,
-    FunnelStageModelAction,
-    FunnelRateLimitGuard,
-  ],
+  providers: [FunnelsReadService, FunnelsGenService, FunnelModelAction, FunnelStageModelAction, FunnelRateLimitGuard],
   exports: [FunnelsGenService, FunnelModelAction],
 })
 export class FunnelsModule {}

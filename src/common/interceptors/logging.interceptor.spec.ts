@@ -5,8 +5,8 @@ import { ExecutionContext, CallHandler } from '@nestjs/common';
 import { of, throwError } from 'rxjs';
 
 const mockPinoLogger = {
-  info:  jest.fn(),
-  warn:  jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
   error: jest.fn(),
   debug: jest.fn(),
 };
@@ -22,19 +22,19 @@ function buildContext(overrides: {
   headers?: Record<string, string>;
 }): ExecutionContext {
   const req = {
-    method:  overrides.method  ?? 'GET',
-    path:    overrides.path    ?? '/api/test',
+    method: overrides.method ?? 'GET',
+    path: overrides.path ?? '/api/test',
     headers: overrides.headers ?? {},
   };
 
   const res = {
     statusCode: 200,
-    setHeader:  jest.fn(),
+    setHeader: jest.fn(),
   };
 
   return {
     switchToHttp: () => ({
-      getRequest:  () => req,
+      getRequest: () => req,
       getResponse: () => res,
     }),
   } as unknown as ExecutionContext;
@@ -77,9 +77,7 @@ describe('LoggingInterceptor', () => {
       interceptor.intercept(ctx, buildHandler()).subscribe({
         complete: () => {
           const calledWith = mockContextService.run.mock.calls[0][0];
-          expect(calledWith.requestId).toMatch(
-            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-          );
+          expect(calledWith.requestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
           done();
         },
       });
@@ -92,9 +90,7 @@ describe('LoggingInterceptor', () => {
         complete: () => {
           const calledWith = mockContextService.run.mock.calls[0][0];
           expect(calledWith.requestId).not.toBe('not-a-uuid');
-          expect(calledWith.requestId).toMatch(
-            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-          );
+          expect(calledWith.requestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
           done();
         },
       });

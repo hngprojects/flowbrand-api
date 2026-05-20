@@ -3,12 +3,7 @@ import { TEMPLATE_LIBRARY } from '../../data/funnel-templates.data';
 import type { BusinessContext } from '../../interfaces/generate-funnel-job.interface';
 import { FunnelTemplateService } from '../funnel-template.service';
 
-const CANONICAL_STAGE_NAMES = [
-  'Get Noticed',
-  'Spark Interest',
-  'Make First Sale',
-  'Bring Them Back',
-] as const;
+const CANONICAL_STAGE_NAMES = ['Get Noticed', 'Spark Interest', 'Make First Sale', 'Bring Them Back'] as const;
 
 // Stage name is implicit by position in the LlmStageData output (matches the
 // shape the AI service returns). The template engine maps position -> name
@@ -53,9 +48,7 @@ describe('FunnelTemplateService - getTemplate', () => {
       } as unknown as BusinessContext);
 
       expect(result).toHaveLength(4);
-      expect(result.map((s) => POSITION_TO_NAME[s.position])).toEqual(
-        Array.from(CANONICAL_STAGE_NAMES),
-      );
+      expect(result.map((s) => POSITION_TO_NAME[s.position])).toEqual(Array.from(CANONICAL_STAGE_NAMES));
     });
 
     it('AC-01: stage positions are 1, 2, 3, 4 in order', () => {
@@ -161,15 +154,11 @@ describe('FunnelTemplateService - getTemplate', () => {
     });
 
     it('AC-05: does not throw on completely empty context', () => {
-      expect(() =>
-        service.getTemplate({} as unknown as BusinessContext),
-      ).not.toThrow();
+      expect(() => service.getTemplate({} as unknown as BusinessContext)).not.toThrow();
     });
 
     it('AC-05: does not throw on null context', () => {
-      expect(() =>
-        service.getTemplate(null as unknown as BusinessContext),
-      ).not.toThrow();
+      expect(() => service.getTemplate(null as unknown as BusinessContext)).not.toThrow();
     });
   });
 
@@ -213,16 +202,11 @@ describe('FunnelTemplateService - getTemplate', () => {
 
   describe('AC-08: emergency fallback', () => {
     it('AC-08: emergency template fires and logs when renderTemplate throws', () => {
-      const loggerError = jest
-        .spyOn(service['logger'], 'error')
-        .mockImplementation(() => undefined);
+      const loggerError = jest.spyOn(service['logger'], 'error').mockImplementation(() => undefined);
 
       // Force the substitution stage to throw by stubbing a private method.
       const renderSpy = jest
-        .spyOn(
-          service as unknown as { renderTemplate: (...args: unknown[]) => unknown },
-          'renderTemplate',
-        )
+        .spyOn(service as unknown as { renderTemplate: (...args: unknown[]) => unknown }, 'renderTemplate')
         .mockImplementation(() => {
           throw new Error('forced render failure');
         });
@@ -244,13 +228,7 @@ describe('FunnelTemplateService - getTemplate', () => {
   describe('AC-09: shape matches LlmStageData', () => {
     it('AC-09: every stage has position, channel, explanation, actionPrompt, tasks with taskText (same shape AI service emits)', () => {
       const result = service.getTemplate(BASE_CONTEXT);
-      const ALLOWED_KEYS = new Set([
-        'position',
-        'channel',
-        'explanation',
-        'actionPrompt',
-        'tasks',
-      ]);
+      const ALLOWED_KEYS = new Set(['position', 'channel', 'explanation', 'actionPrompt', 'tasks']);
       for (const stage of result) {
         expect(typeof stage.position).toBe('number');
         expect(typeof stage.channel).toBe('string');
@@ -312,10 +290,7 @@ describe('FunnelTemplateService - getTemplate', () => {
     it('EC-04: emergency template contains no double-brace literals', () => {
       // Force fallback path
       jest
-        .spyOn(
-          service as unknown as { renderTemplate: (...args: unknown[]) => unknown },
-          'renderTemplate',
-        )
+        .spyOn(service as unknown as { renderTemplate: (...args: unknown[]) => unknown }, 'renderTemplate')
         .mockImplementation(() => {
           throw new Error('forced');
         });
@@ -349,12 +324,14 @@ describe('FunnelTemplateService - getTemplate', () => {
   });
 });
 
-function serializeAllText(stages: ReadonlyArray<{
-  channel: string;
-  explanation: string;
-  actionPrompt: string;
-  tasks: ReadonlyArray<{ taskText: string }>;
-}>): string {
+function serializeAllText(
+  stages: ReadonlyArray<{
+    channel: string;
+    explanation: string;
+    actionPrompt: string;
+    tasks: ReadonlyArray<{ taskText: string }>;
+  }>,
+): string {
   return stages
     .map((s) => [s.channel, s.explanation, s.actionPrompt, ...s.tasks.map((t) => t.taskText)].join('\n'))
     .join('\n');

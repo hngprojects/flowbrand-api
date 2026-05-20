@@ -82,9 +82,7 @@ describe('EmailProcessor.handleSendEmail', () => {
         error: { message: 'rate limited' },
       });
 
-      await expect(processor.handleSendEmail(makeJob() as never)).rejects.toThrow(
-        'Resend error: rate limited',
-      );
+      await expect(processor.handleSendEmail(makeJob() as never)).rejects.toThrow('Resend error: rate limited');
     });
   });
 
@@ -93,9 +91,7 @@ describe('EmailProcessor.handleSendEmail', () => {
       mockTemplateService.render.mockReturnValue({ html: '<p>ok</p>', subject: 'sub' });
       mockResend.emails.send.mockRejectedValue(new Error('network timeout'));
 
-      await expect(processor.handleSendEmail(makeJob() as never)).rejects.toThrow(
-        'network timeout',
-      );
+      await expect(processor.handleSendEmail(makeJob() as never)).rejects.toThrow('network timeout');
     });
   });
 });

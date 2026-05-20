@@ -19,9 +19,7 @@ export class WaitlistService {
     private readonly emailService: EmailService,
   ) {}
 
-  async joinWaitlist(
-    dto: JoinWaitlistDto,
-  ): Promise<{ user: Waitlist; isNew: boolean }> {
+  async joinWaitlist(dto: JoinWaitlistDto): Promise<{ user: Waitlist; isNew: boolean }> {
     const existing = await this.waitlistAction.findByEmail(dto.email);
     if (existing) {
       return { user: existing, isNew: false };
@@ -39,12 +37,9 @@ export class WaitlistService {
     } catch (error) {
       if (
         error instanceof QueryFailedError &&
-        (error as { driverError?: { code?: string } }).driverError?.code ===
-          '23505'
+        (error as { driverError?: { code?: string } }).driverError?.code === '23505'
       ) {
-        const existingAfterCreate = await this.waitlistAction.findByEmail(
-          dto.email,
-        );
+        const existingAfterCreate = await this.waitlistAction.findByEmail(dto.email);
         if (existingAfterCreate) {
           return { user: existingAfterCreate, isNew: false };
         }
@@ -57,10 +52,7 @@ export class WaitlistService {
         user: { name: user.email.split('@')[0] },
       });
     } catch (err) {
-      this.logger.error(
-        `Failed to queue waitlist email for ${maskEmail(user.email)}`,
-        (err as Error).stack,
-      );
+      this.logger.error(`Failed to queue waitlist email for ${maskEmail(user.email)}`, (err as Error).stack);
     }
 
     return { user, isNew: true };

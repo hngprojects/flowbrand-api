@@ -6,7 +6,7 @@ import {
   Injectable,
   UnauthorizedException,
   Logger,
-  Optional
+  Optional,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as crypto from 'crypto';
@@ -40,15 +40,7 @@ const LEGACY_SESSION_KEY_PREFIX = 'sess';
 const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 const ACCOUNT_LOCK_DURATION_MS = 60 * 60 * 1000;
 
-type SafeUser = Omit<
-  User,
-  | 'password_hash'
-  | 'deletedAt'
-  | 'deleted_at'
-  | 'auth_metadata'
-  | 'sessions'
-  | 'roles'
->;
+type SafeUser = Omit<User, 'password_hash' | 'deletedAt' | 'deleted_at' | 'auth_metadata' | 'sessions' | 'roles'>;
 
 export interface AuthResponse extends AuthTokens {
   user: SafeUser;
@@ -71,10 +63,7 @@ export class AuthService {
   private get userSessionAction(): {
     findById(id: string): Promise<UserSession | null>;
     findByUserId(userId: string): Promise<UserSession[]>;
-    updateById(
-      id: string,
-      payload: Partial<UserSession>,
-    ): Promise<UserSession | null>;
+    updateById(id: string, payload: Partial<UserSession>): Promise<UserSession | null>;
     deleteById(id: string): Promise<void>;
     createSession(payload: Partial<UserSession>): Promise<UserSession>;
   } {
@@ -83,10 +72,7 @@ export class AuthService {
 
   private get authMetadataAction(): {
     findByUserId(userId: string): Promise<AuthMetadata | null>;
-    updateByUserId(
-      userId: string,
-      payload: Partial<AuthMetadata>,
-    ): Promise<AuthMetadata | null>;
+    updateByUserId(userId: string, payload: Partial<AuthMetadata>): Promise<AuthMetadata | null>;
     createForUser(payload: Partial<AuthMetadata>): Promise<AuthMetadata>;
   } {
     return this.authMetadataModelAction;
@@ -119,8 +105,8 @@ export class AuthService {
       termsAccepted: true,
     });
     await this.sendOtp(user.email);
-    
-    return {message: SYS_MSG.REGISTRATION_SUCCESSFUL_VERIFY_EMAIL};
+
+    return { message: SYS_MSG.REGISTRATION_SUCCESSFUL_VERIFY_EMAIL };
   }
 
   async login(dto: LoginDto): Promise<AuthResponse> {
@@ -133,10 +119,7 @@ export class AuthService {
     const metadata = await this.ensureAuthMetadata(user.id);
     this.throwIfLocked(metadata);
 
-    const passwordMatches = await bcrypt.compare(
-      dto.password,
-      user.password_hash,
-    );
+    const passwordMatches = await bcrypt.compare(dto.password, user.password_hash);
 
     if (!passwordMatches) {
       await this.recordFailedLogin(user.id, metadata);
@@ -236,10 +219,7 @@ export class AuthService {
       throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_REFRESH_TOKEN);
     }
 
-    const tokenMatches = await bcrypt.compare(
-      refreshToken,
-      session.refresh_token,
-    );
+    const tokenMatches = await bcrypt.compare(refreshToken, session.refresh_token);
 
     if (!tokenMatches) {
       throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_REFRESH_TOKEN);
@@ -286,10 +266,7 @@ export class AuthService {
         await this.redisService.expire(rateKey, 900);
       }
       if (newCount > 5) {
-        throw new HttpException(
-          SYS_MSG.OTP_RATE_LIMITED,
-          HttpStatus.TOO_MANY_REQUESTS,
-        );
+        throw new HttpException(SYS_MSG.OTP_RATE_LIMITED, HttpStatus.TOO_MANY_REQUESTS);
       }
     }
 
@@ -385,10 +362,7 @@ export class AuthService {
     const cooldownRaw = await this.redisService.get(cooldownKey);
     if (cooldownRaw) {
       const retryAfter = Math.ceil((parseInt(cooldownRaw, 10) - Date.now()) / 1000);
-      throw new HttpException(
-        { message: SYS_MSG.OTP_RESEND_RATE_LIMITED, retryAfter },
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
+      throw new HttpException({ message: SYS_MSG.OTP_RESEND_RATE_LIMITED, retryAfter }, HttpStatus.TOO_MANY_REQUESTS);
     }
 
     await this.generateAndSendOtp(user);
@@ -399,17 +373,17 @@ export class AuthService {
 
   async forgotPassword(email: string): Promise<{ message: string }> {
     const user = await this.usersService.findByEmail(email);
-    
+
     if (!user) {
       this.logger.debug({ message: 'Password reset requested for non-existent email', email });
       return { message: SYS_MSG.PASSWORD_RESET_OTP_SENT };
     }
-    
+
     if (!user.is_verified) {
       this.logger.debug({ message: 'Password reset requested for unverified account', userId: user.id });
       return { message: SYS_MSG.PASSWORD_RESET_OTP_SENT };
     }
-    
+
     const rateKey = `password-reset:rate:${user.id}`;
     const newCount = await this.redisService.incr(rateKey);
     if (newCount !== null) {
@@ -417,34 +391,31 @@ export class AuthService {
         await this.redisService.expire(rateKey, 900);
       }
       if (newCount > 3) {
-        this.logger.warn({ 
-          message: 'Password reset rate limit exceeded', 
-          userId: user.id, 
-          attempts: newCount 
+        this.logger.warn({
+          message: 'Password reset rate limit exceeded',
+          userId: user.id,
+          attempts: newCount,
         });
-        throw new HttpException(
-          SYS_MSG.PASSWORD_RESET_RATE_LIMITED,
-          HttpStatus.TOO_MANY_REQUESTS,
-        );
+        throw new HttpException(SYS_MSG.PASSWORD_RESET_RATE_LIMITED, HttpStatus.TOO_MANY_REQUESTS);
       }
     }
-    
+
     await this.generateAndSendPasswordResetOtp(user);
-    
+
     return { message: SYS_MSG.PASSWORD_RESET_OTP_SENT };
   }
 
   private async generateAndSendPasswordResetOtp(user: User): Promise<void> {
     const otpCode = crypto.randomInt(100000, 1000000);
     const token_hash = await bcrypt.hash(String(otpCode), 10);
-   
+
     await this.otpTokenAction.replaceToken({
       user_id: user.id,
       type: 'password_reset',
       token_hash,
-      expires_at: new Date(Date.now() + 15 * 60 * 1000), 
+      expires_at: new Date(Date.now() + 15 * 60 * 1000),
     });
-    
+
     await this.emailService.sendPasswordReset(
       user.email,
       {
@@ -454,7 +425,7 @@ export class AuthService {
       },
       user.id,
     );
-    
+
     this.logger.log({
       message: 'Password reset OTP generated and queued',
       userId: user.id,
@@ -463,77 +434,67 @@ export class AuthService {
     });
   }
 
-  async resetPassword(
-    email: string,
-    otpCode: string,
-    newPassword: string,
-  ): Promise<AuthResponse> {
+  async resetPassword(email: string, otpCode: string, newPassword: string): Promise<AuthResponse> {
     const user = await this.usersService.findByEmail(email);
-    
+
     if (!user) {
       throw new BadRequestException(SYS_MSG.PASSWORD_RESET_INVALID_OTP);
     }
-    
+
     const attemptsKey = `password-reset:verify:${user.id}`;
     const { exceeded } = await this.redisService.rateLimit(attemptsKey, 5, 300);
     if (exceeded) {
-      this.logger.warn({ 
-        message: 'Password reset verify attempts exceeded', 
-        userId: user.id 
+      this.logger.warn({
+        message: 'Password reset verify attempts exceeded',
+        userId: user.id,
       });
-      throw new HttpException(
-        SYS_MSG.PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED,
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
+      throw new HttpException(SYS_MSG.PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS);
     }
-    
-    const token = await this.otpTokenModelAction.findByUserAndType(
-      user.id,
-      'password_reset',
-    );
-    
+
+    const token = await this.otpTokenModelAction.findByUserAndType(user.id, 'password_reset');
+
     if (!token) {
       throw new BadRequestException(SYS_MSG.PASSWORD_RESET_INVALID_OTP);
     }
-    
+
     if (token.expires_at < new Date()) {
       await this.otpTokenAction.delete({
         identifierOptions: { user_id: user.id, type: 'password_reset' },
         transactionOptions: { useTransaction: false },
       });
-      this.logger.debug({ 
-        message: 'Expired password reset OTP used', 
+      this.logger.debug({
+        message: 'Expired password reset OTP used',
         userId: user.id,
-        expiredAt: token.expires_at
+        expiredAt: token.expires_at,
       });
       throw new BadRequestException(SYS_MSG.PASSWORD_RESET_EXPIRED);
     }
-    
+
     const codeMatches = await bcrypt.compare(otpCode, token.token_hash);
     if (!codeMatches) {
       throw new BadRequestException(SYS_MSG.PASSWORD_RESET_INVALID_OTP);
     }
-    
+
     await this.usersService.update(user.id, { password: newPassword });
-   
+
     await this.otpTokenAction.delete({
       identifierOptions: { user_id: user.id, type: 'password_reset' },
       transactionOptions: { useTransaction: false },
     });
-  
+
     await this.revokeAllUserSessions(user.id);
 
     await this.redisService.del(attemptsKey);
     await this.redisService.del(`password-reset:rate:${user.id}`);
-   
+
     const authResponse = await this.issueTokens(user);
-    
+
     this.logger.log({
       message: 'Password reset successful with auto-login',
       userId: user.id,
       email: user.email,
     });
-    
+
     return authResponse;
   }
 
@@ -547,21 +508,21 @@ export class AuthService {
       });
       return;
     }
-    
+
     for (const session of sessions) {
       if (!session.is_revoked) {
         await this.userSessionAction.updateById(session.id, {
           is_revoked: true,
           revoked_at: new Date(),
         });
-        
+
         await Promise.all([
           this.redisService.del(`active_session:${userId}:${session.id}`),
           this.redisService.del(`sess:${userId}:${session.id}`),
         ]);
       }
     }
-    
+
     this.logger.debug({
       message: `Revoked ${sessions.length} sessions for user`,
       userId,
@@ -591,16 +552,11 @@ export class AuthService {
     optionsOrSessionId?: string | { rollbackOnFailure?: boolean },
   ): Promise<AuthResponse> {
     const rollbackOnFailure =
-      typeof optionsOrSessionId === 'object'
-        ? optionsOrSessionId.rollbackOnFailure === true
-        : false;
+      typeof optionsOrSessionId === 'object' ? optionsOrSessionId.rollbackOnFailure === true : false;
     let sessionId: string | undefined;
 
     try {
-      sessionId =
-        typeof optionsOrSessionId === 'string'
-          ? optionsOrSessionId
-          : await this.createSession(user.id);
+      sessionId = typeof optionsOrSessionId === 'string' ? optionsOrSessionId : await this.createSession(user.id);
 
       const tokens = await this.signTokens(user, sessionId);
       await Promise.all([
@@ -627,10 +583,7 @@ export class AuthService {
     return safeUser;
   }
 
-  private async signTokens(
-    user: User,
-    sessionId?: string,
-  ): Promise<AuthTokens> {
+  private async signTokens(user: User, sessionId?: string): Promise<AuthTokens> {
     const payload: JwtPayload = {
       userId: user.id,
       sub: user.id,
@@ -650,41 +603,24 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
-  private async persistRefreshToken(
-    sessionId: string,
-    refreshToken: string,
-  ): Promise<void> {
+  private async persistRefreshToken(sessionId: string, refreshToken: string): Promise<void> {
     const hash = await bcrypt.hash(refreshToken, 10);
     await this.userSessionAction.updateById(sessionId, {
       refresh_token: hash,
     });
   }
 
-  private async persistRedisSession(
-    userId: string,
-    sessionId: string,
-  ): Promise<void> {
+  private async persistRedisSession(userId: string, sessionId: string): Promise<void> {
     const redisKey = `${ACTIVE_SESSION_KEY_PREFIX}:${userId}:${sessionId}`;
     const legacyRedisKey = `${LEGACY_SESSION_KEY_PREFIX}:${userId}:${sessionId}`;
     const redisValue = JSON.stringify({ userId, sessionId });
     await Promise.all([
-      this.redisService.setStrict(
-        redisKey,
-        redisValue,
-        REDIS_SESSION_TTL_SECONDS,
-      ),
-      this.redisService.setStrict(
-        legacyRedisKey,
-        redisValue,
-        REDIS_SESSION_TTL_SECONDS,
-      ),
+      this.redisService.setStrict(redisKey, redisValue, REDIS_SESSION_TTL_SECONDS),
+      this.redisService.setStrict(legacyRedisKey, redisValue, REDIS_SESSION_TTL_SECONDS),
     ]);
   }
 
-  private async rollbackRegistration(
-    userId: string,
-    sessionId?: string,
-  ): Promise<void> {
+  private async rollbackRegistration(userId: string, sessionId?: string): Promise<void> {
     if (sessionId) {
       await this.userSessionAction.deleteById(sessionId);
     }
@@ -709,15 +645,10 @@ export class AuthService {
     }
   }
 
-  private async recordFailedLogin(
-    userId: string,
-    metadata: AuthMetadata,
-  ): Promise<void> {
+  private async recordFailedLogin(userId: string, metadata: AuthMetadata): Promise<void> {
     const nextAttempts = metadata.failed_attempts + 1;
     const shouldLock = nextAttempts >= MAX_FAILED_LOGIN_ATTEMPTS;
-    const lockedUntil = shouldLock
-      ? new Date(Date.now() + ACCOUNT_LOCK_DURATION_MS)
-      : metadata.locked_until;
+    const lockedUntil = shouldLock ? new Date(Date.now() + ACCOUNT_LOCK_DURATION_MS) : metadata.locked_until;
 
     await this.authMetadataAction.updateByUserId(userId, {
       failed_attempts: nextAttempts,
@@ -725,10 +656,7 @@ export class AuthService {
     });
 
     if (shouldLock) {
-      throw new HttpException(
-        SYS_MSG.AUTH_TOO_MANY_FAILED_ATTEMPTS,
-        HttpStatus.LOCKED,
-      );
+      throw new HttpException(SYS_MSG.AUTH_TOO_MANY_FAILED_ATTEMPTS, HttpStatus.LOCKED);
     }
   }
 
@@ -745,10 +673,7 @@ export class AuthService {
     const refreshTokenHash = await bcrypt.hash(refreshTokenPlaceholder, 10);
 
     const expiresAt = new Date();
-    const refreshExpiresInSeconds = parseInt(
-      env.JWT_REFRESH_EXPIRES_IN.replace(/\D/g, ''),
-      10,
-    );
+    const refreshExpiresInSeconds = parseInt(env.JWT_REFRESH_EXPIRES_IN.replace(/\D/g, ''), 10);
     const refreshExpiresInMs = env.JWT_REFRESH_EXPIRES_IN.includes('d')
       ? refreshExpiresInSeconds * 24 * 60 * 60 * 1000
       : env.JWT_REFRESH_EXPIRES_IN.includes('h')
