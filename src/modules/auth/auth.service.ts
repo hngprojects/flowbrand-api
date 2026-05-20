@@ -107,7 +107,7 @@ export class AuthService {
     return this.otpTokenModelAction;
   }
 
-  async register(dto: RegisterDto): Promise<AuthResponse> {
+  async register(dto: RegisterDto): Promise<{ message: string }> {
     if (!dto.termsAccepted) {
       throw new BadRequestException(SYS_MSG.AUTH_TERMS_REQUIRED);
     }
@@ -118,7 +118,9 @@ export class AuthService {
       fullName: dto.fullName,
       termsAccepted: true,
     });
-    return this.issueTokens(user, { rollbackOnFailure: true });
+    await this.sendOtp(user.email);
+    
+    return {message: SYS_MSG.REGISTRATION_SUCCESSFUL_VERIFY_EMAIL};
   }
 
   async login(dto: LoginDto): Promise<AuthResponse> {
