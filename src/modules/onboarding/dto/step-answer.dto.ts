@@ -52,7 +52,7 @@ export class Step2AnswerDto {
     @Type(() => CustomerTagsDto)
     customer_tags: CustomerTagsDto;
 
-    @ApiProperty({ required: false, maxLength: 300 })
+    @ApiProperty({ required: false, maxLength: 500 })
     @IsOptional()
     @IsString()
     @MaxLength(500, { message: 'Additional notes must be 500 characters or less' })
