@@ -31,9 +31,14 @@ export type WizardStartResolveResult =
  *  The entity stores this as Record<string, unknown> for flexibility.
  *  This interface is used internally by OnboardingService only.
  */
+// onboarding.interface.ts
+
 export interface WizardAnswers {
-  step_1?: { business_type?: string };
-  step_2?: { target_customer?: string };
+  step_1?: { business_description?: string };
+  step_2?: {
+    customer_tags?: { type?: string[]; location?: string[]; wants?: string[] };
+    additional_notes?: string;
+  };
   step_3?: { discovery_channel?: string };
 }
 export interface OnboardingCompleteResult {

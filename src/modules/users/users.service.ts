@@ -121,7 +121,12 @@ export class UsersService {
   async update(id: string, dto: UpdateUserDto): Promise<User> {
     await this.findById(id);
 
-    const payload: Partial<User> = { ...dto };
+    const payload: Partial<User> = {};
+
+    if (dto.fullName !== undefined) payload.full_name = dto.fullName;
+    if (dto.email !== undefined) payload.email = dto.email;
+    if (dto.termsAccepted !== undefined) payload.termsAccepted = dto.termsAccepted;
+  
     if (dto.password) {
       payload.password_hash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
     }
