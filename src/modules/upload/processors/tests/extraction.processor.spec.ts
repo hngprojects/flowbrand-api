@@ -1,0 +1,159 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { UploadedDocumentModelAction } from '../../actions/uploaded-document.action';
+import { UPLOAD_PROGRESS } from '../../constants/upload.constants';
+import { DocumentTextExtractorService } from '../../services/document-text-extractor.service';
+import { UploadDocumentStatus, UPLOAD_OBJECT_STORAGE } from '../../upload.types';
+import type { ObjectStorage } from '../../upload.types';
+import { ExtractionProcessor } from '../extraction.processor';
+import type { ExtractionJobPayload } from '../extraction.processor';
+import type { Job } from 'bull';
+
+const UPLOAD_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const STORAGE_PATH = `funnels/user-1/${UPLOAD_ID}.pdf`;
+
+const mockDocumentAction = {
+  get: jest.fn(),
+  saveDocument: jest.fn(),
+};
+
+const mockExtractor = {
+  extract: jest.fn(),
+};
+
+const mockObjectStorage: jest.Mocked<ObjectStorage> = {
+  putObject: jest.fn(),
+  getObject: jest.fn(),
+  deleteObject: jest.fn(),
+};
+
+function makeRow(overrides = {}) {
+  return {
+    id: UPLOAD_ID,
+    user_id: 'user-1',
+    file_name: 'pitch.pdf',
+    file_size_bytes: '1024',
+    file_type: 'pdf',
+    status: UploadDocumentStatus.PARSING,
+    percent_complete: UPLOAD_PROGRESS.PARSING,
+    storage_path: STORAGE_PATH,
+    parsed_text: null,
+    failure_reason: null,
+    created_at: new Date(),
+    updated_at: new Date(),
+    ...overrides,
+  };
+}
+
+function makeJob(overrides: Partial<ExtractionJobPayload> = {}): Job<ExtractionJobPayload> {
+  return {
+    id: 'job-1',
+    data: {
+      uploadId: UPLOAD_ID,
+      userId: 'user-1',
+      fileType: 'pdf',
+      storagePath: STORAGE_PATH,
+      ...overrides,
+    },
+  } as unknown as Job<ExtractionJobPayload>;
+}
+
+describe('ExtractionProcessor', () => {
+  let module: TestingModule;
+  let processor: ExtractionProcessor;
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    mockDocumentAction.get.mockResolvedValue(makeRow());
+    mockDocumentAction.saveDocument.mockImplementation((row) => Promise.resolve(row));
+    mockObjectStorage.getObject.mockResolvedValue(Buffer.from('%PDF-1.4 content'));
+    mockExtractor.extract.mockResolvedValue('extracted text from PDF');
+
+    module = await Test.createTestingModule({
+      providers: [
+        ExtractionProcessor,
+        { provide: UploadedDocumentModelAction, useValue: mockDocumentAction },
+        { provide: DocumentTextExtractorService, useValue: mockExtractor },
+        { provide: UPLOAD_OBJECT_STORAGE, useValue: mockObjectStorage },
+      ],
+    }).compile();
+
+    processor = module.get<ExtractionProcessor>(ExtractionProcessor);
+    jest.spyOn(processor['logger'], 'log').mockImplementation(() => {});
+    jest.spyOn(processor['logger'], 'error').mockImplementation(() => {});
+  });
+
+  afterEach(async () => {
+    await module.close();
+  });
+
+  describe('handleExtraction — success path', () => {
+    it('fetches from storage, extracts text, and saves READY status', async () => {
+      await processor.handleExtraction(makeJob());
+
+      expect(mockObjectStorage.getObject).toHaveBeenCalledWith(STORAGE_PATH);
+      expect(mockExtractor.extract).toHaveBeenCalledWith(
+        expect.any(Buffer),
+        'pdf',
+      );
+      expect(mockDocumentAction.saveDocument).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: UploadDocumentStatus.READY,
+          percent_complete: UPLOAD_PROGRESS.READY,
+          parsed_text: 'extracted text from PDF',
+          failure_reason: null,
+        }),
+      );
+    });
+  });
+
+  describe('AC-08 — extraction failure does not crash the worker', () => {
+    it('marks record FAILED when getObject throws', async () => {
+      mockObjectStorage.getObject.mockRejectedValue(new Error('MinIO unreachable'));
+
+      await expect(processor.handleExtraction(makeJob())).resolves.toBeUndefined();
+
+      expect(mockDocumentAction.saveDocument).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: UploadDocumentStatus.FAILED,
+          percent_complete: 0,
+          failure_reason: expect.stringContaining('MinIO unreachable'),
+        }),
+      );
+    });
+
+    it('marks record FAILED when text extraction throws', async () => {
+      mockExtractor.extract.mockRejectedValue(new Error('Corrupted PDF'));
+
+      await expect(processor.handleExtraction(makeJob())).resolves.toBeUndefined();
+
+      expect(mockDocumentAction.saveDocument).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: UploadDocumentStatus.FAILED,
+          failure_reason: expect.stringContaining('Corrupted PDF'),
+        }),
+      );
+    });
+
+    it('truncates failure_reason to 200 chars', async () => {
+      mockExtractor.extract.mockRejectedValue(new Error('x'.repeat(300)));
+
+      await processor.handleExtraction(makeJob());
+
+      const saved = mockDocumentAction.saveDocument.mock.calls[0][0];
+      expect(saved.failure_reason.length).toBeLessThanOrEqual(200);
+    });
+  });
+
+  describe('record not found', () => {
+    it('throws before attempting extraction when upload record is missing', async () => {
+      mockDocumentAction.get.mockResolvedValue(null);
+
+      await expect(processor.handleExtraction(makeJob())).rejects.toThrow(
+        `Upload record not found: ${UPLOAD_ID}`,
+      );
+
+      expect(mockObjectStorage.getObject).not.toHaveBeenCalled();
+      expect(mockExtractor.extract).not.toHaveBeenCalled();
+    });
+  });
+});

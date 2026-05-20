@@ -109,6 +109,8 @@ describe('OnboardingService — getOnboardingSession (BE-009)', () => {
   });
 });
 
+// ── startWizardSession (BE-007) ───────────────────────────────────────────────
+
 describe('OnboardingService — startWizardSession (edge cases)', () => {
   let service: OnboardingService;
   let mockDataSource: any;

@@ -35,8 +35,16 @@ export class OnboardingController {
   async completeOnboarding(
     @CurrentUser('sub') userId: string,
     @Body() body: CompleteOnboardingDto,
+    @Res() res: Response,
   ) {
-    return this.onboardingService.completeOnboarding(userId, body.session_id)
+    const result = await this.onboardingService.completeOnboarding(userId, body.session_id);
+
+    return res.status(result.statusCode).json({
+      success: true,
+      statusCode: result.statusCode,
+      message: result.message,
+      data: result.data,
+    });
   }
   
   @Get('session')
