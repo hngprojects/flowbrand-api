@@ -12,6 +12,7 @@ import * as SYS_MSG from '../../constants/system.messages';
 jest.mock('node:fs', () => ({
   ...jest.requireActual('node:fs'),
   existsSync: jest.fn(),
+  statSync: jest.fn(),
   unlink: jest.fn(),
   openSync: jest.fn(),
   readSync: jest.fn(),
@@ -113,6 +114,8 @@ describe('UploadService', () => {
     mockDocumentTextExtractor.extract.mockResolvedValue('extracted funnel text');
 
     (fs.existsSync as jest.Mock).mockReturnValue(true);
+    // Default: disk size matches valid PDF buffer (EC-04 passes for normal files)
+    (fs.statSync as jest.Mock).mockReturnValue({ size: Buffer.from('%PDF-1.4 test content').length });
     (fs.unlink as unknown as jest.Mock).mockImplementation((_path, cb) => (cb as (e: null) => void)(null));
     (fs.openSync as jest.Mock).mockReturnValue(1);
     (fs.readSync as jest.Mock).mockImplementation((_fd, buffer) => {
@@ -158,9 +161,8 @@ describe('UploadService', () => {
     });
 
     it('throws UnprocessableEntityException when every file is rejected', async () => {
-      const oversized = mockPdfFile({
-        size: MAX_UPLOAD_BYTES + 1,
-      });
+      const oversized = mockPdfFile({ size: MAX_UPLOAD_BYTES + 1 });
+      (fs.statSync as jest.Mock).mockReturnValue({ size: MAX_UPLOAD_BYTES + 1 });
 
       await expect(
         service.handleUpload(USER_ID, [oversized]),
@@ -182,7 +184,7 @@ describe('UploadService', () => {
       expect(result.message).toBe(SYS_MSG.FUNNEL_UPLOAD_PARTIAL);
       expect(result.data.uploads).toHaveLength(2);
       expect(result.data.uploads[0].uploadId).toBeDefined();
-      expect(result.data.uploads[0].status).toBe(UploadDocumentStatus.PARSING);
+      expect(result.data.uploads[0].status).toBe(UploadDocumentStatus.UPLOADING);
       expect(result.data.uploads[1].status).toBe(UploadDocumentStatus.FAILED);
       expect(result.data.uploads[1].errorMessage).toBe(
         SYS_MSG.UPLOAD_INVALID_FILE,
@@ -200,7 +202,7 @@ describe('UploadService', () => {
       expect(result.data.uploads[0]).toMatchObject({
         fileName: 'pitch-deck.pdf',
         fileType: 'pdf',
-        status: UploadDocumentStatus.PARSING,
+        status: UploadDocumentStatus.UPLOADING,
         percentComplete: UPLOAD_PROGRESS.PARSING,
       });
     });
@@ -227,7 +229,7 @@ describe('UploadService', () => {
 
       expect(result.message).toBe(SYS_MSG.FUNNEL_UPLOAD_COMPLETED);
       expect(mockUploadedDocumentAction.updateProgress).toHaveBeenCalledTimes(3);
-      expect(result.data.uploads[0].status).toBe(UploadDocumentStatus.PARSING);
+      expect(result.data.uploads[0].status).toBe(UploadDocumentStatus.UPLOADING);
     });
 
     it('FR-10: logs orphan_upload and throws when all retries are exhausted', async () => {

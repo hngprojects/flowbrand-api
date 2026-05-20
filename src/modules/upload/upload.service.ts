@@ -152,7 +152,8 @@ export class UploadService {
         storagePath,
       });
 
-      return this.mapRowToUploadItem(parsing);
+      // AC-01: 201 always signals 'uploading' — the client polls GET /progress for actual state.
+      return { ...this.mapRowToUploadItem(parsing), status: UploadDocumentStatus.UPLOADING };
     } catch (error) {
       this.logger.warn(
         `Upload failed for file index=${index} name=${file.originalname}`,
@@ -179,9 +180,20 @@ export class UploadService {
     }
   }
   private buildStoragePath(userId: string, uploadId: string, fileType: UploadFileType): string {
-    return path.posix.join('funnels', userId, `${uploadId}.${fileType}`);
+    return path.posix.join('uploads', userId, `${uploadId}.${fileType}`);
   }
   private async validateFile(file: Express.Multer.File): Promise<FileValidationResult> {
+    if (file.path) {
+      try {
+        const { size: diskSize } = fs.statSync(file.path);
+        if (diskSize !== file.size) {
+          return { ok: false, errorMessage: SYS_MSG.UPLOAD_INTERRUPTED };
+        }
+      } catch {
+        return { ok: false, errorMessage: SYS_MSG.UPLOAD_INTERRUPTED };
+      }
+    }
+
     if (file.size === 0) {
       return { ok: false, errorMessage: 'Uploaded file is empty.' };
     }
@@ -192,9 +204,30 @@ export class UploadService {
         errorFields: { file: { actualSize: file.size, maxSize: MAX_UPLOAD_BYTES } },
       };
     }
-    const fileType = await this.detectFileType(file);
+
+    const extension = path.extname(file.originalname).toLowerCase() || 'none';
+
+    let fileType: UploadFileType | null;
+    try {
+      fileType = await this.detectFileType(file);
+    } catch (error) {
+      this.logger.warn(
+        `File validation failed for ${file.originalname}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      return {
+        ok: false,
+        errorMessage: SYS_MSG.UPLOAD_INVALID_FILE,
+        errorFields: { file: { extension } },
+      };
+    }
+
     if (!fileType) {
-      return { ok: false, errorMessage: SYS_MSG.UPLOAD_INVALID_FILE };
+      return {
+        ok: false,
+        errorMessage: SYS_MSG.UPLOAD_INVALID_FILE,
+        errorFields: { file: { extension } },
+      };
     }
     return { ok: true, fileType };
   }

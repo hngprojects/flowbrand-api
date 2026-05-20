@@ -49,6 +49,7 @@ export const VALIDATION_FAILED = 'Validation failed';
 export const UPLOAD_FAILED = 'File upload failed';
 export const UPLOAD_FILE_TOO_LARGE = 'Uploaded file is too large';
 export const UPLOAD_INVALID_FILE = 'Uploaded file type is not allowed';
+export const UPLOAD_INTERRUPTED = 'Upload incomplete: received bytes do not match expected size.';
 export const UPLOAD_TOO_MANY_FILES = 'Too many files uploaded';
 
 // Funnel uploads
