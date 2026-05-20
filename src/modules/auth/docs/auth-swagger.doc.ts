@@ -214,8 +214,12 @@ const SWAGGER_OAUTH_REDIRECT_SCRIPT_PATH = '/swagger-oauth-redirect.js';
 
 function registerSwaggerOAuthRedirectScript(app: INestApplication): void {
   app.use(SWAGGER_OAUTH_REDIRECT_SCRIPT_PATH, (_req: Request, res: Response) => {
+    // Inject a FRONTEND_BASE value from server config so the client-side mock redirects to the real frontend.
+    const frontendBase = (process.env.FRONTEND_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+
     res.type('application/javascript').send(`
       (() => {
+        const FRONTEND_BASE = '${frontendBase}';
         const originalFetch = window.fetch.bind(window);
 
         function getStoredJwt() {
@@ -233,9 +237,23 @@ function registerSwaggerOAuthRedirectScript(app: INestApplication): void {
         window.fetch = (input, init) => {
           try {
             const token = getStoredJwt();
-            const url = typeof input === 'string' ? input : input && input.url ? input.url : '';
+            let url = '';
+            try {
+              if (typeof input === 'string') url = input;
+              else if (input && input.url) url = input.url;
+            } catch (e) {
+              url = '';
+            }
 
-            if (token && typeof url === 'string' && url.includes('/api/')) {
+            let target = null;
+            try {
+              target = new URL(url, window.location.href);
+            } catch (e) {
+              target = null;
+            }
+
+            // Only attach Authorization to same-origin API calls
+            if (token && target && target.origin === window.location.origin && target.pathname.startsWith('/api/')) {
               const originalHeaders = (init && init.headers) || (input && input.headers) || {};
               const headers = new Headers(originalHeaders);
 
@@ -244,25 +262,26 @@ function registerSwaggerOAuthRedirectScript(app: INestApplication): void {
               }
 
               if (typeof input === 'string') {
-                return originalFetch(input, Object.assign({}, init || {}, { headers }));
+                return originalFetch(target.toString(), Object.assign({}, init || {}, { headers }));
               }
 
               try {
-                const request = new Request(input, Object.assign({}, init || {}, { headers }));
+                const request = new Request(target.toString(), Object.assign({}, init || {}, { headers }));
                 return originalFetch(request);
               } catch (error) {
                 return originalFetch(input, init);
               }
             }
 
-            if (typeof url === 'string' && String((init && init.method) || (input && input.method) || 'GET').toUpperCase() === 'GET') {
-              if (url.includes('/auth/google/callback')) {
-                const callbackRedirectUrl = window.location.origin + '/onboarding#access_token=jwt.access.token';
-
+            // Only handle OAuth mock redirects for same-origin GETs
+            const method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
+            if (target && target.origin === window.location.origin && method === 'GET') {
+              if (target.pathname.includes('/auth/google/callback')) {
+                const callbackRedirectUrl = FRONTEND_BASE + '/onboarding#access_token=jwt.access.token';
                 return Promise.resolve(Response.redirect(callbackRedirectUrl, 302));
               }
 
-              if (url.includes('/auth/google')) {
+              if (target.pathname.includes('/auth/google')) {
                 return Promise.resolve(
                   new Response('Redirect to Google OAuth consent screen', {
                     status: 302,
