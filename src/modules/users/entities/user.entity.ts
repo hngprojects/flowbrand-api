@@ -39,13 +39,13 @@ export class User extends BaseEntity {
   @Column({ type: 'boolean', default: false, name: 'terms_accepted' })
   termsAccepted: boolean;
 
-  @Column({ type: 'varchar', length: 100, nullable: true })
+  @Column({ type: 'text', nullable: true })
   business_type: string | null;
 
   @Column({ type: 'text', nullable: true })
   target_customer: string | null;
 
-  @Column({ type: 'varchar', length: 50, nullable: true })
+  @Column({ type: 'varchar', length: 100, nullable: true })
   primary_goal: string | null;
 
   @Exclude()

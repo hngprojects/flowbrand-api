@@ -17,11 +17,11 @@ import {
 } from 'class-validator';
 
 export class Step1AnswerDto {
-  @ApiProperty({ description: 'Business Description', minLength: 1, maxLength: 500 })
-  @IsString()
-  @MinLength(1)
-  @MaxLength(500)
-  business_description: string;
+    @ApiProperty({ description: 'Business Description', minLength: 1, maxLength: 500 })
+    @IsString()
+    @MinLength(1)
+    @MaxLength(500, { message: 'Business description must be 500 characters or less' })
+    business_description: string
 }
 
 class CustomerTagsDto {
@@ -51,11 +51,11 @@ export class Step2AnswerDto {
   @Type(() => CustomerTagsDto)
   customer_tags: CustomerTagsDto;
 
-  @ApiProperty({ required: false, maxLength: 300 })
-  @IsOptional()
-  @IsString()
-  @MaxLength(300)
-  additional_notes?: string;
+    @ApiProperty({ required: false, maxLength: 500 })
+    @IsOptional()
+    @IsString()
+    @MaxLength(500, { message: 'Additional notes must be 500 characters or less' })
+    additional_notes?: string 
 }
 
 enum DiscoveryChannel {

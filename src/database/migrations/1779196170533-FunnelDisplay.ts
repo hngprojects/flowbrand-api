@@ -38,15 +38,24 @@ export class FunnelDisplay1779196170533 implements MigrationInterface {
     await queryRunner.query(`ALTER TABLE "stage_tasks" ALTER COLUMN "name" SET NOT NULL`);
     await queryRunner.query(`ALTER TABLE "stage_tasks" ALTER COLUMN "position" SET NOT NULL`);
 
-    await queryRunner.query(`CREATE TYPE "public"."stage_tasks_status_enum" AS ENUM('pending', 'complete')`);
-    await queryRunner.query(`ALTER TABLE "stage_tasks" ADD "status" "public"."stage_tasks_status_enum"`);
-    await queryRunner.query(
-      `UPDATE "stage_tasks" SET "status" = CASE WHEN COALESCE("is_complete", false) = true OR "completed_at" IS NOT NULL THEN 'complete' ELSE 'pending' END`,
-    );
-    await queryRunner.query(`ALTER TABLE "stage_tasks" ALTER COLUMN "status" SET NOT NULL`);
-    await queryRunner.query(`ALTER TABLE "stage_tasks" ALTER COLUMN "status" SET DEFAULT 'pending'`);
-    await queryRunner.query(`CREATE INDEX "IDX_42f8131afe67c8c2de95b3b242" ON "stage_tasks" ("position") `);
-  }
+        await queryRunner.query(`CREATE TYPE "public"."stage_tasks_status_enum" AS ENUM('pending', 'complete')`);
+        await queryRunner.query(`ALTER TABLE "stage_tasks" ADD "status" "public"."stage_tasks_status_enum"`);
+        await queryRunner.query(`UPDATE "stage_tasks" SET "status" = (CASE WHEN COALESCE("is_complete", false) = true OR "completed_at" IS NOT NULL THEN 'complete' ELSE 'pending' END)::"public"."stage_tasks_status_enum"`);
+        await queryRunner.query(`ALTER TABLE "stage_tasks" ALTER COLUMN "status" SET NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "stage_tasks" ALTER COLUMN "status" SET DEFAULT 'pending'`);
+        await queryRunner.query(`CREATE INDEX "IDX_42f8131afe67c8c2de95b3b242" ON "stage_tasks" ("position") `);
+    }
+
+    public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`DROP INDEX "public"."IDX_42f8131afe67c8c2de95b3b242"`);
+        await queryRunner.query(`ALTER TABLE "stage_tasks" DROP COLUMN "status"`);
+        await queryRunner.query(`DROP TYPE "public"."stage_tasks_status_enum"`);
+        await queryRunner.query(`ALTER TABLE "stage_tasks" DROP COLUMN "position"`);
+        await queryRunner.query(`ALTER TABLE "stage_tasks" DROP COLUMN "name"`);
+        await queryRunner.query(`ALTER TABLE "funnel_stages" DROP COLUMN "completed_at"`);
+        await queryRunner.query(`ALTER TABLE "funnels" DROP COLUMN "creation_path"`);
+        await queryRunner.query(`ALTER TABLE "funnels" DROP COLUMN "business_name"`);
+    }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP INDEX "public"."IDX_42f8131afe67c8c2de95b3b242"`);
