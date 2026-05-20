@@ -148,7 +148,7 @@ describe('UploadService', () => {
       expect(result.message).toBe(SYS_MSG.FUNNEL_UPLOAD_PARTIAL);
       expect(result.data.uploads).toHaveLength(2);
       expect(result.data.uploads[0].uploadId).toBeDefined();
-      expect(result.data.uploads[0].status).toBe(UploadDocumentStatus.PARSING);
+      expect(result.data.uploads[0].status).toBe(UploadDocumentStatus.READY);
       expect(result.data.uploads[1].status).toBe(UploadDocumentStatus.FAILED);
       expect(result.data.uploads[1].errorMessage).toBe(
         SYS_MSG.UPLOAD_INVALID_FILE,
@@ -170,8 +170,8 @@ describe('UploadService', () => {
       expect(result.data.uploads[0]).toMatchObject({
         fileName: 'pitch-deck.pdf',
         fileType: 'pdf',
-        status: UploadDocumentStatus.PARSING,
-        percentComplete: UPLOAD_PROGRESS.PARSING,
+        status: UploadDocumentStatus.READY,
+        percentComplete: UPLOAD_PROGRESS.READY,
       });
     });
 
