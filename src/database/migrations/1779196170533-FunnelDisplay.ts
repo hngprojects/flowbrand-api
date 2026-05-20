@@ -40,9 +40,7 @@ export class FunnelDisplay1779196170533 implements MigrationInterface {
 
         await queryRunner.query(`CREATE TYPE "public"."stage_tasks_status_enum" AS ENUM('pending', 'complete')`);
         await queryRunner.query(`ALTER TABLE "stage_tasks" ADD "status" "public"."stage_tasks_status_enum"`);
-        await queryRunner.query(
-            `UPDATE "stage_tasks" SET "status" = CASE WHEN COALESCE("is_complete", false) = true OR "completed_at" IS NOT NULL THEN 'complete' ELSE 'pending' END`
-        );
+        await queryRunner.query(`UPDATE "stage_tasks" SET "status" = (CASE WHEN COALESCE("is_complete", false) = true OR "completed_at" IS NOT NULL THEN 'complete' ELSE 'pending' END)::"public"."stage_tasks_status_enum"`);
         await queryRunner.query(`ALTER TABLE "stage_tasks" ALTER COLUMN "status" SET NOT NULL`);
         await queryRunner.query(`ALTER TABLE "stage_tasks" ALTER COLUMN "status" SET DEFAULT 'pending'`);
         await queryRunner.query(`CREATE INDEX "IDX_42f8131afe67c8c2de95b3b242" ON "stage_tasks" ("position") `);

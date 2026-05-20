@@ -20,7 +20,7 @@ export class Step1AnswerDto {
     @ApiProperty({ description: 'Business Description', minLength: 1, maxLength: 500 })
     @IsString()
     @MinLength(1)
-    @MaxLength(500)
+    @MaxLength(500, { message: 'Business description must be 500 characters or less' })
     business_description: string
 }
 
@@ -55,7 +55,7 @@ export class Step2AnswerDto {
     @ApiProperty({ required: false, maxLength: 300 })
     @IsOptional()
     @IsString()
-    @MaxLength(300)
+    @MaxLength(500, { message: 'Additional notes must be 500 characters or less' })
     additional_notes?: string 
 }
 
