@@ -55,8 +55,8 @@ export class FunnelGenerationProcessor {
       this.logger.error({ message: 'Funnel not found — aborting job', funnelId, jobId: job.id });
       return;
     }
-    if (funnel.status === FunnelStatus.ACTIVE) {
-      this.logger.log({ message: 'Funnel already active — skipping', funnelId, jobId: job.id });
+    if (funnel.status === FunnelStatus.ACTIVE || funnel.status === FunnelStatus.FAILED) {
+      this.logger.log({ message: `Funnel already ${funnel.status.toLowerCase()} — skipping`, funnelId, jobId: job.id });
       return;
     }
 
@@ -73,9 +73,8 @@ export class FunnelGenerationProcessor {
       this.validateStageData(stageData);
 
       await job.progress(70);
-      await job.progress(80);
 
-      await this.writeFunnelData(funnelId, stageData);
+      await this.writeFunnelData(funnelId, stageData, job);
 
       await job.progress(100);
 
@@ -145,10 +144,16 @@ export class FunnelGenerationProcessor {
     }
   }
 
-  private async writeFunnelData(funnelId: string, stageData: LlmStageData[]): Promise<void> {
+  private async writeFunnelData(
+    funnelId: string,
+    stageData: LlmStageData[],
+    job: Job<GenerateFunnelJobPayload>,
+  ): Promise<void> {
     const qr = this.dataSource.createQueryRunner();
     await qr.connect();
     await qr.startTransaction();
+
+    await job.progress(80);
 
     try {
       for (const sd of stageData) {
@@ -200,10 +205,12 @@ export class FunnelGenerationProcessor {
 
   @OnQueueCompleted()
   onCompleted(job: Job<GenerateFunnelJobPayload>): void {
+    const duration = (job.finishedOn ?? Date.now()) - (job.processedOn ?? Date.now());
     this.logger.log({
       event: 'funnel_job_completed',
       jobId: job.id,
       funnelId: job.data.funnelId,
+      duration,
     });
   }
 

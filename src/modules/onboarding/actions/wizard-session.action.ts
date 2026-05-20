@@ -78,12 +78,6 @@ export class WizardSessionModelAction extends AbstractModelAction<WizardSession>
       .andWhere('ws.expires_at > :at', { at })
       .orderBy('ws.created_at', 'DESC');
   }
-
-  async findSessionById(sessionId: string): Promise<WizardSession | null> {
-    return this.wizardSessionRepository.findOne({
-      where: { id: sessionId },
-    });
-  }
   
   async findActiveSession(userId: string): Promise<WizardSession | null> {
     return this.repository
@@ -99,5 +93,17 @@ export class WizardSessionModelAction extends AbstractModelAction<WizardSession>
 
   async markAsExpired(id: string): Promise<void> {
     await this.repository.update(id, { status: WizardStatus.EXPIRED })
+  }
+
+  async findSessionById(sessionId: string, userId: string): Promise<WizardSession | null> {
+    return this.repository
+      .createQueryBuilder('ws')
+      .where('ws.id = :sessionId', { sessionId })
+      .andWhere('ws.user_id = :userId', { userId })
+      .getOne()
+  }
+
+  async saveSession(session: WizardSession): Promise<WizardSession> {
+    return this.repository.save(session)
   }
 }

@@ -9,12 +9,16 @@ import {
   ApiUnauthorizedResponse,
   DocumentBuilder,
   SwaggerModule,
+  ApiBadRequestResponse,
+  ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { SendOtpDto } from '../dto/send-otp.dto';
 import { VerifyOtpDto } from '../dto/verify-otp.dto';
 import { ResendOtpDto } from '../dto/resend-otp.dto';
 import * as SYS_MSG from '../../../constants/system.messages';
+import { ForgotPasswordDto } from '../dto/forgot-password.dto';
+import { ResetPasswordDto } from '../dto/reset-password.dto';
 
 const authUserExample = {
   id: 'uuid',
@@ -36,8 +40,7 @@ export const RegisterDocs = () =>
       schema: {
         example: {
           statusCode: 201,
-          message: 'User Created Successfully',
-          data: authResponseExample,
+          message: SYS_MSG.REGISTRATION_SUCCESSFUL_VERIFY_EMAIL,
         },
       },
     }),
@@ -135,10 +138,7 @@ export const LogoutDocs = () =>
   );
 
 export const MeDocs = () =>
-  applyDecorators(
-    ApiBearerAuth('JWT'),
-    ApiOperation({ summary: 'Return the current authenticated user' }),
-  );
+  applyDecorators(ApiBearerAuth('JWT'), ApiOperation({ summary: 'Return the current authenticated user' }));
 
 export const GoogleAuthDocs = () =>
   applyDecorators(
@@ -160,13 +160,12 @@ export const GoogleCallbackDocs = () =>
     ApiOperation({ summary: 'Handle Google OAuth callback' }),
     ApiResponse({
       status: HttpStatus.FOUND,
-      description:
-        'Redirects to client after successful OAuth; tokens are issued via cookie and redirect URL',
+      description: 'Redirects to client after successful OAuth; tokens are issued via cookie and redirect URL',
     }),
     ApiUnauthorizedResponse({
       description: 'Google OAuth failed or no email was provided',
       schema: {
-          example: {
+        example: {
           success: false,
           status_code: HttpStatus.UNAUTHORIZED,
           error: 'UnauthorizedException',
@@ -199,8 +198,7 @@ export const SendOtpDocs = () =>
     }),
     ApiResponse({
       status: HttpStatus.TOO_MANY_REQUESTS,
-      description:
-        'Rate limit exceeded — max 5 OTP requests per 15 minutes per user',
+      description: 'Rate limit exceeded — max 5 OTP requests per 15 minutes per user',
       schema: {
         example: {
           statusCode: 429,
@@ -217,62 +215,106 @@ function registerSwaggerOAuthRedirectScript(app: INestApplication): void {
   app.use(SWAGGER_OAUTH_REDIRECT_SCRIPT_PATH, (_req: Request, res: Response) => {
     res.type('application/javascript').send(`
       (() => {
-        const originalFetch = window.fetch.bind(window);
+        const originalFetch = (window.fetch && window.fetch.bind) ? window.fetch.bind(window) : null;
 
-        window.fetch = (...args) => {
-          const [input, init] = args;
-          const requestUrl =
-            typeof input === 'string'
-              ? input
-              : input && typeof input === 'object' && 'url' in input
-                ? input.url
-                : '';
-          const method =
-            (init && init.method) ||
-            (typeof input !== 'string' && input && typeof input === 'object' && 'method' in input
-              ? input.method
-              : 'GET');
-
-          if (typeof requestUrl === 'string' && String(method).toUpperCase() === 'GET') {
-            if (requestUrl.includes('/auth/google/callback')) {
-              return Promise.resolve(
-                new Response(
-                  JSON.stringify({
-                    status_code: 200,
-                    message: 'OAuth login successful',
-                    access_token: 'jwt.access.token',
-                    refresh_token: 'jwt.refresh.token',
-                    data: {
-                      user: {
-                        id: 'uuid',
-                        full_name: 'Jane Doe',
-                        email: 'user@example.com',
-                        avatar_url: null,
-                      },
-                    },
-                  }),
-                  {
-                    status: 200,
-                    statusText: 'OK',
-                    headers: { 'Content-Type': 'application/json' },
-                  },
-                ),
-              );
-            }
-
-            if (requestUrl.includes('/auth/google')) {
-              return Promise.resolve(
-                new Response('Redirect to Google OAuth consent screen', {
-                  status: 302,
-                  statusText: 'Redirect to Google OAuth consent screen',
-                  headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-                }),
-              );
-            }
+        function getStoredJwt() {
+          try {
+            const auth = localStorage.getItem('authorized');
+            if (!auth) return null;
+            const parsed = JSON.parse(auth);
+            if (parsed && parsed.JWT && parsed.JWT.value) return parsed.JWT.value;
+            return null;
+          } catch (e) {
+            return null;
           }
+        }
 
-          return originalFetch(...args);
-        };
+        // Wrap fetch to inject Authorization header for API requests when a token exists
+        if (originalFetch) {
+          window.fetch = (input, init) => {
+            try {
+              const token = getStoredJwt();
+              const url = typeof input === 'string' ? input : input && input.url ? input.url : '';
+              // Only attach for same-origin API paths
+              if (token && typeof url === 'string' && url.includes('/api/')) {
+                // Build headers
+                const origHeaders = (init && init.headers) || (input && input.headers) || {};
+                const headers = new Headers(origHeaders);
+                if (!headers.has('Authorization')) {
+                  headers.set('Authorization', 'Bearer ' + token);
+                }
+
+                if (typeof input === 'string') {
+                  const newInit = Object.assign({}, init || {}, { headers });
+                  return originalFetch(input, newInit);
+                }
+
+                // input might be a Request
+                try {
+                  const newReq = new Request(input, Object.assign({}, init || {}, { headers }));
+                  return originalFetch(newReq);
+                } catch (e) {
+                  // fallback
+                  return originalFetch(input, init);
+                }
+              }
+            } catch (e) {
+              // ignore and call original
+            }
+            return originalFetch(input, init);
+          };
+        }
+
+        // Keep lightweight mocks for the Google OAuth flow in Swagger UI (GET only)
+        const originalFetchForMock = originalFetch;
+        if (originalFetchForMock) {
+          const wrapped = window.fetch;
+          window.fetch = (...args) => {
+            try {
+              const [input, init] = args;
+              const requestUrl = typeof input === 'string' ? input : input && input.url ? input.url : '';
+              const method = (init && init.method) || (input && input.method) || 'GET';
+              if (typeof requestUrl === 'string' && String(method).toUpperCase() === 'GET') {
+                if (requestUrl.includes('/auth/google/callback')) {
+                   return Promise.resolve(
+                     new Response(
+                       JSON.stringify({
+                         status_code: 200,
+                         message: 'OAuth login successful',
+                         access_token: 'jwt.access.token',
+                         refresh_token: 'jwt.refresh.token',
+                         data: {
+                           id: 'uuid',
+                           email: 'user@example.com',
+                           full_name: 'Jane Doe',
+                         },
+                       }),
+                       {
+                         status: 200,
+                         headers: { 'Content-Type': 'application/json' },
+                       },
+                     ),
+                   );
+                 }
+                if (requestUrl.includes('/auth/google')) {
+                  return Promise.resolve(
+                     new Response('Redirect to Google OAuth consent screen', {
+                       status: 302,
+                       statusText: 'Redirect to Google OAuth consent screen',
+                       headers: {
+                         'Content-Type': 'text/plain',
+                         Location: '/auth/google/callback',
+                       },
+                     }),
+                   );
+                 }
+               }
+             } catch (e) {
+              // noop
+            }
+            return wrapped(...args);
+          };
+        }
       })();
     `);
   });
@@ -289,10 +331,7 @@ export function setupSwagger(app: INestApplication): void {
     .setTitle('SEIL API')
     .setDescription('SEIL REST API documentation')
     .setVersion('1.0.0')
-    .addBearerAuth(
-      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-      'JWT',
-    )
+    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'JWT')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -375,6 +414,87 @@ export const ResendOtpDocs = () =>
           statusCode: 429,
           message: SYS_MSG.OTP_RESEND_RATE_LIMITED,
           retryAfter: 18,
+        },
+      },
+    }),
+  );
+
+export const ForgotPasswordDocs = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Request password reset OTP',
+      description:
+        "Generates a 6-digit OTP, stores it with 15-minute expiry, and sends it to the user's email. " +
+        'Rate limited to 3 requests per 15 minutes per user. ' +
+        'Returns 200 for unknown emails to prevent enumeration. ' +
+        'Only verified accounts can request password reset.',
+    }),
+    ApiBody({ type: ForgotPasswordDto }),
+    ApiOkResponse({
+      description: 'OTP sent if email exists (always returns 200 to prevent enumeration)',
+      schema: {
+        example: {
+          statusCode: HttpStatus.OK,
+          message: SYS_MSG.PASSWORD_RESET_OTP_SENT,
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.TOO_MANY_REQUESTS,
+      description: 'Rate limit exceeded — max 3 OTP requests per 15 minutes per user',
+      schema: {
+        example: {
+          statusCode: HttpStatus.TOO_MANY_REQUESTS,
+          message: SYS_MSG.PASSWORD_RESET_RATE_LIMITED,
+        },
+      },
+    }),
+  );
+
+export const ResetPasswordDocs = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Reset password using OTP and auto-login',
+      description:
+        'Validates the 6-digit OTP against the stored hash. On success: ' +
+        '1) Password is updated, 2) All existing sessions are revoked, 3) OTP token is deleted, ' +
+        '4) User is automatically logged in with new access/refresh tokens. ' +
+        'Rate limited to 5 verification attempts per 5 minutes.',
+    }),
+    ApiBody({ type: ResetPasswordDto }),
+    ApiOkResponse({
+      description: 'Password reset successful and user auto-logged in',
+      schema: {
+        example: {
+          statusCode: HttpStatus.OK,
+          message: SYS_MSG.PASSWORD_RESET_SUCCESSFUL,
+          data: {
+            accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+            user: {
+              id: 'uuid',
+              email: 'user@example.com',
+              full_name: 'Jane Doe',
+            },
+            redirectUrl: '/dashboard',
+          },
+        },
+      },
+    }),
+    ApiBadRequestResponse({
+      description: 'Invalid or expired OTP',
+      schema: {
+        example: {
+          statusCode: HttpStatus.BAD_REQUEST,
+          message: SYS_MSG.PASSWORD_RESET_INVALID_OTP,
+        },
+      },
+    }),
+    ApiTooManyRequestsResponse({
+      description: 'Too many verification attempts (max 5 per 5 minutes)',
+      schema: {
+        example: {
+          statusCode: HttpStatus.TOO_MANY_REQUESTS,
+          message: SYS_MSG.PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED,
         },
       },
     }),

@@ -32,10 +32,14 @@ import {
   ResendOtpDocs,
   SendOtpDocs,
   VerifyOtpDocs,
+  ForgotPasswordDocs, 
+  ResetPasswordDocs,
 } from './docs/auth-swagger.doc';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { ResendOtpDto } from './dto/resend-otp.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 
 @ApiTags('auth')
@@ -58,7 +62,7 @@ export class AuthController {
   private buildAuthResponse(
     statusCode: HttpStatus,
     message: string,
-    result: Awaited<ReturnType<AuthService['register']>>,
+    result: Awaited<ReturnType<AuthService['login']>>,
   ) {
     return {
       statusCode,
@@ -80,21 +84,13 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   @RegisterDocs()
   async register(@Body() dto: RegisterDto, @Res() res: Response) {
-    const result = await this.authService.register(dto);
-
-    res.cookie(
-      'refreshToken',
-      result.refreshToken,
-      this.getRefreshCookieOptions(),
-    );
-
-    return res.json(
-      this.buildAuthResponse(
-        HttpStatus.CREATED,
-        SYS_MSG.USER_CREATED_SUCCESSFULLY,
-        result,
-      ),
-    );
+    const { message } = await this.authService.register(dto);
+    
+    res.status(HttpStatus.CREATED).json({
+      success: true,
+      statusCode: HttpStatus.CREATED,
+      message,
+    });
   }
 
   @Public()
@@ -197,6 +193,34 @@ export class AuthController {
   async resendOtp(@Body() dto: ResendOtpDto, @Res() res: Response): Promise<void> {
     const result = await this.authService.resendOtp(dto.email);
     res.json({ statusCode: HttpStatus.OK, message: result.message });
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ForgotPasswordDocs()
+  async forgotPassword(@Body() dto: ForgotPasswordDto, @Res() res: Response): Promise<void> {
+    const result = await this.authService.forgotPassword(dto.email);
+    res.json({ statusCode: HttpStatus.OK, message: result.message });
+  }
+
+  @Public()
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ResetPasswordDocs()
+  async resetPassword(@Body() dto: ResetPasswordDto, @Res() res: Response): Promise<void> {
+    const result = await this.authService.resetPassword(dto.email, dto.otp_code, dto.password);
+    
+    // Set refresh token cookie for auto-login
+    res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
+    
+    res.json(
+      this.buildAuthResponse(
+        HttpStatus.OK,
+        SYS_MSG.PASSWORD_RESET_SUCCESSFUL,
+        result,
+      )
+    );
   }
 
   @Get('me')
