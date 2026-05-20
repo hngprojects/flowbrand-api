@@ -1,7 +1,7 @@
 import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { Funnel } from './funnel.entity';
 import { BaseEntity } from '../../../common/entities/base.entity';
 import { StageStatus } from '../enums/stage-status.enum';
-import { Funnel } from './funnel.entity';
 import { StageTask } from './stage-task.entity';
 
 @Entity('funnel_stages')
@@ -34,6 +34,9 @@ export class FunnelStage extends BaseEntity {
 
   @Column({ type: 'timestamptz', name: 'unlocked_at', nullable: true })
   unlocked_at: Date | null;
+
+  @Column({ type: 'timestamptz', name: 'completed_at', nullable: true })
+  completed_at: Date | null;
 
   // Relations
   @ManyToOne(() => Funnel, (funnel) => funnel.stages, { onDelete: 'CASCADE' })

@@ -33,6 +33,7 @@ export class UploadedDocumentModelAction extends AbstractModelAction<UploadedDoc
         status: true,
         percent_complete: true,
         storage_path: true,
+        failure_reason: true,
         created_at: true,
         updated_at: true,
       },
@@ -42,5 +43,15 @@ export class UploadedDocumentModelAction extends AbstractModelAction<UploadedDoc
 
   async deleteById(uploadId: string): Promise<void> {
     await this.uploadedDocumentRepository.delete({ id: uploadId });
+  }
+
+  async updateProgress(id: string, percent: number): Promise<void> {
+    await this.uploadedDocumentRepository
+      .createQueryBuilder()
+      .update(UploadedDocument)
+      .set({ percent_complete: percent })
+      .where('id = :id', { id })
+      .andWhere('percent_complete < :percent', { percent })
+      .execute();
   }
 }
