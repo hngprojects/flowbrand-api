@@ -72,65 +72,74 @@ export class OnboardingService {
   }
 
   async completeOnboarding(userId: string, sessionId: string): Promise<OnboardingCompleteResult> {
-    const session = await this.wizardSessionModelAction.findSessionById(sessionId, userId);
+  const session = await this.wizardSessionModelAction.findSessionById(sessionId, userId);
 
-    if (!session || session.user_id !== userId) {
-      throw new NotFoundException(SYS_MSG.ONBOARDING_SESSION_NOT_FOUND);
-    }
+  if (!session || session.user_id !== userId) {
+    throw new NotFoundException(SYS_MSG.ONBOARDING_SESSION_NOT_FOUND);
+  }
 
-    const now = new Date();
-    if (session.status === WizardStatus.EXPIRED || session.expires_at <= now) {
-      throw new ForbiddenException(SYS_MSG.ONBOARDING_SESSION_EXPIRED)
-    }
-    
-    if (session.status === WizardStatus.COMPLETE) {
-      throw new ConflictException({
-        error: 'ConflictException',
-        message: SYS_MSG.ONBOARDING_ALREADY_COMPLETE,
-        data: { redirect: { to: 'funnel_generation' } }
-      })
-    }
+  const now = new Date();
+  if (session.status === WizardStatus.EXPIRED || session.expires_at <= now) {
+    throw new ForbiddenException(SYS_MSG.ONBOARDING_SESSION_EXPIRED);
+  }
 
-    const answers = session.answers as WizardAnswers;
-
-    this.validateAnswers(answers)
-
-    const discoveryChannel = answers.step_3?.discovery_channel ?? '';
-    const primaryGoal = OnboardingService.GOAL_MAP[discoveryChannel] ?? 'awareness';
-
-    await this.dataSource.transaction(async (manager) => {      
-      await manager.update(User, userId, {
-        business_type:   answers.step_1!.business_type,
-        target_customer: answers.step_2!.target_customer,
-        primary_goal:    primaryGoal,
-      });
-
-      await manager.update(WizardSession, session.id, {
-        status: WizardStatus.COMPLETE,
-      });
+  if (session.status === WizardStatus.COMPLETE) {
+    throw new ConflictException({
+      error: 'ConflictException',
+      message: SYS_MSG.ONBOARDING_ALREADY_COMPLETE,
+      data: { redirect: { to: 'funnel_generation' } },
     });
-
-    return {
-      statusCode: HttpStatus.OK,
-      message: SYS_MSG.ONBOARDING_COMPLETE_SUCCESS,
-      data: { redirect: { to: 'funnel_generation'} },
-    }
   }
 
-  private validateAnswers(answers: WizardAnswers): void {
-    const missingSteps: string[] = [];
+  const answers = session.answers as WizardAnswers;
+  this.validateAnswers(answers);
 
-    if (!answers?.step_1?.business_type)      missingSteps.push('step_1');
-    if (!answers?.step_2?.target_customer)    missingSteps.push('step_2');
-    if (!answers?.step_3?.discovery_channel)  missingSteps.push('step_3');
+  const step2 = answers.step_2!;
+  const tags = step2.customer_tags ?? {};
+  const tagParts = [
+    ...(tags.type ?? []),
+    ...(tags.location ?? []),
+    ...(tags.wants ?? []),
+  ];
+  const target_customer = [tagParts.join(', '), step2.additional_notes]
+    .filter(Boolean)
+    .join('. ');
 
-    if (missingSteps.length > 0) {
-      throw new UnprocessableEntityException({
-        message: SYS_MSG.ONBOARDING_INCOMPLETE,
-        missing_fields: missingSteps
-      })
-    }
+  const discoveryChannel = answers.step_3?.discovery_channel ?? '';
+  const primaryGoal = OnboardingService.GOAL_MAP[discoveryChannel] ?? 'awareness';
+
+  await this.dataSource.transaction(async (manager) => {
+    await manager.update(User, userId, {
+      business_type: answers.step_1!.business_description,
+      target_customer,
+      primary_goal: primaryGoal,
+    });
+    await manager.update(WizardSession, session.id, {
+      status: WizardStatus.COMPLETE,
+    });
+  });
+
+  return {
+    statusCode: HttpStatus.OK,
+    message: SYS_MSG.ONBOARDING_COMPLETE_SUCCESS,
+    data: { redirect: { to: 'funnel_generation' } },
+  };
+}
+
+private validateAnswers(answers: WizardAnswers): void {
+  const missingSteps: string[] = [];
+
+  if (!answers?.step_1?.business_description)        missingSteps.push('step_1');
+  if (!answers?.step_2?.customer_tags?.type?.length) missingSteps.push('step_2');
+  if (!answers?.step_3?.discovery_channel)           missingSteps.push('step_3');
+
+  if (missingSteps.length > 0) {
+    throw new UnprocessableEntityException({
+      message: SYS_MSG.ONBOARDING_INCOMPLETE,
+      missing_fields: missingSteps,
+    });
   }
+}
 
   private mapSessionToResponse(
     session: WizardSession,
