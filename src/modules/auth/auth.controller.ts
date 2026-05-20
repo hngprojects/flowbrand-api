@@ -62,7 +62,7 @@ export class AuthController {
   private buildAuthResponse(
     statusCode: HttpStatus,
     message: string,
-    result: Awaited<ReturnType<AuthService['register']>>,
+    result: Awaited<ReturnType<AuthService['login']>>,
   ) {
     return {
       statusCode,
@@ -84,21 +84,13 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   @RegisterDocs()
   async register(@Body() dto: RegisterDto, @Res() res: Response) {
-    const result = await this.authService.register(dto);
-
-    res.cookie(
-      'refreshToken',
-      result.refreshToken,
-      this.getRefreshCookieOptions(),
-    );
-
-    return res.json(
-      this.buildAuthResponse(
-        HttpStatus.CREATED,
-        SYS_MSG.USER_CREATED_SUCCESSFULLY,
-        result,
-      ),
-    );
+    const { message } = await this.authService.register(dto);
+    
+    res.status(HttpStatus.CREATED).json({
+      success: true,
+      statusCode: HttpStatus.CREATED,
+      message,
+    });
   }
 
   @Public()
