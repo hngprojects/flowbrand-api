@@ -11,7 +11,8 @@ import {
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { memoryStorage } from 'multer';
+import { diskStorage } from 'multer';
+import * as os from 'node:os';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { MAX_FILES_PER_UPLOAD, MAX_UPLOAD_BYTES } from './constants/upload.constants';
 import { GetFunnelUploadProgressDocs, UploadFunnelDocumentsDocs } from './docs/upload-swagger.doc';
@@ -19,7 +20,9 @@ import { UploadService } from './upload.service';
 import type { UploadBatchResponse } from './upload.types';
 
 const uploadInterceptor = FilesInterceptor('files', MAX_FILES_PER_UPLOAD, {
-  storage: memoryStorage(),
+  storage: diskStorage({
+    destination: os.tmpdir(),
+  }),
   limits: {
     fileSize: MAX_UPLOAD_BYTES,
     files: MAX_FILES_PER_UPLOAD,
