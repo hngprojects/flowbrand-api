@@ -23,6 +23,7 @@ import { EmailModule } from './email/email.module';
 import { FunnelGenerationQueueModule } from './queue/funnel-generation-queue.module';
 import { WaitlistModule } from './modules/waitlist/waitlist.module';
 import { ContactModule } from './modules/contact/contact.module';
+import { LoggerModule } from './common/logger/logger.module';
 
 function collectValidationErrors(errors: ValidationError[], parentPath = ''): string[] {
   return errors.flatMap((error) => {
@@ -45,6 +46,8 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
     TypeOrmModule.forRootAsync({
       useFactory: () => databaseConfig(),
     }),
+    LoggerModule,
+
     HealthModule,
     UsersModule,
     AuthModule,

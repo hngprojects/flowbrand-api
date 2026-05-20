@@ -1,10 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, LoggerService } from '@nestjs/common';
 import { logger, logLevel } from './pino.logger';
 import { LoggerContextService } from './logger-context.service';
 import { maskId, maskEmail, maskSessionId } from './pii';
 
 @Injectable()
-export class PinoLoggerService {
+export class PinoLoggerService implements LoggerService {
   private readonly logger = logger;
   private readonly logLevel = logLevel;
 
@@ -21,7 +21,7 @@ export class PinoLoggerService {
     const existingContext = this.contextService.getContext() ?? {};
     return this.contextService.run(
       { requestId: null, ...existingContext, ...context },
-      callback,
+      callback as () => void,
     );
   }
 
@@ -80,5 +80,20 @@ export class PinoLoggerService {
 
   debug(event: string, data?: Record<string, unknown>): void {
     this.logger.debug(this.buildPayload(event, data));
+  }
+
+  log(message: string, ...optionalParams: any[]): void {
+    const context = optionalParams[0] ?? 'NestJS';
+    this.logger.info(this.buildPayload('nestjs.log', { message: String(message), context }));
+  }
+
+  verbose(message: string, ...optionalParams: any[]): void {
+    const context = optionalParams[0] ?? 'NestJS';
+    this.logger.debug(this.buildPayload('nestjs.verbose', { message: String(message), context }));
+  }
+
+  fatal(message: string, ...optionalParams: any[]): void {
+    const context = optionalParams[0] ?? 'NestJS';
+    this.logger.fatal(this.buildPayload('nestjs.fatal', { message: String(message), context }));
   }
 }
