@@ -21,7 +21,7 @@ export class PinoLoggerService implements LoggerService {
     const existingContext = this.contextService.getContext() ?? {};
     return this.contextService.run(
       { requestId: null, ...existingContext, ...context },
-      callback as () => void,
+      () => Promise.resolve(callback()),
     );
   }
 
@@ -59,9 +59,8 @@ export class PinoLoggerService implements LoggerService {
       maskedData.error = err.message;
       maskedData.stack = err.stack;
     } else if (maskedData.error instanceof Error) {
-      const e = maskedData.error as Error;
-      maskedData.error = e.message;
-      maskedData.stack = e.stack;
+      maskedData.stack = maskedData.error.stack;
+      maskedData.error = maskedData.error.message;
     }
     return { event, ...fields, ...maskedData }
   }
@@ -83,17 +82,17 @@ export class PinoLoggerService implements LoggerService {
   }
 
   log(message: string, ...optionalParams: any[]): void {
-    const context = optionalParams[0] ?? 'NestJS';
+    const context = (optionalParams[0] as string | undefined) ?? 'NestJS';
     this.logger.info(this.buildPayload('nestjs.log', { message: String(message), context }));
   }
 
   verbose(message: string, ...optionalParams: any[]): void {
-    const context = optionalParams[0] ?? 'NestJS';
+    const context = (optionalParams[0] as string | undefined) ?? 'NestJS';
     this.logger.debug(this.buildPayload('nestjs.verbose', { message: String(message), context }));
   }
 
   fatal(message: string, ...optionalParams: any[]): void {
-    const context = optionalParams[0] ?? 'NestJS';
+    const context = (optionalParams[0] as string | undefined) ?? 'NestJS';
     this.logger.fatal(this.buildPayload('nestjs.fatal', { message: String(message), context }));
   }
 }
