@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, UnauthorizedException } from '@nestjs/common';
+import { HttpException, HttpStatus, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
@@ -49,7 +49,7 @@ const TEST_USER = {
   full_name: 'Jane Doe',
   password_hash: '$2b$10$hash',
   is_active: true,
-  is_verfied: true,
+  is_verified: true,
 };
 
 const LOGIN_DTO = { email: TEST_USER.email, password: 'CorrectPassword1!' };
