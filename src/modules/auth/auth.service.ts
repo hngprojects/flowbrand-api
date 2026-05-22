@@ -152,6 +152,39 @@ export class AuthService {
     return this.issueTokens(user);
   }
 
+
+  async initiateOAuthExchange(profile: GoogleOAuthProfile): Promise<string> {
+    const oauthResult = await this.handleOAuthLogin(profile);
+    
+    const exchangeCode = crypto.randomBytes(32).toString('hex');
+    
+    const redisKey = `oauth:exchange:${exchangeCode}`;
+    
+    // Save to Redis strictly for 60 seconds
+    await this.redisService.setStrict(
+      redisKey,
+      JSON.stringify(oauthResult),
+      60
+    );
+    
+    return exchangeCode;
+  }
+
+  async exchangeCode(code: string): Promise<OAuthLoginResponse> {
+    const redisKey = `oauth:exchange:${code}`;
+    const rawData = await this.redisService.getdel(redisKey);
+
+    if (!rawData) {
+      throw new BadRequestException(SYS_MSG.GOOGLE_EXCHANGE_CODE_INVALID);
+    }
+
+    try {
+      return JSON.parse(rawData) as OAuthLoginResponse;
+    } catch {
+      throw new BadRequestException(SYS_MSG.GOOGLE_EXCHANGE_CODE_INVALID);
+    }
+  }
+
   async handleOAuthLogin(profile: GoogleOAuthProfile): Promise<OAuthLoginResponse> {
     const email = profile.email.trim().toLowerCase();
     const existingUser = await this.usersService.findByEmail(email);
@@ -168,17 +201,17 @@ export class AuthService {
       }
 
       user = await this.usersService.updateGoogleAccount(existingUser.id, {
-        fullName: profile.full_name || existingUser.full_name,
+        fullName: profile.fullName || existingUser.full_name,
         providerUserId: profile.providerId,
-        avatarUrl: profile.avatar_url,
+        avatarUrl: profile.avatarUrl,
       });
     } else {
       try {
         user = await this.usersService.createGoogleAccount({
           email,
-          fullName: profile.full_name || email,
+          fullName: profile.fullName || email,
           providerUserId: profile.providerId,
-          avatarUrl: profile.avatar_url,
+          avatarUrl: profile.avatarUrl,
         });
       } catch (error) {
         if (this.isUniqueEmailConflict(error)) {
@@ -196,9 +229,9 @@ export class AuthService {
           }
 
           user = await this.usersService.updateGoogleAccount(concurrentUser.id, {
-            fullName: profile.full_name || concurrentUser.full_name,
+            fullName: profile.fullName || concurrentUser.full_name,
             providerUserId: profile.providerId,
-            avatarUrl: profile.avatar_url,
+            avatarUrl: profile.avatarUrl,
           });
         } else {
           throw error;
@@ -209,10 +242,10 @@ export class AuthService {
     const tokens = await this.issueTokens(user);
 
     return {
-      status_code: HttpStatus.OK,
+      statusCode: HttpStatus.OK,
       message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
-      access_token: tokens.accessToken,
-      refresh_token: tokens.refreshToken,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       data: {
         user: {
           id: tokens.user.id,
