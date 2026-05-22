@@ -65,7 +65,7 @@ describe('Onboarding (e2e)', () => {
         .post('/api/onboarding/start')
         .set('Authorization', `Bearer ${accessToken}`);
 
-      expect([200, 201]).toContain(res.status);
+      expect(res.status).toBe(201);
       expect(res.body.data.session_id).toBeDefined();
       expect(res.body.data.status).toBe('in_progress');
       expect(res.body.data.steps_completed).toBe(0);

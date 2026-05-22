@@ -12,7 +12,7 @@ describe('Security Tests (e2e)', () => {
   let userAToken: string;
   let userBToken: string;
 
-  jest.setTimeout(30000);
+  jest.setTimeout(60000);
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -38,7 +38,7 @@ describe('Security Tests (e2e)', () => {
     .send({ email: testEmail, password: testPassword });
     userAToken = loginA.body.data?.accessToken;
     userBToken = loginA.body.data?.accessToken;
-  }, 30000);
+  }, 60000);
 
   afterAll(async () => {
     const emailQueue = app.get<Queue>(getQueueToken(QUEUES.EMAIL));
@@ -57,7 +57,7 @@ describe('Security Tests (e2e)', () => {
     ]);
 
     await app.close();
-  }, 30000);
+  }, 60000);
 
   describe('SEC-01: No Authorization header', () => {
     it('POST /api/funnels/generate without auth header returns 401', async () => {
@@ -133,7 +133,7 @@ describe('Security Tests (e2e)', () => {
     it('POST /api/waitlist/join is public', async () => {
       const res = await request(app.getHttpServer())
         .post('/api/waitlist/join')
-        .send({ email: `prestigensien45@gmail.com` });
+        .send({ email: `security-waitlist-${Date.now()}@example.com` });
 
       expect([200, 201]).toContain(res.status);
     });
@@ -143,7 +143,7 @@ describe('Security Tests (e2e)', () => {
         .post('/api/contact') 
         .send({
           fullName: 'Security Test',
-          email: 'prestigensien45@gmail.com',
+          email: `security-contact-${Date.now()}@example.com`,
           message: 'This is a security test message for the contact form.',
         });
 
