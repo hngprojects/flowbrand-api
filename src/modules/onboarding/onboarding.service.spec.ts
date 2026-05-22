@@ -60,54 +60,6 @@ const mockAction = {
   resolveStartWizardSession: jest.fn(),
 };
 
-describe('OnboardingService — getOnboardingSession (BE-009)', () => {
-  let service: OnboardingService;
-
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        OnboardingService,
-        { provide: WizardSessionModelAction, useValue: mockAction },
-        { provide: DataSource, useValue: { transaction: jest.fn() } },
-      ],
-    }).compile();
-
-    service = module.get<OnboardingService>(OnboardingService);
-    jest.clearAllMocks();
-  });
-
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
-
-  it('AC-03: should throw NotFoundException when no session exists', async () => {
-    mockAction.findActiveSession.mockResolvedValue(null);
-    await expect(service.getOnboardingSession('user-uuid')).rejects.toThrow(NotFoundException);
-  });
-
-  it('AC-04: should mark session as expired and throw NotFoundException', async () => {
-    mockAction.findActiveSession.mockResolvedValue({
-      ...mockSession,
-      expires_at: new Date(Date.now() - 1000),
-    });
-    mockAction.markAsExpired.mockResolvedValue(undefined);
-    await expect(service.getOnboardingSession('user-uuid')).rejects.toThrow(NotFoundException);
-    expect(mockAction.markAsExpired).toHaveBeenCalledWith(mockSession.id);
-  });
-
-  it('AC-01: should return session with cleaned answers', async () => {
-    mockAction.findActiveSession.mockResolvedValue(mockSession);
-    const result = await service.getOnboardingSession('user-uuid');
-    expect(result.answers).toEqual({ step_1: { name: 'Jane' } });
-    expect(result.answers).not.toHaveProperty('step_2');
-  });
-
-  it('AC-02: should omit null answer keys', async () => {
-    mockAction.findActiveSession.mockResolvedValue(mockSession);
-    const result = await service.getOnboardingSession('user-uuid');
-    expect(Object.values(result.answers).every(v => v !== null)).toBe(true);
-  });
-});
 
 // ── startWizardSession (BE-007) ───────────────────────────────────────────────
 
@@ -139,49 +91,42 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
     service = module.get<OnboardingService>(OnboardingService);
   });
 
-  it('throws 409 when user already has a completed wizard session', async () => {
+  it('returns 200 with completed status and redirect when already complete', async () => {
     mockWizardSessionModelAction.resolveStartWizardSession.mockResolvedValue({
       status: 'already_complete',
     });
-
-    let caught: unknown;
-    try {
-      await service.startWizardSession(USER_A);
-    } catch (e) {
-      caught = e;
-    }
-    expect(caught).toBeInstanceOf(ConflictException);
-    expect((caught as ConflictException).getResponse()).toMatchObject({
-      message: SYS_MSG.ONBOARDING_ALREADY_COMPLETE,
+    const result = await service.startWizardSession(USER_A);
+    expect(result.statusCode).toBe(HttpStatus.OK);
+    expect(result.message).toBe(SYS_MSG.ONBOARDING_ALREADY_COMPLETE);
+    expect(result.data).toEqual({
+      status: WizardStatus.COMPLETE,
+      redirect: { to: 'funnel_generation' }
     });
   });
 
-  it('returns existing active in-progress session without creating (idempotent)', async () => {
+  it('returns existing active in-progress session with camelCase fields (idempotent)', async () => {
     const existing = buildSession({
       id: SESSION_1,
       user_id: USER_A,
       steps_completed: 2,
-      answers: { step_1: { x: 1 }, step_2: { y: 2 } },
+      answers: { step_1: { x: 1 }, step_2: null }, // note step_2: null will be omitted
     });
-
     mockWizardSessionModelAction.resolveStartWizardSession.mockResolvedValue({
       status: 'active',
       session: existing,
     });
-
     const result = await service.startWizardSession(USER_A);
-
     expect(result.statusCode).toBe(HttpStatus.OK);
     expect(result.message).toBe(SYS_MSG.ONBOARDING_SESSION_RESUMED);
     expect(result.data).toEqual({
-      session_id: SESSION_1,
-      user_id: USER_A,
+      sessionId: SESSION_1,
+      userId: USER_A,
       status: WizardStatus.IN_PROGRESS,
-      steps_completed: 2,
-      answers: { step_1: { x: 1 }, step_2: { y: 2 } },
-      expires_at: existing.expires_at,
-      created_at: existing.created_at,
-      updated_at: existing.updated_at,
+      stepsCompleted: 2,
+      answers: { step_1: { x: 1 } }, // null step_2 was filtered out
+      expiresAt: existing.expires_at,
+      createdAt: existing.created_at,
+      updatedAt: existing.updated_at,
     });
   });
 
@@ -212,8 +157,8 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
 
       expect(result.statusCode).toBe(HttpStatus.CREATED);
       expect(result.message).toBe(SYS_MSG.ONBOARDING_SESSION_STARTED);
-      expect(result.data.session_id).toBe(created.id);
-      expect(result.data.user_id).toBe(USER_A);
+      expect(result.data.sessionId).toBe(created.id);
+      expect(result.data.userId).toBe(USER_A);
       expect(result.data.status).toBe(WizardStatus.IN_PROGRESS);
     } finally {
       jest.useRealTimers();
@@ -253,7 +198,7 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
 
     const result = await service.startWizardSession(USER_B);
     expect(result.statusCode).toBe(HttpStatus.CREATED);
-    expect(result.data.user_id).toBe(USER_B);
+    expect(result.data.userId).toBe(USER_B);
   });
 
   it('delegates to atomic resolveStartWizardSession', async () => {
@@ -279,7 +224,7 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
     const result = await service.startWizardSession(USER_A);
 
     expect(result.statusCode).toBe(HttpStatus.OK);
-    expect(result.data.session_id).toBe('ffffffff-ffff-4fff-8fff-ffffffffffff');
+    expect(result.data.sessionId).toBe('ffffffff-ffff-4fff-8fff-ffffffffffff');
     expect('id' in result.data).toBe(false);
   });
 });
@@ -640,7 +585,7 @@ describe('OnboardingService — saveStepAnswer (BE-008)', () => {
     expect(result.statusCode).toBe(HttpStatus.OK);
     expect(result.message).toBe(SYS_MSG.ONBOARDING_STEP_SAVED);
     expect(result.data.answers).toHaveProperty('step_1');
-    expect(result.data.steps_completed).toBe(1);
+    expect(result.data.stepsCompleted).toBe(1);
   });
 
   it('AC-05: saves step 2 answer and returns 200 with steps_completed = 2', async () => {
@@ -656,10 +601,10 @@ describe('OnboardingService — saveStepAnswer (BE-008)', () => {
 
     expect(result.statusCode).toBe(HttpStatus.OK);
     expect(result.data.answers).toHaveProperty('step_2');
-    expect(result.data.steps_completed).toBe(2);
+    expect(result.data.stepsCompleted).toBe(2);
   });
 
-  it('AC-06: saves step 3 answer and returns 200 with steps_completed = 3', async () => {
+  it('AC-06: saves step 3 answer and returns 200 with stepsCompleted = 3', async () => {
     mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession({
       answers: {
         step_1: { business_description: 'We sell shoes' },
@@ -675,7 +620,7 @@ describe('OnboardingService — saveStepAnswer (BE-008)', () => {
 
     expect(result.statusCode).toBe(HttpStatus.OK);
     expect(result.data.answers).toHaveProperty('step_3');
-    expect(result.data.steps_completed).toBe(3);
+    expect(result.data.stepsCompleted).toBe(3);
   });
 
   it('AC-07: calling step 1 again overwrites previous answer — steps_completed stays same', async () => {
@@ -690,7 +635,7 @@ describe('OnboardingService — saveStepAnswer (BE-008)', () => {
     } as any);
 
     expect((result.data.answers as any).step_1).toEqual({ business_description: 'New answer' });
-    expect(result.data.steps_completed).toBe(1);
+    expect(result.data.stepsCompleted).toBe(1);
   });
 
   it('AC-08: throws 422 when step 1 business_description exceeds 500 characters', async () => {

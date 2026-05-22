@@ -4,14 +4,15 @@ import { WizardStatus } from '../enums/wizzard-status.enum';
 
 /** `data` payload for POST /onboarding/start success responses. */
 export interface OnboardingStartResponseData {
-  session_id: string;
-  user_id: string;
+  sessionId?: string;
+  userId?: string;
   status: WizardStatus;
-  steps_completed: number;
-  answers: Record<string, unknown>;
-  expires_at: Date;
-  created_at: Date;
-  updated_at: Date;
+  stepsCompleted?: number;
+  answers?: Record<string, unknown>;
+  expiresAt?: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
+  redirectUrl?: { to: string };
 }
 
 /** Service result passed to the controller for POST /onboarding/start. */
@@ -27,11 +28,7 @@ export type WizardStartResolveResult =
   | { status: 'active'; session: WizardSession }
   | { status: 'created'; session: WizardSession };
 
-/** Typed shape of the answers JSON stored on a WizardSession.
- *  The entity stores this as Record<string, unknown> for flexibility.
- *  This interface is used internally by OnboardingService only.
- */
-// onboarding.interface.ts
+// Typed shape of the answers JSON stored on a WizardSession
 
 export interface WizardAnswers {
   step_1?: { business_description?: string };
