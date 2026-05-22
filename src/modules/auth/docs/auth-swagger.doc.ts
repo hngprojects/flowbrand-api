@@ -89,6 +89,18 @@ export const LoginDocs = () =>
         },
       },
     }),
+    ApiResponse({
+      status: HttpStatus.FORBIDDEN,
+      description: 'Email is unverified. Please verify your email via OTP before logging in.',
+      schema: {
+        example: {
+          success: false,
+          statusCode: HttpStatus.FORBIDDEN,
+          error: 'ForbiddenException',
+          message: SYS_MSG.AUTH_EMAIL_UNVERIFIED,
+        },
+      },
+    }),
   );
 
 export const RefreshDocs = () =>
