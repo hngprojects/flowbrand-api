@@ -7,14 +7,14 @@ import { AppModule } from './../src/app.module';
 describe('Health (e2e)', () => {
   let app: INestApplication<App>;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();
-  });
+  }, 30000);
 
   it('GET /health → 200', () => {
     return request(app.getHttpServer())
@@ -26,7 +26,7 @@ describe('Health (e2e)', () => {
       });
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     await app.close();
-  });
+  }, 30000);
 });
