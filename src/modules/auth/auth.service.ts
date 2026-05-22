@@ -182,8 +182,7 @@ export class AuthService {
     await this.redisService.del(redisKey);
 
     try {
-      const oauthResult: OAuthLoginResponse = JSON.parse(rawData);
-      return oauthResult;
+      return JSON.parse(rawData) as OAuthLoginResponse;
     } catch {
       throw new BadRequestException(SYS_MSG.GOOGLE_EXCHANGE_CODE_INVALID);
     }

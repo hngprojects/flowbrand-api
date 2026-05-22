@@ -23,7 +23,7 @@ const mockJwtService = {
   signAsync: jest.fn(),
   verifyAsync: jest.fn(),
 };
-const mockRedisService = { setStrict: jest.fn(), del: jest.fn(), rateLimit: jest.fn() };
+const mockRedisService = { setStrict: jest.fn(), del: jest.fn(), rateLimit: jest.fn(), get: jest.fn() };
 const mockUserSessionModelAction = {
   findById: jest.fn(),
   updateById: jest.fn(),
@@ -403,7 +403,11 @@ describe('AuthService login lockout (BE-005)', () => {
           60,
         );
 
-        const storedData = JSON.parse(mockRedisService.setStrict.mock.calls[0][1]);
+        const exchangeCall = mockRedisService.setStrict.mock.calls.find(
+          (call) => call[0] === `oauth:exchange:${code}`
+        );
+
+        const storedData = JSON.parse(exchangeCall[1]);
         expect(storedData).toMatchObject({
           access_token: 'signed.jwt.token',
           refresh_token: 'signed.jwt.token',
