@@ -48,7 +48,7 @@ const options: LoggerOptions = {
   formatters: {
     level: (label) => ({ level: label }),
     // Return only our own base fields; this implicitly strips pino's default pid and hostname
-    bindings: (b) => ({ service: b['service'], env: b['env'] }),
+    bindings: (b) => ({ service: String(b['service']), env: String(b['env']) }),
   },
 
   timestamp: () => `, "timestamp":"${new Date().toISOString()}"`,
