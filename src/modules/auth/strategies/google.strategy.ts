@@ -47,8 +47,8 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
             provider: 'google',
             providerId: profile.id,
             email,
-            full_name: profile.displayName || `${profile.name?.givenName || ''} ${profile.name?.familyName || ''}`.trim(),
-            avatar_url: profile.photos && profile.photos.length ? profile.photos[0].value : null,
+            fullName: profile.displayName || `${profile.name?.givenName || ''} ${profile.name?.familyName || ''}`.trim(),
+            avatarUrl: profile.photos && profile.photos.length ? profile.photos[0].value : null,
         };
 
         return done(null, user);

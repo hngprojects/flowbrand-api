@@ -34,13 +34,14 @@ import {
   VerifyOtpDocs,
   ForgotPasswordDocs, 
   ResetPasswordDocs,
+  GoogleExchangeDocs,
 } from './docs/auth-swagger.doc';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { ResendOtpDto } from './dto/resend-otp.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-
+import { GoogleExchangeDto } from './dto/google-exchange.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -251,10 +252,38 @@ export class AuthController {
       throw new UnauthorizedException(SYS_MSG.GOOGLE_OAUTH_FAILED);
     }
 
-    const result = await this.authService.handleOAuthLogin(payload);
-    res.cookie('refreshToken', result.refresh_token, this.getRefreshCookieOptions());
+    const exchangeCode = await this.authService.initiateOAuthExchange(payload);
 
-    const redirectUrl = `${this.getFrontendBaseUrl()}${AuthController.OAUTH_REDIRECT_URL}#access_token=${encodeURIComponent(result.access_token)}`;
+    // Redirect user to the frontend with the short-lived code query parameter
+    const redirectUrl = `${this.getFrontendBaseUrl()}${AuthController.OAUTH_REDIRECT_URL}?code=${encodeURIComponent(exchangeCode)}`;
     res.redirect(HttpStatus.FOUND, redirectUrl);
+  }
+
+  @Public()
+  @Post('google/exchange')
+  @HttpCode(HttpStatus.OK)
+  @GoogleExchangeDocs()
+  async googleExchange(
+    @Body() dto: GoogleExchangeDto,
+    @Res() res: Response,
+  ): Promise<Response> {
+    const oauthResult = await this.authService.exchangeCode(dto.code);
+
+    res.cookie(
+      'refreshToken',
+      oauthResult.refreshToken,
+      this.getRefreshCookieOptions(),
+    );
+
+    // Return access token and user info matching the standard response template
+    return res.json({
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
+      data: {
+        accessToken: oauthResult.accessToken,
+        user: oauthResult.data.user,
+        redirectUrl: AuthController.REDIRECT_URL,
+      },
+    });
   }
 }
