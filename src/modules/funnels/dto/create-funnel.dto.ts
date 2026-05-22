@@ -25,7 +25,7 @@ export class CreateFunnelDto {
       'Client-generated UUID used to deduplicate retries on flaky networks. ' +
       'The same key always resolves to the same funnel.',
   })
-  @IsUUID()
+  @IsUUID('4')
   @IsNotEmpty()
   idempotency_key: string;
 
