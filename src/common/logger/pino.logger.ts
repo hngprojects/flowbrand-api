@@ -5,7 +5,7 @@ const isDev = env.NODE_ENV === 'development';
 
 const logLevel = env.LOG_LEVEL;
 
-const REDACTED_PATHS = [
+export const REDACTED_PATHS = [
   'password',
   '*.password',
   'password_hash',
@@ -47,7 +47,8 @@ const options: LoggerOptions = {
 
   formatters: {
     level: (label) => ({ level: label }),
-    bindings: () => ({}),
+    // Return only our own base fields; this implicitly strips pino's default pid and hostname
+    bindings: (b) => ({ service: b['service'], env: b['env'] }),
   },
 
   timestamp: () => `, "timestamp":"${new Date().toISOString()}"`,
