@@ -271,7 +271,7 @@ export class AuthController {
 
     res.cookie(
       'refreshToken',
-      oauthResult.refresh_token,
+      oauthResult.refreshToken,
       this.getRefreshCookieOptions(),
     );
 
@@ -280,7 +280,7 @@ export class AuthController {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
       data: {
-        accessToken: oauthResult.access_token,
+        accessToken: oauthResult.accessToken,
         user: oauthResult.data.user,
         redirectUrl: AuthController.REDIRECT_URL,
       },

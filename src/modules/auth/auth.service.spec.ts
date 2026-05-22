@@ -286,7 +286,7 @@ describe('AuthService login lockout (BE-005)', () => {
         id: 'google-user-1',
         email: 'new.google@example.com',
         full_name: 'Google User',
-        avatar_url: 'https://example.com/avatar.png',
+        avatarrl: 'https://example.com/avatar.png',
         is_verified: true,
         auth_provider: 'google',
         provider_user_id: 'google-123',
@@ -298,8 +298,8 @@ describe('AuthService login lockout (BE-005)', () => {
         provider: 'google',
         providerId: 'google-123',
         email: 'new.google@example.com',
-        full_name: 'Google User',
-        avatar_url: 'https://example.com/avatar.png',
+        fullName: 'Google User',
+        avatarUrl: 'https://example.com/avatar.png',
       });
 
       expect(mockUsersService.createGoogleAccount).toHaveBeenCalledWith(
@@ -309,10 +309,10 @@ describe('AuthService login lockout (BE-005)', () => {
         }),
       );
       expect(result).toMatchObject({
-        status_code: HttpStatus.OK,
+        statusCode: HttpStatus.OK,
         message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
-        access_token: 'signed.jwt.token',
-        refresh_token: 'signed.jwt.token',
+        accessToken: 'signed.jwt.token',
+        refreshToken: 'signed.jwt.token',
       });
     });
 
@@ -334,8 +334,8 @@ describe('AuthService login lockout (BE-005)', () => {
         provider: 'google',
         providerId: 'google-456',
         email: TEST_USER.email,
-        full_name: TEST_USER.full_name,
-        avatar_url: null,
+        fullName: TEST_USER.full_name,
+        avatarUrl: null,
       });
 
       expect(mockUsersService.updateGoogleAccount).toHaveBeenCalledWith(
@@ -346,10 +346,10 @@ describe('AuthService login lockout (BE-005)', () => {
         }),
       );
       expect(result).toMatchObject({
-        status_code: HttpStatus.OK,
+        statusCode: HttpStatus.OK,
         message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
-        access_token: 'signed.jwt.token',
-        refresh_token: 'signed.jwt.token',
+        accessToken: 'signed.jwt.token',
+        refreshToken: 'signed.jwt.token',
       });
     });
   });
@@ -359,8 +359,8 @@ describe('AuthService login lockout (BE-005)', () => {
       provider: 'google' as const,
       providerId: 'google-123',
       email: 'jane@example.com',
-      full_name: 'Jane Doe',
-      avatar_url: null,
+      fullName: 'Jane Doe',
+      avatarUrl: null,
     };
 
     const mockOAuthResponse = {
@@ -409,8 +409,8 @@ describe('AuthService login lockout (BE-005)', () => {
 
         const storedData = JSON.parse(exchangeCall[1]);
         expect(storedData).toMatchObject({
-          access_token: 'signed.jwt.token',
-          refresh_token: 'signed.jwt.token',
+          accessToken: 'signed.jwt.token',
+          refreshToken: 'signed.jwt.token',
         });
       });
     });

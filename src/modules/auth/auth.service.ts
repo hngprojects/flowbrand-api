@@ -201,17 +201,17 @@ export class AuthService {
       }
 
       user = await this.usersService.updateGoogleAccount(existingUser.id, {
-        fullName: profile.full_name || existingUser.full_name,
+        fullName: profile.fullName || existingUser.full_name,
         providerUserId: profile.providerId,
-        avatarUrl: profile.avatar_url,
+        avatarUrl: profile.avatarUrl,
       });
     } else {
       try {
         user = await this.usersService.createGoogleAccount({
           email,
-          fullName: profile.full_name || email,
+          fullName: profile.fullName || email,
           providerUserId: profile.providerId,
-          avatarUrl: profile.avatar_url,
+          avatarUrl: profile.avatarUrl,
         });
       } catch (error) {
         if (this.isUniqueEmailConflict(error)) {
@@ -229,9 +229,9 @@ export class AuthService {
           }
 
           user = await this.usersService.updateGoogleAccount(concurrentUser.id, {
-            fullName: profile.full_name || concurrentUser.full_name,
+            fullName: profile.fullName || concurrentUser.full_name,
             providerUserId: profile.providerId,
-            avatarUrl: profile.avatar_url,
+            avatarUrl: profile.avatarUrl,
           });
         } else {
           throw error;
@@ -242,10 +242,10 @@ export class AuthService {
     const tokens = await this.issueTokens(user);
 
     return {
-      status_code: HttpStatus.OK,
+      statusCode: HttpStatus.OK,
       message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
-      access_token: tokens.accessToken,
-      refresh_token: tokens.refreshToken,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       data: {
         user: {
           id: tokens.user.id,
