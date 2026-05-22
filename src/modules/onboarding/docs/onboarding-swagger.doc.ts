@@ -8,29 +8,35 @@ import {
   ApiOperation,
   ApiUnauthorizedResponse,
   ApiUnprocessableEntityResponse,
+  ApiBody,
 } from '@nestjs/swagger';
 import * as SYS_MSG from '../../../constants/system.messages';
 
 const startResponseDataExample = {
-  session_id: '550e8400-e29b-41d4-a716-446655440001',
-  user_id: '550e8400-e29b-41d4-a716-446655440002',
+  sessionId: '550e8400-e29b-41d4-a716-446655440001',
+  userId: '550e8400-e29b-41d4-a716-446655440002',
   status: 'in_progress' as const,
-  steps_completed: 0,
+  stepsCompleted: 0,
   answers: {},
-  expires_at: '2026-05-16T12:00:00.000Z',
-  created_at: '2026-05-15T12:00:00.000Z',
-  updated_at: '2026-05-15T12:00:00.000Z',
+  expiresAt: '2026-05-16T12:00:00.000Z',
+  createdAt: '2026-05-15T12:00:00.000Z',
+  updatedAt: '2026-05-15T12:00:00.000Z',
+};
+
+const completedResponseDataExample = {
+  status: 'complete' as const,
+  redirect: { to: 'funnel_generation' }
 };
 
 export const StartOnboardingDocs = () =>
   applyDecorators(
     ApiOperation({
-      summary: 'Initialise onboarding wizard session',
+      summary: 'Initialise or retrieve onboarding wizard session',
       description:
         'Requires Bearer accessToken from POST /auth/login or /auth/register. ' +
-        'Returns 409 if onboarding is already complete. ' +
-        'Returns 200 with an existing in-progress session when still valid. ' +
-        'Returns 201 when a new session is created.',
+        'If onboarding is already complete, returns 200 OK with redirect instructions. ' +
+        'If an active in-progress session exists, returns 200 OK to resume it. ' +
+        'If no active session exists, returns 201 Created.',
     }),
     ApiCreatedResponse({
       description: 'New wizard session created.',
@@ -43,76 +49,30 @@ export const StartOnboardingDocs = () =>
       },
     }),
     ApiOkResponse({
-      description: 'Existing in-progress session resumed (idempotent).',
+      description: 'Active session resumed OR user has already completed onboarding.',
       schema: {
-        example: {
-          statusCode: HttpStatus.OK,
-          message: SYS_MSG.ONBOARDING_SESSION_RESUMED,
-          data: startResponseDataExample,
-        },
+        oneOf: [
+          {
+            description: 'Existing in-progress session resumed.',
+            example: {
+              statusCode: HttpStatus.OK,
+              message: SYS_MSG.ONBOARDING_SESSION_RESUMED,
+              data: startResponseDataExample,
+            },
+          },
+          {
+            description: 'Onboarding already completed previously.',
+            example: {
+              statusCode: HttpStatus.OK,
+              message: SYS_MSG.ONBOARDING_ALREADY_COMPLETE,
+              data: completedResponseDataExample,
+            },
+          },
+        ],
       },
     }),
     ApiUnauthorizedResponse({
       description: 'Missing or invalid bearer token',
-    }),
-    ApiConflictResponse({
-      description: 'User has already completed onboarding',
-      schema: {
-        example: {
-          success: false,
-          statusCode: HttpStatus.CONFLICT,
-          error: 'ConflictException',
-          message: SYS_MSG.ONBOARDING_ALREADY_COMPLETE,
-          path: '/api/onboarding/start',
-          timestamp: '2026-05-15T12:00:00.000Z',
-        },
-      },
-    }),
-  );
-
-export const GetSessionDocs = () =>
-  applyDecorators(
-    ApiOperation({
-      summary: 'Get active onboarding session',
-      description:
-        'Returns the most recent active onboarding session for the authenticated user. ' +
-        'Only answered steps are included in the answers object — null steps are omitted. ' +
-        'Returns 404 if no active session exists or if the session has expired.',
-    }),
-    ApiOkResponse({
-      description: 'Active session returned successfully.',
-      schema: {
-        example: {
-          success: true,
-          data: {
-            sessionId: '550e8400-e29b-41d4-a716-446655440001',
-            status: 'in_progress',
-            steps_completed: 2,
-            answers: {
-              step_1: { business_description: 'We sell handmade shoes' },
-              step_2: { customer_tags: { type: ['retail'] } },
-            },
-            created_at: '2026-05-15T12:00:00.000Z',
-            expires_at: '2026-05-16T12:00:00.000Z',
-          },
-        },
-      },
-    }),
-    ApiUnauthorizedResponse({
-      description: 'Missing or invalid bearer token.',
-    }),
-    ApiNotFoundResponse({
-      description: 'No active session found or session has expired.',
-      schema: {
-        example: {
-          success: false,
-          statusCode: HttpStatus.NOT_FOUND,
-          error: 'NotFoundException',
-          message: SYS_MSG.ONBOARDING_SESSION_NOT_FOUND,
-          path: '/api/onboarding/session',
-          timestamp: '2026-05-15T12:00:00.000Z',
-        },
-      },
     }),
   );
 
@@ -123,8 +83,57 @@ export const PostStepDocs = () =>
       description:
         'Saves the answer for a specific wizard step. ' +
         'Each step has a different answer schema. ' +
-        'Calling the same step again overwrites the previous answer (idempotent). ' +
+        'Calling the same step again overwrites the previous answer. ' +
         'Returns the full updated session.',
+    }),
+    ApiBody({
+      description: 'The step answer payload. Select the step example from the dropdown to view the expected schema.',
+      schema: {
+        type: 'object',
+        properties: {
+          session_id: { type: 'string', format: 'uuid', description: 'The wizard session ID' },
+          step: { type: 'integer', minimum: 1, maximum: 3, description: 'Step number' },
+          answer: { type: 'object', description: 'Answer content' },
+        },
+        required: ['session_id', 'step', 'answer'],
+      },
+      examples: {
+        step1: {
+          summary: 'Step 1: Business Description',
+          value: {
+            session_id: '550e8400-e29b-41d4-a716-446655440001',
+            step: 1,
+            answer: {
+              business_description: 'We sell handmade skincare products including body butters, scrubs, and face creams made from natural African ingredients.'
+            }
+          }
+        },
+        step2: {
+          summary: 'Step 2: Customer Profiling',
+          value: {
+            session_id: '550e8400-e29b-41d4-a716-446655440001',
+            step: 2,
+            answer: {
+              customer_tags: {
+                type: ['Women', 'Young adults'],
+                location: ['Nigeria', 'Africa'],
+                wants: ['Look good', 'Feel Confident']
+              },
+              additional_notes: 'Mostly working-class women aged 22-35 who prefer natural products'
+            }
+          }
+        },
+        step3: {
+          summary: 'Step 3: Discovery Channel',
+          value: {
+            session_id: '550e8400-e29b-41d4-a716-446655440001',
+            step: 3,
+            answer: {
+              discovery_channel: 'TikTok'
+            }
+          }
+        }
+      }
     }),
     ApiOkResponse({
       description: 'Step answer saved successfully.',
@@ -132,16 +141,16 @@ export const PostStepDocs = () =>
         example: {
           success: true,
           data: {
-            session_id: '550e8400-e29b-41d4-a716-446655440001',
-            user_id: '550e8400-e29b-41d4-a716-446655440002',
+            sessionId: '550e8400-e29b-41d4-a716-446655440001',
+            userId: '550e8400-e29b-41d4-a716-446655440002',
             status: 'in_progress',
-            steps_completed: 1,
+            stepsCompleted: 1,
             answers: {
-              step_1: { business_description: 'We sell handmade shoes' }
+              step_1: { business_description: 'We sell handmade skincare products...' }
             },
-            expires_at: '2026-05-17T12:00:00.000Z',
-            created_at: '2026-05-16T12:00:00.000Z',
-            updated_at: '2026-05-16T12:00:00.000Z',
+            expiresAt: '2026-05-17T12:00:00.000Z',
+            createdAt: '2026-05-16T12:00:00.000Z',
+            updatedAt: '2026-05-16T12:00:00.000Z',
           }
         }
       }
