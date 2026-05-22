@@ -173,12 +173,13 @@ this.logger.error('funnel.write.rolled_back', { jobId, funnelId }, err);
 // Also fine — if you only have the message string
 this.logger.error('funnel.status.failed', { jobId, error: err.message });
 
-// Wrong — Error objects serialize as {} in JSON
+// Avoid — the service handles { error: err } as a safety net, but the third-arg form is the documented convention
 this.logger.error('funnel.job.failed', { error: err });
 ```
 
-Stack traces are included in non-production environments. Pino's `redact` config
-strips `stack` in production automatically — you do not need to handle this yourself.
+Stack traces are included in all environments and captured by your log aggregator.
+They are never sent to API clients. Pino's `redact` config covers token and credential
+field names — not stack traces.
 
 ### `logger.debug(event, data?)`
 
@@ -627,7 +628,7 @@ console.log('something happened');
 // NestJS built-in Logger — not Pino, not JSON, no requestId
 private readonly logger = new Logger(MyService.name);
 
-// Raw Error inside data — serialises as {} in JSON
+// Raw Error inside data — use the third argument instead (documented convention)
 this.logger.error('funnel.job.failed', { error: err });
 
 // Unmasked userId
@@ -679,7 +680,7 @@ await this.context.run({ requestId: null, jobId: job.id, queue }, async () => {
 | AC-02 | All lines for one request share the same `requestId` | Hit `POST /funnels/generate`, grep logs for the returned UUID |
 | AC-03 | `X-Request-ID` is echoed in the response header | `curl -H "X-Request-ID: <uuid>"` and inspect response headers; also test without the header |
 | AC-04 | Sensitive fields output `[REDACTED]` | Unit test: `{ password: 'secret', nested: { token: 'abc' } }` → both `[REDACTED]` |
-| AC-05 | Full generation job emits all expected events in order | `http.request.received` → `funnel.job.received` → `funnel.llm.success` → `funnel.write.committed` → `funnel.status.active` → `http.re
+| AC-05 | Full generation job emits all expected events in order | `http.request.received` → `funnel.job.received` → `funnel.llm.success` → `funnel.write.committed` → `funnel.status.active` �
 | AC-06 | `GEMINI_API_KEY` never appears in any log line | `grep GEMINI_API_KEY <logfile>` returns nothing after a generation request |
 | AC-07 | `LOG_LEVEL=error` suppresses info and warn | `LOG_LEVEL=error pnpm start` — only error-level lines appear |
 | AC-08 | HTTP interceptor does not log request bodies | Send `{ "password": "test" }` in body — confirm it does not appear in logs |
