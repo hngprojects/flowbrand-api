@@ -13,8 +13,8 @@ describe('Onboarding (e2e)', () => {
   let accessToken: string;
   let sessionId: string;
 
-  const testEmail = `e2e-onboarding-${Date.now()}@example.com`;
-  const testPassword = 'Test@12345';
+  const testEmail = 'admin@example.com';
+  const testPassword = 'Admin@123456';
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -24,16 +24,6 @@ describe('Onboarding (e2e)', () => {
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api');
     await app.init();
-
-    // Register and login to get token
-    await request(app.getHttpServer())
-      .post('/api/auth/register')
-      .send({
-        email: testEmail,
-        password: testPassword,
-        fullName: 'E2E Onboarding User',
-        termsAccepted: true,
-      });
 
     const loginRes = await request(app.getHttpServer())
       .post('/api/auth/login')

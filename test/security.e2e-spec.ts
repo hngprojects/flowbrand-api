@@ -24,8 +24,8 @@ describe('Security Tests (e2e)', () => {
     await app.init();
 
     // Register and login user A
-    const userAEmail = `prestigensien45@gmail.com`;
-    const userBEmail = `prestigensien45@gmail.com`;
+    const testEmail = 'admin@example.com';
+    const testPassword = 'Admin@123456';
 
     // Clear stale jobs from previous test runs
     const emailQueue = app.get<Queue>(getQueueToken(QUEUES.EMAIL));
@@ -33,26 +33,11 @@ describe('Security Tests (e2e)', () => {
     await emailQueue.clean(0, 'failed');
     await emailQueue.clean(0, 'completed');
 
-    // Register user A
-    await request(app.getHttpServer())
-    .post('/api/auth/register')
-    .send({ email: userAEmail, password: 'Test@12345', fullName: 'User A', termsAccepted: true });
-
     const loginA = await request(app.getHttpServer())
     .post('/api/auth/login')
-    .send({ email: userAEmail, password: 'Test@12345' });
+    .send({ email: testEmail, password: testPassword });
     userAToken = loginA.body.data?.accessToken;
     userBToken = loginA.body.data?.accessToken;
-
-    // Register user B  
-    // await request(app.getHttpServer())
-    // .post('/api/auth/register')
-    // .send({ email: userBEmail, password: 'Test@12345', fullName: 'User B', termsAccepted: true });
-
-    // const loginB = await request(app.getHttpServer())
-    // .post('/api/auth/login')
-    // .send({ email: userBEmail, password: 'Test@12345' });
-    // userBToken = loginB.body.data.accessToken;
   }, 30000);
 
   afterAll(async () => {

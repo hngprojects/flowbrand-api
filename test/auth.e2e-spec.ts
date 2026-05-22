@@ -10,8 +10,8 @@ import { QUEUES } from '../src/common/constants/queue.constants';
 describe('Auth (e2e)', () => {
   let app: INestApplication<App>;
 
-  const testEmail = `e2e-test-${Date.now()}@example.com`;
-  const testPassword = 'Test@12345';
+  const testEmail = 'admin@example.com';
+  const testPassword = 'Admin@123456';
   let accessToken: string;
 
   beforeAll(async () => {
@@ -48,7 +48,7 @@ describe('Auth (e2e)', () => {
         const res = await request(app.getHttpServer())
             .post('/api/auth/register')
             .send({
-            email: testEmail,
+            email: `e2e-new-${Date.now()}@example.com`,
             password: testPassword,
             fullName: 'E2E Test User',
             termsAccepted: true,
