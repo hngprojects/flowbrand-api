@@ -5,7 +5,7 @@ import * as SYS_MSG from '../../../constants/system.messages';
 
 export function CompleteOnboardingDocs() {
   return applyDecorators(
-    ApiBearerAuth(),
+    ApiBearerAuth('JWT'),
     ApiOperation({ 
       summary: 'Complete onboarding and write profile data',
       description: 'Validates the session, checks all 3 steps are answered, writes business data to user profile, and marks the session as complete.'
