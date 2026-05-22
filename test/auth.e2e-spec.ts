@@ -1,4 +1,4 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
@@ -25,22 +25,24 @@ describe('Auth (e2e)', () => {
   });
 
   afterAll(async () => {
-    const emailQueue = app.get<Queue>(getQueueToken(QUEUES.EMAIL));
-    const funnelQueue = app.get<Queue>(getQueueToken(QUEUES.FUNNEL_GENERATION));
-    const extractionQueue = app.get<Queue>(getQueueToken(QUEUES.DOCUMENT_EXTRACTION));
-    
-    await Promise.all([
-      emailQueue.pause(),
-      funnelQueue.pause(),
-      extractionQueue.pause(),
-    ]);
-    await Promise.all([
-      emailQueue.close(),
-      funnelQueue.close(),
-      extractionQueue.close(),
-    ]);
-
-    await app.close();
+    try {
+        const emailQueue = app.get<Queue>(getQueueToken(QUEUES.EMAIL));
+        const funnelQueue = app.get<Queue>(getQueueToken(QUEUES.FUNNEL_GENERATION));
+        const extractionQueue = app.get<Queue>(getQueueToken(QUEUES.DOCUMENT_EXTRACTION));
+        
+        await Promise.all([
+            emailQueue.pause(),
+            funnelQueue.pause(),
+            extractionQueue.pause(),
+        ]);
+        await Promise.all([
+            emailQueue.close(),
+            funnelQueue.close(),
+            extractionQueue.close(),
+        ]);
+    } finally {
+        await app.close();
+    }
   }, 30000);
 
   describe('POST /api/auth/register', () => {
@@ -110,10 +112,18 @@ describe('Auth (e2e)', () => {
   });
 
   describe('GET /api/auth/me', () => {
+    let meAccessToken: string;
+
+    beforeEach(async () => {
+        const res = await request(app.getHttpServer())
+            .post('/api/auth/login')
+            .send({ email: testEmail, password: testPassword });
+        meAccessToken = res.body.data.accessToken;
+    })
     it('AC-07: returns current user when authenticated', async () => {
       const res = await request(app.getHttpServer())
         .get('/api/auth/me')
-        .set('Authorization', `Bearer ${accessToken}`);
+        .set('Authorization', `Bearer ${meAccessToken}`);
 
       expect(res.status).toBe(200);
       expect(res.body.data.email).toBe(testEmail);

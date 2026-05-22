@@ -27,18 +27,20 @@ describe('Contact (e2e)', () => {
       const funnelQueue = app.get<Queue>(getQueueToken(QUEUES.FUNNEL_GENERATION));
       const extractionQueue = app.get<Queue>(getQueueToken(QUEUES.DOCUMENT_EXTRACTION));
       
-      await Promise.all([
-        emailQueue.pause(),
-        funnelQueue.pause(),
-        extractionQueue.pause(),
-      ]);
-      await Promise.all([
-        emailQueue.close(),
-        funnelQueue.close(),
-        extractionQueue.close(),
-      ]);
-
-      await app.close();
+      try {
+        await Promise.all([
+            emailQueue.pause(),
+            funnelQueue.pause(),
+            extractionQueue.pause(),
+        ]);
+        await Promise.all([
+            emailQueue.close(),
+            funnelQueue.close(),
+            extractionQueue.close(),
+        ]);
+      } finally {
+         await app.close();
+      }
     }, 30000);
 
   describe('POST /api/contact', () => {
