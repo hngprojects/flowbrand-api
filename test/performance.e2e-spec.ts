@@ -27,15 +27,12 @@ describe('Performance Tests (e2e)', () => {
     await emailQueue.clean(0, 'failed');
     await emailQueue.clean(0, 'completed');
 
-    const email = `perf-test-${Date.now()}@example.com`;
-    await request(app.getHttpServer())
-      .post('/api/auth/register')
-      .send({ email, password: 'Test@12345', fullName: 'Perf User', termsAccepted: true });
+    const email = 'admin@example.com';
 
     const loginRes = await request(app.getHttpServer())
       .post('/api/auth/login')
-      .send({ email, password: 'Test@12345' });
-    accessToken = loginRes.body.data.accessToken;
+      .send({ email, password: 'Admin@123456' });
+    accessToken = loginRes.body.data?.accessToken;
   }, 60000);
 
   afterAll(async () => {
@@ -113,15 +110,11 @@ describe('Performance Tests (e2e)', () => {
 
   describe('POST /api/auth/login', () => {
     it('PERF-05: responds in under 500ms', async () => {
-      const email = `perf-login-${Date.now()}@example.com`;
-      await request(app.getHttpServer())
-        .post('/api/auth/register')
-        .send({ email, password: 'Test@12345', fullName: 'Perf Login', termsAccepted: true });
-
+      const email = `admin@example.com`;
       const start = Date.now();
       const res = await request(app.getHttpServer())
         .post('/api/auth/login')
-        .send({ email, password: 'Test@12345' });
+        .send({ email, password: 'Admin@123456' });
       const elapsed = Date.now() - start;
 
       console.log(`POST /api/auth/login response time: ${elapsed}ms`);
