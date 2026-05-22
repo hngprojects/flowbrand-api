@@ -27,6 +27,7 @@ import { FunnelGenerationQueueModule } from './queue/funnel-generation-queue.mod
 import { WaitlistModule } from './modules/waitlist/waitlist.module';
 import { ContactModule } from './modules/contact/contact.module';
 import { llmConfig } from './config/llm.config';
+import { AppController } from './app.controller';
 
 function collectValidationErrors(errors: ValidationError[], parentPath = ''): string[] {
   return errors.flatMap((error) => {
@@ -69,6 +70,7 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
     WaitlistModule,
     ContactModule,
   ],
+  controllers: [AppController],
   providers: [
     {
       provide: APP_PIPE,

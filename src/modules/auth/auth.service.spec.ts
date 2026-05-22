@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, UnauthorizedException } from '@nestjs/common';
+import { HttpException, HttpStatus, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
@@ -49,6 +49,7 @@ const TEST_USER = {
   full_name: 'Jane Doe',
   password_hash: '$2b$10$hash',
   is_active: true,
+  is_verified: true,
 };
 
 const LOGIN_DTO = { email: TEST_USER.email, password: 'CorrectPassword1!' };
@@ -267,6 +268,15 @@ describe('AuthService login lockout (BE-005)', () => {
 
       await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(UnauthorizedException);
     });
+
+      it('throws 403 Forbidden when the user is not verified', async () => {
+    mockUsersService.findByEmail.mockResolvedValue({
+      ...TEST_USER,
+      is_verified: false,
+    });
+
+    await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(ForbiddenException);
+  });
   });
 
   describe('Google OAuth login', () => {

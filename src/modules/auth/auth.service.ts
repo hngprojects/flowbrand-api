@@ -6,7 +6,8 @@ import {
   Injectable,
   UnauthorizedException,
   Logger,
-  Optional
+  Optional,
+  ForbiddenException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as crypto from 'crypto';
@@ -128,6 +129,10 @@ export class AuthService {
 
     if (!user?.password_hash) {
       throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_CREDENTIALS);
+    }
+
+    if (!user?.is_verified) {
+      throw new ForbiddenException(SYS_MSG.AUTH_EMAIL_UNVERIFIED);
     }
 
     const metadata = await this.ensureAuthMetadata(user.id);
