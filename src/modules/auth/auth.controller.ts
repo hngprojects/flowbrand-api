@@ -97,22 +97,10 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @LoginDocs()
-  async login(@Body() dto: LoginDto, @Res() res: Response) {
+  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(dto);
-
-    res.cookie(
-      'refreshToken',
-      result.refreshToken,
-      this.getRefreshCookieOptions(),
-    );
-
-    return res.json(
-      this.buildAuthResponse(
-        HttpStatus.OK,
-        SYS_MSG.AUTH_LOGIN_SUCCESSFUL,
-        result,
-      ),
-    );
+    res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
+    return this.buildAuthResponse(HttpStatus.OK, SYS_MSG.AUTH_LOGIN_SUCCESSFUL, result);
   }
 
   @Public()
@@ -122,7 +110,7 @@ export class AuthController {
   async refresh(
     @Body() dto: RefreshTokenDto,
     @Req() req: Request,
-    @Res() res: Response,
+    @Res({ passthrough: true }) res: Response,
   ) {
     const refreshToken =
       dto.refreshToken ?? (req.cookies?.refreshToken as string | undefined);
@@ -132,20 +120,8 @@ export class AuthController {
     }
 
     const result = await this.authService.refresh(refreshToken);
-
-    res.cookie(
-      'refreshToken',
-      result.refreshToken,
-      this.getRefreshCookieOptions(),
-    );
-
-    return res.json(
-      this.buildAuthResponse(
-        HttpStatus.OK,
-        SYS_MSG.AUTH_TOKEN_REFRESHED,
-        result,
-      ),
-    );
+    res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
+    return this.buildAuthResponse(HttpStatus.OK, SYS_MSG.AUTH_TOKEN_REFRESHED, result);
   }
 
   @Post('logout')
@@ -154,17 +130,14 @@ export class AuthController {
   async logout(
     @CurrentUser('sub') userId: string,
     @CurrentUser('sessionId') sessionId: string,
-    @Res() res: Response,
+    @Res({ passthrough: true }) res: Response,
   ) {
     await this.authService.logout(userId, sessionId);
-
     res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
     });
-
-    return res.status(HttpStatus.NO_CONTENT).send();
   }
 
   @Public()
