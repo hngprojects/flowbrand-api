@@ -158,6 +158,12 @@ export class FunnelGenerationProcessor {
         }
       }
 
+      if (typeof stage.explanation !== 'string') {
+        throw new Error(`Stage ${stage.position}: explanation must be a string`);
+      }
+      if (typeof stage.actionPrompt !== 'string') {
+        throw new Error(`Stage ${stage.position}: actionPrompt must be a string`);
+      }
       if (stage.explanation.length > MAX_FIELD_LENGTH) {
         throw new Error(`Stage ${stage.position}: explanation exceeds ${MAX_FIELD_LENGTH} chars`);
       }

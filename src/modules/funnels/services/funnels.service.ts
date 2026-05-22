@@ -77,14 +77,14 @@ export class FunnelsService {
       };
     }
 
-    // 2. Rate limit — only charged for genuine new generation attempts.
-    await this.checkRateLimit(userId);
-
-    // 3. Concurrent-generation guard (AC-03).
+    // 2. Concurrent-generation guard (AC-03).
     const inflight = await this.funnelAction.findGeneratingForUser(userId);
     if (inflight) {
       throw new ConflictException(SYS_MSG.GENERATION_IN_PROGRESS);
     }
+
+    // 3. Rate limit — only charged for genuine new generation attempts.
+    await this.checkRateLimit(userId);
 
     // 4. Source-specific validation + business context derivation.
     const { businessName, businessContext } = await this.validateSourceAndDeriveContext(
@@ -209,12 +209,16 @@ export class FunnelsService {
 
     // source === DOCUMENT_UPLOAD
     const ids = dto.upload_ids ?? [];
-    if (ids.length === 0) {
+    const uniqueIds = [...new Set(ids)];
+    if (uniqueIds.length !== ids.length) {
+      throw new UnprocessableEntityException(SYS_MSG.UPLOAD_OWNERSHIP_INVALID);
+    }
+    if (uniqueIds.length === 0) {
       throw new UnprocessableEntityException(SYS_MSG.UPLOAD_NOT_READY);
     }
 
-    const docs = await this.uploadRepo.find({ where: { id: In(ids), user_id: userId } });
-    if (docs.length !== ids.length) {
+    const docs = await this.uploadRepo.find({ where: { id: In(uniqueIds), user_id: userId } });
+    if (docs.length !== uniqueIds.length) {
       throw new UnprocessableEntityException(SYS_MSG.UPLOAD_OWNERSHIP_INVALID);
     }
 
