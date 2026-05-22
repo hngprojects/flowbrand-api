@@ -172,14 +172,11 @@ export class AuthService {
 
   async exchangeCode(code: string): Promise<OAuthLoginResponse> {
     const redisKey = `oauth:exchange:${code}`;
-    const rawData = await this.redisService.get(redisKey);
+    const rawData = await this.redisService.getdel(redisKey);
 
     if (!rawData) {
       throw new BadRequestException(SYS_MSG.GOOGLE_EXCHANGE_CODE_INVALID);
     }
-
-    // Immediately consume/delete the exchange code from Redis (Single-use restriction)
-    await this.redisService.del(redisKey);
 
     try {
       return JSON.parse(rawData) as OAuthLoginResponse;

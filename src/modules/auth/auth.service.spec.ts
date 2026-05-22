@@ -23,7 +23,7 @@ const mockJwtService = {
   signAsync: jest.fn(),
   verifyAsync: jest.fn(),
 };
-const mockRedisService = { setStrict: jest.fn(), del: jest.fn(), rateLimit: jest.fn(), get: jest.fn() };
+const mockRedisService = { setStrict: jest.fn(), del: jest.fn(), rateLimit: jest.fn(), getdel: jest.fn() };
 const mockUserSessionModelAction = {
   findById: jest.fn(),
   updateById: jest.fn(),
@@ -417,17 +417,16 @@ describe('AuthService login lockout (BE-005)', () => {
 
     describe('exchangeCode', () => {
       it('successfully retrieves and consumes code from Redis', async () => {
-        mockRedisService.get.mockResolvedValue(JSON.stringify(mockOAuthResponse));
+        mockRedisService.getdel.mockResolvedValue(JSON.stringify(mockOAuthResponse));
 
         const result = await service.exchangeCode('valid-exchange-code');
 
-        expect(mockRedisService.get).toHaveBeenCalledWith('oauth:exchange:valid-exchange-code');
-        expect(mockRedisService.del).toHaveBeenCalledWith('oauth:exchange:valid-exchange-code');
+        expect(mockRedisService.getdel).toHaveBeenCalledWith('oauth:exchange:valid-exchange-code');
         expect(result).toEqual(mockOAuthResponse);
       });
 
       it('throws BadRequestException if code is invalid or expired', async () => {
-        mockRedisService.get.mockResolvedValue(null);
+        mockRedisService.getdel.mockResolvedValue(null);
 
         await expect(service.exchangeCode('expired-code')).rejects.toThrow(
           new BadRequestException(SYS_MSG.GOOGLE_EXCHANGE_CODE_INVALID),
