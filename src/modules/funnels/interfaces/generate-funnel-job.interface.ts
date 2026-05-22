@@ -7,5 +7,4 @@ export interface BusinessContext {
 export interface GenerateFunnelJobPayload {
   funnelId: string;
   userId: string;
-  businessContext: BusinessContext;
 }

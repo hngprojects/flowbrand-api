@@ -237,9 +237,9 @@ describe('OnboardingService — completeOnboarding', () => {
   const SESSION_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
   const validAnswers = {
-    step_1: { business_type: 'retail', description: 'Selling handmade bags' },
-    step_2: { target_customer: 'Working mothers', tags: ['female', '25-40'] },
-    step_3: { discovery_channel: 'Instagram', other_channels: ['WhatsApp'] },
+    step_1: { business_description: 'Selling handmade bags' },
+    step_2: { customer_tags: { type: ['retail'] } },
+    step_3: { discovery_channel: 'Instagram' },
   };
 
   const validSession = {
@@ -429,7 +429,7 @@ describe('OnboardingService — completeOnboarding', () => {
     mockWizardSessionModelAction.findSessionById.mockResolvedValue({
       ...validSession,
       answers: {
-        step_2: { target_customer: 'Working mothers' },
+        step_2: { customer_tags: { type: ['retail'] } },
         step_3: { discovery_channel: 'Instagram' },
       },
     });

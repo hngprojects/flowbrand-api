@@ -19,7 +19,7 @@ const mockQueryRunner = {
   release: jest.fn().mockResolvedValue(undefined),
   manager: {
     update: jest.fn().mockResolvedValue(undefined),
-    findOne: jest.fn(),
+    find: jest.fn(),
     create: jest.fn((_, data) => data),
     save: jest.fn().mockResolvedValue(undefined),
   },
@@ -66,7 +66,7 @@ function makeValidStageData(): LlmStageData[] {
 function makeJob(overrides: Partial<Job<GenerateFunnelJobPayload>> = {}): Job<GenerateFunnelJobPayload> {
   return {
     id: 'job-1',
-    data: { funnelId: 'funnel-uuid', userId: 'user-uuid', businessContext },
+    data: { funnelId: 'funnel-uuid', userId: 'user-uuid' },
     progress: jest.fn().mockResolvedValue(undefined),
     attemptsMade: 0,
     opts: { attempts: 3 },
@@ -83,11 +83,20 @@ describe('FunnelGenerationProcessor', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
 
-    // Default: funnel exists in GENERATING state
-    mockFunnelAction.get.mockResolvedValue({ id: 'funnel-uuid', status: FunnelStatus.GENERATING });
+    // Default: funnel exists in GENERATING state with business_context
+    mockFunnelAction.get.mockResolvedValue({
+      id: 'funnel-uuid',
+      status: FunnelStatus.GENERATING,
+      business_context: businessContext,
+    });
 
-    // Default: findOne in queryRunner returns a stage record
-    mockQueryRunner.manager.findOne.mockResolvedValue({ id: 'stage-uuid', position: 1 });
+    // Default: bulk stage fetch returns all 4 stages
+    mockQueryRunner.manager.find.mockResolvedValue([
+      { id: 'stage-1-uuid', position: 1 },
+      { id: 'stage-2-uuid', position: 2 },
+      { id: 'stage-3-uuid', position: 3 },
+      { id: 'stage-4-uuid', position: 4 },
+    ]);
 
     module = await Test.createTestingModule({
       providers: [
@@ -269,7 +278,12 @@ describe('FunnelGenerationProcessor', () => {
   describe('EC-04 — Stage record not found triggers rollback', () => {
     it('rolls back if a stage is missing from funnel_stages', async () => {
       mockLlmService.generateWithGemini.mockResolvedValue(makeValidStageData());
-      mockQueryRunner.manager.findOne.mockResolvedValue(null);
+      // Return only 3 stages — position 2 is missing from the DB, so stageMap.get(2) is undefined
+      mockQueryRunner.manager.find.mockResolvedValueOnce([
+        { id: 'stage-1-uuid', position: 1 },
+        { id: 'stage-3-uuid', position: 3 },
+        { id: 'stage-4-uuid', position: 4 },
+      ]);
 
       await expect(processor.handleGenerateFunnel(makeJob())).rejects.toThrow(/Stage not found/);
 

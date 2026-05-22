@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  HttpException,
   HttpStatus,
   NotFoundException,
   ServiceUnavailableException,
@@ -12,6 +13,7 @@ import { DataSource } from 'typeorm';
 import { JOBS, QUEUES } from '../../../../common/constants/queue.constants';
 import { WizardSession } from '../../../onboarding/entities/wizzard-session.entity';
 import { WizardStatus } from '../../../onboarding/enums/wizzard-status.enum';
+import { RedisService } from '../../../redis/redis.service';
 import { UploadedDocument } from '../../../upload/entities/uploaded-document.entity';
 import { UploadDocumentStatus } from '../../../upload/upload.types';
 import { FunnelModelAction } from '../../actions/funnel.action';
@@ -47,6 +49,7 @@ const COMPLETE_WIZARD: Partial<WizardSession> = {
 describe('FunnelsService', () => {
   let service: FunnelsService;
   let funnelAction: jest.Mocked<FunnelModelAction>;
+  let redisService: { rateLimit: jest.Mock };
   let wizardRepo: { findOne: jest.Mock };
   let uploadRepo: { find: jest.Mock };
   let queue: { add: jest.Mock };
@@ -67,6 +70,7 @@ describe('FunnelsService', () => {
       findOwnedById: jest.fn(),
     } as unknown as jest.Mocked<FunnelModelAction>;
 
+    redisService = { rateLimit: jest.fn().mockResolvedValue({ count: 1, exceeded: false }) };
     wizardRepo = { findOne: jest.fn() };
     uploadRepo = { find: jest.fn() };
     queue = { add: jest.fn().mockResolvedValue({ id: 'job-1' }) };
@@ -90,6 +94,7 @@ describe('FunnelsService', () => {
       providers: [
         FunnelsService,
         { provide: FunnelModelAction, useValue: funnelAction },
+        { provide: RedisService, useValue: redisService },
         { provide: getRepositoryToken(WizardSession), useValue: wizardRepo },
         { provide: getRepositoryToken(UploadedDocument), useValue: uploadRepo },
         { provide: getQueueToken(QUEUES.FUNNEL_GENERATION), useValue: queue },
@@ -162,6 +167,26 @@ describe('FunnelsService', () => {
     });
   });
 
+  describe('SEC-03: rate limiting', () => {
+    it('does not call rateLimit when idempotency_key already exists', async () => {
+      funnelAction.findByIdempotency.mockResolvedValue({
+        id: FUNNEL_ID,
+        status: FunnelStatus.GENERATING,
+      } as Funnel);
+
+      await service.createGeneration(USER_ID, BASE_DTO);
+
+      expect(redisService.rateLimit).not.toHaveBeenCalled();
+    });
+
+    it('throws 429 when rate limit is exceeded for a new generation attempt', async () => {
+      funnelAction.findByIdempotency.mockResolvedValue(null);
+      redisService.rateLimit.mockResolvedValue({ count: 6, exceeded: true });
+
+      await expect(service.createGeneration(USER_ID, BASE_DTO)).rejects.toThrow(HttpException);
+    });
+  });
+
   describe('AC-03: concurrent generation guard', () => {
     it('AC-03: returns 409 GENERATION_IN_PROGRESS when another funnel is generating', async () => {
       funnelAction.findByIdempotency.mockResolvedValue(null);
@@ -212,14 +237,9 @@ describe('FunnelsService', () => {
     it('EC-03 / SEC-04: returns 422 when any upload belongs to another user', async () => {
       funnelAction.findByIdempotency.mockResolvedValue(null);
       funnelAction.findGeneratingForUser.mockResolvedValue(null);
-      uploadRepo.find.mockResolvedValue([
-        {
-          id: 'u1',
-          user_id: OTHER_USER_ID,
-          status: UploadDocumentStatus.READY,
-          file_name: 'a.pdf',
-        },
-      ]);
+      // Combined query (id IN ids AND user_id = userId) returns nothing for a
+      // cross-user upload — the DB filters it out rather than returning it.
+      uploadRepo.find.mockResolvedValue([]);
 
       await expect(
         service.createGeneration(USER_ID, {
@@ -266,7 +286,7 @@ describe('FunnelsService', () => {
 
       expect(result.status).toBe(FunnelStatus.FAILED);
       expect(result.error?.code).toBe('GENERATION_FAILED');
-      expect(result.error?.retry_endpoint).toBe('/funnels/generate');
+      expect(result.error?.retry_endpoint).toBe('/api/funnels/generate');
     });
   });
 
