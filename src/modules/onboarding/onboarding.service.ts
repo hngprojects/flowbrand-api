@@ -38,10 +38,7 @@ export class OnboardingService {
     private readonly dataSource: DataSource,
   ) {}
 
-  /**
-   * Idempotent start: 201 when created, 200 when an active session is resumed.
-   * 409 when the user already completed onboarding.
-   */
+
   async startWizardSession(userId: string): Promise<OnboardingStartResult> {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -54,10 +51,14 @@ export class OnboardingService {
       );
 
     if (result.status === 'already_complete') {
-      throw new ConflictException({
-        error: 'ConflictException',
+      return {
+        statusCode: HttpStatus.OK,
         message: SYS_MSG.ONBOARDING_ALREADY_COMPLETE,
-      });
+        data: { 
+          status: WizardStatus.COMPLETE, 
+          redirect: { to: 'funnel_generation' } 
+        },
+      };
     }
 
     const created = result.status === 'created';
@@ -144,49 +145,19 @@ private validateAnswers(answers: WizardAnswers): void {
   private mapSessionToResponse(
     session: WizardSession,
   ): OnboardingStartResponseData {
-    return {
-      session_id: session.id,
-      user_id: session.user_id,
-      status: session.status,
-      steps_completed: session.steps_completed,
-      answers: session.answers,
-      expires_at: session.expires_at,
-      created_at: session.created_at,
-      updated_at: session.updated_at,
-    };
-  }
-
-  async getOnboardingSession(userId: string) {
-    const session = await this.wizardSessionModelAction.findActiveSession(userId)
-
-    if (!session) {
-      throw new NotFoundException({
-        code: 'RESOURCE_NOT_FOUND',
-        message: SYS_MSG.ONBOARDING_SESSION_NOT_FOUND
-      })
-    }
-
-    if (session.status === WizardStatus.IN_PROGRESS && session.expires_at && session.expires_at < new Date()) {
-      await this.wizardSessionModelAction.markAsExpired(session.id)
-
-      throw new NotFoundException({
-        code: 'RESOURCE_NOT_FOUND',
-        message: SYS_MSG.ONBOARDING_SESSION_EXPIRED
-      })
-    }
-
     const cleanedAnswers = Object.fromEntries(
-      Object.entries(session.answers).filter(([, value]) => value !== null)
-    )
-
+      Object.entries(session.answers ?? {}).filter(([, value]) => value !== null)
+    );
     return {
       sessionId: session.id,
+      userId: session.user_id,
       status: session.status,
+      stepsCompleted: session.steps_completed,
       answers: cleanedAnswers,
-      created_at: session.created_at,
-      expires_at: session.expires_at,
-      steps_completed: session.steps_completed
-    }
+      expiresAt: session.expires_at,
+      createdAt: session.created_at,
+      updatedAt: session.updated_at,
+    };
   }
 
   async saveStepAnswer(userId: string, dto: StepAnswerDto) {
@@ -211,6 +182,20 @@ private validateAnswers(answers: WizardAnswers): void {
         code: 'ONBOARDING_ALREADY_COMPLETE',
         message: SYS_MSG.ONBOARDING_ALREADY_COMPLETE
       })
+    }
+
+    const answers = session.answers as WizardAnswers;
+    if (dto.step === 2 && !answers?.step_1?.business_description) {
+      throw new UnprocessableEntityException({
+        code: 'SEQUENCE_ERROR',
+        message: 'Step 1 must be completed before answering Step 2.'
+      });
+    }
+    if (dto.step === 3 && (!answers?.step_1?.business_description || !answers?.step_2?.customer_tags?.type?.length)) {
+      throw new UnprocessableEntityException({
+        code: 'SEQUENCE_ERROR',
+        message: 'Steps 1 and 2 must be completed before answering Step 3.'
+      });
     }
 
     type StepDtoClass = ClassConstructor<Step1AnswerDto | Step2AnswerDto | Step3AnswerDto>

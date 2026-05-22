@@ -33,18 +33,18 @@ export const OAUTH_LOGIN_SUCCESSFUL = 'OAuth login successful';
 export const GOOGLE_EXCHANGE_CODE_INVALID = 'Invalid or expired exchange code';
 
 // Onboarding — API response `message` values (machine-oriented identifiers)
-export const ONBOARDING_SESSION_STARTED = 'ONBOARDING_SESSION_STARTED';
-export const ONBOARDING_SESSION_RESUMED = 'ONBOARDING_SESSION_RESUMED';
-export const ONBOARDING_ALREADY_COMPLETE = 'ONBOARDING_ALREADY_COMPLETE';
+export const ONBOARDING_SESSION_STARTED = 'Onboarding session started';
+export const ONBOARDING_SESSION_RESUMED = 'Onboarding session resumed';
+export const ONBOARDING_ALREADY_COMPLETE = 'Onboarding already complete';
 export const ONBOARDING_COMPLETE_SUCCESS = 'Onboarding completed successfully';
 export const ONBOARDING_INCOMPLETE = 'Onboarding incomplete';
 export const ONBOARDING_SESSION_RETRIEVED = 'Onboarding session retrieved successfully';
 export const ONBOARDING_SESSION_NOT_FOUND = 'Session not found. Please call POST /onboarding/start to begin the wizard.';
 export const ONBOARDING_SESSION_EXPIRED = 'Session has expired. Restart the onboarding process.';
-export const ONBOARDING_STEP_SAVED = 'ONBOARDING_STEP_SAVED';
+export const ONBOARDING_STEP_SAVED = 'Onboarding step saved';
 export const ONBOARDING_SESSION_NOT_BELONG = 'Session not found or does not belong to this user';
 export const ONBOARDING_SESSION_FORBIDDEN = 'Session has expired. Please start a new onboarding session.';
-export const ONBOARDING_SESSION_COMPLETE = 'ONBOARDING_ALREADY_COMPLETE';
+export const ONBOARDING_SESSION_COMPLETE = 'Onboarding already complete';
 export const ONBOARDING_INVALID_STEP = 'Step must be 1, 2, or 3';
 
 // Error handling
