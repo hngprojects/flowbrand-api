@@ -42,7 +42,6 @@ describe('LlmServiceImpl', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [LlmServiceImpl, { provide: ConfigService, useValue: makeConfigService() }],
     })
-      .setLogger(false)
       .compile();
 
     service = module.get(LlmServiceImpl);

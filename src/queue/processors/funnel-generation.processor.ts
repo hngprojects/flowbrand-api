@@ -39,7 +39,7 @@ export class FunnelGenerationProcessor {
 
   @Process(JOBS.GENERATE_FUNNEL)
   async handleGenerateFunnel(job: Job<GenerateFunnelJobPayload>): Promise<void> {
-    const { funnelId, userId, businessContext } = job.data;
+    const { funnelId, userId } = job.data;
 
     this.logger.log({
       message: 'Processing funnel generation job',
@@ -59,6 +59,8 @@ export class FunnelGenerationProcessor {
       this.logger.log({ message: `Funnel already ${funnel.status.toLowerCase()} — skipping`, funnelId, jobId: job.id });
       return;
     }
+
+    const businessContext = funnel.business_context as BusinessContext;
 
     await job.progress(10);
 
@@ -127,6 +129,8 @@ export class FunnelGenerationProcessor {
       throw new Error(`LLM output invalid: expected ${EXPECTED_STAGE_COUNT} stages, got ${actual}`);
     }
 
+    const positions = new Set<number>();
+
     for (const stage of data) {
       for (const key of Object.keys(stage)) {
         if (!ALLOWED_STAGE_KEYS.has(key)) {
@@ -134,10 +138,35 @@ export class FunnelGenerationProcessor {
         }
       }
 
+      if (typeof stage.position !== 'number' || stage.position < 1 || stage.position > EXPECTED_STAGE_COUNT) {
+        throw new Error(`Stage has invalid position: ${stage.position}`);
+      }
+      if (positions.has(stage.position)) {
+        throw new Error(`Duplicate position in stage data: ${stage.position}`);
+      }
+      positions.add(stage.position);
+
+      if (!stage.channel || typeof stage.channel !== 'string') {
+        throw new Error(`Stage ${stage.position}: channel is required`);
+      }
+      if (!Array.isArray(stage.tasks)) {
+        throw new Error(`Stage ${stage.position}: tasks must be an array`);
+      }
+      for (const task of stage.tasks) {
+        if (!task.taskText || typeof task.taskText !== 'string') {
+          throw new Error(`Stage ${stage.position}: task missing taskText`);
+        }
+      }
+
+      if (typeof stage.explanation !== 'string') {
+        throw new Error(`Stage ${stage.position}: explanation must be a string`);
+      }
+      if (typeof stage.actionPrompt !== 'string') {
+        throw new Error(`Stage ${stage.position}: actionPrompt must be a string`);
+      }
       if (stage.explanation.length > MAX_FIELD_LENGTH) {
         throw new Error(`Stage ${stage.position}: explanation exceeds ${MAX_FIELD_LENGTH} chars`);
       }
-
       if (stage.actionPrompt.length > MAX_FIELD_LENGTH) {
         throw new Error(`Stage ${stage.position}: actionPrompt exceeds ${MAX_FIELD_LENGTH} chars`);
       }
@@ -149,41 +178,42 @@ export class FunnelGenerationProcessor {
     stageData: LlmStageData[],
     job: Job<GenerateFunnelJobPayload>,
   ): Promise<void> {
+    await job.progress(80);
+
     const qr = this.dataSource.createQueryRunner();
     await qr.connect();
     await qr.startTransaction();
 
-    await job.progress(80);
-
     try {
+      const stages = await qr.manager.find(FunnelStage, { where: { funnel_id: funnelId } });
+      const stageMap = new Map(stages.map((s) => [s.position, s]));
+
       for (const sd of stageData) {
         await qr.manager.update(
           FunnelStage,
           { funnel_id: funnelId, position: sd.position },
           { channel: sd.channel, explanation: sd.explanation, action_prompt: sd.actionPrompt },
         );
+      }
 
-        const stage = await qr.manager.findOne(FunnelStage, {
-          where: { funnel_id: funnelId, position: sd.position },
-        });
-
+      const allTasks = stageData.flatMap((sd) => {
+        const stage = stageMap.get(sd.position);
         if (!stage) {
           throw new Error(`Stage not found: funnelId=${funnelId} position=${sd.position}`);
         }
-
-        const tasks = sd.tasks.map((t) =>
+        return sd.tasks.map((t, taskIdx) =>
           qr.manager.create(StageTask, {
             stage_id: stage.id,
             task_text: t.taskText,
             name: t.taskText,
+            position: taskIdx + 1,
             is_complete: false,
             completed_at: null,
           }),
         );
+      });
 
-        await qr.manager.save(StageTask, tasks);
-      }
-
+      await qr.manager.save(StageTask, allTasks);
       await qr.manager.update(Funnel, { id: funnelId }, { status: FunnelStatus.ACTIVE });
       await qr.commitTransaction();
     } catch (err) {

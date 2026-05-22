@@ -24,6 +24,22 @@ describe('PinoLoggerService', () => {
   });
 
   describe('info()', () => {
+    it('routes non-string input through resolveEvent', () => {
+      service.info({ event: 'auth.login', userId: 'usr_123' } as unknown as string);
+      expect(logger.info).toHaveBeenCalledWith(expect.objectContaining({ event: 'auth.login', userId: 'usr_123' }));
+    });
+
+    it('preserves Error stack when passed as message', () => {
+      const err = new Error('unexpected failure');
+      service.info(err as unknown as string);
+      expect(logger.info).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'unexpected failure',
+          stack: expect.stringContaining('Error: unexpected failure'),
+        }),
+      );
+    });
+
     it('calls logger.info with event and data', () => {
       service.info('auth.login.success', { userId: 'usr_****1234' });
       expect(logger.info).toHaveBeenCalledWith(
@@ -78,6 +94,11 @@ describe('PinoLoggerService', () => {
       service.warn('auth.otp.invalid', { email: 'bob@example.com' });
       expect(logger.warn).toHaveBeenCalledWith(expect.objectContaining({ email: 'b****@example.com' }));
     });
+
+    it('routes non-string input through resolveEvent', () => {
+      service.warn({ message: 'rate.limit.exceeded', count: 5 } as unknown as string);
+      expect(logger.warn).toHaveBeenCalledWith(expect.objectContaining({ event: 'rate.limit.exceeded', count: 5 }));
+    });
   });
 
   describe('error()', () => {
@@ -97,10 +118,37 @@ describe('PinoLoggerService', () => {
       );
     });
 
-    it('unpacks Error object passed inside data', () => {
+    it('unpacks Error object passed inside data — extracts message and stack', () => {
       const err = new Error('db error');
       service.error('funnel.write.rolled_back', { error: err });
-      expect(logger.error).toHaveBeenCalledWith(expect.objectContaining({ error: 'db error' }));
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: 'db error',
+          stack: expect.stringContaining('Error: db error'),
+        }),
+      );
+    });
+
+    it('unpacks Error passed directly as dataOrStack — preserves stack from non-enumerable props', () => {
+      const err = new Error('direct error');
+      service.error('funnel.write.failed', err as unknown as Record<string, unknown>);
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: 'direct error',
+          stack: expect.stringContaining('Error: direct error'),
+        }),
+      );
+    });
+
+    it('puts nestContext in payload when third argument is a string (NestJS convention)', () => {
+      const stack = 'Error: something\n    at ...';
+      service.error('http.unhandled', stack, 'ExceptionsHandler');
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'http.unhandled',
+          nestContext: 'ExceptionsHandler',
+        }),
+      );
     });
 
     it('does not expose raw Error object in log output', () => {
@@ -138,6 +186,33 @@ describe('PinoLoggerService', () => {
     it('fatal() bridges to pino.fatal', () => {
       service.fatal('Uncaught exception', 'Bootstrap');
       expect(logger.fatal).toHaveBeenCalledWith(expect.objectContaining({ event: 'nestjs.fatal' }));
+    });
+  });
+
+  describe('resolveEvent() — non-string message routing', () => {
+    it('array input produces event: unknown with raw field', () => {
+      service.info(['a', 'b'] as unknown as string);
+      expect(logger.info).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'unknown', raw: ['a', 'b'] }),
+      );
+    });
+
+    it('plain object with no event or message key falls back to event: unknown', () => {
+      service.info({ userId: 'usr_123' } as unknown as string);
+      expect(logger.info).toHaveBeenCalledWith(expect.objectContaining({ event: 'unknown' }));
+    });
+
+    it('plain object uses message key when event key is absent', () => {
+      service.info({ message: 'fallback.event' } as unknown as string);
+      expect(logger.info).toHaveBeenCalledWith(expect.objectContaining({ event: 'fallback.event' }));
+    });
+
+    it('plain object strips event and message keys from data spread', () => {
+      service.info({ event: 'my.event', message: 'ignore', extra: 42 } as unknown as string);
+      const call = (logger.info as jest.Mock).mock.calls[0][0] as Record<string, unknown>;
+      expect(call.event).toBe('my.event');
+      expect(call.message).toBeUndefined();
+      expect(call.extra).toBe(42);
     });
   });
 

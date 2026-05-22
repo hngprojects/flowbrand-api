@@ -43,6 +43,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
       this.logger.warn(logMessage);
     }
 
+    if (response.headersSent) {
+      this.logger.error(`Headers already sent, cannot write error response: ${request.method} ${request.url}`);
+      return;
+    }
+
     const body: ErrorBody = {
       ...payload,
       path: request.url,
