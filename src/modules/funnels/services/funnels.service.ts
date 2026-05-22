@@ -1,6 +1,7 @@
 import { InjectQueue } from '@nestjs/bull';
 import {
   ConflictException,
+  HttpException,
   HttpStatus,
   Injectable,
   Logger,
@@ -15,6 +16,7 @@ import { JOBS, QUEUES } from '../../../common/constants/queue.constants';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { WizardSession } from '../../onboarding/entities/wizzard-session.entity';
 import { WizardStatus } from '../../onboarding/enums/wizzard-status.enum';
+import { RedisService } from '../../redis/redis.service';
 import { UploadedDocument } from '../../upload/entities/uploaded-document.entity';
 import { UploadDocumentStatus } from '../../upload/upload.types';
 import { FunnelModelAction } from '../actions/funnel.action';
@@ -53,6 +55,7 @@ export class FunnelsService {
 
   constructor(
     private readonly funnelAction: FunnelModelAction,
+    private readonly redisService: RedisService,
     @InjectRepository(WizardSession)
     private readonly wizardRepo: Repository<WizardSession>,
     @InjectRepository(UploadedDocument)
@@ -80,13 +83,16 @@ export class FunnelsService {
       throw new ConflictException(SYS_MSG.GENERATION_IN_PROGRESS);
     }
 
-    // 3. Source-specific validation + business context derivation.
+    // 3. Rate limit — only charged for genuine new generation attempts.
+    await this.checkRateLimit(userId);
+
+    // 4. Source-specific validation + business context derivation.
     const { businessName, businessContext } = await this.validateSourceAndDeriveContext(
       userId,
       dto,
     );
 
-    // 4. Transaction: insert funnel + 4 stages, dispatch queue job
+    // 5. Transaction: insert funnel + 4 stages, dispatch queue job
     //    BEFORE commit. Any failure rolls back DB.
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -119,7 +125,7 @@ export class FunnelsService {
       try {
         await this.queue.add(
           JOBS.GENERATE_FUNNEL,
-          { funnelId: funnel.id, userId, businessContext },
+          { funnelId: funnel.id, userId },
           { jobId: `funnel:${funnel.id}`, delay: QUEUE_DELAY_MS },
         );
       } catch (queueErr) {
@@ -166,7 +172,7 @@ export class FunnelsService {
         error: {
           code: 'GENERATION_FAILED',
           message: SYS_MSG.GENERATION_FAILED,
-          retry_endpoint: '/funnels/generate',
+          retry_endpoint: '/api/funnels/generate',
         },
       };
     }
@@ -203,17 +209,16 @@ export class FunnelsService {
 
     // source === DOCUMENT_UPLOAD
     const ids = dto.upload_ids ?? [];
-    if (ids.length === 0) {
+    const uniqueIds = [...new Set(ids)];
+    if (uniqueIds.length !== ids.length) {
+      throw new UnprocessableEntityException(SYS_MSG.UPLOAD_OWNERSHIP_INVALID);
+    }
+    if (uniqueIds.length === 0) {
       throw new UnprocessableEntityException(SYS_MSG.UPLOAD_NOT_READY);
     }
 
-    const docs = await this.uploadRepo.find({ where: { id: In(ids) } });
-    if (docs.length !== ids.length) {
-      throw new UnprocessableEntityException(SYS_MSG.UPLOAD_OWNERSHIP_INVALID);
-    }
-
-    // SEC-04: per-ID ownership check.
-    if (docs.some((d) => d.user_id !== userId)) {
+    const docs = await this.uploadRepo.find({ where: { id: In(uniqueIds), user_id: userId } });
+    if (docs.length !== uniqueIds.length) {
       throw new UnprocessableEntityException(SYS_MSG.UPLOAD_OWNERSHIP_INVALID);
     }
 
@@ -247,5 +252,13 @@ export class FunnelsService {
     const first = docs[0]?.file_name;
     if (!first) return '';
     return first.replace(/\.[a-zA-Z0-9]+$/, '').slice(0, 100).trim();
+  }
+
+  private async checkRateLimit(userId: string): Promise<void> {
+    const key = `ratelimit:funnel-generate:${userId}`;
+    const { exceeded } = await this.redisService.rateLimit(key, 5, 3600);
+    if (exceeded) {
+      throw new HttpException(SYS_MSG.GENERATION_RATE_LIMIT_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS);
+    }
   }
 }

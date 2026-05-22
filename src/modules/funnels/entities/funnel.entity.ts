@@ -9,6 +9,7 @@ import { FunnelStage } from './funnel-stage.entity';
 // SELECT 1 FROM funnels WHERE user_id = $1 AND status = 'generating'.
 @Entity('funnels')
 @Index('IDX_funnels_user_id_status', ['user_id', 'status'])
+@Index('UQ_funnels_user_idempotency', ['user_id', 'idempotency_key'], { unique: true })
 export class Funnel extends BaseEntity {
   @Index()
   @Column({ type: 'uuid', name: 'user_id' })
@@ -32,7 +33,6 @@ export class Funnel extends BaseEntity {
   })
   status: FunnelStatus;
 
-  @Index({ unique: true })
   @Column({ type: 'varchar', length: 255, name: 'idempotency_key' })
   idempotency_key: string;
 

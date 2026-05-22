@@ -15,7 +15,6 @@ import { FunnelsController } from './funnels.controller';
 // Providers / actions
 import { FunnelModelAction } from './actions/funnel.action';
 import { FunnelStageModelAction } from './actions/funnel-stage.action';
-import { FunnelRateLimitGuard } from './guards/funnel-rate-limit.guard';
 
 // Two service implementations live in the module; import and alias both
 import { FunnelsService as FunnelsReadService } from './funnels.service';
@@ -33,7 +32,6 @@ import { FunnelsService as FunnelsGenService } from './services/funnels.service'
     FunnelsGenService,
     FunnelModelAction,
     FunnelStageModelAction,
-    FunnelRateLimitGuard,
   ],
   exports: [FunnelsGenService, FunnelModelAction],
 })

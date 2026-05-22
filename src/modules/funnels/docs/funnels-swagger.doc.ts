@@ -20,9 +20,11 @@ export const CreateFunnelDocs = () =>
       summary: 'Start funnel generation',
       description:
         'Creates a new funnel and dispatches the generation job to the Bull queue. ' +
-        'Idempotent via `idempotency_key`: re-sending the same key returns 200 with ' +
-        'the existing funnel_id rather than creating a duplicate. Rate-limited to ' +
-        '5 requests per hour per user.',
+        'The caller must generate a UUID v4 and pass it as `idempotency_key`. ' +
+        'Re-sending the same key returns 200 with the existing funnel_id rather than ' +
+        'creating a duplicate — use this to safely retry on network failures. ' +
+        'Idempotency re-submissions do NOT count against the rate limit. ' +
+        'Rate-limited to 5 new generation requests per hour per user.',
     }),
     ApiAcceptedResponse({
       description: 'Generation accepted; client should poll the status endpoint.',
@@ -58,7 +60,8 @@ export const CreateFunnelDocs = () =>
     }),
     ApiUnprocessableEntityResponse({
       description:
-        'Source validation failed: wizard session not complete, or upload(s) not ready / not owned.',
+        'Source validation failed: wizard session not complete; upload_ids omitted ' +
+        'when source=document_upload; or upload(s) not ready / not owned by the caller.',
       schema: {
         example: {
           success: false,
