@@ -21,6 +21,11 @@ interface AuthenticatedRequest extends Request {
 // BE-305 SEC-03: cap funnel generations at 5 per hour per user to prevent
 // LLM quota exhaustion via automated requests. Implemented as a sliding
 // window via Redis INCR + EXPIRE so we add no new package dependencies.
+//
+// NOTE: This guard is no longer applied to the generate endpoint.
+// Rate limit logic moved into FunnelsService.checkRateLimit() so that
+// idempotency re-submissions do not consume quota before the idempotency
+// check runs.
 @Injectable()
 export class FunnelRateLimitGuard implements CanActivate {
   private readonly logger = new Logger(FunnelRateLimitGuard.name);
