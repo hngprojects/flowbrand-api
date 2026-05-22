@@ -14,7 +14,7 @@ export const databaseConfig = registerAs(
     entities: [__dirname + '/../**/*.entity{.ts,.js}'],
     migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
     synchronize: env.DATABASE_SYNC,
-    logging: env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : env.DATABASE_LOGGING,
+    logging: env.DATABASE_LOGGING ? ['error', 'warn'] : false,
     maxQueryExecutionTime: env.NODE_ENV === 'development' ? 250 : undefined,
     ssl: env.DATABASE_SSL ? { rejectUnauthorized: false } : false,
     autoLoadEntities: true,

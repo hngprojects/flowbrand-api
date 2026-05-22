@@ -1,7 +1,7 @@
 import { env } from '../../config/env';
 import pino, { Logger as PinoLogger, LoggerOptions } from 'pino';
 
-const isDev = process.env.NODE_ENV === 'development';
+const isDev = env.NODE_ENV === 'development';
 
 const logLevel = env.LOG_LEVEL;
 
@@ -18,18 +18,16 @@ const REDACTED_PATHS = [
   '*.otp_code',
   'accessToken',
   '*.accessToken',
+  'access_token',
+  '*.access_token',
   'refreshToken',
   '*.refreshToken',
+  'refresh_token',
+  '*.refresh_token',
   'apiKey',
   '*.apiKey',
   'api_key',
   '*.api_key',
-  'GEMINI_API_KEY',
-  '*.GEMINI_API_KEY',
-  'GROQ_API_KEY',
-  '*.GROQ_API_KEY',
-  'RESEND_API_KEY',
-  '*.RESEND_API_KEY',
   'authorization',
   '*.authorization',
 ];
@@ -65,6 +63,7 @@ const logger: PinoLogger = isDev
           translateTime: 'SYS:standard',
           ignore: 'pid,hostname',
           messageFormat: '{event} - {msg}',
+          singleLine: true,
         },
       },
     })

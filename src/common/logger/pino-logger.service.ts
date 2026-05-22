@@ -20,6 +20,7 @@ export class PinoLoggerService implements LoggerService {
       userId?: string;
       sessionId?: string;
       jobId?: string | number;
+      queue?: string;
       attempt?: number;
     }>,
     callback: () => void | Promise<void>,
@@ -30,6 +31,25 @@ export class PinoLoggerService implements LoggerService {
     return this.contextService.run(mergedContext, async () => {
       await callback();
     });
+  }
+
+  private resolveEvent(message: unknown): { event: string; data: Record<string, unknown> } {
+    // Check Error before the generic object branch — stack/name are non-enumerable and lost in spread
+    if (message instanceof Error) {
+      return { event: message.message, data: { stack: message.stack } };
+    }
+    if (Array.isArray(message)) {
+      return { event: 'unknown', data: { raw: JSON.stringify(message) } };
+    }
+    if (typeof message === 'object' && message !== null) {
+      const obj = message as Record<string, unknown>;
+      const event =
+        typeof obj['event'] === 'string' ? obj['event'] :
+        typeof obj['message'] === 'string' ? obj['message'] : 'unknown';
+      const { event: _ev, message: _msg, ...rest } = obj;
+      return { event, data: rest };
+    }
+    return { event: String(message), data: {} };
   }
 
   private getContextFields(): Record<string, unknown> {
@@ -50,9 +70,26 @@ export class PinoLoggerService implements LoggerService {
     return fields;
   }
 
-  private buildPayload(event: string, data?: Record<string, unknown>, err?: Error): Record<string, unknown> {
+  private buildPayload(
+    event: string,
+    data?: Record<string, unknown> | string,
+    err?: Error,
+    nestContext?: string,
+  ): Record<string, unknown> {
     const fields = this.getContextFields();
-    const maskedData = { ...data };
+
+    // Error passed directly as data — non-enumerable props (stack, name) are lost in spread
+    if (data instanceof Error) {
+      const payload: Record<string, unknown> = { event, ...fields, error: data.message, stack: data.stack };
+      if (nestContext) payload['nestContext'] = nestContext;
+      return payload;
+    }
+
+    const maskedData: Record<string, unknown> = typeof data === 'object' && data !== null
+      ? { ...data }
+      : typeof data === 'string'
+        ? { stack: data }
+        : {};
 
     if (maskedData.email && typeof maskedData.email === 'string') {
       maskedData.email = maskEmail(maskedData.email);
@@ -65,37 +102,77 @@ export class PinoLoggerService implements LoggerService {
       maskedData.stack = maskedData.error.stack;
       maskedData.error = maskedData.error.message;
     }
-    return { event, ...fields, ...maskedData };
+
+    const payload = { event, ...fields, ...maskedData };
+    if (nestContext) payload['nestContext'] = nestContext;
+    return payload;
   }
 
   info(event: string, data?: Record<string, unknown>): void {
+    if (typeof event !== 'string') {
+      const { event: ev, data: d } = this.resolveEvent(event);
+      this.logger.info(this.buildPayload(ev, d));
+      return;
+    }
     this.logger.info(this.buildPayload(event, data));
   }
 
   warn(event: string, data?: Record<string, unknown>): void {
+    if (typeof event !== 'string') {
+      const { event: ev, data: d } = this.resolveEvent(event);
+      this.logger.warn(this.buildPayload(ev, d));
+      return;
+    }
     this.logger.warn(this.buildPayload(event, data));
   }
 
-  error(event: string, data?: Record<string, unknown>, err?: Error): void {
-    this.logger.error(this.buildPayload(event, data, err));
+  error(event: string, dataOrStack?: Record<string, unknown> | string, errOrContext?: Error | string): void {
+    if (typeof event !== 'string') {
+      const { event: ev, data: d } = this.resolveEvent(event);
+      this.logger.error(this.buildPayload(ev, d));
+      return;
+    }
+    const err = errOrContext instanceof Error ? errOrContext : undefined;
+    const nestContext = typeof errOrContext === 'string' ? errOrContext : undefined;
+    this.logger.error(this.buildPayload(event, dataOrStack, err, nestContext));
   }
 
   debug(event: string, data?: Record<string, unknown>): void {
+    if (typeof event !== 'string') {
+      const { event: ev, data: d } = this.resolveEvent(event);
+      this.logger.debug(this.buildPayload(ev, d));
+      return;
+    }
     this.logger.debug(this.buildPayload(event, data));
   }
 
-  log(message: string, ...optionalParams: any[]): void {
+  log(message: string, ...optionalParams: unknown[]): void {
+    if (typeof message !== 'string') {
+      const { event, data } = this.resolveEvent(message);
+      this.logger.info(this.buildPayload(event, data));
+      return;
+    }
     const context = (optionalParams[0] as string | undefined) ?? 'NestJS';
-    this.logger.info(this.buildPayload('nestjs.log', { message: String(message), context }));
+    this.logger.info(this.buildPayload('nestjs.log', { message, context }));
   }
 
-  verbose(message: string, ...optionalParams: any[]): void {
+  verbose(message: string, ...optionalParams: unknown[]): void {
+    if (typeof message !== 'string') {
+      const { event, data } = this.resolveEvent(message);
+      this.logger.debug(this.buildPayload(event, data));
+      return;
+    }
     const context = (optionalParams[0] as string | undefined) ?? 'NestJS';
-    this.logger.debug(this.buildPayload('nestjs.verbose', { message: String(message), context }));
+    this.logger.debug(this.buildPayload('nestjs.verbose', { message, context }));
   }
 
-  fatal(message: string, ...optionalParams: any[]): void {
+  fatal(message: string, ...optionalParams: unknown[]): void {
+    if (typeof message !== 'string') {
+      const { event, data } = this.resolveEvent(message);
+      this.logger.fatal(this.buildPayload(event, data));
+      return;
+    }
     const context = (optionalParams[0] as string | undefined) ?? 'NestJS';
-    this.logger.fatal(this.buildPayload('nestjs.fatal', { message: String(message), context }));
+    this.logger.fatal(this.buildPayload('nestjs.fatal', { message, context }));
   }
 }
