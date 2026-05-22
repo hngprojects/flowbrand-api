@@ -1,4 +1,4 @@
-import { 
+import {
   ConflictException,
   ForbiddenException,
   NotFoundException,
@@ -13,7 +13,6 @@ import { WizardStatus } from './enums/wizzard-status.enum';
 import { OnboardingService } from './onboarding.service';
 import { DataSource } from 'typeorm';
 
-// ── Shared constants ─────────────────────────────────────────────────────────�
 
 const USER_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const USER_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -25,7 +24,6 @@ const mockWizardSessionModelAction = {
   markAsExpired: jest.fn(),
 };
 
-// ── Shared helpers ──────────────────────────────────────────────────────────�
 
 function buildSession(partial: Partial<WizardSession> = {}): WizardSession {
   const base = {
@@ -332,7 +330,7 @@ describe('OnboardingService — completeOnboarding', () => {
         useValue: mockWizardSessionModelAction,
       },
       {
-        provide: DataSource,  
+        provide: DataSource,
         useValue: mockDataSource,
       },
     ],
@@ -515,7 +513,7 @@ describe('OnboardingService — completeOnboarding', () => {
   await service.completeOnboarding(USER_ID, SESSION_ID);
 
   expect(mockDataSource.transaction).toHaveBeenCalled();
-  
+
   const transactionCallback = mockDataSource.transaction.mock.calls[0][0];
   expect(transactionCallback).toBeDefined();
 });
@@ -528,7 +526,7 @@ describe('OnboardingService — completeOnboarding', () => {
   const updateCall = mockManager.update.mock.calls.find(
     call => call[1] === SESSION_ID && call[2]?.status === WizardStatus.COMPLETE
   );
-  
+
   expect(updateCall).toBeDefined();
   });
 
