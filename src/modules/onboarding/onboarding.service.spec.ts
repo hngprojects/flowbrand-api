@@ -13,7 +13,7 @@ import { WizardStatus } from './enums/wizzard-status.enum';
 import { OnboardingService } from './onboarding.service';
 import { DataSource } from 'typeorm';
 
-// ── Shared constants ──────────────────────────────────────────────────────────
+// ── Shared constants ─────────────────────────────────────────────────────────�
 
 const USER_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const USER_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -25,7 +25,7 @@ const mockWizardSessionModelAction = {
   markAsExpired: jest.fn(),
 };
 
-// ── Shared helpers ────────────────────────────────────────────────────────────
+// ── Shared helpers ──────────────────────────────────────────────────────────�
 
 function buildSession(partial: Partial<WizardSession> = {}): WizardSession {
   const base = {
@@ -292,8 +292,8 @@ describe('OnboardingService — completeOnboarding', () => {
   const SESSION_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
   const validAnswers = {
-    step_1: { business_type: 'retail', description: 'Selling handmade bags' },
-    step_2: { target_customer: 'Working mothers', tags: ['female', '25-40'] },
+    step_1: { business_description: 'Selling handmade bags' },
+    step_2: { customer_tags: { type: ['female', '25-40'] } },
     step_3: { discovery_channel: 'Instagram', other_channels: ['WhatsApp'] },
   };
 
@@ -484,7 +484,7 @@ describe('OnboardingService — completeOnboarding', () => {
     mockWizardSessionModelAction.findSessionById.mockResolvedValue({
       ...validSession,
       answers: {
-        step_2: { target_customer: 'Working mothers' },
+        step_2: { customer_tags: { type: ['retail'] } },
         step_3: { discovery_channel: 'Instagram' },
       },
     });
