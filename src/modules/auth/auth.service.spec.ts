@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import { HttpException, HttpStatus, UnauthorizedException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
@@ -23,7 +23,7 @@ const mockJwtService = {
   signAsync: jest.fn(),
   verifyAsync: jest.fn(),
 };
-const mockRedisService = { setStrict: jest.fn(), del: jest.fn(), rateLimit: jest.fn() };
+const mockRedisService = { setStrict: jest.fn(), del: jest.fn(), rateLimit: jest.fn(), getdel: jest.fn() };
 const mockUserSessionModelAction = {
   findById: jest.fn(),
   updateById: jest.fn(),
@@ -286,7 +286,7 @@ describe('AuthService login lockout (BE-005)', () => {
         id: 'google-user-1',
         email: 'new.google@example.com',
         full_name: 'Google User',
-        avatar_url: 'https://example.com/avatar.png',
+        avatarrl: 'https://example.com/avatar.png',
         is_verified: true,
         auth_provider: 'google',
         provider_user_id: 'google-123',
@@ -298,8 +298,8 @@ describe('AuthService login lockout (BE-005)', () => {
         provider: 'google',
         providerId: 'google-123',
         email: 'new.google@example.com',
-        full_name: 'Google User',
-        avatar_url: 'https://example.com/avatar.png',
+        fullName: 'Google User',
+        avatarUrl: 'https://example.com/avatar.png',
       });
 
       expect(mockUsersService.createGoogleAccount).toHaveBeenCalledWith(
@@ -309,10 +309,10 @@ describe('AuthService login lockout (BE-005)', () => {
         }),
       );
       expect(result).toMatchObject({
-        status_code: HttpStatus.OK,
+        statusCode: HttpStatus.OK,
         message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
-        access_token: 'signed.jwt.token',
-        refresh_token: 'signed.jwt.token',
+        accessToken: 'signed.jwt.token',
+        refreshToken: 'signed.jwt.token',
       });
     });
 
@@ -334,8 +334,8 @@ describe('AuthService login lockout (BE-005)', () => {
         provider: 'google',
         providerId: 'google-456',
         email: TEST_USER.email,
-        full_name: TEST_USER.full_name,
-        avatar_url: null,
+        fullName: TEST_USER.full_name,
+        avatarUrl: null,
       });
 
       expect(mockUsersService.updateGoogleAccount).toHaveBeenCalledWith(
@@ -346,10 +346,92 @@ describe('AuthService login lockout (BE-005)', () => {
         }),
       );
       expect(result).toMatchObject({
-        status_code: HttpStatus.OK,
+        statusCode: HttpStatus.OK,
         message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
-        access_token: 'signed.jwt.token',
-        refresh_token: 'signed.jwt.token',
+        accessToken: 'signed.jwt.token',
+        refreshToken: 'signed.jwt.token',
+      });
+    });
+  });
+
+    describe('Google OAuth Short-lived Exchange Flow', () => {
+    const mockProfile = {
+      provider: 'google' as const,
+      providerId: 'google-123',
+      email: 'jane@example.com',
+      fullName: 'Jane Doe',
+      avatarUrl: null,
+    };
+
+    const mockOAuthResponse = {
+      status_code: HttpStatus.OK,
+      message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
+      access_token: 'access.jwt.token',
+      refresh_token: 'refresh.jwt.token',
+      data: {
+        user: {
+          id: 'user-uuid-1',
+          fullName: 'Jane Doe',
+          email: 'jane@example.com',
+          avatarUrl: null,
+        },
+      },
+    };
+
+    describe('initiateOAuthExchange', () => {
+      it('creates/updates account, signs tokens, and stores them in Redis with 60s TTL', async () => {
+        mockUsersService.findByEmail.mockResolvedValue(null);
+        mockUsersService.createGoogleAccount.mockResolvedValue({
+          id: 'user-uuid-1',
+          email: 'jane@example.com',
+          full_name: 'Jane Doe',
+          avatar_url: null,
+          is_verified: true,
+          auth_provider: 'google',
+          provider_user_id: 'google-123',
+          password_hash: null,
+          is_active: true,
+        });
+
+        const code = await service.initiateOAuthExchange(mockProfile);
+
+        expect(code).toBeDefined();
+        expect(code).toHaveLength(64); // 32 bytes in hex = 64 characters
+        expect(mockRedisService.setStrict).toHaveBeenCalledWith(
+          `oauth:exchange:${code}`,
+          expect.any(String),
+          60,
+        );
+
+        const exchangeCall = mockRedisService.setStrict.mock.calls.find(
+          (call) => call[0] === `oauth:exchange:${code}`
+        );
+
+        const storedData = JSON.parse(exchangeCall[1]);
+        expect(storedData).toMatchObject({
+          accessToken: 'signed.jwt.token',
+          refreshToken: 'signed.jwt.token',
+        });
+      });
+    });
+
+    describe('exchangeCode', () => {
+      it('successfully retrieves and consumes code from Redis', async () => {
+        mockRedisService.getdel.mockResolvedValue(JSON.stringify(mockOAuthResponse));
+
+        const result = await service.exchangeCode('valid-exchange-code');
+
+        expect(mockRedisService.getdel).toHaveBeenCalledWith('oauth:exchange:valid-exchange-code');
+        expect(result).toEqual(mockOAuthResponse);
+      });
+
+      it('throws BadRequestException if code is invalid or expired', async () => {
+        mockRedisService.getdel.mockResolvedValue(null);
+
+        await expect(service.exchangeCode('expired-code')).rejects.toThrow(
+          new BadRequestException(SYS_MSG.GOOGLE_EXCHANGE_CODE_INVALID),
+        );
+        expect(mockRedisService.del).not.toHaveBeenCalled();
       });
     });
   });

@@ -2,15 +2,15 @@ export interface GoogleOAuthProfile {
   provider: 'google';
   providerId: string;
   email: string;
-  full_name: string;
-  avatar_url: string | null;
+  fullName: string;
+  avatarUrl: string | null;
 }
 
 export interface OAuthLoginResponse {
-  status_code: number;
+  statusCode: number;
   message: string;
-  access_token: string;
-  refresh_token: string;
+  accessToken: string;
+  refreshToken: string;
   data: {
     user: {
       id: string;
