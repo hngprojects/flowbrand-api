@@ -39,7 +39,7 @@ export class PinoLoggerService implements LoggerService {
       return { event: message.message, data: { stack: message.stack } };
     }
     if (Array.isArray(message)) {
-      return { event: 'unknown', data: { raw: JSON.stringify(message) } };
+      return { event: 'unknown', data: { raw: message } };
     }
     if (typeof message === 'object' && message !== null) {
       const obj = message as Record<string, unknown>;
