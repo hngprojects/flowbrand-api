@@ -46,7 +46,9 @@ export class PinoLoggerService implements LoggerService {
       const event =
         typeof obj['event'] === 'string' ? obj['event'] :
         typeof obj['message'] === 'string' ? obj['message'] : 'unknown';
-      const { event: _ev, message: _msg, ...rest } = obj;
+      const rest = Object.fromEntries(
+        Object.entries(obj).filter(([k]) => k !== 'event' && k !== 'message'),
+      ) as Record<string, unknown>;
       return { event, data: rest };
     }
     return { event: String(message), data: {} };
