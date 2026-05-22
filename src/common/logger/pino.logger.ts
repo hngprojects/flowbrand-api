@@ -1,11 +1,11 @@
 import { env } from '../../config/env';
 import pino, { Logger as PinoLogger, LoggerOptions } from 'pino';
 
-const isDev = process.env.NODE_ENV === 'development';
+const isDev = env.NODE_ENV === 'development';
 
 const logLevel = env.LOG_LEVEL;
 
-const REDACTED_PATHS = [
+export const REDACTED_PATHS = [
   'password',
   '*.password',
   'password_hash',
@@ -18,18 +18,16 @@ const REDACTED_PATHS = [
   '*.otp_code',
   'accessToken',
   '*.accessToken',
+  'access_token',
+  '*.access_token',
   'refreshToken',
   '*.refreshToken',
+  'refresh_token',
+  '*.refresh_token',
   'apiKey',
   '*.apiKey',
   'api_key',
   '*.api_key',
-  'GEMINI_API_KEY',
-  '*.GEMINI_API_KEY',
-  'GROQ_API_KEY',
-  '*.GROQ_API_KEY',
-  'RESEND_API_KEY',
-  '*.RESEND_API_KEY',
   'authorization',
   '*.authorization',
 ];
@@ -49,7 +47,8 @@ const options: LoggerOptions = {
 
   formatters: {
     level: (label) => ({ level: label }),
-    bindings: () => ({}),
+    // Return only our own base fields; this implicitly strips pino's default pid and hostname
+    bindings: (b) => ({ service: String(b['service']), env: String(b['env']) }),
   },
 
   timestamp: () => `, "timestamp":"${new Date().toISOString()}"`,
@@ -65,6 +64,7 @@ const logger: PinoLogger = isDev
           translateTime: 'SYS:standard',
           ignore: 'pid,hostname',
           messageFormat: '{event} - {msg}',
+          singleLine: true,
         },
       },
     })

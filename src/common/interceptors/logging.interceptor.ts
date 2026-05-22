@@ -28,7 +28,7 @@ export class LoggingInterceptor implements NestInterceptor {
     const startTime = Date.now();
 
     return new Observable((subscriber) => {
-      void this.contextService.run({ requestId }, () => {
+      this.contextService.run({ requestId }, () => {
         this.pinoLogger.info('http.request.received', {
           method,
           path,
@@ -94,6 +94,8 @@ export class LoggingInterceptor implements NestInterceptor {
             }),
           )
           .subscribe(subscriber);
+      }).catch((err: unknown) => {
+        subscriber.error(err);
       });
     });
   }
