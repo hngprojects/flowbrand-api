@@ -56,7 +56,7 @@ export class OnboardingService {
         message: SYS_MSG.ONBOARDING_ALREADY_COMPLETE,
         data: { 
           status: WizardStatus.COMPLETE, 
-          redirectUrl: { to: 'funnel_generation' } 
+          redirect: { to: 'funnel_generation' } 
         },
       };
     }

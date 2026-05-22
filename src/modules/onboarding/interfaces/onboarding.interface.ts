@@ -12,7 +12,7 @@ export interface OnboardingStartResponseData {
   expiresAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
-  redirectUrl?: { to: string };
+  redirect?: { to: string };
 }
 
 /** Service result passed to the controller for POST /onboarding/start. */

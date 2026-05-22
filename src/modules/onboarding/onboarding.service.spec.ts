@@ -192,9 +192,9 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
       },
     );
 
-    await expect(service.startWizardSession(USER_A)).rejects.toBeInstanceOf(
-      ConflictException,
-    );
+    const resultA = await service.startWizardSession(USER_A);
+    expect(resultA.statusCode).toBe(HttpStatus.OK);
+    expect(resultA.data.status).toBe(WizardStatus.COMPLETE);
 
     const result = await service.startWizardSession(USER_B);
     expect(result.statusCode).toBe(HttpStatus.CREATED);
