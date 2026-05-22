@@ -9,14 +9,12 @@ import {
   Post,
   Query,
   Res,
-  UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../constants/system.messages';
 import { CreateFunnelDocs, GetFunnelStatusDocs } from './docs/funnels-swagger.doc';
 import { CreateFunnelDto, FunnelIdParamDto } from './dto/create-funnel.dto';
-import { FunnelRateLimitGuard } from './guards/funnel-rate-limit.guard';
 
 // Swagger decorator factories
 import {
@@ -71,10 +69,9 @@ export class FunnelsController {
 
   // Generation endpoints (idempotent create + status polling)
   @Post('generate')
-  @UseGuards(FunnelRateLimitGuard)
   @CreateFunnelDocs()
   async generate(
-    @CurrentUser('sub') userId: string,
+    @CurrentUser('userId') userId: string,
     @Body() dto: CreateFunnelDto,
     @Res() res: Response,
   ): Promise<void> {
@@ -93,7 +90,7 @@ export class FunnelsController {
   @HttpCode(HttpStatus.OK)
   @GetFunnelStatusDocs()
   async status(
-    @CurrentUser('sub') userId: string,
+    @CurrentUser('userId') userId: string,
     @Param() params: FunnelIdParamDto,
     @Res() res: Response,
   ): Promise<void> {

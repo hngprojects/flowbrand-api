@@ -16,6 +16,7 @@ export const AUTH_TERMS_REQUIRED = 'You must accept the terms and conditions to 
 export const AUTH_ACCOUNT_LOCKED = 'Account locked due to too many failed login attempts. Try again later.';
 export const AUTH_TOO_MANY_FAILED_ATTEMPTS = 'Too many failed login attempts. Your account has been locked for 1 hour.';
 export const REGISTRATION_SUCCESSFUL_VERIFY_EMAIL = 'Registration successful. Please verify your email.';
+export const AUTH_EMAIL_UNVERIFIED = 'Please verify your email address to log in.';
 
 // User messages
 export const USER_EMAIL_IN_USE = 'Email already in use';
@@ -29,6 +30,7 @@ export const GOOGLE_OAUTH_FAILED = 'Google OAuth authentication failed';
 export const GOOGLE_OAUTH_CONFIGURATION_INVALID = 'Google OAuth configuration is missing';
 export const USER_OAUTH_CREATION_FAILED = 'Failed to create user account';
 export const OAUTH_LOGIN_SUCCESSFUL = 'OAuth login successful';
+export const GOOGLE_EXCHANGE_CODE_INVALID = 'Invalid or expired exchange code';
 
 // Onboarding — API response `message` values (machine-oriented identifiers)
 export const ONBOARDING_SESSION_STARTED = 'ONBOARDING_SESSION_STARTED';

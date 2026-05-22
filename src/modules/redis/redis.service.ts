@@ -118,6 +118,17 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  // in RedisService
+  async getdel(key: string): Promise<string | null> {
+    try{
+      return await this.client.getdel(key);
+    } catch (err) {
+      this.logger.error(`GETDEL failed`, (err as Error).message);
+      return null;
+    }
+  }
+
+
   async exists(key: string): Promise<boolean> {
     try {
       return (await this.client.exists(key)) === 1;

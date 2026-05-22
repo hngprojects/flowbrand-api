@@ -19,6 +19,7 @@ import { ResendOtpDto } from '../dto/resend-otp.dto';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { ForgotPasswordDto } from '../dto/forgot-password.dto';
 import { ResetPasswordDto } from '../dto/reset-password.dto';
+import { GoogleExchangeDto } from '../dto/google-exchange.dto';
 
 const authUserExample = {
   id: 'uuid',
@@ -86,6 +87,18 @@ export const LoginDocs = () =>
           statusCode: HttpStatus.LOCKED,
           error: 'HttpException',
           message: SYS_MSG.AUTH_ACCOUNT_LOCKED,
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.FORBIDDEN,
+      description: 'Email is unverified. Please verify your email via OTP before logging in.',
+      schema: {
+        example: {
+          success: false,
+          statusCode: HttpStatus.FORBIDDEN,
+          error: 'ForbiddenException',
+          message: SYS_MSG.AUTH_EMAIL_UNVERIFIED,
         },
       },
     }),
@@ -160,7 +173,7 @@ export const GoogleCallbackDocs = () =>
     ApiOperation({ summary: 'Handle Google OAuth callback' }),
     ApiResponse({
       status: HttpStatus.FOUND,
-      description: 'Redirects to client after successful OAuth; tokens are issued via cookie and redirect URL',
+      description: 'Redirects to client after successful OAuth with a short-lived exchange code query parameter',
     }),
     ApiUnauthorizedResponse({
       description: 'Google OAuth failed or no email was provided',
@@ -170,6 +183,46 @@ export const GoogleCallbackDocs = () =>
           status_code: HttpStatus.UNAUTHORIZED,
           error: 'UnauthorizedException',
           message: SYS_MSG.GOOGLE_OAUTH_FAILED,
+        },
+      },
+    }),
+  );
+
+export const GoogleExchangeDocs = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Exchange short-lived Google OAuth code for user session and tokens',
+      description:
+        'Validates the short-lived single-use exchange code from Redis, consumes it (deletes it), ' +
+        'sets the refresh token as an HttpOnly cookie, and returns the access token + user details.',
+    }),
+    ApiBody({ type: GoogleExchangeDto }),
+    ApiOkResponse({
+      description: 'Exchange successful, user session created and tokens issued',
+      schema: {
+        example: {
+          statusCode: HttpStatus.OK,
+          message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
+          data: {
+            accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+            user: {
+              id: 'user-uuid-xyz',
+              email: 'user@example.com',
+              fullName: 'Jane Doe',
+              avatarUrl: 'https://example.com/avatar.png',
+            },
+            redirectUrl: '/dashboard',
+          },
+        },
+      },
+    }),
+    ApiBadRequestResponse({
+      description: 'Exchange code is invalid or expired',
+      schema: {
+        example: {
+          statusCode: HttpStatus.BAD_REQUEST,
+          message: SYS_MSG.GOOGLE_EXCHANGE_CODE_INVALID,
+          error: 'BadRequestException',
         },
       },
     }),
@@ -272,25 +325,48 @@ function registerSwaggerOAuthRedirectScript(app: INestApplication): void {
               }
             }
 
-            // Only handle OAuth mock redirects for same-origin GETs
+            // Only handle OAuth mock redirects for same-origin GETs & POSTs
             const method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
-            if (target && target.origin === window.location.origin && method === 'GET') {
-              if (target.pathname.includes('/auth/google/callback')) {
-                const callbackRedirectUrl = FRONTEND_BASE + '/onboarding#access_token=jwt.access.token';
-                return Promise.resolve(Response.redirect(callbackRedirectUrl, 302));
-              }
+            if (target && target.origin === window.location.origin) {
+              if (method === 'GET') {
+                if (target.pathname.includes('/auth/google/callback')) {
+                  const callbackRedirectUrl = FRONTEND_BASE + '/onboarding?code=mock-exchange-code-123';
+                  return Promise.resolve(Response.redirect(callbackRedirectUrl, 302));
+                }
 
-              if (target.pathname.includes('/auth/google')) {
-                return Promise.resolve(
-                  new Response('Redirect to Google OAuth consent screen', {
-                    status: 302,
-                    statusText: 'Redirect to Google OAuth consent screen',
-                    headers: {
-                      'Content-Type': 'text/plain; charset=utf-8',
-                      Location: '/auth/google/callback',
-                    },
-                  }),
-                );
+                if (target.pathname.includes('/auth/google')) {
+                  return Promise.resolve(
+                    new Response('Redirect to Google OAuth consent screen', {
+                      status: 302,
+                      statusText: 'Redirect to Google OAuth consent screen',
+                      headers: {
+                        'Content-Type': 'text/plain; charset=utf-8',
+                        Location: '/auth/google/callback',
+                      },
+                    }),
+                  );
+                }
+              } else if (method === 'POST') {
+                if (target.pathname.includes('/auth/google/exchange')) {
+                  const responsePayload = {
+                    statusCode: 200,
+                    message: 'OAuth login successful',
+                    data: {
+                      accessToken: 'mock.access.token',
+                      user: {
+                        id: 'mock-user-id',
+                        email: 'mock@example.com',
+                        fullName: 'Mock Google User',
+                        avatarUrl: null
+                      },
+                      redirectUrl: '/dashboard'
+                    }
+                  };
+                  return Promise.resolve(new Response(JSON.stringify(responsePayload), {
+                    status: 200,
+                    headers: { 'Content-Type': 'application/json' }
+                  }));
+                }
               }
             }
           } catch (error) {

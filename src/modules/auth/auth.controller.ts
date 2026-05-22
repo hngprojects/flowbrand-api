@@ -34,13 +34,14 @@ import {
   VerifyOtpDocs,
   ForgotPasswordDocs, 
   ResetPasswordDocs,
+  GoogleExchangeDocs,
 } from './docs/auth-swagger.doc';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { ResendOtpDto } from './dto/resend-otp.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-
+import { GoogleExchangeDto } from './dto/google-exchange.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -97,22 +98,10 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @LoginDocs()
-  async login(@Body() dto: LoginDto, @Res() res: Response) {
+  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(dto);
-
-    res.cookie(
-      'refreshToken',
-      result.refreshToken,
-      this.getRefreshCookieOptions(),
-    );
-
-    return res.json(
-      this.buildAuthResponse(
-        HttpStatus.OK,
-        SYS_MSG.AUTH_LOGIN_SUCCESSFUL,
-        result,
-      ),
-    );
+    res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
+    return this.buildAuthResponse(HttpStatus.OK, SYS_MSG.AUTH_LOGIN_SUCCESSFUL, result);
   }
 
   @Public()
@@ -122,7 +111,7 @@ export class AuthController {
   async refresh(
     @Body() dto: RefreshTokenDto,
     @Req() req: Request,
-    @Res() res: Response,
+    @Res({ passthrough: true }) res: Response,
   ) {
     const refreshToken =
       dto.refreshToken ?? (req.cookies?.refreshToken as string | undefined);
@@ -132,20 +121,8 @@ export class AuthController {
     }
 
     const result = await this.authService.refresh(refreshToken);
-
-    res.cookie(
-      'refreshToken',
-      result.refreshToken,
-      this.getRefreshCookieOptions(),
-    );
-
-    return res.json(
-      this.buildAuthResponse(
-        HttpStatus.OK,
-        SYS_MSG.AUTH_TOKEN_REFRESHED,
-        result,
-      ),
-    );
+    res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
+    return this.buildAuthResponse(HttpStatus.OK, SYS_MSG.AUTH_TOKEN_REFRESHED, result);
   }
 
   @Post('logout')
@@ -154,17 +131,14 @@ export class AuthController {
   async logout(
     @CurrentUser('sub') userId: string,
     @CurrentUser('sessionId') sessionId: string,
-    @Res() res: Response,
+    @Res({ passthrough: true }) res: Response,
   ) {
     await this.authService.logout(userId, sessionId);
-
     res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
     });
-
-    return res.status(HttpStatus.NO_CONTENT).send();
   }
 
   @Public()
@@ -251,10 +225,38 @@ export class AuthController {
       throw new UnauthorizedException(SYS_MSG.GOOGLE_OAUTH_FAILED);
     }
 
-    const result = await this.authService.handleOAuthLogin(payload);
-    res.cookie('refreshToken', result.refresh_token, this.getRefreshCookieOptions());
+    const exchangeCode = await this.authService.initiateOAuthExchange(payload);
 
-    const redirectUrl = `${this.getFrontendBaseUrl()}${AuthController.OAUTH_REDIRECT_URL}#access_token=${encodeURIComponent(result.access_token)}`;
+    // Redirect user to the frontend with the short-lived code query parameter
+    const redirectUrl = `${this.getFrontendBaseUrl()}${AuthController.OAUTH_REDIRECT_URL}?code=${encodeURIComponent(exchangeCode)}`;
     res.redirect(HttpStatus.FOUND, redirectUrl);
+  }
+
+  @Public()
+  @Post('google/exchange')
+  @HttpCode(HttpStatus.OK)
+  @GoogleExchangeDocs()
+  async googleExchange(
+    @Body() dto: GoogleExchangeDto,
+    @Res() res: Response,
+  ): Promise<Response> {
+    const oauthResult = await this.authService.exchangeCode(dto.code);
+
+    res.cookie(
+      'refreshToken',
+      oauthResult.refreshToken,
+      this.getRefreshCookieOptions(),
+    );
+
+    // Return access token and user info matching the standard response template
+    return res.json({
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
+      data: {
+        accessToken: oauthResult.accessToken,
+        user: oauthResult.data.user,
+        redirectUrl: AuthController.REDIRECT_URL,
+      },
+    });
   }
 }

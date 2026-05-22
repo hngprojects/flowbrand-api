@@ -26,7 +26,9 @@ import { FunnelsModule } from './modules/funnels/funnels.module';
 import { FunnelGenerationQueueModule } from './queue/funnel-generation-queue.module';
 import { WaitlistModule } from './modules/waitlist/waitlist.module';
 import { ContactModule } from './modules/contact/contact.module';
+import { LoggerModule } from './common/logger/logger.module';
 import { llmConfig } from './config/llm.config';
+import { AppController } from './app.controller';
 
 function collectValidationErrors(errors: ValidationError[], parentPath = ''): string[] {
   return errors.flatMap((error) => {
@@ -42,6 +44,7 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
 
 @Module({
   imports: [
+    LoggerModule,
     ConfigModule.forRoot({
       isGlobal: true,
       load: [appConfig, databaseConfig, jwtConfig, redisConfig, llmConfig],
@@ -69,6 +72,7 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
     WaitlistModule,
     ContactModule,
   ],
+  controllers: [AppController],
   providers: [
     {
       provide: APP_PIPE,
