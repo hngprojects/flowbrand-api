@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { env } from './config/env';
 import { setupSwagger } from './modules/auth/docs/auth-swagger.doc';
+import { PinoLoggerService } from './common/logger/pino-logger.service';
 
 const bootstrapLogger = new Logger('Bootstrap');
 
@@ -25,6 +26,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
   });
+  
+  const pinoLogger = app.get(PinoLoggerService);
+  app.useLogger(pinoLogger);
 
   app.use(helmet());
   app.use(compression());
@@ -35,6 +39,8 @@ async function bootstrap() {
   });
   app.setGlobalPrefix('api', {
     exclude: [
+      { path: '', method: RequestMethod.GET },
+      { path: 'api', method: RequestMethod.GET },
       { path: 'health', method: RequestMethod.ALL },
       { path: 'auth/google', method: RequestMethod.ALL },
       { path: 'auth/google/callback', method: RequestMethod.ALL },
