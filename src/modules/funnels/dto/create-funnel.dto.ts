@@ -5,7 +5,6 @@ import {
   IsArray,
   IsEnum,
   IsNotEmpty,
-  IsOptional,
   IsUUID,
   ValidateIf,
 } from 'class-validator';
@@ -41,7 +40,6 @@ export class CreateFunnelDto {
   @ArrayMinSize(1)
   @ArrayMaxSize(20)
   @IsUUID('4', { each: true })
-  @IsOptional()
   upload_ids?: string[];
 }
 
