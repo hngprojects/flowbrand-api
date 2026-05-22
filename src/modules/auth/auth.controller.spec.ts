@@ -53,10 +53,10 @@ describe('AuthController Google OAuth', () => {
   describe('POST /auth/google/exchange', () => {
     it('returns the access token, user info and sets refresh cookie on successful exchange', async () => {
       const mockResult = {
-        status_code: 200,
+        statusCode: 200,
         message: 'OAuth login successful',
-        access_token: 'access.jwt',
-        refresh_token: 'refresh.jwt',
+        accessToken: 'access.jwt',
+        refreshToken: 'refresh.jwt',
         data: {
           user: {
             id: 'user-1',
@@ -66,6 +66,7 @@ describe('AuthController Google OAuth', () => {
           },
         },
       };
+
 
       mockAuthService.exchangeCode.mockResolvedValue(mockResult);
 
