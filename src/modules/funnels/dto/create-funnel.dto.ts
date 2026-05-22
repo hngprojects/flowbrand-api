@@ -5,7 +5,6 @@ import {
   IsArray,
   IsEnum,
   IsNotEmpty,
-  IsOptional,
   IsUUID,
   ValidateIf,
 } from 'class-validator';
@@ -26,7 +25,7 @@ export class CreateFunnelDto {
       'Client-generated UUID used to deduplicate retries on flaky networks. ' +
       'The same key always resolves to the same funnel.',
   })
-  @IsUUID()
+  @IsUUID('4')
   @IsNotEmpty()
   idempotency_key: string;
 
@@ -41,7 +40,6 @@ export class CreateFunnelDto {
   @ArrayMinSize(1)
   @ArrayMaxSize(20)
   @IsUUID('4', { each: true })
-  @IsOptional()
   upload_ids?: string[];
 }
 
