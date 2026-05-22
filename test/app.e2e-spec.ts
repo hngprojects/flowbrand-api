@@ -14,7 +14,7 @@ describe('Health (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     await app.init();
-  });
+  }, 30000);
 
   it('GET /health → 200', () => {
     return request(app.getHttpServer())
@@ -28,5 +28,5 @@ describe('Health (e2e)', () => {
 
   afterEach(async () => {
     await app.close();
-  });
+  }, 30000);
 });

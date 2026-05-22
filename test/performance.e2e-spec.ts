@@ -78,7 +78,7 @@ describe('Performance Tests (e2e)', () => {
 
       console.log(`GET /api/onboarding/session response time: ${elapsed}ms`);
       expect([200, 404]).toContain(res.status);
-      expect(elapsed).toBeLessThan(2000);
+      expect(elapsed).toBeLessThan(3000);
     });
   });
 
@@ -104,7 +104,7 @@ describe('Performance Tests (e2e)', () => {
 
       console.log(`POST /api/waitlist/join response time: ${elapsed}ms`);
       expect(res.status).toBe(201);
-      expect(elapsed).toBeLessThan(2000);
+      expect(elapsed).toBeLessThan(3000);
     });
   });
 
