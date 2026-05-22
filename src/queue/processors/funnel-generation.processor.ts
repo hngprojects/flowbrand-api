@@ -138,18 +138,17 @@ export class FunnelGenerationProcessor {
         }
       }
 
-      if (typeof stage.position !== 'number' || stage.position < 1 || stage.position > 4) {
+      if (typeof stage.position !== 'number' || stage.position < 1 || stage.position > EXPECTED_STAGE_COUNT) {
         throw new Error(`Stage has invalid position: ${stage.position}`);
       }
       if (positions.has(stage.position)) {
-        throw new Error(`Duplicate position in LLM output: ${stage.position}`);
+        throw new Error(`Duplicate position in stage data: ${stage.position}`);
       }
       positions.add(stage.position);
 
       if (!stage.channel || typeof stage.channel !== 'string') {
         throw new Error(`Stage ${stage.position}: channel is required`);
       }
-
       if (!Array.isArray(stage.tasks)) {
         throw new Error(`Stage ${stage.position}: tasks must be an array`);
       }
@@ -162,7 +161,6 @@ export class FunnelGenerationProcessor {
       if (stage.explanation.length > MAX_FIELD_LENGTH) {
         throw new Error(`Stage ${stage.position}: explanation exceeds ${MAX_FIELD_LENGTH} chars`);
       }
-
       if (stage.actionPrompt.length > MAX_FIELD_LENGTH) {
         throw new Error(`Stage ${stage.position}: actionPrompt exceeds ${MAX_FIELD_LENGTH} chars`);
       }

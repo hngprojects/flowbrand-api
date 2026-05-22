@@ -17,7 +17,7 @@ import * as SYS_MSG from '../../constants/system.messages';
  */
 
 export function FunnelControllerDecorators() {
-  return applyDecorators(ApiTags('funnels'), ApiBearerAuth());
+  return applyDecorators(ApiTags('funnels'), ApiBearerAuth('JWT'));
 }
 
 export function ListFunnelsDecorators() {
