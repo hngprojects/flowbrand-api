@@ -17,10 +17,10 @@ export class ContactController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ContactSwaggerDocs.create()
-  async create(@Body() dto: CreateContactDto, @Res() res: Response) {
+  async create(@Body() dto: CreateContactDto, @Res() res: Response): Promise<void> {
     const result = await this.contactService.create(dto);
 
-    return res.status(HttpStatus.CREATED).json({
+    res.status(HttpStatus.CREATED).json({
       success: true,
       statusCode: HttpStatus.CREATED,
       message: SYS_MSG.CONTACT_MESSAGE_SENT_SUCCESSFULLY,
