@@ -36,10 +36,10 @@ export class OnboardingController {
     @CurrentUser('sub') userId: string,
     @Body() body: CompleteOnboardingDto,
     @Res() res: Response,
-  ) {
+  ): Promise<void> {
     const result = await this.onboardingService.completeOnboarding(userId, body.session_id);
 
-    return res.status(result.statusCode).json({
+    res.status(result.statusCode).json({
       success: true,
       statusCode: result.statusCode,
       message: result.message,
