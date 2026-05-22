@@ -10,9 +10,9 @@
 
 | Category | Total Tests | Passed | Failed |
 |---|---|---|---|
-| Unit Tests | 100+ | ✅ All | 0 |
-| E2E / Integration Tests | 27 | ✅ All | 0 |
-| **Total** | **127+** | **✅ All** | **0** |
+| Unit Tests | 431 | ✅ All | 0 |
+| E2E / Integration Tests | 48 | ✅ All | 0 |
+| **Total** | **519** | **✅ All** | **0** |
 
 ---
 
