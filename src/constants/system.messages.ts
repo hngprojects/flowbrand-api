@@ -30,6 +30,7 @@ export const GOOGLE_OAUTH_FAILED = 'Google OAuth authentication failed';
 export const GOOGLE_OAUTH_CONFIGURATION_INVALID = 'Google OAuth configuration is missing';
 export const USER_OAUTH_CREATION_FAILED = 'Failed to create user account';
 export const OAUTH_LOGIN_SUCCESSFUL = 'OAuth login successful';
+export const GOOGLE_EXCHANGE_CODE_INVALID = 'Invalid or expired exchange code';
 
 // Onboarding — API response `message` values (machine-oriented identifiers)
 export const ONBOARDING_SESSION_STARTED = 'ONBOARDING_SESSION_STARTED';

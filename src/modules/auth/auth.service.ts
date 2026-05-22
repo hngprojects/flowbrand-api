@@ -152,6 +152,43 @@ export class AuthService {
     return this.issueTokens(user);
   }
 
+
+  async initiateOAuthExchange(profile: GoogleOAuthProfile): Promise<string> {
+    const oauthResult = await this.handleOAuthLogin(profile);
+    
+    const exchangeCode = crypto.randomBytes(32).toString('hex');
+    
+    const redisKey = `oauth:exchange:${exchangeCode}`;
+    
+    // Save to Redis strictly for 60 seconds
+    await this.redisService.setStrict(
+      redisKey,
+      JSON.stringify(oauthResult),
+      60
+    );
+    
+    return exchangeCode;
+  }
+
+  async exchangeCode(code: string): Promise<OAuthLoginResponse> {
+    const redisKey = `oauth:exchange:${code}`;
+    const rawData = await this.redisService.get(redisKey);
+
+    if (!rawData) {
+      throw new BadRequestException(SYS_MSG.GOOGLE_EXCHANGE_CODE_INVALID);
+    }
+
+    // Immediately consume/delete the exchange code from Redis (Single-use restriction)
+    await this.redisService.del(redisKey);
+
+    try {
+      const oauthResult: OAuthLoginResponse = JSON.parse(rawData);
+      return oauthResult;
+    } catch {
+      throw new BadRequestException(SYS_MSG.GOOGLE_EXCHANGE_CODE_INVALID);
+    }
+  }
+
   async handleOAuthLogin(profile: GoogleOAuthProfile): Promise<OAuthLoginResponse> {
     const email = profile.email.trim().toLowerCase();
     const existingUser = await this.usersService.findByEmail(email);

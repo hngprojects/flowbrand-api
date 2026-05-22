@@ -9,6 +9,8 @@ import * as SYS_MSG from '../../constants/system.messages';
 
 const mockAuthService = {
   handleOAuthLogin: jest.fn(),
+  initiateOAuthExchange: jest.fn(),
+  exchangeCode: jest.fn(),
 };
 
 describe('AuthController Google OAuth', () => {
@@ -25,38 +27,20 @@ describe('AuthController Google OAuth', () => {
     controller = module.get<AuthController>(AuthController);
   });
 
-  it('redirects to /onboarding with the issued access token after Google callback', async () => {
-    mockAuthService.handleOAuthLogin.mockResolvedValue({
-      status_code: 200,
-      message: 'OAuth login successful',
-      access_token: 'access.jwt',
-      refresh_token: 'refresh.jwt',
-      data: {
-        user: {
-          id: 'user-1',
-          full_name: 'Jane Doe',
-          email: 'jane@example.com',
-          avatar_url: null,
-        },
-      },
-    });
+  it('redirects to /onboarding with the short-lived exchange code after Google callback', async () => {
+    mockAuthService.initiateOAuthExchange.mockResolvedValue('mock-exchange-code-xyz');
 
-    const cookie = jest.fn();
     const redirect = jest.fn();
 
     await controller.googleAuthRedirect(
       { user: { email: 'jane@example.com' } } as never,
-      { cookie, redirect } as never,
+      { redirect } as never,
     );
 
-    expect(cookie).toHaveBeenCalledWith(
-      'refreshToken',
-      'refresh.jwt',
-      expect.objectContaining({ httpOnly: true, sameSite: 'strict' }),
-    );
+    expect(mockAuthService.initiateOAuthExchange).toHaveBeenCalledWith({ email: 'jane@example.com' });
     expect(redirect).toHaveBeenCalledWith(
       HttpStatus.FOUND,
-      'http://localhost:3000/onboarding#access_token=access.jwt',
+      'http://localhost:3000/onboarding?code=mock-exchange-code-xyz',
     );
   });
 
@@ -64,6 +48,51 @@ describe('AuthController Google OAuth', () => {
     await expect(
       controller.googleAuthRedirect({} as never, {} as never),
     ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  describe('POST /auth/google/exchange', () => {
+    it('returns the access token, user info and sets refresh cookie on successful exchange', async () => {
+      const mockResult = {
+        status_code: 200,
+        message: 'OAuth login successful',
+        access_token: 'access.jwt',
+        refresh_token: 'refresh.jwt',
+        data: {
+          user: {
+            id: 'user-1',
+            fullName: 'Jane Doe',
+            email: 'jane@example.com',
+            avatarUrl: null,
+          },
+        },
+      };
+
+      mockAuthService.exchangeCode.mockResolvedValue(mockResult);
+
+      const cookie = jest.fn();
+      const json = jest.fn();
+
+      await controller.googleExchange(
+        { code: 'valid-code' },
+        { cookie, json } as never,
+      );
+
+      expect(mockAuthService.exchangeCode).toHaveBeenCalledWith('valid-code');
+      expect(cookie).toHaveBeenCalledWith(
+        'refreshToken',
+        'refresh.jwt',
+        expect.objectContaining({ httpOnly: true, sameSite: 'strict' }),
+      );
+      expect(json).toHaveBeenCalledWith({
+        statusCode: HttpStatus.OK,
+        message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
+        data: {
+          accessToken: 'access.jwt',
+          user: mockResult.data.user,
+          redirectUrl: '/dashboard',
+        },
+      });
+    });
   });
 });
 
