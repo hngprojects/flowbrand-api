@@ -3,6 +3,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
+import { Queue } from 'bull';
+import { getQueueToken } from '@nestjs/bull';
+import { QUEUES } from '../src/common/constants/queue.constants';
 
 describe('Onboarding (e2e)', () => {
     jest.setTimeout(30000)
@@ -40,8 +43,23 @@ describe('Onboarding (e2e)', () => {
   }, 30000);
 
   afterAll(async () => {
-    await app.close();
-  }, 30000);
+      const emailQueue = app.get<Queue>(getQueueToken(QUEUES.EMAIL));
+      const funnelQueue = app.get<Queue>(getQueueToken(QUEUES.FUNNEL_GENERATION));
+      const extractionQueue = app.get<Queue>(getQueueToken(QUEUES.DOCUMENT_EXTRACTION));
+      
+      await Promise.all([
+        emailQueue.pause(),
+        funnelQueue.pause(),
+        extractionQueue.pause(),
+      ]);
+      await Promise.all([
+        emailQueue.close(),
+        funnelQueue.close(),
+        extractionQueue.close(),
+      ]);
+  
+      await app.close();
+    }, 30000);
 
   describe('POST /api/onboarding/start', () => {
     it('AC-01: creates a new onboarding session and returns 201', async () => {

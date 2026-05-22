@@ -3,6 +3,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
+import { Queue } from 'bull';
+import { getQueueToken } from '@nestjs/bull';
+import { QUEUES } from '../src/common/constants/queue.constants';
 
 describe('Contact (e2e)', () => {
   let app: INestApplication<App>;
@@ -20,8 +23,23 @@ describe('Contact (e2e)', () => {
   }, 30000);
 
   afterAll(async () => {
-    await app.close();
-  }, 30000);
+      const emailQueue = app.get<Queue>(getQueueToken(QUEUES.EMAIL));
+      const funnelQueue = app.get<Queue>(getQueueToken(QUEUES.FUNNEL_GENERATION));
+      const extractionQueue = app.get<Queue>(getQueueToken(QUEUES.DOCUMENT_EXTRACTION));
+      
+      await Promise.all([
+        emailQueue.pause(),
+        funnelQueue.pause(),
+        extractionQueue.pause(),
+      ]);
+      await Promise.all([
+        emailQueue.close(),
+        funnelQueue.close(),
+        extractionQueue.close(),
+      ]);
+
+      await app.close();
+    }, 30000);
 
   describe('POST /api/contact', () => {
     const validDto = {

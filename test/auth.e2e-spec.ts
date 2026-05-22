@@ -3,6 +3,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
+import { getQueueToken } from '@nestjs/bull';
+import { Queue } from 'bull';
+import { QUEUES } from '../src/common/constants/queue.constants';
 
 describe('Auth (e2e)', () => {
   let app: INestApplication<App>;
@@ -22,23 +25,38 @@ describe('Auth (e2e)', () => {
   });
 
   afterAll(async () => {
+    const emailQueue = app.get<Queue>(getQueueToken(QUEUES.EMAIL));
+    const funnelQueue = app.get<Queue>(getQueueToken(QUEUES.FUNNEL_GENERATION));
+    const extractionQueue = app.get<Queue>(getQueueToken(QUEUES.DOCUMENT_EXTRACTION));
+    
+    await Promise.all([
+      emailQueue.pause(),
+      funnelQueue.pause(),
+      extractionQueue.pause(),
+    ]);
+    await Promise.all([
+      emailQueue.close(),
+      funnelQueue.close(),
+      extractionQueue.close(),
+    ]);
+
     await app.close();
-  });
+  }, 30000);
 
   describe('POST /api/auth/register', () => {
-    it('AC-01: registers a new user and returns 201 with accessToken', async () => {
-      const res = await request(app.getHttpServer())
-        .post('/api/auth/register')
-        .send({
-          email: testEmail,
-          password: testPassword,
-          fullName: 'E2E Test User',
-          termsAccepted: true,
-        });
+    it('AC-01: registers a new user and returns 201 with success message', async () => {
+        const res = await request(app.getHttpServer())
+            .post('/api/auth/register')
+            .send({
+            email: testEmail,
+            password: testPassword,
+            fullName: 'E2E Test User',
+            termsAccepted: true,
+            });
 
-      expect(res.status).toBe(201);
-      expect(res.body.data.accessToken).toBeDefined();
-      accessToken = res.body.data.accessToken;
+        expect(res.status).toBe(201);
+        expect(res.body.success).toBe(true);
+        expect(res.body.message).toBe('Registration successful. Please verify your email.');
     });
 
     it('AC-02: returns 409 when email already exists', async () => {

@@ -3,6 +3,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
+import { getQueueToken } from '@nestjs/bull';
+import { Queue } from 'bull';
+import { QUEUES } from '../src/common/constants/queue.constants';
 
 describe('Waitlist (e2e)', () => {
   let app: INestApplication<App>;
@@ -20,6 +23,21 @@ describe('Waitlist (e2e)', () => {
   }, 30000);
 
   afterAll(async () => {
+    const emailQueue = app.get<Queue>(getQueueToken(QUEUES.EMAIL));
+    const funnelQueue = app.get<Queue>(getQueueToken(QUEUES.FUNNEL_GENERATION));
+    const extractionQueue = app.get<Queue>(getQueueToken(QUEUES.DOCUMENT_EXTRACTION));
+    
+    await Promise.all([
+      emailQueue.pause(),
+      funnelQueue.pause(),
+      extractionQueue.pause(),
+    ]);
+    await Promise.all([
+      emailQueue.close(),
+      funnelQueue.close(),
+      extractionQueue.close(),
+    ]);
+
     await app.close();
   }, 30000);
 
