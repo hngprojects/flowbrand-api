@@ -39,7 +39,8 @@ export const ONBOARDING_ALREADY_COMPLETE = 'Onboarding already complete';
 export const ONBOARDING_COMPLETE_SUCCESS = 'Onboarding completed successfully';
 export const ONBOARDING_INCOMPLETE = 'Onboarding incomplete';
 export const ONBOARDING_SESSION_RETRIEVED = 'Onboarding session retrieved successfully';
-export const ONBOARDING_SESSION_NOT_FOUND = 'Session not found. Please call POST /onboarding/start to begin the wizard.';
+export const ONBOARDING_SESSION_NOT_FOUND =
+  'Session not found. Please call POST /onboarding/start to begin the wizard.';
 export const ONBOARDING_SESSION_EXPIRED = 'Session has expired. Restart the onboarding process.';
 export const ONBOARDING_STEP_SAVED = 'Onboarding step saved';
 export const ONBOARDING_SESSION_NOT_BELONG = 'Session not found or does not belong to this user';
@@ -57,21 +58,14 @@ export const UPLOAD_TOO_MANY_FILES = 'Too many files uploaded';
 
 // Funnel uploads
 export const FUNNEL_UPLOAD_COMPLETED = 'Funnel upload completed';
-export const FUNNEL_UPLOAD_PARTIAL =
-  'Some files were rejected; see uploads[].errorMessage for details';
-export const FUNNEL_UPLOAD_ALL_REJECTED =
-  'All files were rejected; see details[]';
+export const FUNNEL_UPLOAD_PARTIAL = 'Some files were rejected; see uploads[].errorMessage for details';
+export const FUNNEL_UPLOAD_ALL_REJECTED = 'All files were rejected; see details[]';
 export const FUNNEL_UPLOAD_NOT_FOUND = 'Upload not found or not owned by user';
-export const FUNNEL_UPLOAD_FILES_REQUIRED =
-  'At least one file is required in the files field';
-export const FUNNEL_UPLOAD_PARSE_FAILED =
-  'Could not extract text from the uploaded document';
-export const FUNNEL_UPLOAD_UNSUPPORTED_FILE_TYPE =
-  'Unsupported file type for text extraction';
-export const FUNNEL_UPLOAD_NO_EXTRACTABLE_TEXT =
-  'No extractable text found in document';
-export const FUNNEL_UPLOAD_NO_SLIDES =
-  'No slides found in presentation';
+export const FUNNEL_UPLOAD_FILES_REQUIRED = 'At least one file is required in the files field';
+export const FUNNEL_UPLOAD_PARSE_FAILED = 'Could not extract text from the uploaded document';
+export const FUNNEL_UPLOAD_UNSUPPORTED_FILE_TYPE = 'Unsupported file type for text extraction';
+export const FUNNEL_UPLOAD_NO_EXTRACTABLE_TEXT = 'No extractable text found in document';
+export const FUNNEL_UPLOAD_NO_SLIDES = 'No slides found in presentation';
 
 export const AI_GENERATION_FAILED = 'AI generation failed';
 
@@ -130,6 +124,7 @@ export const PASSWORD_RESET_EXPIRED = 'Reset code has expired. Please request a 
 export const PASSWORD_RESET_SUCCESSFUL = 'Password reset successful. You have been automatically logged in.';
 export const PASSWORD_RESET_RATE_LIMITED = 'Too many password reset requests. Please try again later.';
 export const PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED = 'Too many verification attempts. Please try again later.';
+export const PASSWORD_RESET_OTP_VERIFIED = 'OTP verified. Use the reset token to set your new password.';
 
 // Waitlist
 export const WAITLIST_JOINED_SUCCESSFULLY = 'Successfully joined the waitlist';
@@ -167,17 +162,13 @@ export const AI_PROVIDER_HTTP_ERROR = (provider: string, status: number) => `${p
 // Funnel generation (BE-305)
 export const FUNNEL_GENERATION_STARTED = 'Funnel generation started.';
 export const FUNNEL_ALREADY_EXISTS = 'Funnel already exists.';
-export const GENERATION_IN_PROGRESS =
-  'A funnel is already being generated for your account.';
+export const GENERATION_IN_PROGRESS = 'A funnel is already being generated for your account.';
 export const FUNNEL_NOT_FOUND = 'Funnel not found.';
 export const FUNNEL_STATUS_RETRIEVED = 'Funnel status retrieved.';
 export const GENERATION_SERVICE_UNAVAILABLE =
   'Funnel generation service is temporarily unavailable. Please try again shortly.';
 export const GENERATION_RATE_LIMIT_EXCEEDED =
   'You have started too many funnel generations recently. Please wait and try again.';
-export const UPLOAD_NOT_READY =
-  'One or more uploaded documents are not yet ready for funnel generation.';
-export const UPLOAD_OWNERSHIP_INVALID =
-  'One or more uploaded documents do not belong to you.';
-export const GENERATION_FAILED =
-  'Funnel generation failed. Please retry from the dashboard.';
+export const UPLOAD_NOT_READY = 'One or more uploaded documents are not yet ready for funnel generation.';
+export const UPLOAD_OWNERSHIP_INVALID = 'One or more uploaded documents do not belong to you.';
+export const GENERATION_FAILED = 'Funnel generation failed. Please retry from the dashboard.';
