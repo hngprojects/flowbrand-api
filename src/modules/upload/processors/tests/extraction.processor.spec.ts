@@ -8,6 +8,22 @@ import { ExtractionProcessor } from '../extraction.processor';
 import type { ExtractionJobPayload } from '../extraction.processor';
 import type { Job } from 'bull';
 
+jest.mock('pdf-parse/worker', () => ({
+  getData: jest.fn(() => ({})),
+}));
+
+jest.mock('pdf-parse', () => {
+  const mockPdfParse = jest.fn().mockImplementation(() => ({
+    getText: jest.fn().mockResolvedValue({ text: 'extracted pdf text' }),
+    destroy: jest.fn().mockResolvedValue(undefined),
+  }));
+  mockPdfParse.setWorker = jest.fn();
+
+  return {
+    PDFParse: mockPdfParse,
+  };
+});
+
 const UPLOAD_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const STORAGE_PATH = `funnels/user-1/${UPLOAD_ID}.pdf`;
 
@@ -86,8 +102,8 @@ describe('ExtractionProcessor', () => {
     await module.close();
   });
 
-  describe('handleExtraction — success path', () => {
-    it('fetches from storage, extracts text, and saves READY status', async () => {
+  describe('AC-01 — success path', () => {
+    it('AC-01: fetches from storage, extracts text, and saves READY status', async () => {
       await processor.handleExtraction(makeJob());
 
       expect(mockObjectStorage.getObject).toHaveBeenCalledWith(STORAGE_PATH);
@@ -106,8 +122,8 @@ describe('ExtractionProcessor', () => {
     });
   });
 
-  describe('AC-08 — extraction failure does not crash the worker', () => {
-    it('marks record FAILED when getObject throws', async () => {
+  describe('EC-01 — extraction failure does not crash the worker', () => {
+    it('EC-01: marks record FAILED when getObject throws', async () => {
       mockObjectStorage.getObject.mockRejectedValue(new Error('MinIO unreachable'));
 
       await expect(processor.handleExtraction(makeJob())).resolves.toBeUndefined();
@@ -121,7 +137,7 @@ describe('ExtractionProcessor', () => {
       );
     });
 
-    it('marks record FAILED when text extraction throws', async () => {
+    it('EC-02: marks record FAILED when text extraction throws', async () => {
       mockExtractor.extract.mockRejectedValue(new Error('Corrupted PDF'));
 
       await expect(processor.handleExtraction(makeJob())).resolves.toBeUndefined();
@@ -134,7 +150,7 @@ describe('ExtractionProcessor', () => {
       );
     });
 
-    it('truncates failure_reason to 200 chars', async () => {
+    it('EC-03: truncates failure_reason to 200 chars', async () => {
       mockExtractor.extract.mockRejectedValue(new Error('x'.repeat(300)));
 
       await processor.handleExtraction(makeJob());
@@ -144,14 +160,13 @@ describe('ExtractionProcessor', () => {
     });
   });
 
-  describe('record not found', () => {
-    it('throws before attempting extraction when upload record is missing', async () => {
+  describe('EC-04 — record not found', () => {
+    it('EC-04: skips extraction when upload record is missing', async () => {
       mockDocumentAction.get.mockResolvedValue(null);
 
-      await expect(processor.handleExtraction(makeJob())).rejects.toThrow(
-        `Upload record not found: ${UPLOAD_ID}`,
-      );
+      await expect(processor.handleExtraction(makeJob())).resolves.toBeUndefined();
 
+      expect(mockDocumentAction.saveDocument).not.toHaveBeenCalled();
       expect(mockObjectStorage.getObject).not.toHaveBeenCalled();
       expect(mockExtractor.extract).not.toHaveBeenCalled();
     });

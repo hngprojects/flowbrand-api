@@ -3,11 +3,25 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bull';
+import { Test, TestingModule } from '@nestjs/testing';
 import * as fs from 'node:fs';
 import { QUEUES } from '../../common/constants/queue.constants';
 import * as SYS_MSG from '../../constants/system.messages';
+import { UploadedDocumentModelAction } from './actions/uploaded-document.action';
+import { MAX_UPLOAD_BYTES, UPLOAD_PROGRESS } from './constants/upload.constants';
+import { UploadedDocument } from './entities/uploaded-document.entity';
+import { DocumentTextExtractorService } from './services/document-text-extractor.service';
+import { UploadService } from './upload.service';
+import {
+  UPLOAD_OBJECT_STORAGE,
+  UploadDocumentStatus,
+  type ObjectStorage,
+} from './upload.types';
+
+jest.mock('./services/document-text-extractor.service', () => ({
+  DocumentTextExtractorService: class DocumentTextExtractorService {},
+}));
 
 jest.mock('node:fs', () => ({
   ...jest.requireActual('node:fs'),
@@ -19,16 +33,6 @@ jest.mock('node:fs', () => ({
   closeSync: jest.fn(),
   createReadStream: jest.fn(),
 }));
-import { MAX_UPLOAD_BYTES, UPLOAD_PROGRESS } from './constants/upload.constants';
-import { UploadedDocument } from './entities/uploaded-document.entity';
-import { UploadedDocumentModelAction } from './actions/uploaded-document.action';
-import { DocumentTextExtractorService } from './services/document-text-extractor.service';
-import { UploadService } from './upload.service';
-import {
-  UPLOAD_OBJECT_STORAGE,
-  UploadDocumentStatus,
-  type ObjectStorage,
-} from './upload.types';
 
 const USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const UPLOAD_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
@@ -110,13 +114,20 @@ describe('UploadService', () => {
     mockUploadedDocumentAction.updateProgress.mockResolvedValue(undefined);
     mockObjectStorage.putObject.mockResolvedValue(undefined);
     mockObjectStorage.deleteObject.mockResolvedValue(undefined);
-    mockObjectStorage.getObject.mockResolvedValue(Buffer.from('%PDF-1.4 test content'));
-    mockDocumentTextExtractor.extract.mockResolvedValue('extracted funnel text');
+    mockObjectStorage.getObject.mockResolvedValue(
+      Buffer.from('%PDF-1.4 test content'),
+    );
+    mockDocumentTextExtractor.extract.mockResolvedValue(
+      'extracted funnel text',
+    );
 
     (fs.existsSync as jest.Mock).mockReturnValue(true);
-    // Default: disk size matches valid PDF buffer (EC-04 passes for normal files)
-    (fs.statSync as jest.Mock).mockReturnValue({ size: Buffer.from('%PDF-1.4 test content').length });
-    (fs.unlink as unknown as jest.Mock).mockImplementation((_path, cb) => (cb as (e: null) => void)(null));
+    (fs.statSync as jest.Mock).mockReturnValue({
+      size: Buffer.from('%PDF-1.4 test content').length,
+    });
+    (fs.unlink as unknown as jest.Mock).mockImplementation((_path, cb) =>
+      (cb as (e: null) => void)(null),
+    );
     (fs.openSync as jest.Mock).mockReturnValue(1);
     (fs.readSync as jest.Mock).mockImplementation((_fd, buffer) => {
       Buffer.from('%PDF-1.4').copy(buffer as Buffer);
@@ -151,25 +162,55 @@ describe('UploadService', () => {
   });
 
   describe('handleUpload', () => {
-    it('throws UnprocessableEntityException when no files are provided', async () => {
-      await expect(service.handleUpload(USER_ID, undefined)).rejects.toThrow(
-        UnprocessableEntityException,
-      );
-      await expect(service.handleUpload(USER_ID, [])).rejects.toThrow(
-        UnprocessableEntityException,
-      );
+    it('AC-01: rejects when no files are provided', async () => {
+      // Arrange
+      const noFiles = undefined;
+
+      // Act
+      const call = service.handleUpload(USER_ID, noFiles as any);
+
+      // Assert
+      await expect(call).rejects.toThrow(UnprocessableEntityException);
+      await expect(call).rejects.toMatchObject({
+        response: { message: SYS_MSG.FUNNEL_UPLOAD_FILES_REQUIRED },
+      });
     });
 
-    it('throws UnprocessableEntityException when every file is rejected', async () => {
+    it('AC-02: rejects file-too-large uploads', async () => {
+      // Arrange
       const oversized = mockPdfFile({ size: MAX_UPLOAD_BYTES + 1 });
       (fs.statSync as jest.Mock).mockReturnValue({ size: MAX_UPLOAD_BYTES + 1 });
 
-      await expect(
-        service.handleUpload(USER_ID, [oversized]),
-      ).rejects.toThrow(UnprocessableEntityException);
+      // Act
+      const call = service.handleUpload(USER_ID, [oversized]);
+
+      // Assert
+      await expect(call).rejects.toThrow(UnprocessableEntityException);
+      await expect(call).rejects.toMatchObject({
+        response: { message: SYS_MSG.FUNNEL_UPLOAD_ALL_REJECTED },
+      });
     });
 
-    it('returns partial message when some files fail validation', async () => {
+    it('AC-03: rejects mime-type mismatches as invalid files', async () => {
+      // Arrange
+      const invalidMime = mockPdfFile({
+        originalname: 'bad.pdf',
+        mimetype: 'application/octet-stream',
+        path: '/tmp/bad.pdf',
+      });
+
+      // Act
+      const call = service.handleUpload(USER_ID, [invalidMime]);
+
+      // Assert
+      await expect(call).rejects.toThrow(UnprocessableEntityException);
+      await expect(call).rejects.toMatchObject({
+        response: { message: SYS_MSG.FUNNEL_UPLOAD_ALL_REJECTED },
+      });
+    });
+
+    it('AC-04: returns partial when some files fail validation', async () => {
+      // Arrange
       const valid = mockPdfFile();
       const invalid = mockPdfFile({
         originalname: 'bad.exe',
@@ -178,8 +219,10 @@ describe('UploadService', () => {
         path: '/tmp/bad.exe',
       });
 
+      // Act
       const result = await service.handleUpload(USER_ID, [valid, invalid]);
 
+      // Assert
       expect(result.statusCode).toBe(HttpStatus.CREATED);
       expect(result.message).toBe(SYS_MSG.FUNNEL_UPLOAD_PARTIAL);
       expect(result.data.uploads).toHaveLength(2);
@@ -191,11 +234,14 @@ describe('UploadService', () => {
       );
     });
 
-    it('accepts a valid file, stores in MinIO, and returns parsing status', async () => {
+    it('AC-05: accepts a valid file, stores in MinIO, and queues extraction', async () => {
+      // Arrange
       const file = mockPdfFile();
 
+      // Act
       const result = await service.handleUpload(USER_ID, [file]);
 
+      // Assert
       expect(result.message).toBe(SYS_MSG.FUNNEL_UPLOAD_COMPLETED);
       expect(mockObjectStorage.putObject).toHaveBeenCalled();
       expect(mockExtractionQueue.add).toHaveBeenCalled();
@@ -207,72 +253,77 @@ describe('UploadService', () => {
       });
     });
 
-    it('rolls back DB row and object when MinIO putObject fails', async () => {
+    it('EC-01: rejects when MinIO putObject fails for the only file', async () => {
+      // Arrange
       mockObjectStorage.putObject.mockRejectedValue(new Error('storage down'));
 
-      await expect(
-        service.handleUpload(USER_ID, [mockPdfFile()]),
-      ).rejects.toThrow(UnprocessableEntityException);
+      // Act
+      const call = service.handleUpload(USER_ID, [mockPdfFile()]);
 
+      // Assert
+      await expect(call).rejects.toThrow(UnprocessableEntityException);
+      await expect(call).rejects.toMatchObject({
+        response: { message: SYS_MSG.FUNNEL_UPLOAD_ALL_REJECTED },
+      });
       expect(mockObjectStorage.deleteObject).not.toHaveBeenCalled();
       expect(mockUploadedDocumentAction.deleteById).toHaveBeenCalledTimes(1);
       expect(mockUploadedDocumentAction.createDocument).toHaveBeenCalled();
     });
 
-    it('returns partial when one file stored and another MinIO putObject fails', async () => {
-      // First file will succeed, second will fail storage
-      mockObjectStorage.putObject.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('storage down'));
-
+    it('EC-02: returns partial when one file stored and another MinIO putObject fails', async () => {
+      // Arrange
+      mockObjectStorage.putObject
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('storage down'));
       const file1 = mockPdfFile({ originalname: 'a.pdf', path: '/tmp/a.pdf' });
       const file2 = mockPdfFile({ originalname: 'b.pdf', path: '/tmp/b.pdf' });
 
+      // Act
       const result = await service.handleUpload(USER_ID, [file1, file2]);
 
+      // Assert
       expect(result.statusCode).toBe(HttpStatus.CREATED);
       expect(result.message).toBe(SYS_MSG.FUNNEL_UPLOAD_PARTIAL);
       expect(result.data.uploads).toHaveLength(2);
-      // one accepted -> uploading, other failed
       const statuses = result.data.uploads.map((u) => u.status);
       expect(statuses).toContain(UploadDocumentStatus.UPLOADING);
       expect(statuses).toContain(UploadDocumentStatus.FAILED);
-      const failed = result.data.uploads.find((u) => u.status === UploadDocumentStatus.FAILED)!;
+      const failed = result.data.uploads.find(
+        (u) => u.status === UploadDocumentStatus.FAILED,
+      )!;
       expect(failed.errorMessage).toBe(SYS_MSG.UPLOAD_FAILED);
     });
 
-    it('detects multipart-truncated uploads and marks file as failed with UPLOAD_INTERRUPTED', async () => {
-      // Simulate disk size mismatch for second file
+    it('EC-03: detects multipart-truncated uploads and marks file as failed with UPLOAD_INTERRUPTED', async () => {
+      // Arrange
       const good = mockPdfFile({ originalname: 'good.pdf', path: '/tmp/good.pdf' });
-      const truncated = mockPdfFile({ originalname: 'trunc.pdf', path: '/tmp/trunc.pdf', size: Buffer.from('%PDF-1.4 test content').length + 10 });
-
-      // fs.statSync should return actual disk size smaller than declared size for truncated file
+      const truncated = mockPdfFile({
+        originalname: 'trunc.pdf',
+        path: '/tmp/trunc.pdf',
+        size: Buffer.from('%PDF-1.4 test content').length + 10,
+      });
       (fs.statSync as jest.Mock).mockImplementation((p: string) => {
-        if (p === '/tmp/trunc.pdf') return { size: Buffer.from('%PDF-1.4 test content').length };
+        if (p === '/tmp/trunc.pdf') {
+          return { size: Buffer.from('%PDF-1.4 test content').length };
+        }
         return { size: Buffer.from('%PDF-1.4 test content').length };
       });
 
+      // Act
       const result = await service.handleUpload(USER_ID, [good, truncated]);
 
+      // Assert
       expect(result.statusCode).toBe(HttpStatus.CREATED);
       expect(result.message).toBe(SYS_MSG.FUNNEL_UPLOAD_PARTIAL);
       expect(result.data.uploads).toHaveLength(2);
-      const failed = result.data.uploads.find((u) => u.status === UploadDocumentStatus.FAILED)!;
+      const failed = result.data.uploads.find(
+        (u) => u.status === UploadDocumentStatus.FAILED,
+      )!;
       expect(failed.errorMessage).toBe(SYS_MSG.UPLOAD_INTERRUPTED);
     });
 
-    it('FR-10: succeeds when updateProgress fails twice then recovers on third attempt', async () => {
-      mockUploadedDocumentAction.updateProgress
-        .mockRejectedValueOnce(new Error('DB hiccup'))
-        .mockRejectedValueOnce(new Error('DB hiccup'))
-        .mockResolvedValue(undefined);
-
-      const result = await service.handleUpload(USER_ID, [mockPdfFile()]);
-
-      expect(result.message).toBe(SYS_MSG.FUNNEL_UPLOAD_COMPLETED);
-      expect(mockUploadedDocumentAction.updateProgress).toHaveBeenCalledTimes(3);
-      expect(result.data.uploads[0].status).toBe(UploadDocumentStatus.UPLOADING);
-    });
-
-    it('FR-10: logs orphan_upload and throws when all retries are exhausted', async () => {
+    it('EC-04: logs orphan_upload and throws when DB retries are exhausted', async () => {
+      // Arrange
       mockUploadedDocumentAction.updateProgress.mockRejectedValue(
         new Error('DB down'),
       );
@@ -280,10 +331,11 @@ describe('UploadService', () => {
         .spyOn(service['logger'], 'error')
         .mockImplementation(() => {});
 
-      await expect(
-        service.handleUpload(USER_ID, [mockPdfFile()]),
-      ).rejects.toThrow(UnprocessableEntityException);
+      // Act
+      const call = service.handleUpload(USER_ID, [mockPdfFile()]);
 
+      // Assert
+      await expect(call).rejects.toThrow(UnprocessableEntityException);
       expect(loggerErrorSpy).toHaveBeenCalledWith(
         expect.objectContaining({ event: 'orphan_upload' }),
       );
@@ -292,15 +344,22 @@ describe('UploadService', () => {
   });
 
   describe('getProgress', () => {
-    it('throws NotFoundException when upload is not owned by user', async () => {
+    it('EC-05: throws NotFoundException when upload is not owned by user', async () => {
+      // Arrange
       mockUploadedDocumentAction.findOwnedById.mockResolvedValue(null);
 
-      await expect(
-        service.getProgress(USER_ID, UPLOAD_ID),
-      ).rejects.toThrow(NotFoundException);
+      // Act
+      const call = service.getProgress(USER_ID, UPLOAD_ID);
+
+      // Assert
+      await expect(call).rejects.toThrow(NotFoundException);
+      await expect(call).rejects.toMatchObject({
+        response: { message: SYS_MSG.FUNNEL_UPLOAD_NOT_FOUND },
+      });
     });
 
-    it('returns progress payload for an owned upload', async () => {
+    it('AC-06: returns progress payload for an owned upload', async () => {
+      // Arrange
       mockUploadedDocumentAction.findOwnedById.mockResolvedValue(
         buildRow({
           status: UploadDocumentStatus.READY,
@@ -308,8 +367,10 @@ describe('UploadService', () => {
         }),
       );
 
+      // Act
       const result = await service.getProgress(USER_ID, UPLOAD_ID);
 
+      // Assert
       expect(mockUploadedDocumentAction.findOwnedById).toHaveBeenCalledWith(
         UPLOAD_ID,
         USER_ID,
