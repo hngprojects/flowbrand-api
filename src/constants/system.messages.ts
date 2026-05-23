@@ -125,6 +125,7 @@ export const PASSWORD_RESET_SUCCESSFUL = 'Password reset successful. You have be
 export const PASSWORD_RESET_RATE_LIMITED = 'Too many password reset requests. Please try again later.';
 export const PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED = 'Too many verification attempts. Please try again later.';
 export const PASSWORD_RESET_OTP_VERIFIED = 'OTP verified. Use the reset token to set your new password.';
+export const PASSWORD_RESET_INVALID_TOKEN = 'Invalid or expired reset token.';
 
 // Waitlist
 export const WAITLIST_JOINED_SUCCESSFULLY = 'Successfully joined the waitlist';

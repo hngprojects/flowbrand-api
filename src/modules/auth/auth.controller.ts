@@ -180,6 +180,7 @@ export class AuthController {
     res.json({ statusCode: HttpStatus.OK, message: result.message });
   }
 
+  /** Step 2 of password reset: validates OTP and returns a single-use reset_token. */
   @Public()
   @Post('verify-reset-otp')
   @HttpCode(HttpStatus.OK)

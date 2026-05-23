@@ -585,7 +585,7 @@ export const ResetPasswordDocs = () =>
       schema: {
         example: {
           statusCode: HttpStatus.BAD_REQUEST,
-          message: SYS_MSG.PASSWORD_RESET_INVALID_OTP,
+          message: SYS_MSG.PASSWORD_RESET_INVALID_TOKEN,
         },
       },
     }),

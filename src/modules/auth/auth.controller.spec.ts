@@ -95,9 +95,9 @@ describe('AuthController - Password Reset Flow (BE-012)', () => {
   const USER_EMAIL = 'user@example.com';
   const OTP_CODE = '123456';
   const NEW_PASSWORD = 'NewSecurePass123!';
-  const RESET_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.reset...';
-  const ACCESS_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
-  const REFRESH_TOKEN = 'refresh-token-123';
+  const RESET_TOKEN = 'reset-token';
+  const ACCESS_TOKEN = 'access-token';
+  const REFRESH_TOKEN = 'refresh-token';
 
   const mockAuthService = {
     forgotPassword: jest.fn(),
@@ -168,7 +168,7 @@ describe('AuthController - Password Reset Flow (BE-012)', () => {
       );
 
       await expect(controller.forgotPassword(forgotPasswordDto, mockResponse as Response)).rejects.toThrow(
-        HttpException,
+        new HttpException(SYS_MSG.PASSWORD_RESET_RATE_LIMITED, HttpStatus.TOO_MANY_REQUESTS),
       );
     });
 
@@ -209,7 +209,9 @@ describe('AuthController - Password Reset Flow (BE-012)', () => {
         new HttpException(SYS_MSG.PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS),
       );
 
-      await expect(controller.verifyResetOtp({ email: USER_EMAIL, otp_code: OTP_CODE })).rejects.toThrow(HttpException);
+      await expect(controller.verifyResetOtp({ email: USER_EMAIL, otp_code: OTP_CODE })).rejects.toThrow(
+        new HttpException(SYS_MSG.PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS),
+      );
     });
   });
 
@@ -261,14 +263,17 @@ describe('AuthController - Password Reset Flow (BE-012)', () => {
       process.env.NODE_ENV = 'production';
       mockAuthService.resetPassword.mockResolvedValue(authResponse);
 
-      await controller.resetPassword(resetPasswordDto, mockResponse as Response);
+      try {
+        await controller.resetPassword(resetPasswordDto, mockResponse as Response);
 
-      expect(mockResponse.cookie).toHaveBeenCalledWith(
-        'refreshToken',
-        REFRESH_TOKEN,
-        expect.objectContaining({ httpOnly: true, secure: true, sameSite: 'strict' }),
-      );
-      process.env.NODE_ENV = originalEnv;
+        expect(mockResponse.cookie).toHaveBeenCalledWith(
+          'refreshToken',
+          REFRESH_TOKEN,
+          expect.objectContaining({ httpOnly: true, secure: true, sameSite: 'strict' }),
+        );
+      } finally {
+        process.env.NODE_ENV = originalEnv;
+      }
     });
 
     it('handles service errors without setting cookie', async () => {

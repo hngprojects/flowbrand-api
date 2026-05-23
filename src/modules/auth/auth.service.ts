@@ -4,6 +4,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
   Logger,
   Optional,
@@ -28,6 +29,7 @@ import { EmailService } from '../../email/email.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import type { GoogleOAuthProfile, OAuthLoginResponse } from './interface/google-oauth.interface';
+import { maskEmail } from '../../utils/pii.utils';
 import { JwtPayload } from './strategies/jwt.strategy';
 
 export interface AuthTokens {
@@ -408,7 +410,7 @@ export class AuthService {
     const user = await this.usersService.findByEmail(email);
 
     if (!user) {
-      this.logger.debug({ message: 'Password reset requested for non-existent email', email });
+      this.logger.debug({ message: 'Password reset requested for non-existent email', email: maskEmail(email) });
       return { message: SYS_MSG.PASSWORD_RESET_OTP_SENT };
     }
 
@@ -462,11 +464,15 @@ export class AuthService {
     this.logger.log({
       message: 'Password reset OTP generated and queued',
       userId: user.id,
-      email: user.email,
+      email: maskEmail(user.email),
       expiresIn: '15 minutes',
     });
   }
 
+  /**
+   * Validates a password-reset OTP and returns a single-use `reset_token` JWT
+   * (15 min). The token must be passed to `resetPassword` to complete the flow.
+   */
   async verifyResetOtp(email: string, otpCode: string): Promise<{ reset_token: string }> {
     const user = await this.usersService.findByEmail(email);
 
@@ -515,10 +521,13 @@ export class AuthService {
 
       await this.redisService.del(attemptsKey);
 
+      const jti = crypto.randomUUID();
       const reset_token = await this.jwtService.signAsync(
-        { sub: user.id, userId: user.id, type: 'password_reset' },
+        { sub: user.id, userId: user.id, type: 'password_reset', jti },
         { secret: env.JWT_ACCESS_SECRET, expiresIn: '15m' },
       );
+      // 900 s matches the 15 m token expiry — key is atomically consumed in resetPassword.
+      await this.redisService.set(`password-reset:jti:${user.id}`, jti, 900);
 
       this.logger.log({ message: 'Password reset OTP verified', userId: user.id });
 
@@ -528,23 +537,37 @@ export class AuthService {
     }
   }
 
+  /**
+   * Validates a single-use `reset_token` issued by `verifyResetOtp` and sets
+   * the user's new password. Auto-logs the user in on success.
+   */
   async resetPassword(resetToken: string, newPassword: string): Promise<AuthResponse> {
-    let payload: { sub: string; userId: string; type: string };
+    let payload: { sub: string; userId: string; type: string; jti?: string };
 
     try {
       payload = await this.jwtService.verifyAsync(resetToken, { secret: env.JWT_ACCESS_SECRET });
     } catch {
-      throw new BadRequestException(SYS_MSG.PASSWORD_RESET_INVALID_OTP);
+      throw new BadRequestException(SYS_MSG.PASSWORD_RESET_INVALID_TOKEN);
     }
 
     if (payload.type !== 'password_reset') {
-      throw new BadRequestException(SYS_MSG.PASSWORD_RESET_INVALID_OTP);
+      throw new BadRequestException(SYS_MSG.PASSWORD_RESET_INVALID_TOKEN);
     }
 
-    const user = await this.usersService.findById(payload.userId).catch(() => null);
+    // Atomically consume the JTI — rejects replays and tokens not issued via verifyResetOtp.
+    const storedJti = await this.redisService.getdel(`password-reset:jti:${payload.userId}`);
+    if (!storedJti || storedJti !== payload.jti) {
+      throw new BadRequestException(SYS_MSG.PASSWORD_RESET_INVALID_TOKEN);
+    }
 
-    if (!user) {
-      throw new BadRequestException(SYS_MSG.PASSWORD_RESET_INVALID_OTP);
+    let user: User;
+    try {
+      user = await this.usersService.findById(payload.userId);
+    } catch (err) {
+      if (err instanceof NotFoundException) {
+        throw new BadRequestException(SYS_MSG.PASSWORD_RESET_INVALID_TOKEN);
+      }
+      throw err;
     }
 
     await this.usersService.update(user.id, { password: newPassword });
@@ -553,11 +576,7 @@ export class AuthService {
 
     const authResponse = await this.issueTokens(user);
 
-    this.logger.log({
-      message: 'Password reset successful with auto-login',
-      userId: user.id,
-      email: user.email,
-    });
+    this.logger.log({ message: 'Password reset successful with auto-login', userId: user.id, email: maskEmail(user.email) });
 
     return authResponse;
   }

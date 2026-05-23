@@ -1,6 +1,7 @@
 import {
   HttpException,
   HttpStatus,
+  NotFoundException,
   UnauthorizedException,
   ForbiddenException,
   BadRequestException,
@@ -488,6 +489,7 @@ describe('AuthService - Password Reset Flow (BE-012)', () => {
     del: jest.fn(),
     set: jest.fn(),
     get: jest.fn(),
+    getdel: jest.fn(),
     setNx: jest.fn(),
     setStrict: jest.fn(),
   };
@@ -674,7 +676,8 @@ describe('AuthService - Password Reset Flow (BE-012)', () => {
 
   describe('resetPassword', () => {
     const RESET_TOKEN = 'valid.reset.token';
-    const VALID_PAYLOAD = { sub: USER_ID, userId: USER_ID, type: 'password_reset' };
+    const VALID_JTI = 'test-jti-uuid-1234';
+    const VALID_PAYLOAD = { sub: USER_ID, userId: USER_ID, type: 'password_reset', jti: VALID_JTI };
 
     beforeEach(() => {
       mockJwtService.verifyAsync.mockResolvedValue(VALID_PAYLOAD);
@@ -684,6 +687,7 @@ describe('AuthService - Password Reset Flow (BE-012)', () => {
       mockUserSessionModelAction.createSession.mockResolvedValue({ id: 'new-session' });
       mockUsersService.update.mockResolvedValue({ ...validUser });
       mockRedisService.setStrict.mockResolvedValue(undefined);
+      mockRedisService.getdel.mockResolvedValue(VALID_JTI);
     });
 
     it('AC-06: successfully resets password and auto-logs in user', async () => {
@@ -698,23 +702,39 @@ describe('AuthService - Password Reset Flow (BE-012)', () => {
       mockJwtService.verifyAsync.mockRejectedValue(new Error('jwt expired'));
 
       await expect(service.resetPassword(RESET_TOKEN, NEW_PASSWORD)).rejects.toThrow(
-        SYS_MSG.PASSWORD_RESET_INVALID_OTP,
+        SYS_MSG.PASSWORD_RESET_INVALID_TOKEN,
       );
     });
 
     it('AC-07: throws 400 when token type is not password_reset', async () => {
-      mockJwtService.verifyAsync.mockResolvedValue({ userId: USER_ID, type: 'access' });
+      mockJwtService.verifyAsync.mockResolvedValue({ userId: USER_ID, type: 'access', jti: VALID_JTI });
 
       await expect(service.resetPassword(RESET_TOKEN, NEW_PASSWORD)).rejects.toThrow(
-        SYS_MSG.PASSWORD_RESET_INVALID_OTP,
+        SYS_MSG.PASSWORD_RESET_INVALID_TOKEN,
+      );
+    });
+
+    it('AC-08: throws 400 when JTI has already been consumed (replay attempt)', async () => {
+      mockRedisService.getdel.mockResolvedValue(null);
+
+      await expect(service.resetPassword(RESET_TOKEN, NEW_PASSWORD)).rejects.toThrow(
+        SYS_MSG.PASSWORD_RESET_INVALID_TOKEN,
+      );
+    });
+
+    it('AC-08: throws 400 when JTI does not match token payload (token swapped)', async () => {
+      mockRedisService.getdel.mockResolvedValue('different-jti');
+
+      await expect(service.resetPassword(RESET_TOKEN, NEW_PASSWORD)).rejects.toThrow(
+        SYS_MSG.PASSWORD_RESET_INVALID_TOKEN,
       );
     });
 
     it('AC-09: throws 400 when user no longer exists', async () => {
-      mockUsersService.findById.mockRejectedValue(new Error('not found'));
+      mockUsersService.findById.mockRejectedValue(new NotFoundException('not found'));
 
       await expect(service.resetPassword(RESET_TOKEN, NEW_PASSWORD)).rejects.toThrow(
-        SYS_MSG.PASSWORD_RESET_INVALID_OTP,
+        SYS_MSG.PASSWORD_RESET_INVALID_TOKEN,
       );
     });
 
