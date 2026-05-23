@@ -246,7 +246,7 @@ export class FunnelGenerationProcessor {
   }
 
   @OnQueueFailed()
-  onFailed(job: Job<GenerateFunnelJobPayload>, error: Error): void {
+  async onFailed(job: Job<GenerateFunnelJobPayload>, error: Error): Promise<void> {
     const maxAttempts = job.opts.attempts ?? 3;
     const willRetry = job.attemptsMade < maxAttempts;
 
@@ -259,6 +259,14 @@ export class FunnelGenerationProcessor {
       maxAttempts,
       willRetry,
     });
+
+    if (!willRetry) {
+      await this.funnelAction.update({
+        identifierOptions: { id: job.data.funnelId },
+        updatePayload: { status: FunnelStatus.FAILED },
+        transactionOptions: { useTransaction: false },
+      });
+    }
   }
 
   @OnQueueStalled()
