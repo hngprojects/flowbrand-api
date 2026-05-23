@@ -239,13 +239,13 @@ export class AuthController {
   @Post('google/exchange')
   @HttpCode(HttpStatus.OK)
   @GoogleExchangeDocs()
-  async googleExchange(@Body() dto: GoogleExchangeDto, @Res() res: Response): Promise<Response> {
+  async googleExchange(@Body() dto: GoogleExchangeDto, @Res() res: Response): Promise<void> {
     const oauthResult = await this.authService.exchangeCode(dto.code);
 
     res.cookie('refreshToken', oauthResult.refreshToken, this.getRefreshCookieOptions());
 
     // Return access token and user info matching the standard response template
-    return res.json({
+    res.json({
       statusCode: HttpStatus.OK,
       message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
       data: {
