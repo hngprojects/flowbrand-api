@@ -1,4 +1,10 @@
-import { HttpException, HttpStatus, UnauthorizedException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  UnauthorizedException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
@@ -113,7 +119,7 @@ describe('AuthService login lockout (BE-005)', () => {
         }),
       );
 
-      expect.assertions(3);
+      expect.assertions(4);
       try {
         await service.login(LOGIN_DTO);
       } catch (err) {
@@ -123,7 +129,7 @@ describe('AuthService login lockout (BE-005)', () => {
         expect(httpErr.message).toBe(SYS_MSG.AUTH_ACCOUNT_LOCKED);
       }
 
-      expect(bcrypt.compare).not.toHaveBeenCalled;
+      expect(bcrypt.compare).not.toHaveBeenCalled();
     });
 
     it('proceeds with credential check when locked_until is in the past', async () => {
@@ -165,7 +171,7 @@ describe('AuthService login lockout (BE-005)', () => {
       mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata({ failed_attempts: 4 }));
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
-      expect.assertions(4);
+      expect.assertions(5);
       try {
         await service.login(LOGIN_DTO);
       } catch (err) {
@@ -177,11 +183,13 @@ describe('AuthService login lockout (BE-005)', () => {
 
       expect(mockAuthMetadataModelAction.updateByUserId).toHaveBeenCalledWith(
         TEST_USER.id,
-        expect.objectContaining({
-          failed_attempts: 5,
-          locked_until: expect.any(Date),
-        }),
+        expect.objectContaining({ failed_attempts: 5 }),
       );
+      const [, lockPayload] = mockAuthMetadataModelAction.updateByUserId.mock.calls[0] as [
+        string,
+        { locked_until: unknown },
+      ];
+      expect(lockPayload.locked_until).toBeInstanceOf(Date);
     });
 
     it('sets locked_until ~1 hour in the future on lock', async () => {
@@ -193,8 +201,11 @@ describe('AuthService login lockout (BE-005)', () => {
       await service.login(LOGIN_DTO).catch(() => undefined);
       const after = Date.now();
 
-      const call = mockAuthMetadataModelAction.updateByUserId.mock.calls[0];
-      const lockedUntil = (call[1] as { locked_until: Date }).locked_until;
+      const [, updatePayload] = mockAuthMetadataModelAction.updateByUserId.mock.calls[0] as [
+        string,
+        { locked_until: Date },
+      ];
+      const lockedUntil = updatePayload.locked_until;
       const oneHourMs = 60 * 60 * 1000;
       expect(lockedUntil.getTime()).toBeGreaterThanOrEqual(before + oneHourMs);
       expect(lockedUntil.getTime()).toBeLessThanOrEqual(after + oneHourMs);
@@ -211,12 +222,13 @@ describe('AuthService login lockout (BE-005)', () => {
 
       expect(mockAuthMetadataModelAction.updateByUserId).toHaveBeenCalledWith(
         TEST_USER.id,
-        expect.objectContaining({
-          failed_attempts: 0,
-          locked_until: null,
-          last_login_at: expect.any(Date),
-        }),
+        expect.objectContaining({ failed_attempts: 0, locked_until: null }),
       );
+      const [, loginPayload] = mockAuthMetadataModelAction.updateByUserId.mock.calls[0] as [
+        string,
+        { last_login_at: unknown },
+      ];
+      expect(loginPayload.last_login_at).toBeInstanceOf(Date);
     });
 
     it('issues access + refresh tokens', async () => {
@@ -269,14 +281,14 @@ describe('AuthService login lockout (BE-005)', () => {
       await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(UnauthorizedException);
     });
 
-      it('throws 403 Forbidden when the user is not verified', async () => {
-    mockUsersService.findByEmail.mockResolvedValue({
-      ...TEST_USER,
-      is_verified: false,
-    });
+    it('throws 403 Forbidden when the user is not verified', async () => {
+      mockUsersService.findByEmail.mockResolvedValue({
+        ...TEST_USER,
+        is_verified: false,
+      });
 
-    await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(ForbiddenException);
-  });
+      await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(ForbiddenException);
+    });
   });
 
   describe('Google OAuth login', () => {
@@ -354,7 +366,7 @@ describe('AuthService login lockout (BE-005)', () => {
     });
   });
 
-    describe('Google OAuth Short-lived Exchange Flow', () => {
+  describe('Google OAuth Short-lived Exchange Flow', () => {
     const mockProfile = {
       provider: 'google' as const,
       providerId: 'google-123',
@@ -397,17 +409,13 @@ describe('AuthService login lockout (BE-005)', () => {
 
         expect(code).toBeDefined();
         expect(code).toHaveLength(64); // 32 bytes in hex = 64 characters
-        expect(mockRedisService.setStrict).toHaveBeenCalledWith(
-          `oauth:exchange:${code}`,
-          expect.any(String),
-          60,
-        );
+        expect(mockRedisService.setStrict).toHaveBeenCalledWith(`oauth:exchange:${code}`, expect.any(String), 60);
 
-        const exchangeCall = mockRedisService.setStrict.mock.calls.find(
-          (call) => call[0] === `oauth:exchange:${code}`
-        );
+        const exchangeCall = (
+          mockRedisService.setStrict.mock.calls as [string, string, number][]
+        ).find(([key]) => key === `oauth:exchange:${code}`);
 
-        const storedData = JSON.parse(exchangeCall[1]);
+        const storedData = JSON.parse(exchangeCall?.[1] ?? '{}') as { accessToken: string; refreshToken: string };
         expect(storedData).toMatchObject({
           accessToken: 'signed.jwt.token',
           refreshToken: 'signed.jwt.token',
@@ -439,13 +447,6 @@ describe('AuthService login lockout (BE-005)', () => {
 
 describe('AuthService - Password Reset Flow (BE-012)', () => {
   let service: AuthService;
-  let mockUsersService: any;
-  let mockJwtService: any;
-  let mockRedisService: any;
-  let mockUserSessionModelAction: any;
-  let mockAuthMetadataModelAction: any;
-  let mockOtpTokenModelAction: any;
-  let mockEmailService: any;
 
   const USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const USER_EMAIL = 'user@example.com';
@@ -469,56 +470,62 @@ describe('AuthService - Password Reset Flow (BE-012)', () => {
     expires_at: new Date(Date.now() + 15 * 60 * 1000),
   };
 
+  const mockUsersService = {
+    findByEmail: jest.fn(),
+    update: jest.fn(),
+    findById: jest.fn(),
+  };
+
+  const mockJwtService = {
+    signAsync: jest.fn(),
+    verifyAsync: jest.fn(),
+  };
+
+  const mockRedisService = {
+    incr: jest.fn(),
+    expire: jest.fn(),
+    rateLimit: jest.fn(),
+    del: jest.fn(),
+    set: jest.fn(),
+    get: jest.fn(),
+    setNx: jest.fn(),
+    setStrict: jest.fn(),
+  };
+
+  const mockUserSessionModelAction = {
+    findById: jest.fn(),
+    findByUserId: jest.fn(),
+    updateById: jest.fn(),
+    deleteById: jest.fn(),
+    createSession: jest.fn(),
+  };
+
+  const mockAuthMetadataModelAction = {
+    findByUserId: jest.fn(),
+    updateByUserId: jest.fn(),
+    createForUser: jest.fn(),
+  };
+
+  const mockOtpTokenModelAction = {
+    findByUserAndType: jest.fn(),
+    replaceToken: jest.fn(),
+    delete: jest.fn(),
+  };
+
+  const mockEmailService = {
+    sendPasswordReset: jest.fn(),
+    sendOtpVerification: jest.fn(),
+    sendOtpReset: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
-   
-    mockUsersService = {
-      findByEmail: jest.fn(),
-      update: jest.fn(),
-      findById: jest.fn(),
-    };
 
-    mockJwtService = {
-      signAsync: jest.fn().mockResolvedValue('signed.jwt.token'),
-      verifyAsync: jest.fn(),
-    };
-
-    mockRedisService = {
-      incr: jest.fn(),
-      expire: jest.fn(),
-      rateLimit: jest.fn(),
-      del: jest.fn(),
-      set: jest.fn().mockResolvedValue('OK'),
-      get: jest.fn(),
-      setNx: jest.fn().mockResolvedValue(1),  
-      setStrict: jest.fn().mockResolvedValue(undefined),
-    };
-
-    mockUserSessionModelAction = {
-      findById: jest.fn(),
-      findByUserId: jest.fn(),
-      updateById: jest.fn(),
-      deleteById: jest.fn(),
-      createSession: jest.fn(),
-    };
-
-    mockAuthMetadataModelAction = {
-      findByUserId: jest.fn(),
-      updateByUserId: jest.fn(),
-      createForUser: jest.fn(),
-    };
-
-    mockOtpTokenModelAction = {
-      findByUserAndType: jest.fn(),
-      replaceToken: jest.fn(),
-      delete: jest.fn(),
-    };
-
-    mockEmailService = {
-      sendPasswordReset: jest.fn().mockResolvedValue({ id: 'email-job-id' }),
-      sendOtpVerification: jest.fn(),
-      sendOtpReset: jest.fn(),
-    };
+    mockJwtService.signAsync.mockResolvedValue('signed.jwt.token');
+    mockRedisService.set.mockResolvedValue('OK');
+    mockRedisService.setNx.mockResolvedValue(1);
+    mockRedisService.setStrict.mockResolvedValue(undefined);
+    mockEmailService.sendPasswordReset.mockResolvedValue({ id: 'email-job-id' });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -580,10 +587,10 @@ describe('AuthService - Password Reset Flow (BE-012)', () => {
 
       await service.forgotPassword(USER_EMAIL);
 
-      const replaceCall = mockOtpTokenModelAction.replaceToken.mock.calls[0][0];
+      const [replaceCall] = mockOtpTokenModelAction.replaceToken.mock.calls[0] as [{ expires_at: Date }];
       const expiresAt = replaceCall.expires_at.getTime();
       const after = Date.now();
-      
+
       expect(expiresAt).toBeGreaterThanOrEqual(before + 15 * 60 * 1000 - 1000);
       expect(expiresAt).toBeLessThanOrEqual(after + 15 * 60 * 1000 + 1000);
     });
@@ -592,142 +599,154 @@ describe('AuthService - Password Reset Flow (BE-012)', () => {
       mockUsersService.findByEmail.mockResolvedValue(validUser);
       mockRedisService.incr.mockResolvedValue(4);
 
-      await expect(service.forgotPassword(USER_EMAIL)).rejects.toThrow(
-        SYS_MSG.PASSWORD_RESET_RATE_LIMITED
+      await expect(service.forgotPassword(USER_EMAIL)).rejects.toThrow(SYS_MSG.PASSWORD_RESET_RATE_LIMITED);
+    });
+  });
+
+  describe('verifyResetOtp', () => {
+    const RESET_TOKEN = 'signed.reset.token';
+
+    beforeEach(() => {
+      mockRedisService.rateLimit.mockResolvedValue({ exceeded: false });
+      mockRedisService.setNx.mockResolvedValue(1);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      mockJwtService.signAsync.mockResolvedValue(RESET_TOKEN);
+    });
+
+    it('returns a reset_token when OTP is valid', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(validUser);
+      mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
+
+      const result = await service.verifyResetOtp(USER_EMAIL, OTP_CODE);
+
+      expect(result).toHaveProperty('reset_token', RESET_TOKEN);
+    });
+
+    it('throws 400 when user is not found', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(null);
+
+      await expect(service.verifyResetOtp(USER_EMAIL, OTP_CODE)).rejects.toThrow(SYS_MSG.PASSWORD_RESET_INVALID_OTP);
+    });
+
+    it('throws 429 when rate limit exceeded', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(validUser);
+      mockRedisService.rateLimit.mockResolvedValue({ exceeded: true });
+
+      await expect(service.verifyResetOtp(USER_EMAIL, OTP_CODE)).rejects.toThrow(
+        SYS_MSG.PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED,
       );
+    });
+
+    it('throws 400 when no OTP token exists', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(validUser);
+      mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(null);
+
+      await expect(service.verifyResetOtp(USER_EMAIL, OTP_CODE)).rejects.toThrow(SYS_MSG.PASSWORD_RESET_INVALID_OTP);
+    });
+
+    it('throws 400 when OTP is expired', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(validUser);
+      mockOtpTokenModelAction.findByUserAndType.mockResolvedValue({
+        ...validOtpToken,
+        expires_at: new Date(Date.now() - 1000),
+      });
+
+      await expect(service.verifyResetOtp(USER_EMAIL, OTP_CODE)).rejects.toThrow(SYS_MSG.PASSWORD_RESET_EXPIRED);
+    });
+
+    it('throws 400 when OTP code does not match', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(validUser);
+      mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      await expect(service.verifyResetOtp(USER_EMAIL, OTP_CODE)).rejects.toThrow(SYS_MSG.PASSWORD_RESET_INVALID_OTP);
+    });
+
+    it('deletes the OTP token after successful verification', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(validUser);
+      mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
+
+      await service.verifyResetOtp(USER_EMAIL, OTP_CODE);
+
+      expect(mockOtpTokenModelAction.delete).toHaveBeenCalled();
     });
   });
 
   describe('resetPassword', () => {
-  beforeEach(() => {
-    mockRedisService.rateLimit.mockResolvedValue({ exceeded: false });
-    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-    (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
-    mockUserSessionModelAction.findByUserId.mockResolvedValue([]);
-    mockJwtService.signAsync.mockResolvedValue('new.jwt.token');
-    mockUserSessionModelAction.createSession.mockResolvedValue({ id: 'new-session' });
-    mockUsersService.update.mockResolvedValue({ ...validUser });
-    mockRedisService.setStrict.mockResolvedValue(undefined);
-  });
+    const RESET_TOKEN = 'valid.reset.token';
+    const VALID_PAYLOAD = { sub: USER_ID, userId: USER_ID, type: 'password_reset' };
 
-  it('AC-06: successfully resets password and auto-logs in user', async () => {
-    mockUsersService.findByEmail.mockResolvedValue(validUser);
-    mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
-
-    const result = await service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD);
-
-    expect(result).toHaveProperty('accessToken');
-    expect(result).toHaveProperty('refreshToken');
-    expect(result).toHaveProperty('user');
-  });
-
-  it('AC-07: throws 400 when OTP is invalid', async () => {
-    mockUsersService.findByEmail.mockResolvedValue(validUser);
-    mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(null);
-
-    await expect(
-      service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD)
-    ).rejects.toThrow(SYS_MSG.PASSWORD_RESET_INVALID_OTP);
-  });
-
-  it('AC-07: throws 400 when OTP code does not match', async () => {
-    mockUsersService.findByEmail.mockResolvedValue(validUser);
-    mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
-    (bcrypt.compare as jest.Mock).mockResolvedValue(false);
-
-    await expect(
-      service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD)
-    ).rejects.toThrow(SYS_MSG.PASSWORD_RESET_INVALID_OTP);
-  });
-
-  it('AC-08: throws 400 when OTP is expired', async () => {
-    mockUsersService.findByEmail.mockResolvedValue(validUser);
-    mockOtpTokenModelAction.findByUserAndType.mockResolvedValue({
-      ...validOtpToken,
-      expires_at: new Date(Date.now() - 1000),
+    beforeEach(() => {
+      mockJwtService.verifyAsync.mockResolvedValue(VALID_PAYLOAD);
+      mockUsersService.findById.mockResolvedValue(validUser);
+      mockUserSessionModelAction.findByUserId.mockResolvedValue([]);
+      mockJwtService.signAsync.mockResolvedValue('new.jwt.token');
+      mockUserSessionModelAction.createSession.mockResolvedValue({ id: 'new-session' });
+      mockUsersService.update.mockResolvedValue({ ...validUser });
+      mockRedisService.setStrict.mockResolvedValue(undefined);
     });
 
-    await expect(
-      service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD)
-    ).rejects.toThrow(SYS_MSG.PASSWORD_RESET_EXPIRED);
+    it('AC-06: successfully resets password and auto-logs in user', async () => {
+      const result = await service.resetPassword(RESET_TOKEN, NEW_PASSWORD);
+
+      expect(result).toHaveProperty('accessToken');
+      expect(result).toHaveProperty('refreshToken');
+      expect(result).toHaveProperty('user');
+    });
+
+    it('AC-07: throws 400 when reset token is invalid or expired', async () => {
+      mockJwtService.verifyAsync.mockRejectedValue(new Error('jwt expired'));
+
+      await expect(service.resetPassword(RESET_TOKEN, NEW_PASSWORD)).rejects.toThrow(
+        SYS_MSG.PASSWORD_RESET_INVALID_OTP,
+      );
+    });
+
+    it('AC-07: throws 400 when token type is not password_reset', async () => {
+      mockJwtService.verifyAsync.mockResolvedValue({ userId: USER_ID, type: 'access' });
+
+      await expect(service.resetPassword(RESET_TOKEN, NEW_PASSWORD)).rejects.toThrow(
+        SYS_MSG.PASSWORD_RESET_INVALID_OTP,
+      );
+    });
+
+    it('AC-09: throws 400 when user no longer exists', async () => {
+      mockUsersService.findById.mockRejectedValue(new Error('not found'));
+
+      await expect(service.resetPassword(RESET_TOKEN, NEW_PASSWORD)).rejects.toThrow(
+        SYS_MSG.PASSWORD_RESET_INVALID_OTP,
+      );
+    });
+
+    it('AC-11: revokes all existing user sessions after password change', async () => {
+      const sessions = [
+        { id: 'session-1', is_revoked: false },
+        { id: 'session-2', is_revoked: false },
+      ];
+      mockUserSessionModelAction.findByUserId.mockResolvedValue(sessions);
+      mockUserSessionModelAction.updateById.mockResolvedValue({});
+
+      await service.resetPassword(RESET_TOKEN, NEW_PASSWORD);
+
+      const revokedCalls = (
+        mockUserSessionModelAction.updateById.mock.calls as [string, { is_revoked?: boolean }][]
+      ).filter(([, payload]) => payload.is_revoked === true);
+      expect(revokedCalls.length).toBe(2);
+    });
+
+    it('AC-13: issues new access and refresh tokens for auto-login', async () => {
+      mockJwtService.signAsync.mockResolvedValue('brand-new-jwt-token');
+
+      const result = await service.resetPassword(RESET_TOKEN, NEW_PASSWORD);
+
+      expect(mockJwtService.signAsync).toHaveBeenCalled();
+      expect(result.accessToken).toBe('brand-new-jwt-token');
+    });
+
+    it('AC-14: updates password via usersService.update', async () => {
+      await service.resetPassword(RESET_TOKEN, NEW_PASSWORD);
+
+      expect(mockUsersService.update).toHaveBeenCalledWith(USER_ID, { password: NEW_PASSWORD });
+    });
   });
-
-  it('AC-09: throws 400 when email does not exist (prevents enumeration)', async () => {
-    mockUsersService.findByEmail.mockResolvedValue(null);
-
-    await expect(
-      service.resetPassword('nonexistent@example.com', OTP_CODE, NEW_PASSWORD)
-    ).rejects.toThrow(SYS_MSG.PASSWORD_RESET_INVALID_OTP);
-  });
-
-  it('AC-10: rate limits verification attempts to 5 per 5 minutes', async () => {
-    mockUsersService.findByEmail.mockResolvedValue(validUser);
-    mockRedisService.rateLimit.mockResolvedValue({ exceeded: true });
-
-    await expect(
-      service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD)
-    ).rejects.toThrow(SYS_MSG.PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED);
-  });
-
-  it('AC-11: revokes all existing user sessions after password change', async () => {
-    const sessions = [
-      { id: 'session-1', is_revoked: false },
-      { id: 'session-2', is_revoked: false },
-    ];
-    
-    mockUsersService.findByEmail.mockResolvedValue(validUser);
-    mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
-    mockUsersService.update.mockResolvedValue({ ...validUser });
-    mockUserSessionModelAction.findByUserId.mockResolvedValue(sessions);
-    mockUserSessionModelAction.updateById.mockResolvedValue({});
-
-    await service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD);
-
-    // Check that updateById was called with is_revoked: true for each session
-    const updateCalls = mockUserSessionModelAction.updateById.mock.calls;
-    const revokedSessionUpdates = updateCalls.filter(call => 
-      call[1]?.is_revoked === true
-    );
-    expect(revokedSessionUpdates.length).toBe(2);
-  });
-
-  it('AC-12: deletes the OTP token after successful reset', async () => {
-    mockUsersService.findByEmail.mockResolvedValue(validUser);
-    mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
-    mockUsersService.update.mockResolvedValue({ ...validUser });
-    mockUserSessionModelAction.findByUserId.mockResolvedValue([]);
-
-    await service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD);
-
-    expect(mockOtpTokenModelAction.delete).toHaveBeenCalled();
-  });
-
-  it('AC-13: issues new access and refresh tokens for auto-login', async () => {
-    mockUsersService.findByEmail.mockResolvedValue(validUser);
-    mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
-    mockUsersService.update.mockResolvedValue({ ...validUser });
-    mockUserSessionModelAction.findByUserId.mockResolvedValue([]);
-    mockJwtService.signAsync.mockResolvedValue('brand-new-jwt-token');
-
-    const result = await service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD);
-
-    expect(mockJwtService.signAsync).toHaveBeenCalled();
-    expect(result.accessToken).toBe('brand-new-jwt-token');
-  });
-
-  it('AC-14: updates password with bcrypt hash', async () => {
-    mockUsersService.findByEmail.mockResolvedValue(validUser);
-    mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
-    mockUserSessionModelAction.findByUserId.mockResolvedValue([]);
-    
-    mockUsersService.update.mockResolvedValue({ ...validUser });
-
-    await service.resetPassword(USER_EMAIL, OTP_CODE, NEW_PASSWORD);
-
-    expect(mockUsersService.update).toHaveBeenCalledWith(
-      USER_ID,
-      { password: NEW_PASSWORD }
-    );
-  });
-});
 });
