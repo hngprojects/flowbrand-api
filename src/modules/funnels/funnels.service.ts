@@ -4,10 +4,10 @@ import { Repository } from 'typeorm';
 import { Funnel } from './entities/funnel.entity';
 import { FunnelStage } from './entities/funnel-stage.entity';
 import { StageStatus } from './enums/stage-status.enum';
-import { StageTask, STAGE_TASK_STATUS } from './entities/stage-task.entity';
+import { StageTask, StageTaskStatus } from './entities/stage-task.entity';
 import * as SYS_MSG from '../../constants/system.messages';
 
-const COMPLETE_STATUS = STAGE_TASK_STATUS[1];
+const COMPLETE_STATUS: StageTaskStatus = 'complete';
 
 type RawCountRow = Record<string, unknown>;
 
