@@ -32,12 +32,14 @@ import {
   ResendOtpDocs,
   SendOtpDocs,
   VerifyOtpDocs,
-  ForgotPasswordDocs, 
+  ForgotPasswordDocs,
+  VerifyResetOtpDocs,
   ResetPasswordDocs,
   GoogleExchangeDocs,
 } from './docs/auth-swagger.doc';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { VerifyResetOtpDto } from './dto/verify-reset-otp.dto';
 import { ResendOtpDto } from './dto/resend-otp.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
@@ -86,7 +88,7 @@ export class AuthController {
   @RegisterDocs()
   async register(@Body() dto: RegisterDto, @Res() res: Response) {
     const { message } = await this.authService.register(dto);
-    
+
     res.status(HttpStatus.CREATED).json({
       success: true,
       statusCode: HttpStatus.CREATED,
@@ -179,22 +181,25 @@ export class AuthController {
   }
 
   @Public()
+  @Post('verify-reset-otp')
+  @HttpCode(HttpStatus.OK)
+  @VerifyResetOtpDocs()
+  async verifyResetOtp(@Body() dto: VerifyResetOtpDto): Promise<object> {
+    const result = await this.authService.verifyResetOtp(dto.email, dto.otp_code);
+    return { statusCode: HttpStatus.OK, message: SYS_MSG.PASSWORD_RESET_OTP_VERIFIED, data: result };
+  }
+
+  @Public()
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @ResetPasswordDocs()
   async resetPassword(@Body() dto: ResetPasswordDto, @Res() res: Response): Promise<void> {
-    const result = await this.authService.resetPassword(dto.email, dto.otp_code, dto.password);
-    
+    const result = await this.authService.resetPassword(dto.reset_token, dto.password);
+
     // Set refresh token cookie for auto-login
     res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
-    
-    res.json(
-      this.buildAuthResponse(
-        HttpStatus.OK,
-        SYS_MSG.PASSWORD_RESET_SUCCESSFUL,
-        result,
-      )
-    );
+
+    res.json(this.buildAuthResponse(HttpStatus.OK, SYS_MSG.PASSWORD_RESET_SUCCESSFUL, result));
   }
 
   @Get('me')
@@ -215,10 +220,7 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   @GoogleCallbackDocs()
-  async googleAuthRedirect(
-    @Req() req: Request & { user?: GoogleOAuthProfile },
-    @Res() res: Response,
-  ): Promise<void> {
+  async googleAuthRedirect(@Req() req: Request & { user?: GoogleOAuthProfile }, @Res() res: Response): Promise<void> {
     const payload = req.user;
 
     if (!payload) {
@@ -236,17 +238,10 @@ export class AuthController {
   @Post('google/exchange')
   @HttpCode(HttpStatus.OK)
   @GoogleExchangeDocs()
-  async googleExchange(
-    @Body() dto: GoogleExchangeDto,
-    @Res() res: Response,
-  ): Promise<Response> {
+  async googleExchange(@Body() dto: GoogleExchangeDto, @Res() res: Response): Promise<Response> {
     const oauthResult = await this.authService.exchangeCode(dto.code);
 
-    res.cookie(
-      'refreshToken',
-      oauthResult.refreshToken,
-      this.getRefreshCookieOptions(),
-    );
+    res.cookie('refreshToken', oauthResult.refreshToken, this.getRefreshCookieOptions());
 
     // Return access token and user info matching the standard response template
     return res.json({

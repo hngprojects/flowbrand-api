@@ -18,6 +18,7 @@ import { VerifyOtpDto } from '../dto/verify-otp.dto';
 import { ResendOtpDto } from '../dto/resend-otp.dto';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { ForgotPasswordDto } from '../dto/forgot-password.dto';
+import { VerifyResetOtpDto } from '../dto/verify-reset-otp.dto';
 import { ResetPasswordDto } from '../dto/reset-password.dto';
 import { GoogleExchangeDto } from '../dto/google-exchange.dto';
 
@@ -511,15 +512,54 @@ export const ForgotPasswordDocs = () =>
     }),
   );
 
+export const VerifyResetOtpDocs = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Verify password reset OTP',
+      description:
+        'Validates the 6-digit OTP sent to the email. On success: OTP is deleted and a short-lived ' +
+        'reset token (JWT, 15 min) is returned. Pass this token to POST /auth/reset-password. ' +
+        'Rate limited to 5 attempts per 5 minutes.',
+    }),
+    ApiBody({ type: VerifyResetOtpDto }),
+    ApiOkResponse({
+      description: 'OTP verified — reset token issued',
+      schema: {
+        example: {
+          statusCode: HttpStatus.OK,
+          message: SYS_MSG.PASSWORD_RESET_OTP_VERIFIED,
+          data: { reset_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' },
+        },
+      },
+    }),
+    ApiBadRequestResponse({
+      description: 'Invalid or expired OTP',
+      schema: {
+        example: {
+          statusCode: HttpStatus.BAD_REQUEST,
+          message: SYS_MSG.PASSWORD_RESET_INVALID_OTP,
+        },
+      },
+    }),
+    ApiTooManyRequestsResponse({
+      description: 'Too many verification attempts (max 5 per 5 minutes)',
+      schema: {
+        example: {
+          statusCode: HttpStatus.TOO_MANY_REQUESTS,
+          message: SYS_MSG.PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED,
+        },
+      },
+    }),
+  );
+
 export const ResetPasswordDocs = () =>
   applyDecorators(
     ApiOperation({
-      summary: 'Reset password using OTP and auto-login',
+      summary: 'Reset password using reset token and auto-login',
       description:
-        'Validates the 6-digit OTP against the stored hash. On success: ' +
-        '1) Password is updated, 2) All existing sessions are revoked, 3) OTP token is deleted, ' +
-        '4) User is automatically logged in with new access/refresh tokens. ' +
-        'Rate limited to 5 verification attempts per 5 minutes.',
+        'Verifies the short-lived reset token issued by POST /auth/verify-reset-otp. On success: ' +
+        '1) Password is updated, 2) All existing sessions are revoked, ' +
+        '3) User is automatically logged in with new access/refresh tokens.',
     }),
     ApiBody({ type: ResetPasswordDto }),
     ApiOkResponse({
@@ -541,20 +581,11 @@ export const ResetPasswordDocs = () =>
       },
     }),
     ApiBadRequestResponse({
-      description: 'Invalid or expired OTP',
+      description: 'Invalid or expired reset token',
       schema: {
         example: {
           statusCode: HttpStatus.BAD_REQUEST,
           message: SYS_MSG.PASSWORD_RESET_INVALID_OTP,
-        },
-      },
-    }),
-    ApiTooManyRequestsResponse({
-      description: 'Too many verification attempts (max 5 per 5 minutes)',
-      schema: {
-        example: {
-          statusCode: HttpStatus.TOO_MANY_REQUESTS,
-          message: SYS_MSG.PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED,
         },
       },
     }),
