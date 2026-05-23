@@ -37,7 +37,7 @@ const XSS_DANGEROUS_CHARS = /[<>"'`]|[\u200B-\u200F\u202A-\u202E]/g;
 export class FunnelTemplateService {
   private readonly logger = new Logger(FunnelTemplateService.name);
 
-  getTemplate(ctx: BusinessContext): LlmStageData[] {
+  getTemplate(ctx: BusinessContext, userId?: string): LlmStageData[] {
     try {
       const safeCtx = this.normalizeContext(ctx);
       const template = this.selectTemplate(safeCtx.businessType, safeCtx.discoveryChannel);
@@ -45,7 +45,7 @@ export class FunnelTemplateService {
     } catch (err) {
       this.logger.error({
         event: 'emergency_template_used',
-        userId: ctx?.userId ?? null,
+        userId: userId ?? null,
         error: (err as Error)?.message ?? 'unknown',
       });
       return this.emergencyTemplate(ctx);

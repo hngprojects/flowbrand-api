@@ -4,8 +4,10 @@ import { Repository } from 'typeorm';
 import { Funnel } from './entities/funnel.entity';
 import { FunnelStage } from './entities/funnel-stage.entity';
 import { StageStatus } from './enums/stage-status.enum';
-import { StageTask } from './entities/stage-task.entity';
+import { StageTask, STAGE_TASK_STATUS } from './entities/stage-task.entity';
 import * as SYS_MSG from '../../constants/system.messages';
+
+const COMPLETE_STATUS = STAGE_TASK_STATUS[1];
 
 type RawCountRow = Record<string, unknown>;
 
@@ -95,7 +97,7 @@ export class FunnelsService {
         .createQueryBuilder('t')
         .select('t.stage_id', 'stage_id')
         .addSelect('COUNT(*)', 'total')
-        .addSelect("SUM(CASE WHEN t.status = 'complete' THEN 1 ELSE 0 END)", 'complete')
+        .addSelect(`SUM(CASE WHEN t.status = '${COMPLETE_STATUS}' THEN 1 ELSE 0 END)`, 'complete')
         .where('t.stage_id IN (:...ids)', { ids: stageIds })
         .groupBy('t.stage_id')
         .getRawMany());
@@ -144,7 +146,7 @@ export class FunnelsService {
         .createQueryBuilder('t')
         .select('t.stage_id', 'stage_id')
         .addSelect('COUNT(*)', 'total')
-        .addSelect("SUM(CASE WHEN t.status = 'complete' THEN 1 ELSE 0 END)", 'complete')
+        .addSelect(`SUM(CASE WHEN t.status = '${COMPLETE_STATUS}' THEN 1 ELSE 0 END)`, 'complete')
         .where('t.stage_id IN (:...ids)', { ids: stageIds })
         .groupBy('t.stage_id')
         .getRawMany());
@@ -189,7 +191,7 @@ export class FunnelsService {
     const raw = (await this.taskRepo
       .createQueryBuilder('t')
       .select('COUNT(*)', 'total')
-      .addSelect("SUM(CASE WHEN t.status = 'complete' THEN 1 ELSE 0 END)", 'complete')
+      .addSelect(`SUM(CASE WHEN t.status = '${COMPLETE_STATUS}' THEN 1 ELSE 0 END)`, 'complete')
       .where('t.stage_id = :stageId', { stageId })
       .getRawOne()) as unknown as { total?: string | number; complete?: string | number } | undefined;
 

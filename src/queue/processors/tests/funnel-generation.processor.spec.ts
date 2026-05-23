@@ -171,7 +171,7 @@ describe('FunnelGenerationProcessor', () => {
 
       await processor.handleGenerateFunnel(makeJob());
 
-      expect(mockTemplateService.getTemplate).toHaveBeenCalledWith(businessContext);
+      expect(mockTemplateService.getTemplate).toHaveBeenCalledWith(businessContext, 'user-uuid');
       expect(mockQueryRunner.commitTransaction).toHaveBeenCalledTimes(1);
     });
   });
@@ -179,16 +179,25 @@ describe('FunnelGenerationProcessor', () => {
   // AC-04 / AC-09: DB failure + rollback + release 
 
   describe('AC-04 — DB failure triggers rollback', () => {
-    it('calls rollbackTransaction and marks funnel FAILED when stage update throws', async () => {
+    it('calls rollbackTransaction and marks funnel FAILED when stage update throws on last attempt', async () => {
       mockLlmService.generateWithGemini.mockResolvedValue(makeValidStageData());
       mockQueryRunner.manager.update.mockRejectedValueOnce(new Error('DB error'));
 
-      await expect(processor.handleGenerateFunnel(makeJob())).rejects.toThrow('DB error');
+      await expect(processor.handleGenerateFunnel(makeJob({ attemptsMade: 2 }))).rejects.toThrow('DB error');
 
       expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalledTimes(1);
       expect(mockFunnelAction.update).toHaveBeenCalledWith(
         expect.objectContaining({ updatePayload: { status: FunnelStatus.FAILED } }),
       );
+    });
+
+    it('does NOT mark funnel FAILED on a non-last attempt (so Bull can retry)', async () => {
+      mockLlmService.generateWithGemini.mockResolvedValue(makeValidStageData());
+      mockQueryRunner.manager.update.mockRejectedValueOnce(new Error('DB error'));
+
+      await expect(processor.handleGenerateFunnel(makeJob({ attemptsMade: 0 }))).rejects.toThrow('DB error');
+
+      expect(mockFunnelAction.update).not.toHaveBeenCalled();
     });
 
     it('AC-09: queryRunner.release() is always called even when rollback fires', async () => {
@@ -204,12 +213,12 @@ describe('FunnelGenerationProcessor', () => {
   // AC-06: Full failure marks funnel FAILED 
 
   describe('AC-06 — Full failure', () => {
-    it('marks funnel FAILED and re-throws when template also throws', async () => {
+    it('marks funnel FAILED and re-throws when template also throws on last attempt', async () => {
       mockLlmService.generateWithGemini.mockRejectedValue(new Error('Gemini down'));
       mockLlmService.generateWithGroq.mockRejectedValue(new Error('Groq down'));
       mockTemplateService.getTemplate.mockImplementation(() => { throw new Error('Template broken'); });
 
-      await expect(processor.handleGenerateFunnel(makeJob())).rejects.toThrow('Template broken');
+      await expect(processor.handleGenerateFunnel(makeJob({ attemptsMade: 2 }))).rejects.toThrow('Template broken');
 
       expect(mockFunnelAction.update).toHaveBeenCalledWith(
         expect.objectContaining({ updatePayload: { status: FunnelStatus.FAILED } }),
@@ -253,7 +262,20 @@ describe('FunnelGenerationProcessor', () => {
     });
   });
 
-  // EC-05: Idempotency guard 
+  // EC-06: Funnel not found throws so Bull retries
+
+  describe('EC-06 — Funnel not found', () => {
+    it('throws so Bull retries instead of silently completing the job', async () => {
+      mockFunnelAction.get.mockResolvedValue(null);
+
+      await expect(processor.handleGenerateFunnel(makeJob())).rejects.toThrow(/not found/);
+
+      expect(mockLlmService.generateWithGemini).not.toHaveBeenCalled();
+      expect(mockQueryRunner.startTransaction).not.toHaveBeenCalled();
+    });
+  });
+
+  // EC-05: Idempotency guard
 
   describe('EC-05 — Idempotency guard', () => {
     it('returns early without calling LLM when funnel is already ACTIVE', async () => {
