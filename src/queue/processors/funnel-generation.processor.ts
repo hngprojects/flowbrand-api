@@ -82,11 +82,15 @@ export class FunnelGenerationProcessor {
 
       this.logger.log({ message: 'Funnel generation complete', funnelId, jobId: job.id });
     } catch (err) {
-      await this.funnelAction.update({
-        identifierOptions: { id: funnelId },
-        updatePayload: { status: FunnelStatus.FAILED },
-        transactionOptions: { useTransaction: false },
-      });
+      const maxAttempts = job.opts.attempts ?? 1;
+      const isLastAttempt = job.attemptsMade + 1 >= maxAttempts;
+      if (isLastAttempt) {
+        await this.funnelAction.update({
+          identifierOptions: { id: funnelId },
+          updatePayload: { status: FunnelStatus.FAILED },
+          transactionOptions: { useTransaction: false },
+        });
+      }
       throw err;
     }
   }
