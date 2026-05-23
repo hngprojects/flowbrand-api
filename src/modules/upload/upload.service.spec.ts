@@ -219,6 +219,46 @@ describe('UploadService', () => {
       expect(mockUploadedDocumentAction.createDocument).toHaveBeenCalled();
     });
 
+    it('returns partial when one file stored and another MinIO putObject fails', async () => {
+      // First file will succeed, second will fail storage
+      mockObjectStorage.putObject.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('storage down'));
+
+      const file1 = mockPdfFile({ originalname: 'a.pdf', path: '/tmp/a.pdf' });
+      const file2 = mockPdfFile({ originalname: 'b.pdf', path: '/tmp/b.pdf' });
+
+      const result = await service.handleUpload(USER_ID, [file1, file2]);
+
+      expect(result.statusCode).toBe(HttpStatus.CREATED);
+      expect(result.message).toBe(SYS_MSG.FUNNEL_UPLOAD_PARTIAL);
+      expect(result.data.uploads).toHaveLength(2);
+      // one accepted -> uploading, other failed
+      const statuses = result.data.uploads.map((u) => u.status);
+      expect(statuses).toContain(UploadDocumentStatus.UPLOADING);
+      expect(statuses).toContain(UploadDocumentStatus.FAILED);
+      const failed = result.data.uploads.find((u) => u.status === UploadDocumentStatus.FAILED)!;
+      expect(failed.errorMessage).toBe(SYS_MSG.UPLOAD_FAILED);
+    });
+
+    it('detects multipart-truncated uploads and marks file as failed with UPLOAD_INTERRUPTED', async () => {
+      // Simulate disk size mismatch for second file
+      const good = mockPdfFile({ originalname: 'good.pdf', path: '/tmp/good.pdf' });
+      const truncated = mockPdfFile({ originalname: 'trunc.pdf', path: '/tmp/trunc.pdf', size: Buffer.from('%PDF-1.4 test content').length + 10 });
+
+      // fs.statSync should return actual disk size smaller than declared size for truncated file
+      (fs.statSync as jest.Mock).mockImplementation((p: string) => {
+        if (p === '/tmp/trunc.pdf') return { size: Buffer.from('%PDF-1.4 test content').length };
+        return { size: Buffer.from('%PDF-1.4 test content').length };
+      });
+
+      const result = await service.handleUpload(USER_ID, [good, truncated]);
+
+      expect(result.statusCode).toBe(HttpStatus.CREATED);
+      expect(result.message).toBe(SYS_MSG.FUNNEL_UPLOAD_PARTIAL);
+      expect(result.data.uploads).toHaveLength(2);
+      const failed = result.data.uploads.find((u) => u.status === UploadDocumentStatus.FAILED)!;
+      expect(failed.errorMessage).toBe(SYS_MSG.UPLOAD_INTERRUPTED);
+    });
+
     it('FR-10: succeeds when updateProgress fails twice then recovers on third attempt', async () => {
       mockUploadedDocumentAction.updateProgress
         .mockRejectedValueOnce(new Error('DB hiccup'))

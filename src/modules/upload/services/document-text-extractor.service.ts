@@ -1,9 +1,12 @@
 import { Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
 import JSZip from 'jszip';
 import mammoth from 'mammoth';
+import { getData } from 'pdf-parse/worker';
 import { PDFParse } from 'pdf-parse';
 import * as SYS_MSG from '../../../constants/system.messages';
 import type { PptxZipLoader, UploadFileType } from '../upload.types';
+
+PDFParse.setWorker(getData());
 
 const MAX_PARSED_TEXT_CHARS = 2_000_000;
 /** Minimum length for coarse OLE (.doc/.ppt) text to be treated as usable. */
