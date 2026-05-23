@@ -19,6 +19,11 @@ import { LlmModule } from '../modules/llm/llm.module';
     BullModule.registerQueueAsync({
       name: QUEUES.FUNNEL_GENERATION,
       useFactory: (config: ConfigService) => ({
+        settings: {
+          // LLM calls can take up to 60 s — extend lock so Bull doesn't
+          // mark the job stalled before the app-level timeout fires.
+          lockDuration: 120_000,
+        },
         defaultJobOptions: {
           attempts: config.get<number>('QUEUE_MAX_ATTEMPTS') ?? 3,
           backoff: {
