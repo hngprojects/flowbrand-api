@@ -54,7 +54,7 @@ export const UPLOAD_FAILED = 'File upload failed';
 export const UPLOAD_FILE_TOO_LARGE = 'Uploaded file is too large';
 export const UPLOAD_INVALID_FILE = 'Uploaded file type is not allowed';
 export const UPLOAD_INTERRUPTED = 'Upload incomplete: received bytes do not match expected size.';
-export const UPLOAD_TOO_MANY_FILES = 'Too many files uploaded';
+export const UPLOAD_TOO_MANY_FILES = 'Too many files uploaded; maximum allowed is 3.';
 
 // Funnel uploads
 export const FUNNEL_UPLOAD_COMPLETED = 'Funnel upload completed';
@@ -66,7 +66,7 @@ export const FUNNEL_UPLOAD_PARSE_FAILED = 'Could not extract text from the uploa
 export const FUNNEL_UPLOAD_UNSUPPORTED_FILE_TYPE = 'Unsupported file type for text extraction';
 export const FUNNEL_UPLOAD_NO_EXTRACTABLE_TEXT = 'No extractable text found in document';
 export const FUNNEL_UPLOAD_NO_SLIDES = 'No slides found in presentation';
-export const FUNNEL_UPLOAD_PROGRESS_RETRIEVED = 'Upload progress retrieved';
+export const FUNNEL_UPLOAD_PROGRESS_RETRIEVED = 'Funnel upload progress retrieved successfully';
 
 export const AI_GENERATION_FAILED = 'AI generation failed';
 

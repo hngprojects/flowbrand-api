@@ -4,12 +4,19 @@ import * as SYS_MSG from '../../../constants/system.messages';
 import { DocumentTextExtractorService } from './document-text-extractor.service';
 
 // Mock heavy dependencies
+jest.mock('pdf-parse/worker', () => ({
+  getData: jest.fn(() => ({})),
+}));
+
 jest.mock('pdf-parse', () => {
+  const mockPdfParse = jest.fn().mockImplementation(() => ({
+    getText: jest.fn().mockResolvedValue({ text: 'extracted pdf text' }),
+    destroy: jest.fn().mockResolvedValue(undefined),
+  }));
+  (mockPdfParse as any).setWorker = jest.fn();
+
   return {
-    PDFParse: jest.fn().mockImplementation(() => ({
-      getText: jest.fn().mockResolvedValue({ text: 'extracted pdf text' }),
-      destroy: jest.fn().mockResolvedValue(undefined),
-    })),
+    PDFParse: mockPdfParse,
   };
 });
 
@@ -55,14 +62,14 @@ describe('DocumentTextExtractorService', () => {
     );
   });
 
-  describe('extract — PDF', () => {
+  describe('AC-01 — PDF extraction', () => {
     it('AC-01: extracts text from a valid PDF buffer', async () => {
       const buffer = Buffer.from('%PDF-1.4 test');
       const result = await service.extract(buffer, 'pdf');
       expect(result).toBe('extracted pdf text');
     });
 
-    it('AC-02: throws 422 when PDF extraction returns empty text', async () => {
+    it('EC-01: throws 422 when PDF extraction returns empty text', async () => {
       (PDFParse as unknown as jest.Mock).mockImplementationOnce(() => ({
         getText: jest.fn().mockResolvedValue({ text: '   ' }),
         destroy: jest.fn().mockResolvedValue(undefined),
@@ -74,15 +81,15 @@ describe('DocumentTextExtractorService', () => {
     });
   });
 
-  describe('extract — DOCX', () => {
-    it('AC-03: extracts text from a valid DOCX buffer', async () => {
+  describe('AC-02 — DOCX extraction', () => {
+    it('AC-02: extracts text from a valid DOCX buffer', async () => {
       const buffer = Buffer.from('docx content');
       const result = await service.extract(buffer, 'docx');
       expect(result).toBe('extracted docx text');
       expect(mammoth.extractRawText).toHaveBeenCalledWith({ buffer });
     });
 
-    it('AC-04: throws 422 when DOCX extraction returns empty text', async () => {
+    it('EC-02: throws 422 when DOCX extraction returns empty text', async () => {
       (mammoth.extractRawText as jest.Mock).mockResolvedValueOnce({
         value: '',
         messages: [],
@@ -94,14 +101,14 @@ describe('DocumentTextExtractorService', () => {
     });
   });
 
-  describe('extract — PPTX', () => {
-    it('AC-05: extracts text from slide XML nodes', async () => {
+  describe('AC-03 — PPTX extraction', () => {
+    it('AC-03: extracts text from slide XML nodes', async () => {
       const result = await service.extract(Buffer.from('pptx'), 'pptx');
       expect(result).toContain('Slide one text');
       expect(result).toContain('More text');
     });
 
-    it('AC-06: throws 422 when PPTX has no slides', async () => {
+    it('EC-03: throws 422 when PPTX has no slides', async () => {
       (JSZip.loadAsync as jest.Mock).mockResolvedValueOnce({ files: {} });
 
       await expect(
@@ -110,22 +117,22 @@ describe('DocumentTextExtractorService', () => {
     });
   });
 
-  describe('extract — DOC/PPT legacy', () => {
-    it('AC-07: extracts readable text from a DOC-like buffer', async () => {
+  describe('AC-04 — DOC/PPT legacy extraction', () => {
+    it('AC-04: extracts readable text from a DOC-like buffer', async () => {
       const text = 'This is a valid business document with enough readable text content here';
       const buffer = Buffer.from(text, 'latin1');
       const result = await service.extract(buffer, 'doc');
       expect(result.length).toBeGreaterThan(0);
     });
 
-    it('AC-08: throws 422 when DOC buffer contains only binary noise', async () => {
+    it('EC-04: throws 422 when DOC buffer contains only binary noise', async () => {
       const binaryNoise = Buffer.from([0x00, 0x01, 0x02, 0x03, 0xff, 0xfe]);
       await expect(service.extract(binaryNoise, 'doc')).rejects.toBeInstanceOf(
         UnprocessableEntityException,
       );
     });
 
-    it('AC-09: extracts text from PPT legacy buffer', async () => {
+    it('AC-05: extracts text from PPT legacy buffer', async () => {
       const text = 'This is a valid presentation slide with enough readable text content here';
       const buffer = Buffer.from(text, 'latin1');
       const result = await service.extract(buffer, 'ppt');
@@ -133,8 +140,8 @@ describe('DocumentTextExtractorService', () => {
     });
   });
 
-  describe('extract — size limit', () => {
-    it('AC-10: truncates output to 2 million characters', async () => {
+  describe('AC-06 — size limit', () => {
+    it('AC-06: truncates output to 2 million characters', async () => {
       const longText = 'a'.repeat(3_000_000);
       (mammoth.extractRawText as jest.Mock).mockResolvedValueOnce({
         value: longText,
@@ -146,8 +153,8 @@ describe('DocumentTextExtractorService', () => {
     });
   });
 
-  describe('extract — normalization', () => {
-    it('AC-11: collapses multiple whitespace into single spaces', async () => {
+  describe('AC-07 — normalization', () => {
+    it('AC-07: collapses multiple whitespace into single spaces', async () => {
       (mammoth.extractRawText as jest.Mock).mockResolvedValueOnce({
         value: 'hello   world\n\ttabs  here',
         messages: [],

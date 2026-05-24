@@ -1,10 +1,10 @@
 import {
-  HttpStatus,
   Inject,
   Injectable,
   Logger,
   NotFoundException,
   UnprocessableEntityException,
+  BadRequestException,
 } from '@nestjs/common';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
@@ -15,6 +15,7 @@ import { JOBS, QUEUES } from '../../common/constants/queue.constants';
 import * as SYS_MSG from '../../constants/system.messages';
 import { UploadedDocumentModelAction } from './actions/uploaded-document.action';
 import { ALLOWED_UPLOAD_RULES, MAX_UPLOAD_BYTES, UPLOAD_PROGRESS } from './constants/upload.constants';
+import { UploadFileConstraints } from './dto/upload-files.dto';
 import { UploadedDocument } from './entities/uploaded-document.entity';
 import { UploadDocumentStatus } from './upload.types';
 import {
@@ -45,6 +46,14 @@ export class UploadService {
         message: SYS_MSG.FUNNEL_UPLOAD_FILES_REQUIRED,
       });
     }
+
+    if (files.length > UploadFileConstraints.MAX_FILES) {
+      throw new BadRequestException({
+        error: 'Bad Request',
+        message: SYS_MSG.UPLOAD_TOO_MANY_FILES,
+      });
+    }
+
     const batchId = randomUUID();
     const uploads = await Promise.all(files.map((file, index) => this.processOneFile(userId, file, index)));
 
@@ -63,9 +72,9 @@ export class UploadService {
     }
     const allAccepted = acceptedCount === uploads.length;
     return {
-      statusCode: HttpStatus.CREATED,
       message: allAccepted ? SYS_MSG.FUNNEL_UPLOAD_COMPLETED : SYS_MSG.FUNNEL_UPLOAD_PARTIAL,
-      data: { batchId, uploads },
+      batchId,
+      uploads,
     };
   }
   async getProgress(userId: string, uploadId: string): Promise<UploadProgressResponse> {
@@ -171,6 +180,12 @@ export class UploadService {
     return path.posix.join('uploads', userId, `${uploadId}.${fileType}`);
   }
   private async validateFile(file: Express.Multer.File): Promise<FileValidationResult> {
+    
+    const dtoError = UploadFileConstraints.validate(file);
+    if (dtoError) {
+      return { ok: false, errorMessage: dtoError };
+    }
+
     if (file.path) {
       try {
         const { size: diskSize } = fs.statSync(file.path);

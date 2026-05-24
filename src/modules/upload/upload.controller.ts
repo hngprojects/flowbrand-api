@@ -15,9 +15,9 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { diskStorage } from 'multer';
 import * as os from 'node:os';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import * as SYS_MSG from '../../constants/system.messages';
 import { MAX_FILES_PER_UPLOAD, MAX_UPLOAD_BYTES } from './constants/upload.constants';
 import { GetFunnelUploadProgressDocs, UploadFunnelDocumentsDocs } from './docs/upload-swagger.doc';
+import { UploadBatchResponseDto, UploadProgressResponseDto } from './dto/upload-files.dto';
 import { UploadService } from './upload.service';
 
 const uploadInterceptor = FilesInterceptor('files', MAX_FILES_PER_UPLOAD, {
@@ -45,7 +45,7 @@ export class UploadController {
     @Res() res: Response,
   ): Promise<void> {
     const result = await this.uploadService.handleUpload(userId, files);
-    res.status(HttpStatus.CREATED).json(result);
+    res.status(HttpStatus.CREATED).json(UploadBatchResponseDto.from(result));
   }
 
   @Get('upload/progress/:uploadId')
@@ -55,7 +55,7 @@ export class UploadController {
     @Param('uploadId', ParseUUIDPipe) uploadId: string,
     @Res() res: Response,
   ): Promise<void> {
-    const result = await this.uploadService.getProgress(userId, uploadId);
-    res.json({ statusCode: HttpStatus.OK, message: SYS_MSG.FUNNEL_UPLOAD_PROGRESS_RETRIEVED, data: result });
+    const progress = await this.uploadService.getProgress(userId, uploadId);
+    res.status(HttpStatus.OK).json(UploadProgressResponseDto.from(progress));
   }
 }

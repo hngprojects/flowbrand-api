@@ -1,26 +1,26 @@
-import { applyDecorators, HttpStatus } from '@nestjs/common';
+import { applyDecorators } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBody,
   ApiConsumes,
+  ApiCreatedResponse,
   ApiNotFoundResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiPayloadTooLargeResponse,
-  ApiResponse,
   ApiUnauthorizedResponse,
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
+import {
+  UploadBatchResponseDto,
+  UploadFilesDto,
+  UploadNotFoundResponseDto,
+  UploadProgressResponseDto,
+  UploadRejectedResponseDto,
+  UploadTooManyFilesResponseDto,
+} from '../dto/upload-files.dto';
 import * as SYS_MSG from '../../../constants/system.messages';
-import { MAX_FILES_PER_UPLOAD, MAX_UPLOAD_BYTES } from '../constants/upload.constants';
-import { UploadDocumentStatus } from '../upload.types';
-
-const uploadItemExample = {
-  uploadId: '550e8400-e29b-41d4-a716-446655440001',
-  fileName: 'pitch-deck.pdf',
-  fileType: 'pdf',
-  fileSizeBytes: 102400,
-  status: UploadDocumentStatus.PARSING,
-  percentComplete: 50,
-};
+import { MAX_UPLOAD_BYTES, MAX_FILES_PER_UPLOAD } from '../constants/upload.constants';
 
 export const UploadFunnelDocumentsDocs = () =>
   applyDecorators(
@@ -34,68 +34,42 @@ export const UploadFunnelDocumentsDocs = () =>
         `Each file is processed in parallel; one failure does not cancel the others.`,
     }),
     ApiConsumes('multipart/form-data'),
-    ApiBody({
-      schema: {
-        type: 'object',
-        required: ['files'],
-        properties: {
-          files: {
-            type: 'array',
-            items: { type: 'string', format: 'binary' },
-            maxItems: MAX_FILES_PER_UPLOAD,
-          },
-        },
-      },
-    }),
-    ApiResponse({
-      status: HttpStatus.CREATED,
+
+    ApiBody({ type: UploadFilesDto }),
+
+    ApiCreatedResponse({
+      type: UploadBatchResponseDto,
       description:
         '201 when at least one file accepted. Response lists per-file status (parsing, ready, or failed). Poll until ready.',
-      schema: {
-        example: {
-          statusCode: HttpStatus.CREATED,
-          message: SYS_MSG.FUNNEL_UPLOAD_COMPLETED,
-          data: {
-            batchId: '550e8400-e29b-41d4-a716-446655440099',
-            uploads: [uploadItemExample],
-          },
-        },
-      },
     }),
     ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' }),
     ApiUnprocessableEntityResponse({
+      type: UploadRejectedResponseDto,
       description: 'Every file in the request was rejected (type, size, or storage).',
+    }),
+    ApiBadRequestResponse({
+      type: UploadTooManyFilesResponseDto,
+      description: SYS_MSG.UPLOAD_TOO_MANY_FILES,
     }),
     ApiPayloadTooLargeResponse({
       description: 'Multer rejected file before handler (size/count).',
     }),
   );
 
+  
+
 export const GetFunnelUploadProgressDocs = () =>
   applyDecorators(
     ApiOperation({
       summary: 'Poll upload progress for an owned document',
     }),
-    ApiResponse({
-      status: HttpStatus.OK,
-      description: 'Standard envelope with upload progress. Poll until data.status is "ready" (100%) or "failed".',
-      schema: {
-        example: {
-          statusCode: HttpStatus.OK,
-          message: SYS_MSG.FUNNEL_UPLOAD_PROGRESS_RETRIEVED,
-          data: {
-            uploadId: uploadItemExample.uploadId,
-            fileName: uploadItemExample.fileName,
-            fileType: uploadItemExample.fileType,
-            fileSizeBytes: uploadItemExample.fileSizeBytes,
-            status: UploadDocumentStatus.READY,
-            percentComplete: 100,
-            uploadedAt: '2026-05-16T12:00:00.000Z',
-            failureReason: null,
-          },
-        },
-      },
+    ApiOkResponse({
+      type: UploadProgressResponseDto,
+      description: '200 when the upload belongs to the user and progress is available.',
     }),
-    ApiNotFoundResponse({ description: SYS_MSG.FUNNEL_UPLOAD_NOT_FOUND }),
+    ApiNotFoundResponse({
+      type: UploadNotFoundResponseDto,
+      description: SYS_MSG.FUNNEL_UPLOAD_NOT_FOUND,
+    }),
     ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' }),
   );
