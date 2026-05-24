@@ -1,7 +1,6 @@
 import {
   Controller,
   Get,
-  HttpCode,
   HttpStatus,
   Param,
   ParseUUIDPipe,
@@ -38,7 +37,6 @@ export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
   @Post('upload')
-  @HttpCode(HttpStatus.CREATED)
   @UploadFunnelDocumentsDocs()
   @UseInterceptors(uploadInterceptor)
   async upload(
@@ -56,9 +54,8 @@ export class UploadController {
     @CurrentUser('sub') userId: string,
     @Param('uploadId', ParseUUIDPipe) uploadId: string,
     @Res() res: Response,
-  ) {
+  ): Promise<void> {
     const progress = await this.uploadService.getProgress(userId, uploadId);
-
     res.status(HttpStatus.OK).json(UploadProgressResponseDto.from(progress));
   }
 }

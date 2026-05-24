@@ -31,15 +31,23 @@ export class ExtractionProcessor {
   @Process({ name: JOBS.EXTRACT_TEXT, concurrency: env.QUEUE_CONCURRENCY })
   async handleExtraction(job: Job<ExtractionJobPayload>): Promise<void> {
     const { uploadId, fileType, storagePath } = job.data;
-    
+
     this.logger.log({ message: 'extraction_start', uploadId });
 
-    try {
-      const row = await this.uploadedDocumentAction.get({ identifierOptions: { id: uploadId } });
-      if (!row) {
-        throw new Error(`Upload record not found: ${uploadId}`);
-      }
+    const row = await this.uploadedDocumentAction.get({ identifierOptions: { id: uploadId } });
+    if (!row) {
+      throw new Error(`Upload record not found: ${uploadId}`);
+    }
 
+    // Idempotency guard: skip if a previous attempt already reached a terminal state.
+    // Bull may retry a job after a stall; without this the processor would overwrite a
+    // successful READY record or loop a FAILED one unnecessarily.
+    if (row.status === UploadDocumentStatus.READY || row.status === UploadDocumentStatus.FAILED) {
+      this.logger.log({ message: 'extraction_skipped_already_terminal', uploadId, status: row.status });
+      return;
+    }
+
+    try {
       const buffer = await this.objectStorage.getObject(storagePath);
       const parsedText = await this.documentTextExtractor.extract(buffer, fileType);
 
@@ -54,18 +62,10 @@ export class ExtractionProcessor {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error({ message: 'extraction_failed', uploadId, error: errorMessage });
 
-      // Fallback block: Ensure database is marked as FAILED if any error occurs
-      try {
-        const row = await this.uploadedDocumentAction.get({ identifierOptions: { id: uploadId } });
-        if (row) {
-          row.status = UploadDocumentStatus.FAILED;
-          row.percent_complete = 0;
-          row.failure_reason = errorMessage.substring(0, 200);
-          await this.uploadedDocumentAction.saveDocument(row);
-        }
-      } catch (dbError) {
-        this.logger.error({ message: 'failed_to_save_failure_status', uploadId, error: dbError });
-      }
+      row.status = UploadDocumentStatus.FAILED;
+      row.percent_complete = 0;
+      row.failure_reason = errorMessage.substring(0, 200);
+      await this.uploadedDocumentAction.saveDocument(row);
     }
   }
 
@@ -76,6 +76,11 @@ export class ExtractionProcessor {
 
   @OnQueueFailed()
   onFailed(job: Job<ExtractionJobPayload>, error: Error): void {
-    this.logger.error({ event: 'extraction_job_failed', jobId: job.id, uploadId: job.data.uploadId, error: error.message });
+    this.logger.error({
+      event: 'extraction_job_failed',
+      jobId: job.id,
+      uploadId: job.data.uploadId,
+      error: error.message,
+    });
   }
 }

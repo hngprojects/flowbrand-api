@@ -14,11 +14,7 @@ import type { Queue } from 'bull';
 import { JOBS, QUEUES } from '../../common/constants/queue.constants';
 import * as SYS_MSG from '../../constants/system.messages';
 import { UploadedDocumentModelAction } from './actions/uploaded-document.action';
-import {
-  ALLOWED_UPLOAD_RULES,
-  MAX_UPLOAD_BYTES,
-  UPLOAD_PROGRESS,
-} from './constants/upload.constants';
+import { ALLOWED_UPLOAD_RULES, MAX_UPLOAD_BYTES, UPLOAD_PROGRESS } from './constants/upload.constants';
 import { UploadFileConstraints } from './dto/upload-files.dto';
 import { UploadedDocument } from './entities/uploaded-document.entity';
 import { UploadDocumentStatus } from './upload.types';
@@ -43,7 +39,7 @@ export class UploadService {
     private readonly objectStorage: ObjectStorage,
   ) {}
 
-  async handleUpload( userId: string, files: Express.Multer.File[] | undefined): Promise<UploadBatchResponse> {
+  async handleUpload(userId: string, files: Express.Multer.File[] | undefined): Promise<UploadBatchResponse> {
     if (!files?.length) {
       throw new UnprocessableEntityException({
         error: 'UnprocessableEntityException',
@@ -59,9 +55,7 @@ export class UploadService {
     }
 
     const batchId = randomUUID();
-    const uploads = await Promise.all(
-      files.map((file, index) => this.processOneFile(userId, file, index)),
-    );
+    const uploads = await Promise.all(files.map((file, index) => this.processOneFile(userId, file, index)));
 
     const acceptedCount = uploads.filter((item) => item.uploadId).length;
     if (acceptedCount === 0) {
@@ -78,19 +72,13 @@ export class UploadService {
     }
     const allAccepted = acceptedCount === uploads.length;
     return {
-      message: allAccepted
-        ? SYS_MSG.FUNNEL_UPLOAD_COMPLETED
-        : SYS_MSG.FUNNEL_UPLOAD_PARTIAL,
+      message: allAccepted ? SYS_MSG.FUNNEL_UPLOAD_COMPLETED : SYS_MSG.FUNNEL_UPLOAD_PARTIAL,
       batchId,
       uploads,
     };
   }
-  async getProgress(userId: string, uploadId: string):
-   Promise<UploadProgressResponse> {
-    const row = await this.uploadedDocumentAction.findOwnedById(
-      uploadId,
-      userId,
-    );
+  async getProgress(userId: string, uploadId: string): Promise<UploadProgressResponse> {
+    const row = await this.uploadedDocumentAction.findOwnedById(uploadId, userId);
     if (!row) {
       throw new NotFoundException({
         error: 'NotFoundException',
@@ -250,10 +238,7 @@ export class UploadService {
   private async detectFileType(file: Express.Multer.File): Promise<UploadFileType | null> {
     const extension = path.extname(file.originalname).toLowerCase();
     const candidates = (
-      Object.entries(ALLOWED_UPLOAD_RULES) as [
-        UploadFileType,
-        (typeof ALLOWED_UPLOAD_RULES)[UploadFileType],
-      ][]
+      Object.entries(ALLOWED_UPLOAD_RULES) as [UploadFileType, (typeof ALLOWED_UPLOAD_RULES)[UploadFileType]][]
     ).filter(([, rule]) => rule.ext === extension);
 
     if (candidates.length === 0) {
@@ -281,7 +266,9 @@ export class UploadService {
       try {
         fs.readSync(fd, buffer, 0, bytes, 0);
         resolve(buffer);
-      } catch {
+      } catch (err) {
+        // Log so silent read failures are traceable in the upload validation flow.
+        this.logger.warn(`peekFile failed for ${filePath}`, err instanceof Error ? err.stack : String(err));
         resolve(Buffer.alloc(0));
       } finally {
         fs.closeSync(fd);
@@ -296,24 +283,18 @@ export class UploadService {
       return false;
     }
     if (fileType === 'docx' || fileType === 'pptx') {
-      return (
-        buffer[0] === 0x50 &&
-        buffer[1] === 0x4b &&
-        buffer[2] === 0x03 &&
-        buffer[3] === 0x04
-      );
+      return buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04;
     }
     if (fileType === 'doc' || fileType === 'ppt') {
-      return (
-        buffer[0] === 0xd0 &&
-        buffer[1] === 0xcf &&
-        buffer[2] === 0x11 &&
-        buffer[3] === 0xe0
-      );
+      return buffer[0] === 0xd0 && buffer[1] === 0xcf && buffer[2] === 0x11 && buffer[3] === 0xe0;
     }
     return false;
   }
-  private async rollbackSingleUpload(storagePath: string, row: UploadedDocument | null, objectWritten: boolean): Promise<void> {
+  private async rollbackSingleUpload(
+    storagePath: string,
+    row: UploadedDocument | null,
+    objectWritten: boolean,
+  ): Promise<void> {
     if (objectWritten) {
       try {
         await this.objectStorage.deleteObject(storagePath);
