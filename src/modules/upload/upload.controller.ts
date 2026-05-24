@@ -1,23 +1,24 @@
 import {
   Controller,
   Get,
-  HttpCode,
   HttpStatus,
   Param,
   ParseUUIDPipe,
   Post,
+  Res,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { diskStorage } from 'multer';
 import * as os from 'node:os';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import * as SYS_MSG from '../../constants/system.messages';
 import { MAX_FILES_PER_UPLOAD, MAX_UPLOAD_BYTES } from './constants/upload.constants';
 import { GetFunnelUploadProgressDocs, UploadFunnelDocumentsDocs } from './docs/upload-swagger.doc';
 import { UploadService } from './upload.service';
-import type { UploadBatchResponse } from './upload.types';
 
 const uploadInterceptor = FilesInterceptor('files', MAX_FILES_PER_UPLOAD, {
   storage: diskStorage({
@@ -36,19 +37,25 @@ export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
   @Post('upload')
-  @HttpCode(HttpStatus.CREATED)
   @UploadFunnelDocumentsDocs()
   @UseInterceptors(uploadInterceptor)
-  upload(
+  async upload(
     @CurrentUser('sub') userId: string,
     @UploadedFiles() files: Express.Multer.File[] | undefined,
-  ): Promise<UploadBatchResponse> {
-    return this.uploadService.handleUpload(userId, files);
+    @Res() res: Response,
+  ): Promise<void> {
+    const result = await this.uploadService.handleUpload(userId, files);
+    res.status(HttpStatus.CREATED).json(result);
   }
 
   @Get('upload/progress/:uploadId')
   @GetFunnelUploadProgressDocs()
-  getProgress(@CurrentUser('sub') userId: string, @Param('uploadId', ParseUUIDPipe) uploadId: string) {
-    return this.uploadService.getProgress(userId, uploadId);
+  async getProgress(
+    @CurrentUser('sub') userId: string,
+    @Param('uploadId', ParseUUIDPipe) uploadId: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const result = await this.uploadService.getProgress(userId, uploadId);
+    res.json({ statusCode: HttpStatus.OK, message: SYS_MSG.FUNNEL_UPLOAD_PROGRESS_RETRIEVED, data: result });
   }
 }

@@ -29,12 +29,20 @@ export class ExtractionProcessor {
   @Process(JOBS.EXTRACT_TEXT)
   async handleExtraction(job: Job<ExtractionJobPayload>): Promise<void> {
     const { uploadId, fileType, storagePath } = job.data;
-    
+
     this.logger.log({ message: 'extraction_start', uploadId });
 
     const row = await this.uploadedDocumentAction.get({ identifierOptions: { id: uploadId } });
     if (!row) {
       throw new Error(`Upload record not found: ${uploadId}`);
+    }
+
+    // Idempotency guard: skip if a previous attempt already reached a terminal state.
+    // Bull may retry a job after a stall; without this the processor would overwrite a
+    // successful READY record or loop a FAILED one unnecessarily.
+    if (row.status === UploadDocumentStatus.READY || row.status === UploadDocumentStatus.FAILED) {
+      this.logger.log({ message: 'extraction_skipped_already_terminal', uploadId, status: row.status });
+      return;
     }
 
     try {
@@ -66,6 +74,11 @@ export class ExtractionProcessor {
 
   @OnQueueFailed()
   onFailed(job: Job<ExtractionJobPayload>, error: Error): void {
-    this.logger.error({ event: 'extraction_job_failed', jobId: job.id, uploadId: job.data.uploadId, error: error.message });
+    this.logger.error({
+      event: 'extraction_job_failed',
+      jobId: job.id,
+      uploadId: job.data.uploadId,
+      error: error.message,
+    });
   }
 }

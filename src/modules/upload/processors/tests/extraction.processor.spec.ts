@@ -91,10 +91,7 @@ describe('ExtractionProcessor', () => {
       await processor.handleExtraction(makeJob());
 
       expect(mockObjectStorage.getObject).toHaveBeenCalledWith(STORAGE_PATH);
-      expect(mockExtractor.extract).toHaveBeenCalledWith(
-        expect.any(Buffer),
-        'pdf',
-      );
+      expect(mockExtractor.extract).toHaveBeenCalledWith(expect.any(Buffer), 'pdf');
       expect(mockDocumentAction.saveDocument).toHaveBeenCalledWith(
         expect.objectContaining({
           status: UploadDocumentStatus.READY,
@@ -148,12 +145,34 @@ describe('ExtractionProcessor', () => {
     it('throws before attempting extraction when upload record is missing', async () => {
       mockDocumentAction.get.mockResolvedValue(null);
 
-      await expect(processor.handleExtraction(makeJob())).rejects.toThrow(
-        `Upload record not found: ${UPLOAD_ID}`,
-      );
+      await expect(processor.handleExtraction(makeJob())).rejects.toThrow(`Upload record not found: ${UPLOAD_ID}`);
 
       expect(mockObjectStorage.getObject).not.toHaveBeenCalled();
       expect(mockExtractor.extract).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('idempotency guard — already terminal', () => {
+    it('skips extraction and does not write to storage or DB when status is READY', async () => {
+      mockDocumentAction.get.mockResolvedValue(makeRow({ status: UploadDocumentStatus.READY }));
+
+      await expect(processor.handleExtraction(makeJob())).resolves.toBeUndefined();
+
+      expect(mockObjectStorage.getObject).not.toHaveBeenCalled();
+      expect(mockExtractor.extract).not.toHaveBeenCalled();
+      expect(mockDocumentAction.saveDocument).not.toHaveBeenCalled();
+    });
+
+    it('skips extraction and does not write to storage or DB when status is FAILED', async () => {
+      mockDocumentAction.get.mockResolvedValue(
+        makeRow({ status: UploadDocumentStatus.FAILED, failure_reason: 'previous error' }),
+      );
+
+      await expect(processor.handleExtraction(makeJob())).resolves.toBeUndefined();
+
+      expect(mockObjectStorage.getObject).not.toHaveBeenCalled();
+      expect(mockExtractor.extract).not.toHaveBeenCalled();
+      expect(mockDocumentAction.saveDocument).not.toHaveBeenCalled();
     });
   });
 });

@@ -16,6 +16,11 @@ import { ExtractionProcessor } from './processors/extraction.processor';
     TypeOrmModule.forFeature([UploadedDocument]),
     BullModule.registerQueue({
       name: QUEUES.DOCUMENT_EXTRACTION,
+      settings: {
+        // Text extraction on large documents can exceed Bull's default 30 s lock.
+        // 120 s matches the upload file size limit (5 MiB at typical parse speeds).
+        lockDuration: 120_000,
+      },
     }),
   ],
   controllers: [UploadController],
