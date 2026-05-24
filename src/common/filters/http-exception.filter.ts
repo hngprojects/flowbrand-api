@@ -92,6 +92,18 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
 
     const response = exception.getResponse();
+
+    if (statusCode === HttpStatus.BAD_REQUEST && typeof response === 'object' && response !== null) {
+      const rawMessage = (response as Record<string, unknown>).message;
+      if (rawMessage === 'Too many files') {
+        return {
+          success: false,
+          statusCode: HttpStatus.BAD_REQUEST, error: 'Bad Request',
+          message: SYS_MSG.UPLOAD_TOO_MANY_FILES,
+        };
+      }
+    }
+
     if (typeof response === 'string') {
       return {
         success: false,

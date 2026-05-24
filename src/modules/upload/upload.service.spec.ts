@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   HttpStatus,
   NotFoundException,
   UnprocessableEntityException,
@@ -18,6 +19,7 @@ import {
   UploadDocumentStatus,
   type ObjectStorage,
 } from './upload.types';
+import { UploadFileConstraints } from './dto/upload-files.dto';
 
 jest.mock('./services/document-text-extractor.service', () => ({
   DocumentTextExtractorService: class DocumentTextExtractorService {},
@@ -176,7 +178,28 @@ describe('UploadService', () => {
       });
     });
 
-    it('AC-02: rejects file-too-large uploads', async () => {
+    it('AC-02: rejects when more than 3 files are provided', async () => {
+      // Arrange
+      const files = Array.from(
+        { length: UploadFileConstraints.MAX_FILES + 1 },
+        (_, index) =>
+          mockPdfFile({
+            originalname: `file-${index + 1}.pdf`,
+            path: `/tmp/file-${index + 1}.pdf`,
+          }),
+      );
+
+      // Act
+      const call = service.handleUpload(USER_ID, files);
+
+      // Assert
+      await expect(call).rejects.toThrow(BadRequestException);
+      await expect(call).rejects.toMatchObject({
+        response: { message: SYS_MSG.UPLOAD_TOO_MANY_FILES },
+      });
+    });
+
+    it('AC-03: rejects file-too-large uploads', async () => {
       // Arrange
       const oversized = mockPdfFile({ size: MAX_UPLOAD_BYTES + 1 });
       (fs.statSync as jest.Mock).mockReturnValue({ size: MAX_UPLOAD_BYTES + 1 });
@@ -191,7 +214,7 @@ describe('UploadService', () => {
       });
     });
 
-    it('AC-03: rejects mime-type mismatches as invalid files', async () => {
+    it('AC-04: rejects mime-type mismatches as invalid files', async () => {
       // Arrange
       const invalidMime = mockPdfFile({
         originalname: 'bad.pdf',
@@ -209,7 +232,7 @@ describe('UploadService', () => {
       });
     });
 
-    it('AC-04: returns partial when some files fail validation', async () => {
+    it('AC-05: returns partial when some files fail validation', async () => {
       // Arrange
       const valid = mockPdfFile();
       const invalid = mockPdfFile({
@@ -223,18 +246,17 @@ describe('UploadService', () => {
       const result = await service.handleUpload(USER_ID, [valid, invalid]);
 
       // Assert
-      expect(result.statusCode).toBe(HttpStatus.CREATED);
       expect(result.message).toBe(SYS_MSG.FUNNEL_UPLOAD_PARTIAL);
-      expect(result.data.uploads).toHaveLength(2);
-      expect(result.data.uploads[0].uploadId).toBeDefined();
-      expect(result.data.uploads[0].status).toBe(UploadDocumentStatus.UPLOADING);
-      expect(result.data.uploads[1].status).toBe(UploadDocumentStatus.FAILED);
-      expect(result.data.uploads[1].errorMessage).toBe(
-        SYS_MSG.UPLOAD_INVALID_FILE,
+      expect(result.uploads).toHaveLength(2);
+      expect(result.uploads[0].uploadId).toBeDefined();
+      expect(result.uploads[0].status).toBe(UploadDocumentStatus.UPLOADING);
+      expect(result.uploads[1].status).toBe(UploadDocumentStatus.FAILED);
+      expect(result.uploads[1].errorMessage).toBe(
+        `File extension ".exe" is not allowed. Allowed: ${UploadFileConstraints.ALLOWED_EXTENSIONS.join(', ')}.`,
       );
     });
 
-    it('AC-05: accepts a valid file, stores in MinIO, and queues extraction', async () => {
+    it('AC-06: accepts a valid file, stores in MinIO, and queues extraction', async () => {
       // Arrange
       const file = mockPdfFile();
 
@@ -245,7 +267,7 @@ describe('UploadService', () => {
       expect(result.message).toBe(SYS_MSG.FUNNEL_UPLOAD_COMPLETED);
       expect(mockObjectStorage.putObject).toHaveBeenCalled();
       expect(mockExtractionQueue.add).toHaveBeenCalled();
-      expect(result.data.uploads[0]).toMatchObject({
+      expect(result.uploads[0]).toMatchObject({
         fileName: 'pitch-deck.pdf',
         fileType: 'pdf',
         status: UploadDocumentStatus.UPLOADING,
@@ -282,13 +304,12 @@ describe('UploadService', () => {
       const result = await service.handleUpload(USER_ID, [file1, file2]);
 
       // Assert
-      expect(result.statusCode).toBe(HttpStatus.CREATED);
       expect(result.message).toBe(SYS_MSG.FUNNEL_UPLOAD_PARTIAL);
-      expect(result.data.uploads).toHaveLength(2);
-      const statuses = result.data.uploads.map((u) => u.status);
+      expect(result.uploads).toHaveLength(2);
+      const statuses = result.uploads.map((u) => u.status);
       expect(statuses).toContain(UploadDocumentStatus.UPLOADING);
       expect(statuses).toContain(UploadDocumentStatus.FAILED);
-      const failed = result.data.uploads.find(
+      const failed = result.uploads.find(
         (u) => u.status === UploadDocumentStatus.FAILED,
       )!;
       expect(failed.errorMessage).toBe(SYS_MSG.UPLOAD_FAILED);
@@ -313,10 +334,9 @@ describe('UploadService', () => {
       const result = await service.handleUpload(USER_ID, [good, truncated]);
 
       // Assert
-      expect(result.statusCode).toBe(HttpStatus.CREATED);
       expect(result.message).toBe(SYS_MSG.FUNNEL_UPLOAD_PARTIAL);
-      expect(result.data.uploads).toHaveLength(2);
-      const failed = result.data.uploads.find(
+      expect(result.uploads).toHaveLength(2);
+      const failed = result.uploads.find(
         (u) => u.status === UploadDocumentStatus.FAILED,
       )!;
       expect(failed.errorMessage).toBe(SYS_MSG.UPLOAD_INTERRUPTED);
@@ -358,7 +378,7 @@ describe('UploadService', () => {
       });
     });
 
-    it('AC-06: returns progress payload for an owned upload', async () => {
+    it('AC-07: returns progress payload for an owned upload', async () => {
       // Arrange
       mockUploadedDocumentAction.findOwnedById.mockResolvedValue(
         buildRow({
