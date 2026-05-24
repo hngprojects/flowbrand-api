@@ -21,6 +21,10 @@ type ErrorBody = {
 };
 
 const INTERNAL_SERVER_ERROR_THRESHOLD = 500;
+const BAD_REQUEST_STATUS = 400;
+const MULTER_LIMIT_FILE_SIZE = 'LIMIT_FILE_SIZE';
+const MULTER_LIMIT_UNEXPECTED_FILE = 'LIMIT_UNEXPECTED_FILE';
+const MULTER_LIMIT_FILE_COUNT = 'LIMIT_FILE_COUNT';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -92,6 +96,18 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
 
     const response = exception.getResponse();
+
+    if (statusCode === BAD_REQUEST_STATUS && typeof response === 'object' && response !== null) {
+      const rawMessage = (response as Record<string, unknown>).message;
+      if (rawMessage === 'Too many files') {
+        return {
+          success: false,
+          statusCode: HttpStatus.BAD_REQUEST, error: 'Bad Request',
+          message: SYS_MSG.UPLOAD_TOO_MANY_FILES,
+        };
+      }
+    }
+
     if (typeof response === 'string') {
       return {
         success: false,
@@ -125,17 +141,19 @@ export class HttpExceptionFilter implements ExceptionFilter {
     ErrorBody,
     'path' | 'timestamp'
   > {
+    const code = String(exception.code);
+
     const statusCode =
-      exception.code === 'LIMIT_FILE_SIZE'
+      code === MULTER_LIMIT_FILE_SIZE
         ? HttpStatus.PAYLOAD_TOO_LARGE
         : HttpStatus.BAD_REQUEST;
 
     const message =
-      exception.code === 'LIMIT_FILE_SIZE'
+      code === MULTER_LIMIT_FILE_SIZE
         ? SYS_MSG.UPLOAD_FILE_TOO_LARGE
-        : exception.code === 'LIMIT_UNEXPECTED_FILE'
+        : code === MULTER_LIMIT_UNEXPECTED_FILE
           ? SYS_MSG.UPLOAD_INVALID_FILE
-          : exception.code === 'LIMIT_FILE_COUNT'
+          : code === MULTER_LIMIT_FILE_COUNT
             ? SYS_MSG.UPLOAD_TOO_MANY_FILES
             : SYS_MSG.UPLOAD_FAILED;
 

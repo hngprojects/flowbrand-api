@@ -1,4 +1,3 @@
-import { HttpStatus } from '@nestjs/common';
 import type { Client } from 'minio';
 import type { Readable } from 'node:stream';
 
@@ -27,14 +26,11 @@ export interface UploadItemResponse {
   errorFields?: Record<string, unknown>;
 }
 
-/** POST /funnels/upload response envelope. */
+/** POST /funnels/upload — returned by service, shaped by controller. */
 export interface UploadBatchResponse {
-  statusCode: typeof HttpStatus.CREATED;
   message: string;
-  data: {
-    batchId: string;
-    uploads: UploadItemResponse[];
-  };
+  batchId: string;
+  uploads: UploadItemResponse[];
 }
 
 /** GET /funnels/upload/progress/:uploadId payload. */

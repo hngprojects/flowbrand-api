@@ -1,6 +1,7 @@
 import { Process, Processor, OnQueueCompleted, OnQueueFailed } from '@nestjs/bull';
 import { Inject, Logger } from '@nestjs/common';
 import type { Job } from 'bull';
+import { env } from '../../../config/env'; // Import the environment config
 import { JOBS, QUEUES } from '../../../common/constants/queue.constants';
 import { UploadedDocumentModelAction } from '../actions/uploaded-document.action';
 import { UPLOAD_PROGRESS } from '../constants/upload.constants';
@@ -26,18 +27,19 @@ export class ExtractionProcessor {
     private readonly objectStorage: ObjectStorage,
   ) {}
 
-  @Process(JOBS.EXTRACT_TEXT)
+  // Added concurrency configuration using the environment variable
+  @Process({ name: JOBS.EXTRACT_TEXT, concurrency: env.QUEUE_CONCURRENCY })
   async handleExtraction(job: Job<ExtractionJobPayload>): Promise<void> {
     const { uploadId, fileType, storagePath } = job.data;
     
     this.logger.log({ message: 'extraction_start', uploadId });
 
-    const row = await this.uploadedDocumentAction.get({ identifierOptions: { id: uploadId } });
-    if (!row) {
-      throw new Error(`Upload record not found: ${uploadId}`);
-    }
-
     try {
+      const row = await this.uploadedDocumentAction.get({ identifierOptions: { id: uploadId } });
+      if (!row) {
+        throw new Error(`Upload record not found: ${uploadId}`);
+      }
+
       const buffer = await this.objectStorage.getObject(storagePath);
       const parsedText = await this.documentTextExtractor.extract(buffer, fileType);
 
@@ -52,10 +54,18 @@ export class ExtractionProcessor {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error({ message: 'extraction_failed', uploadId, error: errorMessage });
 
-      row.status = UploadDocumentStatus.FAILED;
-      row.percent_complete = 0;
-      row.failure_reason = errorMessage.substring(0, 200);
-      await this.uploadedDocumentAction.saveDocument(row);
+      // Fallback block: Ensure database is marked as FAILED if any error occurs
+      try {
+        const row = await this.uploadedDocumentAction.get({ identifierOptions: { id: uploadId } });
+        if (row) {
+          row.status = UploadDocumentStatus.FAILED;
+          row.percent_complete = 0;
+          row.failure_reason = errorMessage.substring(0, 200);
+          await this.uploadedDocumentAction.saveDocument(row);
+        }
+      } catch (dbError) {
+        this.logger.error({ message: 'failed_to_save_failure_status', uploadId, error: dbError });
+      }
     }
   }
 
