@@ -48,11 +48,6 @@ export class ExtractionProcessor {
     }
 
     try {
-      const row = await this.uploadedDocumentAction.get({ identifierOptions: { id: uploadId } });
-      if (!row) {
-        throw new Error(`Upload record not found: ${uploadId}`);
-      }
-
       const buffer = await this.objectStorage.getObject(storagePath);
       const parsedText = await this.documentTextExtractor.extract(buffer, fileType);
 
@@ -67,18 +62,10 @@ export class ExtractionProcessor {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error({ message: 'extraction_failed', uploadId, error: errorMessage });
 
-      // Fallback block: Ensure database is marked as FAILED if any error occurs
-      try {
-        const row = await this.uploadedDocumentAction.get({ identifierOptions: { id: uploadId } });
-        if (row) {
-          row.status = UploadDocumentStatus.FAILED;
-          row.percent_complete = 0;
-          row.failure_reason = errorMessage.substring(0, 200);
-          await this.uploadedDocumentAction.saveDocument(row);
-        }
-      } catch (dbError) {
-        this.logger.error({ message: 'failed_to_save_failure_status', uploadId, error: dbError });
-      }
+      row.status = UploadDocumentStatus.FAILED;
+      row.percent_complete = 0;
+      row.failure_reason = errorMessage.substring(0, 200);
+      await this.uploadedDocumentAction.saveDocument(row);
     }
   }
 
