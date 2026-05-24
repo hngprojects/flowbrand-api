@@ -5,17 +5,14 @@ import { getData } from 'pdf-parse/worker';
 import { PDFParse } from 'pdf-parse';
 import * as SYS_MSG from '../../../constants/system.messages';
 import type { PptxZipLoader, UploadFileType } from '../upload.types';
-
+// 2. Set the worker globally to prevent dynamic path resolution hanging in Node.js
 PDFParse.setWorker(getData());
-
 const MAX_PARSED_TEXT_CHARS = 2_000_000;
 /** Minimum length for coarse OLE (.doc/.ppt) text to be treated as usable. */
 const OLE_MIN_TEXT_LENGTH = 40;
 /** Minimum ratio of letters for OLE extraction (filters GUID/style noise). */
 const OLE_MIN_LETTER_RATIO = 0.4;
-
 const pptxZipLoader = JSZip as unknown as PptxZipLoader;
-
 @Injectable()
 export class DocumentTextExtractorService {
   private readonly logger = new Logger(DocumentTextExtractorService.name);
