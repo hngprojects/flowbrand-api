@@ -1,13 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
 import {
-  ArrayMaxSize,
-  ArrayMinSize,
-  IsNotEmpty,
-  ValidateNested,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import {
   MAX_FILES_PER_UPLOAD,
   MAX_UPLOAD_BYTES,
   ALLOWED_UPLOAD_RULES,
@@ -17,7 +10,6 @@ import {
   type UploadBatchResponse,
   type UploadItemResponse,
   type UploadProgressResponse,
-  type UploadFileType,
 } from '../upload.types';
 import * as SYS_MSG from '../../../constants/system.messages';
 
