@@ -65,6 +65,7 @@ export function GetStageDetailDecorators() {
 export const funnelListExample = {
   success: true,
   statusCode: HttpStatus.OK,
+  message: 'Operation successful',
   data: {
     funnels: [
       {
@@ -88,6 +89,7 @@ export const funnelListExample = {
 export const funnelFullExample = {
   success: true,
   statusCode: HttpStatus.OK,
+  message: 'Operation successful',
   data: {
     funnelId: '550e8400-e29b-41d4-a716-446655440001',
     businessName: 'Acme Studio',
@@ -116,6 +118,7 @@ export const funnelFullExample = {
 export const funnelStagesSummaryExample = {
   success: true,
   statusCode: HttpStatus.OK,
+  message: 'Operation successful',
   data: [
     {
       stageId: '550e8400-e29b-41d4-a716-446655440010',
@@ -134,6 +137,7 @@ export const funnelStagesSummaryExample = {
 export const funnelStageDetailExample = {
   success: true,
   statusCode: HttpStatus.OK,
+  message: 'Operation successful',
   data: {
     stageId: '550e8400-e29b-41d4-a716-446655440010',
     position: 2,

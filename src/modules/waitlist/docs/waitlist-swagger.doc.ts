@@ -31,6 +31,7 @@ export const JoinWaitlistDocs = () =>
       description: 'Email added to the waitlist and confirmation email queued.',
       schema: {
         example: {
+          success: true,
           statusCode: HttpStatus.CREATED,
           message: SYS_MSG.WAITLIST_JOINED_SUCCESSFULLY,
           data: waitlistEntryExample,
@@ -41,6 +42,7 @@ export const JoinWaitlistDocs = () =>
       description: 'Email is already on the waitlist (idempotent).',
       schema: {
         example: {
+          success: true,
           statusCode: HttpStatus.OK,
           message: SYS_MSG.WAITLIST_ALREADY_JOINED,
           data: waitlistEntryExample,

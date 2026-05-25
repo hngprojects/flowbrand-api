@@ -11,6 +11,7 @@ import {
   SwaggerModule,
   ApiBadRequestResponse,
   ApiTooManyRequestsResponse,
+  ApiForbiddenResponse,
 } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { SendOtpDto } from '../dto/send-otp.dto';
@@ -38,11 +39,13 @@ export const RegisterDocs = () =>
   applyDecorators(
     ApiOperation({ summary: 'Register a new user' }),
     ApiCreatedResponse({
-      description: 'User registered and logged in',
+      description: 'User registered — OTP verification email sent',
       schema: {
         example: {
+          success: true,
           statusCode: 201,
           message: SYS_MSG.REGISTRATION_SUCCESSFUL_VERIFY_EMAIL,
+          data: null,
         },
       },
     }),
@@ -60,6 +63,7 @@ export const LoginDocs = () =>
       description: 'Login successful',
       schema: {
         example: {
+          success: true,
           statusCode: 200,
           message: SYS_MSG.AUTH_LOGIN_SUCCESSFUL,
           data: authResponseExample,
@@ -120,6 +124,7 @@ export const RefreshDocs = () =>
       description: 'Refresh token rotated and new access token issued',
       schema: {
         example: {
+          success: true,
           statusCode: 200,
           message: SYS_MSG.AUTH_TOKEN_REFRESHED,
           data: authResponseExample,
@@ -147,7 +152,19 @@ export const LogoutDocs = () =>
       description:
         'Sets `is_revoked = true` on the active `user_sessions` row and deletes the \
         matching `sess:{userId}:{sessionId}` key in Redis, so neither the refresh \
-        token nor the still-unexpired access token can be used after logout.',
+        token nor the still-unexpired access token can be used after logout. \
+        Clears the `refreshToken` HttpOnly cookie.',
+    }),
+    ApiOkResponse({
+      description: 'Session revoked and refresh cookie cleared',
+      schema: {
+        example: {
+          success: true,
+          statusCode: 200,
+          message: SYS_MSG.AUTH_LOGOUT_SUCCESSFUL,
+          data: null,
+        },
+      },
     }),
   );
 
@@ -199,9 +216,10 @@ export const GoogleExchangeDocs = () =>
     }),
     ApiBody({ type: GoogleExchangeDto }),
     ApiOkResponse({
-      description: 'Exchange successful, user session created and tokens issued',
+      description: 'Exchange successful — session created, refresh cookie set, and tokens issued',
       schema: {
         example: {
+          success: true,
           statusCode: HttpStatus.OK,
           message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
           data: {
@@ -245,8 +263,10 @@ export const SendOtpDocs = () =>
         'OTP dispatched, email not found, or account already verified — all return 200 to prevent enumeration',
       schema: {
         example: {
+          success: true,
           statusCode: 200,
-          message: 'OTP sent successfully',
+          message: SYS_MSG.OTP_SENT_SUCCESSFULLY,
+          data: null,
         },
       },
     }),
@@ -416,6 +436,7 @@ export const VerifyOtpDocs = () =>
       description: 'OTP verified, account activated, tokens issued',
       schema: {
         example: {
+          success: true,
           statusCode: 200,
           message: SYS_MSG.OTP_VERIFIED_SUCCESSFULLY,
           data: authResponseExample,
@@ -460,8 +481,10 @@ export const ResendOtpDocs = () =>
       description: 'OTP sent, email not found, or account already verified — all return 200',
       schema: {
         example: {
+          success: true,
           statusCode: 200,
           message: SYS_MSG.OTP_RESENT_SUCCESSFULLY,
+          data: null,
         },
       },
     }),
@@ -495,8 +518,10 @@ export const ForgotPasswordDocs = () =>
       description: 'OTP sent if email exists (always returns 200 to prevent enumeration)',
       schema: {
         example: {
+          success: true,
           statusCode: HttpStatus.OK,
           message: SYS_MSG.PASSWORD_RESET_OTP_SENT,
+          data: null,
         },
       },
     }),
@@ -526,6 +551,7 @@ export const VerifyResetOtpDocs = () =>
       description: 'OTP verified — reset token issued',
       schema: {
         example: {
+          success: true,
           statusCode: HttpStatus.OK,
           message: SYS_MSG.PASSWORD_RESET_OTP_VERIFIED,
           data: { reset_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' },
@@ -563,9 +589,10 @@ export const ResetPasswordDocs = () =>
     }),
     ApiBody({ type: ResetPasswordDto }),
     ApiOkResponse({
-      description: 'Password reset successful and user auto-logged in',
+      description: 'Password reset successful — user auto-logged in and refresh cookie set',
       schema: {
         example: {
+          success: true,
           statusCode: HttpStatus.OK,
           message: SYS_MSG.PASSWORD_RESET_SUCCESSFUL,
           data: {

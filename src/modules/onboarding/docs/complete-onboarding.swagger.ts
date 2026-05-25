@@ -17,6 +17,7 @@ export function CompleteOnboardingDocs() {
       description: 'Onboarding completed successfully',
       schema: {
         example: {
+          success: true,
           statusCode: HttpStatus.OK,
           message: SYS_MSG.ONBOARDING_COMPLETE_SUCCESS,
           data: {
@@ -30,6 +31,7 @@ export function CompleteOnboardingDocs() {
       description: 'Onboarding already complete',
       schema: {
         example: {
+          success: true,
           statusCode: HttpStatus.CONFLICT,
           message: SYS_MSG.ONBOARDING_ALREADY_COMPLETE,
           data: {

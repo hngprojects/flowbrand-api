@@ -42,6 +42,7 @@ export const StartOnboardingDocs = () =>
       description: 'New wizard session created.',
       schema: {
         example: {
+          success: true,
           statusCode: HttpStatus.CREATED,
           message: SYS_MSG.ONBOARDING_SESSION_STARTED,
           data: startResponseDataExample,
@@ -55,6 +56,7 @@ export const StartOnboardingDocs = () =>
           {
             description: 'Existing in-progress session resumed.',
             example: {
+              success: true,
               statusCode: HttpStatus.OK,
               message: SYS_MSG.ONBOARDING_SESSION_RESUMED,
               data: startResponseDataExample,
@@ -63,6 +65,7 @@ export const StartOnboardingDocs = () =>
           {
             description: 'Onboarding already completed previously.',
             example: {
+              success: true,
               statusCode: HttpStatus.OK,
               message: SYS_MSG.ONBOARDING_ALREADY_COMPLETE,
               data: completedResponseDataExample,
@@ -140,6 +143,8 @@ export const PostStepDocs = () =>
       schema: {
         example: {
           success: true,
+          statusCode: HttpStatus.OK,
+          message: SYS_MSG.ONBOARDING_STEP_SAVED,
           data: {
             sessionId: '550e8400-e29b-41d4-a716-446655440001',
             userId: '550e8400-e29b-41d4-a716-446655440002',

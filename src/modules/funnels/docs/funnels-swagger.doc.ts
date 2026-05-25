@@ -30,6 +30,7 @@ export const CreateFunnelDocs = () =>
       description: 'Generation accepted; client should poll the status endpoint.',
       schema: {
         example: {
+          success: true,
           statusCode: HttpStatus.ACCEPTED,
           message: SYS_MSG.FUNNEL_GENERATION_STARTED,
           data: { funnel_id: FUNNEL_ID_EXAMPLE, status: 'generating' },
@@ -40,6 +41,7 @@ export const CreateFunnelDocs = () =>
       description: 'Idempotent re-submission; returns existing funnel.',
       schema: {
         example: {
+          success: true,
           statusCode: HttpStatus.OK,
           message: SYS_MSG.FUNNEL_ALREADY_EXISTS,
           data: { funnel_id: FUNNEL_ID_EXAMPLE, status: 'generating' },
@@ -110,6 +112,7 @@ export const GetFunnelStatusDocs = () =>
       description: 'Funnel status snapshot.',
       schema: {
         example: {
+          success: true,
           statusCode: HttpStatus.OK,
           message: SYS_MSG.FUNNEL_STATUS_RETRIEVED,
           data: {
