@@ -249,12 +249,16 @@ export const GoogleExchangeDocs = () =>
 export const SendOtpDocs = () =>
   applyDecorators(
     ApiOperation({
-      summary: "Send OTP verification code to the user's registered email",
+      summary: '[Internal] Send OTP — use resend-otp for frontend retry flows',
       description:
+        '**Internal use only.** `POST /auth/register` calls this automatically — ' +
+        'the frontend should never need to call it directly. ' +
+        'For user-facing retry UI (e.g. "Resend code" button), use `POST /auth/resend-otp` instead, ' +
+        'which enforces a 30-second cooldown and hourly cap designed for user-initiated retries.\n\n' +
         'Generates a 6-digit OTP, hashes it, stores it in otp_tokens, and enqueues a verification email. ' +
         'Rate limited to 5 requests per 15 minutes per user. ' +
         'Returns 200 for unknown emails to prevent enumeration. ' +
-        'Already-verified accounts also return 200 with a distinct message.',
+        'Already-verified accounts also return 200.',
     }),
     ApiBody({ type: SendOtpDto }),
     ApiOkResponse({
