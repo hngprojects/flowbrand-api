@@ -1,5 +1,3 @@
-import { Res } from '@nestjs/common';
-import type { Response } from 'express';
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ContactService } from './contact.service';
@@ -17,14 +15,12 @@ export class ContactController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ContactSwaggerDocs.create()
-  async create(@Body() dto: CreateContactDto, @Res() res: Response): Promise<void> {
+  async create(@Body() dto: CreateContactDto) {
     const result = await this.contactService.create(dto);
-
-    res.status(HttpStatus.CREATED).json({
-      success: true,
+    return {
       statusCode: HttpStatus.CREATED,
       message: SYS_MSG.CONTACT_MESSAGE_SENT_SUCCESSFULLY,
       data: result,
-    });
+    };
   }
 }

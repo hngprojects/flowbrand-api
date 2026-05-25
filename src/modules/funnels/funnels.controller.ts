@@ -8,9 +8,7 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
-  Res,
 } from '@nestjs/common';
-import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../constants/system.messages';
 import { CreateFunnelDocs, GetFunnelStatusDocs } from './docs/funnels-swagger.doc';
@@ -70,20 +68,20 @@ export class FunnelsController {
   // Generation endpoints (idempotent create + status polling)
   @Post('generate')
   @CreateFunnelDocs()
+  @HttpCode(HttpStatus.OK)
   async generate(
     @CurrentUser('userId') userId: string,
     @Body() dto: CreateFunnelDto,
-    @Res() res: Response,
-  ): Promise<void> {
+  ) {
     const result = await this.funnelsGenService.createGeneration(userId, dto);
-    res.status(result.statusCode).json({
+    return {
       statusCode: result.statusCode,
       message: result.message,
       data: {
         funnel_id: result.funnelId,
         status: result.status,
       },
-    });
+    };
   }
 
   @Get('generate/status/:funnelId')
@@ -92,10 +90,9 @@ export class FunnelsController {
   async status(
     @CurrentUser('userId') userId: string,
     @Param() params: FunnelIdParamDto,
-    @Res() res: Response,
-  ): Promise<void> {
+  ) {
     const result = await this.funnelsGenService.getStatus(params.funnelId, userId);
-    res.status(HttpStatus.OK).json({
+    return {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.FUNNEL_STATUS_RETRIEVED,
       data: {
@@ -104,6 +101,6 @@ export class FunnelsController {
         ...(result.redirect ? { redirect: result.redirect } : {}),
         ...(result.error ? { error: result.error } : {}),
       },
-    });
+    };
   }
 }

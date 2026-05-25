@@ -57,6 +57,7 @@ export const UPLOAD_INTERRUPTED = 'Upload incomplete: received bytes do not matc
 export const UPLOAD_TOO_MANY_FILES = 'Too many files uploaded; maximum allowed is 3.';
 
 // Funnel uploads
+export const UPLOAD_BATCH_ACCEPTED = 'Files uploaded successfully';
 export const FUNNEL_UPLOAD_COMPLETED = 'Funnel upload completed';
 export const FUNNEL_UPLOAD_PARTIAL = 'Some files were rejected; see uploads[].errorMessage for details';
 export const FUNNEL_UPLOAD_ALL_REJECTED = 'All files were rejected; see details[]';
