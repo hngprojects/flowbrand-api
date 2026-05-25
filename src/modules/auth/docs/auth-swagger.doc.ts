@@ -11,7 +11,6 @@ import {
   SwaggerModule,
   ApiBadRequestResponse,
   ApiTooManyRequestsResponse,
-  ApiForbiddenResponse,
 } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { SendOtpDto } from '../dto/send-otp.dto';

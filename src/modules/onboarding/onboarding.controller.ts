@@ -1,4 +1,5 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PostStepDocs, StartOnboardingDocs } from './docs/onboarding-swagger.doc';
@@ -15,10 +16,14 @@ export class OnboardingController {
 
   @Post('start')
   @StartOnboardingDocs()
-  @HttpCode(HttpStatus.OK)
-  async start(@CurrentUser('sub') userId: string) {
+  async start(
+    @CurrentUser('sub') userId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const { statusCode, message, data } =
       await this.onboardingService.startWizardSession(userId);
+    // Dynamic status: 201 for a new session, 200 for a resumed/completed one
+    res.status(statusCode);
     return { statusCode, message, data };
   }
 
