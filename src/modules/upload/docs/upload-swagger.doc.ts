@@ -40,7 +40,10 @@ export const UploadFunnelDocumentsDocs = () =>
     ApiCreatedResponse({
       type: UploadBatchResponseDto,
       description:
-        '201 when at least one file accepted. Response lists per-file status (parsing, ready, or failed). Poll until ready.',
+        '201 when at least one file accepted. ' +
+        'The DTO is served under `data` in the standard envelope: ' +
+        '`{ success, statusCode, message, data: <UploadBatchResponseDto> }`. ' +
+        'Per-file status (parsing, ready, or failed) is inside `data`. Poll until ready.',
     }),
     ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' }),
     ApiUnprocessableEntityResponse({
@@ -56,8 +59,6 @@ export const UploadFunnelDocumentsDocs = () =>
     }),
   );
 
-  
-
 export const GetFunnelUploadProgressDocs = () =>
   applyDecorators(
     ApiOperation({
@@ -65,7 +66,10 @@ export const GetFunnelUploadProgressDocs = () =>
     }),
     ApiOkResponse({
       type: UploadProgressResponseDto,
-      description: '200 when the upload belongs to the user and progress is available.',
+      description:
+        '200 when the upload belongs to the user and progress is available. ' +
+        'The DTO is served under `data` in the standard envelope: ' +
+        '`{ success, statusCode, message, data: <UploadProgressResponseDto> }`.',
     }),
     ApiNotFoundResponse({
       type: UploadNotFoundResponseDto,

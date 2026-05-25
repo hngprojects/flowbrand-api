@@ -65,9 +65,8 @@ describe('AuthController Google OAuth', () => {
       mockAuthService.exchangeCode.mockResolvedValue(mockResult);
 
       const cookie = jest.fn();
-      const json = jest.fn();
 
-      await controller.googleExchange({ code: 'valid-code' }, { cookie, json } as never);
+      const result = await controller.googleExchange({ code: 'valid-code' }, { cookie } as never);
 
       expect(mockAuthService.exchangeCode).toHaveBeenCalledWith('valid-code');
       expect(cookie).toHaveBeenCalledWith(
@@ -75,7 +74,7 @@ describe('AuthController Google OAuth', () => {
         'refresh.jwt',
         expect.objectContaining({ httpOnly: true, sameSite: 'strict' }),
       );
-      expect(json).toHaveBeenCalledWith({
+      expect(result).toEqual({
         statusCode: HttpStatus.OK,
         message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
         data: {
@@ -137,29 +136,20 @@ describe('AuthController - Password Reset Flow (BE-012)', () => {
     const forgotPasswordDto: ForgotPasswordDto = { email: USER_EMAIL };
 
     it('AC-01: returns 200 with success message for valid request', async () => {
-      const expectedMessage = { message: SYS_MSG.PASSWORD_RESET_OTP_SENT };
-      mockAuthService.forgotPassword.mockResolvedValue(expectedMessage);
+      mockAuthService.forgotPassword.mockResolvedValue({ message: SYS_MSG.PASSWORD_RESET_OTP_SENT });
 
-      await controller.forgotPassword(forgotPasswordDto, mockResponse as Response);
+      const result = await controller.forgotPassword(forgotPasswordDto);
 
       expect(mockAuthService.forgotPassword).toHaveBeenCalledWith(USER_EMAIL);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        statusCode: HttpStatus.OK,
-        message: SYS_MSG.PASSWORD_RESET_OTP_SENT,
-      });
+      expect(result).toEqual({ statusCode: HttpStatus.OK, message: SYS_MSG.PASSWORD_RESET_OTP_SENT });
     });
 
     it('AC-01: returns 200 even when email not found (prevents enumeration)', async () => {
-      mockAuthService.forgotPassword.mockResolvedValue({
-        message: SYS_MSG.PASSWORD_RESET_OTP_SENT,
-      });
+      mockAuthService.forgotPassword.mockResolvedValue({ message: SYS_MSG.PASSWORD_RESET_OTP_SENT });
 
-      await controller.forgotPassword({ email: 'nonexistent@example.com' }, mockResponse as Response);
+      const result = await controller.forgotPassword({ email: 'nonexistent@example.com' });
 
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        statusCode: HttpStatus.OK,
-        message: SYS_MSG.PASSWORD_RESET_OTP_SENT,
-      });
+      expect(result).toEqual({ statusCode: HttpStatus.OK, message: SYS_MSG.PASSWORD_RESET_OTP_SENT });
     });
 
     it('AC-02: passes rate limit errors to client', async () => {
@@ -167,7 +157,7 @@ describe('AuthController - Password Reset Flow (BE-012)', () => {
         new HttpException(SYS_MSG.PASSWORD_RESET_RATE_LIMITED, HttpStatus.TOO_MANY_REQUESTS),
       );
 
-      await expect(controller.forgotPassword(forgotPasswordDto, mockResponse as Response)).rejects.toThrow(
+      await expect(controller.forgotPassword(forgotPasswordDto)).rejects.toThrow(
         new HttpException(SYS_MSG.PASSWORD_RESET_RATE_LIMITED, HttpStatus.TOO_MANY_REQUESTS),
       );
     });
@@ -175,7 +165,7 @@ describe('AuthController - Password Reset Flow (BE-012)', () => {
     it('calls service with correct email parameter', async () => {
       mockAuthService.forgotPassword.mockResolvedValue({ message: SYS_MSG.PASSWORD_RESET_OTP_SENT });
 
-      await controller.forgotPassword(forgotPasswordDto, mockResponse as Response);
+      await controller.forgotPassword(forgotPasswordDto);
 
       expect(mockAuthService.forgotPassword).toHaveBeenCalledWith(USER_EMAIL);
       expect(mockAuthService.forgotPassword).toHaveBeenCalledTimes(1);
@@ -230,7 +220,7 @@ describe('AuthController - Password Reset Flow (BE-012)', () => {
     it('AC-04: returns 200 with tokens and sets cookie on success', async () => {
       mockAuthService.resetPassword.mockResolvedValue(authResponse);
 
-      await controller.resetPassword(resetPasswordDto, mockResponse as Response);
+      const result = await controller.resetPassword(resetPasswordDto, mockResponse as Response);
 
       expect(mockAuthService.resetPassword).toHaveBeenCalledWith(RESET_TOKEN, NEW_PASSWORD);
       expect(mockResponse.cookie).toHaveBeenCalledWith(
@@ -238,7 +228,7 @@ describe('AuthController - Password Reset Flow (BE-012)', () => {
         REFRESH_TOKEN,
         expect.objectContaining({ httpOnly: true, sameSite: 'strict' }),
       );
-      expect(mockResponse.json).toHaveBeenCalledWith({
+      expect(result).toEqual({
         statusCode: HttpStatus.OK,
         message: SYS_MSG.PASSWORD_RESET_SUCCESSFUL,
         data: {
@@ -288,9 +278,9 @@ describe('AuthController - Password Reset Flow (BE-012)', () => {
     it('includes redirectUrl in response data', async () => {
       mockAuthService.resetPassword.mockResolvedValue(authResponse);
 
-      await controller.resetPassword(resetPasswordDto, mockResponse as Response);
+      const result = await controller.resetPassword(resetPasswordDto, mockResponse as Response);
 
-      expect(mockResponse.json).toHaveBeenCalledWith({
+      expect(result).toEqual({
         statusCode: HttpStatus.OK,
         message: SYS_MSG.PASSWORD_RESET_SUCCESSFUL,
         data: { accessToken: ACCESS_TOKEN, user: mockUser, redirectUrl: '/dashboard' },

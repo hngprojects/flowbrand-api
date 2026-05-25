@@ -1,6 +1,6 @@
 import { Body, Controller, HttpCode, HttpStatus, Post, Res } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PostStepDocs, StartOnboardingDocs } from './docs/onboarding-swagger.doc';
 import { CompleteOnboardingDocs } from './docs/complete-onboarding.swagger';
@@ -16,44 +16,25 @@ export class OnboardingController {
 
   @Post('start')
   @StartOnboardingDocs()
-  async start(
-    @CurrentUser('sub') userId: string,
-    @Res() res: Response,
-  ): Promise<void> {
-    const { statusCode, message, data } =
-      await this.onboardingService.startWizardSession(userId);
-
-    res.status(statusCode).json({
-      statusCode,
-      message,
-      data,
-    });
+  async start(@CurrentUser('sub') userId: string, @Res({ passthrough: true }) res: Response) {
+    const { statusCode, message, data } = await this.onboardingService.startWizardSession(userId);
+    // Dynamic status: 201 for a new session, 200 for a resumed/completed one
+    res.status(statusCode);
+    return { statusCode, message, data };
   }
 
   @Post('complete')
   @CompleteOnboardingDocs()
-  async completeOnboarding(
-    @CurrentUser('sub') userId: string,
-    @Body() body: CompleteOnboardingDto,
-    @Res() res: Response,
-  ): Promise<void> {
+  @HttpCode(HttpStatus.OK)
+  async completeOnboarding(@CurrentUser('sub') userId: string, @Body() body: CompleteOnboardingDto) {
     const result = await this.onboardingService.completeOnboarding(userId, body.session_id);
-
-    res.status(result.statusCode).json({
-      success: true,
-      statusCode: result.statusCode,
-      message: result.message,
-      data: result.data,
-    });
+    return { statusCode: result.statusCode, message: result.message, data: result.data };
   }
 
   @Post('step')
   @HttpCode(HttpStatus.OK)
   @PostStepDocs()
-  saveStep(
-    @CurrentUser('sub') userId: string,
-    @Body() dto: StepAnswerDto
-  ) {
-    return this.onboardingService.saveStepAnswer(userId, dto)
+  saveStep(@CurrentUser('sub') userId: string, @Body() dto: StepAnswerDto) {
+    return this.onboardingService.saveStepAnswer(userId, dto);
   }
 }

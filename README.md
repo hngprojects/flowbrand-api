@@ -165,16 +165,30 @@ The global `JwtAuthGuard` protects every route by default. Decorate handlers (or
 
 ### Response envelope
 
-`TransformInterceptor` wraps successful responses:
+`TransformInterceptor` wraps every successful response in a consistent envelope:
 
 ```json
 {
   "success": true,
+  "statusCode": 200,
+  "message": "Operation successful",
   "data": { ... }
 }
 ```
 
-For paginated responses, `paginationMeta` from `@hng-sdk/orm` is hoisted into `meta`.
+Controllers return a plain object — the interceptor adds `success` and fills `message` with a default when the controller omits it. For paginated responses, `paginationMeta` from `@hng-sdk/orm` is hoisted into `meta`:
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Operation successful",
+  "data": [...],
+  "meta": { "total": 42, "page": 1, "limit": 20 }
+}
+```
+
+See `src/common/interceptors/transform.interceptor.ts` and CONTRIBUTING.md §6 for the full controller return-shape guide.
 
 Errors go through `HttpExceptionFilter`:
 
