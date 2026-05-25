@@ -8,7 +8,7 @@ Your participation helps keep the platform smarter, more reliable, and more impa
 
 ### 1. Clone the repository
 
-This project uses a shared-repo workflow. If you have write access to `hngprojects/flowbrand-api`, clone the repo directly and branch off `dev`. External contributors without write access can fork instead and open a cross-fork PR.
+This project uses a shared-repo workflow. If you have write access to `hngprojects/flowbrand-api`, clone the repo directly and branch off `dev`. External contributors without write access can fork ins
 
 ```sh
 git clone https://github.com/hngprojects/flowbrand-api.git
@@ -201,7 +201,62 @@ export class UserModelAction extends AbstractModelAction<User> {
 
 Services depend on the model action, not the repository.
 
-### 6. Testing Proof Is Required in Every PR
+### 6. Controller Return Shapes — Let the Interceptor Do the Wrapping
+
+All controllers go through `TransformInterceptor`, which produces the consistent envelope:
+
+```json
+{ "success": true, "statusCode": 200, "message": "...", "data": <payload> }
+```
+
+**Never call `res.json()` directly** unless the endpoint performs a `res.redirect()`. Never include `success: true` in what you return — the interceptor adds it, and if you include it manually it le
+
+#### Shape A — Structured with data ✅ (most endpoints)
+
+Use when you need an explicit message *and* a data payload.
+
+```ts
+return {
+  statusCode: HttpStatus.OK,
+  message: SYS_MSG.AUTH_LOGIN_SUCCESSFUL,
+  data: { accessToken, user },
+};
+// → { "success": true, "statusCode": 200, "message": "...", "data": { "accessToken": "..." } }
+```
+
+#### Shape B — Structured without data ✅ (message-only responses)
+
+Omit the `data` key; the interceptor fills it with `null`.
+
+```ts
+return { statusCode: HttpStatus.OK, message: SYS_MSG.OTP_SENT_SUCCESSFULLY };
+// → { "success": true, "statusCode": 200, "message": "...", "data": null }
+```
+
+#### Shape C — Plain service result ✅ (pass-through)
+
+Use when the service already returns the payload and no custom message is needed.
+
+```ts
+return this.usersService.findById(userId);
+// → { "success": true, "statusCode": 200, "message": "Operation successful", "data": { "id": "..." } }
+```
+
+#### Shape D — Pagination ✅ (existing convention, unchanged)
+
+```ts
+return { paginationMeta: { ... }, payload: [...] };
+// → { "success": true, "statusCode": 200, "data": [...], "meta": { ... } }
+```
+
+#### Rules and gotchas
+
+- **Shape A/B requires BOTH `statusCode` AND `message`.** Without `message`, the interceptor treats the whole object as Shape C data, causing `body.data.statusCode` instead of `body.statusCode`.
+- **Use `@Res({ passthrough: true })`** only when you must call `res.cookie()`, `res.clearCookie()`, or `res.status()` (dynamic status). Then `return` the structured object and the interceptor still f
+- **Keep plain `@Res()`** (without passthrough) only for `res.redirect()` endpoints — these bypass the interceptor entirely.
+- **Keep `@HttpCode()` in sync** with the `statusCode` field you return. The JSON `statusCode` comes from your return value; the HTTP status header comes from `@HttpCode()` or `res.status()`. They mus
+
+### 7. Testing Proof Is Required in Every PR
 
 Every PR must include at least one of the following:
 
