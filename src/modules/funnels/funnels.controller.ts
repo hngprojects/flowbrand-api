@@ -8,7 +8,9 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../constants/system.messages';
 import { CreateFunnelDocs, GetFunnelStatusDocs } from './docs/funnels-swagger.doc';
@@ -68,12 +70,14 @@ export class FunnelsController {
   // Generation endpoints (idempotent create + status polling)
   @Post('generate')
   @CreateFunnelDocs()
-  @HttpCode(HttpStatus.OK)
   async generate(
     @CurrentUser('userId') userId: string,
     @Body() dto: CreateFunnelDto,
+    @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.funnelsGenService.createGeneration(userId, dto);
+    // Dynamic status: 202 ACCEPTED for a new generation, 200 OK for an idempotent repeat
+    res.status(result.statusCode);
     return {
       statusCode: result.statusCode,
       message: result.message,
