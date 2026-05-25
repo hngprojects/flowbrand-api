@@ -256,6 +256,29 @@ return { paginationMeta: { ... }, payload: [...] };
 - **Keep plain `@Res()`** (without passthrough) only for `res.redirect()` endpoints — these bypass the interceptor entirely.
 - **Keep `@HttpCode()` in sync** with the `statusCode` field you return. The JSON `statusCode` comes from your return value; the HTTP status header comes from `@HttpCode()` or `res.status()`. They must match. Use `@Res({ passthrough: true })` + `res.status()` when the status is dynamic (e.g. 200 vs 201 vs 202 depending on a service result).
 
+**Dynamic-status pattern example** — when the service decides the status code (202 for a new job, 200 for an idempotent repeat):
+
+```ts
+@Post('generate')
+@CreateFunnelDocs()
+async generate(
+  @CurrentUser('userId') userId: string,
+  @Body() dto: CreateFunnelDto,
+  @Res({ passthrough: true }) res: Response,
+) {
+  const result = await this.service.generate(userId, dto);
+  // Set the HTTP status header to match the body — 202 ACCEPTED or 200 OK
+  res.status(result.statusCode);
+  return {
+    statusCode: result.statusCode, // 202 | 200
+    message: result.message,
+    data: { id: result.id, status: result.status },
+  };
+}
+// → HTTP 202  { "success": true, "statusCode": 202, "message": "...", "data": { ... } }
+// → HTTP 200  { "success": true, "statusCode": 200, "message": "...", "data": { ... } }
+```
+
 ### 7. Testing Proof Is Required in Every PR
 
 Every PR must include at least one of the following:

@@ -18,8 +18,15 @@ interface StructuredPayload {
 }
 
 function isStructuredPayload(value: unknown): value is StructuredPayload {
+  if (value === null || typeof value !== 'object') return false;
+  const obj = value as Record<string, unknown>;
+  // `in` on a typed Record gives boolean without any inference — intentional
+  // choice over hasOwnProperty.call which TS types as `any` in this lib version.
   return (
-    value !== null && typeof value === 'object' && 'statusCode' in (value) && 'message' in (value)
+    'statusCode' in obj &&
+    'message' in obj &&
+    typeof obj['statusCode'] === 'number' &&
+    typeof obj['message'] === 'string'
   );
 }
 
@@ -58,7 +65,15 @@ export class TransformInterceptor<T> implements NestInterceptor<T, ApiResponse<T
         }
 
         // Case 2: { paginationMeta, payload, ...rest } — paginated list
-        if (payload !== null && typeof payload === 'object' && 'paginationMeta' in (payload as object)) {
+        // Require both keys and a defined payload so a missing `payload` key doesn't
+        // silently produce { data: undefined } in the envelope.
+        if (
+          payload !== null &&
+          typeof payload === 'object' &&
+          Object.prototype.hasOwnProperty.call(payload, 'paginationMeta') &&
+          Object.prototype.hasOwnProperty.call(payload, 'payload') &&
+          (payload as Record<string, unknown>)['payload'] !== undefined
+        ) {
           const {
             paginationMeta,
             payload: data,
