@@ -16,12 +16,8 @@ export class OnboardingController {
 
   @Post('start')
   @StartOnboardingDocs()
-  async start(
-    @CurrentUser('sub') userId: string,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const { statusCode, message, data } =
-      await this.onboardingService.startWizardSession(userId);
+  async start(@CurrentUser('sub') userId: string, @Res({ passthrough: true }) res: Response) {
+    const { statusCode, message, data } = await this.onboardingService.startWizardSession(userId);
     // Dynamic status: 201 for a new session, 200 for a resumed/completed one
     res.status(statusCode);
     return { statusCode, message, data };
@@ -30,10 +26,7 @@ export class OnboardingController {
   @Post('complete')
   @CompleteOnboardingDocs()
   @HttpCode(HttpStatus.OK)
-  async completeOnboarding(
-    @CurrentUser('sub') userId: string,
-    @Body() body: CompleteOnboardingDto,
-  ) {
+  async completeOnboarding(@CurrentUser('sub') userId: string, @Body() body: CompleteOnboardingDto) {
     const result = await this.onboardingService.completeOnboarding(userId, body.session_id);
     return { statusCode: result.statusCode, message: result.message, data: result.data };
   }
@@ -41,10 +34,7 @@ export class OnboardingController {
   @Post('step')
   @HttpCode(HttpStatus.OK)
   @PostStepDocs()
-  saveStep(
-    @CurrentUser('sub') userId: string,
-    @Body() dto: StepAnswerDto,
-  ) {
+  saveStep(@CurrentUser('sub') userId: string, @Body() dto: StepAnswerDto) {
     return this.onboardingService.saveStepAnswer(userId, dto);
   }
 }

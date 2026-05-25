@@ -1,15 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Param,
-  ParseUUIDPipe,
-  Post,
-  Query,
-  Res,
-} from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../constants/system.messages';
@@ -91,10 +80,7 @@ export class FunnelsController {
   @Get('generate/status/:funnelId')
   @HttpCode(HttpStatus.OK)
   @GetFunnelStatusDocs()
-  async status(
-    @CurrentUser('userId') userId: string,
-    @Param() params: FunnelIdParamDto,
-  ) {
+  async status(@CurrentUser('userId') userId: string, @Param() params: FunnelIdParamDto) {
     const result = await this.funnelsGenService.getStatus(params.funnelId, userId);
     return {
       statusCode: HttpStatus.OK,

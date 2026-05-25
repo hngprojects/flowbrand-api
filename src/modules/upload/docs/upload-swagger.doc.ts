@@ -59,8 +59,6 @@ export const UploadFunnelDocumentsDocs = () =>
     }),
   );
 
-  
-
 export const GetFunnelUploadProgressDocs = () =>
   applyDecorators(
     ApiOperation({

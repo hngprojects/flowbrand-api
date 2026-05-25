@@ -25,7 +25,7 @@ const startResponseDataExample = {
 
 const completedResponseDataExample = {
   status: 'complete' as const,
-  redirect: { to: 'funnel_generation' }
+  redirect: { to: 'funnel_generation' },
 };
 
 export const StartOnboardingDocs = () =>
@@ -107,9 +107,10 @@ export const PostStepDocs = () =>
             session_id: '550e8400-e29b-41d4-a716-446655440001',
             step: 1,
             answer: {
-              business_description: 'We sell handmade skincare products including body butters, scrubs, and face creams made from natural African ingredients.'
-            }
-          }
+              business_description:
+                'We sell handmade skincare products including body butters, scrubs, and face creams made from natural African ingredients.',
+            },
+          },
         },
         step2: {
           summary: 'Step 2: Customer Profiling',
@@ -120,11 +121,11 @@ export const PostStepDocs = () =>
               customer_tags: {
                 type: ['Women', 'Young adults'],
                 location: ['Nigeria', 'Africa'],
-                wants: ['Look good', 'Feel Confident']
+                wants: ['Look good', 'Feel Confident'],
               },
-              additional_notes: 'Mostly working-class women aged 22-35 who prefer natural products'
-            }
-          }
+              additional_notes: 'Mostly working-class women aged 22-35 who prefer natural products',
+            },
+          },
         },
         step3: {
           summary: 'Step 3: Discovery Channel',
@@ -132,11 +133,11 @@ export const PostStepDocs = () =>
             session_id: '550e8400-e29b-41d4-a716-446655440001',
             step: 3,
             answer: {
-              discovery_channel: 'TikTok'
-            }
-          }
-        }
-      }
+              discovery_channel: 'TikTok',
+            },
+          },
+        },
+      },
     }),
     ApiOkResponse({
       description: 'Step answer saved successfully.',
@@ -151,14 +152,14 @@ export const PostStepDocs = () =>
             status: 'in_progress',
             stepsCompleted: 1,
             answers: {
-              step_1: { business_description: 'We sell handmade skincare products...' }
+              step_1: { business_description: 'We sell handmade skincare products...' },
             },
             expiresAt: '2026-05-17T12:00:00.000Z',
             createdAt: '2026-05-16T12:00:00.000Z',
             updatedAt: '2026-05-16T12:00:00.000Z',
-          }
-        }
-      }
+          },
+        },
+      },
     }),
     ApiUnauthorizedResponse({
       description: 'Missing or invalid bearer token.',
@@ -181,9 +182,9 @@ export const PostStepDocs = () =>
           error: 'UnprocessableEntityException',
           message: 'Validation failed',
           fields: {
-            business_description: 'must be shorter than or equal to 500 characters'
-          }
-        }
-      }
+            business_description: 'must be shorter than or equal to 500 characters',
+          },
+        },
+      },
     }),
   );

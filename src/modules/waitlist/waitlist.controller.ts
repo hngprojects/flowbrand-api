@@ -15,16 +15,11 @@ export class WaitlistController {
   @Public()
   @Post('join')
   @JoinWaitlistDocs()
-  async joinWaitlist(
-    @Body() dto: JoinWaitlistDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async joinWaitlist(@Body() dto: JoinWaitlistDto, @Res({ passthrough: true }) res: Response) {
     const { user, isNew } = await this.waitlistService.joinWaitlist(dto);
 
     const statusCode = isNew ? HttpStatus.CREATED : HttpStatus.OK;
-    const message = isNew
-      ? SYS_MSG.WAITLIST_JOINED_SUCCESSFULLY
-      : SYS_MSG.WAITLIST_ALREADY_JOINED;
+    const message = isNew ? SYS_MSG.WAITLIST_JOINED_SUCCESSFULLY : SYS_MSG.WAITLIST_ALREADY_JOINED;
 
     // Dynamic status — set the HTTP header to match the body statusCode field
     res.status(statusCode);

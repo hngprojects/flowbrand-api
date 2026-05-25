@@ -6,9 +6,10 @@ import * as SYS_MSG from '../../../constants/system.messages';
 export function CompleteOnboardingDocs() {
   return applyDecorators(
     ApiBearerAuth('JWT'),
-    ApiOperation({ 
+    ApiOperation({
       summary: 'Complete onboarding and write profile data',
-      description: 'Validates the session, checks all 3 steps are answered, writes business data to user profile, and marks the session as complete.'
+      description:
+        'Validates the session, checks all 3 steps are answered, writes business data to user profile, and marks the session as complete.',
     }),
     ApiBody({ type: CompleteOnboardingDto }),
     // Add explicit status codes
@@ -21,10 +22,10 @@ export function CompleteOnboardingDocs() {
           statusCode: HttpStatus.OK,
           message: SYS_MSG.ONBOARDING_COMPLETE_SUCCESS,
           data: {
-            redirect: { to: 'funnel_generation' }
-          }
-        }
-      }
+            redirect: { to: 'funnel_generation' },
+          },
+        },
+      },
     }),
     ApiResponse({
       status: HttpStatus.CONFLICT,
@@ -35,10 +36,10 @@ export function CompleteOnboardingDocs() {
           statusCode: HttpStatus.CONFLICT,
           message: SYS_MSG.ONBOARDING_ALREADY_COMPLETE,
           data: {
-            redirect: { to: 'funnel_generation' }
-          }
-        }
-      }
+            redirect: { to: 'funnel_generation' },
+          },
+        },
+      },
     }),
     ApiResponse({
       status: HttpStatus.FORBIDDEN,
@@ -46,9 +47,9 @@ export function CompleteOnboardingDocs() {
       schema: {
         example: {
           statusCode: HttpStatus.FORBIDDEN,
-          message: SYS_MSG.ONBOARDING_SESSION_EXPIRED
-        }
-      }
+          message: SYS_MSG.ONBOARDING_SESSION_EXPIRED,
+        },
+      },
     }),
     ApiResponse({
       status: HttpStatus.NOT_FOUND,
@@ -56,9 +57,9 @@ export function CompleteOnboardingDocs() {
       schema: {
         example: {
           statusCode: HttpStatus.NOT_FOUND,
-          message: SYS_MSG.ONBOARDING_SESSION_NOT_FOUND
-        }
-      }
+          message: SYS_MSG.ONBOARDING_SESSION_NOT_FOUND,
+        },
+      },
     }),
     ApiResponse({
       status: 422,
@@ -67,9 +68,9 @@ export function CompleteOnboardingDocs() {
         example: {
           statusCode: 422,
           message: SYS_MSG.ONBOARDING_INCOMPLETE,
-          missing_fields: ['step_1', 'step_2', 'step_3']
-        }
-      }
+          missing_fields: ['step_1', 'step_2', 'step_3'],
+        },
+      },
     }),
     ApiResponse({
       status: HttpStatus.UNAUTHORIZED,
@@ -77,9 +78,9 @@ export function CompleteOnboardingDocs() {
       schema: {
         example: {
           statusCode: HttpStatus.UNAUTHORIZED,
-          message: 'Unauthenticated'
-        }
-      }
-    })
+          message: 'Unauthenticated',
+        },
+      },
+    }),
   );
 }

@@ -1,10 +1,4 @@
-import {
-  CallHandler,
-  ExecutionContext,
-  HttpStatus,
-  Injectable,
-  NestInterceptor,
-} from '@nestjs/common';
+import { CallHandler, ExecutionContext, HttpStatus, Injectable, NestInterceptor } from '@nestjs/common';
 import { map, Observable } from 'rxjs';
 
 export interface ApiResponse<T> {
@@ -25,14 +19,11 @@ interface StructuredPayload {
 
 function isStructuredPayload(value: unknown): value is StructuredPayload {
   return (
-    value !== null &&
-    typeof value === 'object' &&
-    'statusCode' in (value as object) &&
-    'message' in (value as object)
+    value !== null && typeof value === 'object' && 'statusCode' in (value) && 'message' in (value)
   );
 }
 
-function defaultMessageFor(statusCode: number): string {
+function defaultMessageFor(statusCode: HttpStatus): string {
   switch (statusCode) {
     case HttpStatus.CREATED:
       return 'Resource created successfully';
@@ -44,12 +35,8 @@ function defaultMessageFor(statusCode: number): string {
 }
 
 @Injectable()
-export class TransformInterceptor<T>
-  implements NestInterceptor<T, ApiResponse<T>> {
-  intercept(
-    _context: ExecutionContext,
-    next: CallHandler<T>,
-  ): Observable<ApiResponse<T>> {
+export class TransformInterceptor<T> implements NestInterceptor<T, ApiResponse<T>> {
+  intercept(_context: ExecutionContext, next: CallHandler<T>): Observable<ApiResponse<T>> {
     const httpResponse = _context.switchToHttp().getResponse<{ statusCode?: number }>();
 
     return next.handle().pipe(
@@ -66,19 +53,17 @@ export class TransformInterceptor<T>
             statusCode: statusCode ?? defaultStatusCode,
             message,
             data: (data === undefined ? null : data) as T,
-            ...(Object.keys(rest).length > 0
-              ? { meta: rest as Record<string, unknown> }
-              : {}),
+            ...(Object.keys(rest).length > 0 ? { meta: rest } : {}),
           };
         }
 
         // Case 2: { paginationMeta, payload, ...rest } — paginated list
-        if (
-          payload !== null &&
-          typeof payload === 'object' &&
-          'paginationMeta' in (payload as object)
-        ) {
-          const { paginationMeta, payload: data, ...rest } = payload as unknown as {
+        if (payload !== null && typeof payload === 'object' && 'paginationMeta' in (payload as object)) {
+          const {
+            paginationMeta,
+            payload: data,
+            ...rest
+          } = payload as unknown as {
             paginationMeta: Record<string, unknown>;
             payload: T;
             [key: string]: unknown;
@@ -88,7 +73,7 @@ export class TransformInterceptor<T>
             statusCode: defaultStatusCode,
             message: defaultMessageFor(defaultStatusCode),
             data,
-            meta: { ...rest, ...paginationMeta } as Record<string, unknown>,
+            meta: { ...rest, ...paginationMeta },
           };
         }
 
@@ -97,7 +82,7 @@ export class TransformInterceptor<T>
           success: true as const,
           statusCode: defaultStatusCode,
           message: defaultMessageFor(defaultStatusCode),
-          data: payload as T,
+          data: payload,
         };
       }),
     );

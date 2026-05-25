@@ -97,13 +97,8 @@ export class AuthController {
   @Post('refresh-token')
   @HttpCode(HttpStatus.OK)
   @RefreshDocs()
-  async refresh(
-    @Body() dto: RefreshTokenDto,
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const refreshToken =
-      dto.refreshToken ?? (req.cookies?.refreshToken as string | undefined);
+  async refresh(@Body() dto: RefreshTokenDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const refreshToken = dto.refreshToken ?? (req.cookies?.refreshToken as string | undefined);
 
     if (!refreshToken) {
       throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_REFRESH_TOKEN);

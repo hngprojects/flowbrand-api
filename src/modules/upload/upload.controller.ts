@@ -40,10 +40,7 @@ export class UploadController {
   @UploadFunnelDocumentsDocs()
   @UseInterceptors(uploadInterceptor)
   @HttpCode(HttpStatus.CREATED)
-  async upload(
-    @CurrentUser('sub') userId: string,
-    @UploadedFiles() files: Express.Multer.File[] | undefined,
-  ) {
+  async upload(@CurrentUser('sub') userId: string, @UploadedFiles() files: Express.Multer.File[] | undefined) {
     const result = await this.uploadService.handleUpload(userId, files);
     return {
       statusCode: HttpStatus.CREATED,
@@ -55,10 +52,7 @@ export class UploadController {
   @Get('upload/progress/:uploadId')
   @GetFunnelUploadProgressDocs()
   @HttpCode(HttpStatus.OK)
-  async getProgress(
-    @CurrentUser('sub') userId: string,
-    @Param('uploadId', ParseUUIDPipe) uploadId: string,
-  ) {
+  async getProgress(@CurrentUser('sub') userId: string, @Param('uploadId', ParseUUIDPipe) uploadId: string) {
     const progress = await this.uploadService.getProgress(userId, uploadId);
     return {
       statusCode: HttpStatus.OK,
