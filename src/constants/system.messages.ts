@@ -22,6 +22,7 @@ export const AUTH_EMAIL_UNVERIFIED = 'Please verify your email address to log in
 export const USER_EMAIL_IN_USE = 'Email already in use';
 export const USER_NOT_FOUND = (id: string) => `User ${id} not found`;
 export const USER_UPDATE_FAILED = 'Failed to update user';
+export const USER_UNAUTHORIZED = "User not authorized"
 
 // OAuth and external auth messages
 export const GOOGLE_ACCOUNT_NO_EMAIL = 'Google account has no email';
