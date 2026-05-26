@@ -128,29 +128,12 @@ export class UploadBatchDataDto {
 
   @ApiProperty({ type: () => [UploadBatchItemDto] })
   uploads!: UploadBatchItemDto[];
-}
 
-export class UploadBatchResponseDto {
-  @ApiProperty({ example: true })
-  success = true;
-
-  @ApiProperty({ example: HttpStatus.CREATED })
-  statusCode = HttpStatus.CREATED;
-
-  @ApiProperty({ example: SYS_MSG.FUNNEL_UPLOAD_COMPLETED })
-  message!: string;
-
-  @ApiProperty({ type: () => UploadBatchDataDto })
-  data!: UploadBatchDataDto;
-
-  static from(result: UploadBatchResponse): UploadBatchResponseDto {
-    const response = new UploadBatchResponseDto();
-    response.message = result.message;
-    response.data = {
-      batchId: result.batchId,
-      uploads: result.uploads.map((item) => UploadBatchItemDto.from(item)),
-    };
-    return response;
+  static from(result: UploadBatchResponse): UploadBatchDataDto {
+    const dto = new UploadBatchDataDto();
+    dto.batchId = result.batchId;
+    dto.uploads = result.uploads.map((item) => UploadBatchItemDto.from(item));
+    return dto;
   }
 }
 
@@ -181,27 +164,6 @@ export class UploadProgressDataDto {
 
   static from(progress: UploadProgressResponse): UploadProgressDataDto {
     return Object.assign(new UploadProgressDataDto(), progress);
-  }
-}
-
-export class UploadProgressResponseDto {
-  @ApiProperty({ example: true })
-  success = true;
-
-  @ApiProperty({ example: HttpStatus.OK })
-  statusCode = HttpStatus.OK;
-
-  @ApiProperty({ example: SYS_MSG.FUNNEL_UPLOAD_PROGRESS_RETRIEVED })
-  message!: string;
-
-  @ApiProperty({ type: () => UploadProgressDataDto })
-  data!: UploadProgressDataDto;
-
-  static from(progress: UploadProgressResponse): UploadProgressResponseDto {
-    const response = new UploadProgressResponseDto();
-    response.message = SYS_MSG.FUNNEL_UPLOAD_PROGRESS_RETRIEVED;
-    response.data = UploadProgressDataDto.from(progress);
-    return response;
   }
 }
 
