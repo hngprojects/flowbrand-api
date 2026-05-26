@@ -58,14 +58,14 @@ export class FunnelsController {
   }
 
   @CompleteStageDecorators()
-  @Patch(':id/stages/:stageId/complete')
+  @Patch(':funnelId/stages/:stageId/complete')
   async completeStage(
     @CurrentUser('userId') userId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('funnelId', ParseUUIDPipe) funnelId: string,
     @Param('stageId', ParseUUIDPipe) stageId: string,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.funnelsGenService.completeStage(id, stageId, userId);
+    const result = await this.funnelsGenService.completeStage(funnelId, stageId, userId);
     res.status(result.statusCode);
     return result;
   }

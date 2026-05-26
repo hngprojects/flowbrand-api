@@ -202,6 +202,9 @@ export class FunnelsService {
     stageId: string,
     userId: string,
   ): Promise<{ statusCode: HttpStatus; message: string; data: StageCompletionResult }> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+
     const funnel = await this.funnelAction.findOwnedById(funnelId, userId);
     if (!funnel) {
       throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
@@ -211,17 +214,18 @@ export class FunnelsService {
       throw new UnprocessableEntityException('Funnel must be active before a stage can be completed.');
     }
 
-    const stageRepository = this.dataSource.getRepository(FunnelStage);
-    const currentStage = await stageRepository.findOne({ where: { id: stageId, funnel_id: funnelId } });
+    const currentStage = await this.funnelAction.findStageById(queryRunner.manager, stageId, funnelId);
 
     if (!currentStage) {
       throw new NotFoundException(SYS_MSG.FUNNEL_OR_STAGE_NOT_FOUND);
     }
 
     if (currentStage.status === StageStatus.COMPLETE) {
-      const unlockedStage = await stageRepository.findOne({
-        where: { funnel_id: funnelId, position: currentStage.position + 1 },
-      });
+      const unlockedStage = await this.funnelAction.findNextStage(
+        queryRunner.manager,
+        funnelId,
+        currentStage.position + 1,
+      );
 
       return {
         statusCode: HttpStatus.OK,
@@ -231,15 +235,15 @@ export class FunnelsService {
     }
 
     if (currentStage.status === StageStatus.LOCKED) {
-      const priorStage = await stageRepository.findOne({
-        where: { funnel_id: funnelId, position: currentStage.position - 1 },
-      });
+      const priorStage = await this.funnelAction.findNextStage(
+        queryRunner.manager,
+        funnelId,
+        currentStage.position - 1,
+      );
       const priorName = priorStage?.name ?? 'previous';
       throw new ForbiddenException(SYS_MSG.FUNNEL_STAGE_LOCKED_MESSAGE(currentStage.name, priorName));
     }
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
@@ -294,7 +298,7 @@ export class FunnelsService {
       await queryRunner.commitTransaction();
 
       const unlockedStage = nextStage
-        ? await stageRepository.findOne({ where: { id: nextStage.id, funnel_id: funnelId } })
+        ? await this.funnelAction.findStageById(queryRunner.manager, nextStage.id, funnelId)
         : null;
 
       return {

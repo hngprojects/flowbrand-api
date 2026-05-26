@@ -72,7 +72,14 @@ describe('FunnelsService', () => {
   });
 
   it('AC-01 - listForUser caps per_page at 20 and returns summaries', async () => {
-    const sampleFunnel: Record<string, unknown> = { id: 'f1', business_name: 'B', creation_path: 'cp', status: 'active', created_at: new Date(), stages: [{ position: 1, name: 'S1', status: 'active' }]
+    const sampleFunnel: Record<string, unknown> = {
+      id: 'f1',
+      business_name: 'B',
+      creation_path: 'cp',
+      status: 'active',
+      created_at: new Date(),
+      stages: [{ position: 1, name: 'S1', status: 'active' }],
+    };
     const qb = createMockQB({ getManyAndCount: [ [sampleFunnel], 1 ] });
     funnelRepo.createQueryBuilder.mockReturnValue(qb as never);
 

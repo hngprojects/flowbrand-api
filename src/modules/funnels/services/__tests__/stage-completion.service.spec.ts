@@ -34,7 +34,6 @@ function createQueryBuilderMock(total: number, pending: number) {
 describe('FunnelsService - stage completion', () => {
   let service: FunnelsService;
   let funnelAction: jest.Mocked<FunnelModelAction>;
-  let stageRepo: { findOne: jest.Mock };
   let queryRunner: {
     isTransactionActive: boolean;
     connect: jest.Mock;
@@ -61,10 +60,6 @@ describe('FunnelsService - stage completion', () => {
       findNextStage: jest.fn(),
     } as unknown as jest.Mocked<FunnelModelAction>;
 
-    stageRepo = {
-      findOne: jest.fn(),
-    };
-
     queryRunner = {
       isTransactionActive: true,
       connect: jest.fn().mockResolvedValue(undefined),
@@ -81,7 +76,7 @@ describe('FunnelsService - stage completion', () => {
 
     dataSource = {
       createQueryRunner: jest.fn().mockReturnValue(queryRunner),
-      getRepository: jest.fn().mockReturnValue(stageRepo),
+      getRepository: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -101,25 +96,24 @@ describe('FunnelsService - stage completion', () => {
 
   it('AC-01: completes an active stage and unlocks the next stage atomically', async () => {
     funnelAction.findOwnedById.mockResolvedValue({ id: FUNNEL_ID, status: FunnelStatus.ACTIVE } as Funnel);
-    stageRepo.findOne
-      .mockResolvedValueOnce({
-        id: STAGE_ID,
-        funnel_id: FUNNEL_ID,
-        position: 1,
-        name: 'Get Noticed',
-        status: StageStatus.ACTIVE,
-        completed_at: null,
-        unlocked_at: new Date('2026-05-26T09:00:00.000Z'),
-      })
-      .mockResolvedValueOnce({
-        id: NEXT_STAGE_ID,
-        funnel_id: FUNNEL_ID,
-        position: 2,
-        name: 'Spark Interest',
-        status: StageStatus.ACTIVE,
-        completed_at: null,
-        unlocked_at: new Date('2026-05-26T10:00:00.000Z'),
-      });
+    funnelAction.findStageById.mockResolvedValueOnce({
+      id: STAGE_ID,
+      funnel_id: FUNNEL_ID,
+      position: 1,
+      name: 'Get Noticed',
+      status: StageStatus.ACTIVE,
+      completed_at: null,
+      unlocked_at: new Date('2026-05-26T09:00:00.000Z'),
+    } as FunnelStage);
+    funnelAction.findStageById.mockResolvedValueOnce({
+      id: NEXT_STAGE_ID,
+      funnel_id: FUNNEL_ID,
+      position: 2,
+      name: 'Spark Interest',
+      status: StageStatus.ACTIVE,
+      completed_at: null,
+      unlocked_at: new Date('2026-05-26T10:00:00.000Z'),
+    } as FunnelStage);
     funnelAction.countTasksForStage.mockResolvedValue({ total: 3, pending: 0 });
     funnelAction.updateStageStatusIfActive.mockResolvedValue(1);
     funnelAction.findNextStage.mockResolvedValue({
@@ -156,7 +150,7 @@ describe('FunnelsService - stage completion', () => {
 
   it('AC-02: completes the last stage and returns unlockedStage null', async () => {
     funnelAction.findOwnedById.mockResolvedValue({ id: FUNNEL_ID, status: FunnelStatus.ACTIVE } as Funnel);
-    stageRepo.findOne.mockResolvedValueOnce({
+    funnelAction.findStageById.mockResolvedValueOnce({
       id: STAGE_ID,
       funnel_id: FUNNEL_ID,
       position: 4,
@@ -164,7 +158,7 @@ describe('FunnelsService - stage completion', () => {
       status: StageStatus.ACTIVE,
       completed_at: null,
       unlocked_at: new Date('2026-05-26T10:00:00.000Z'),
-    });
+    } as FunnelStage);
     funnelAction.countTasksForStage.mockResolvedValue({ total: 2, pending: 0 });
     funnelAction.updateStageStatusIfActive.mockResolvedValue(1);
     funnelAction.findNextStage.mockResolvedValue(null);
@@ -178,7 +172,7 @@ describe('FunnelsService - stage completion', () => {
 
   it('AC-03: returns 422 when at least one task is still pending', async () => {
     funnelAction.findOwnedById.mockResolvedValue({ id: FUNNEL_ID, status: FunnelStatus.ACTIVE } as Funnel);
-    stageRepo.findOne.mockResolvedValueOnce({
+    funnelAction.findStageById.mockResolvedValueOnce({
       id: STAGE_ID,
       funnel_id: FUNNEL_ID,
       position: 1,
@@ -186,7 +180,7 @@ describe('FunnelsService - stage completion', () => {
       status: StageStatus.ACTIVE,
       completed_at: null,
       unlocked_at: new Date(),
-    });
+    } as FunnelStage);
     funnelAction.countTasksForStage.mockResolvedValue({ total: 3, pending: 2 });
 
     await expect(service.completeStage(FUNNEL_ID, STAGE_ID, USER_ID)).rejects.toThrow(
@@ -197,7 +191,7 @@ describe('FunnelsService - stage completion', () => {
 
   it('AC-04: returns 422 when the stage has zero tasks', async () => {
     funnelAction.findOwnedById.mockResolvedValue({ id: FUNNEL_ID, status: FunnelStatus.ACTIVE } as Funnel);
-    stageRepo.findOne.mockResolvedValueOnce({
+    funnelAction.findStageById.mockResolvedValueOnce({
       id: STAGE_ID,
       funnel_id: FUNNEL_ID,
       position: 1,
@@ -205,7 +199,7 @@ describe('FunnelsService - stage completion', () => {
       status: StageStatus.ACTIVE,
       completed_at: null,
       unlocked_at: new Date(),
-    });
+    } as FunnelStage);
     funnelAction.countTasksForStage.mockResolvedValue({ total: 0, pending: 0 });
 
     await expect(service.completeStage(FUNNEL_ID, STAGE_ID, USER_ID)).rejects.toThrow(
@@ -216,25 +210,15 @@ describe('FunnelsService - stage completion', () => {
 
   it('AC-05: returns 200 idempotently when the stage is already complete', async () => {
     funnelAction.findOwnedById.mockResolvedValue({ id: FUNNEL_ID, status: FunnelStatus.ACTIVE } as Funnel);
-    stageRepo.findOne
-      .mockResolvedValueOnce({
-        id: STAGE_ID,
-        funnel_id: FUNNEL_ID,
-        position: 1,
-        name: 'Get Noticed',
-        status: StageStatus.COMPLETE,
-        completed_at: new Date('2026-05-26T10:00:00.000Z'),
-        unlocked_at: new Date('2026-05-26T09:00:00.000Z'),
-      })
-      .mockResolvedValueOnce({
-        id: NEXT_STAGE_ID,
-        funnel_id: FUNNEL_ID,
-        position: 2,
-        name: 'Spark Interest',
-        status: StageStatus.ACTIVE,
-        completed_at: null,
-        unlocked_at: new Date('2026-05-26T10:00:00.000Z'),
-      });
+    funnelAction.findStageById.mockResolvedValueOnce({
+      id: STAGE_ID,
+      funnel_id: FUNNEL_ID,
+      position: 1,
+      name: 'Get Noticed',
+      status: StageStatus.COMPLETE,
+      completed_at: new Date('2026-05-26T10:00:00.000Z'),
+      unlocked_at: new Date('2026-05-26T09:00:00.000Z'),
+    } as FunnelStage);
 
     funnelAction.findNextStage.mockResolvedValue({
       id: NEXT_STAGE_ID,
@@ -256,27 +240,25 @@ describe('FunnelsService - stage completion', () => {
 
   it('AC-06: rejects a locked stage with 403', async () => {
     funnelAction.findOwnedById.mockResolvedValue({ id: FUNNEL_ID, status: FunnelStatus.ACTIVE } as Funnel);
-    stageRepo.findOne
-      .mockResolvedValueOnce({
-        id: STAGE_ID,
-        funnel_id: FUNNEL_ID,
-        position: 2,
-        name: 'Spark Interest',
-        status: StageStatus.LOCKED,
-        completed_at: null,
-        unlocked_at: null,
-      })
-      .mockResolvedValueOnce({
-        id: PREV_STAGE_ID,
-        funnel_id: FUNNEL_ID,
-        position: 1,
-        name: 'Get Noticed',
-        status: StageStatus.COMPLETE,
-        completed_at: new Date(),
-        unlocked_at: new Date(),
-      });
+    funnelAction.findStageById.mockResolvedValueOnce({
+      id: STAGE_ID,
+      funnel_id: FUNNEL_ID,
+      position: 2,
+      name: 'Spark Interest',
+      status: StageStatus.LOCKED,
+      completed_at: null,
+      unlocked_at: null,
+    } as FunnelStage);
 
-      funnelAction.findNextStage.mockResolvedValue(null);
+    funnelAction.findNextStage.mockResolvedValueOnce({
+      id: PREV_STAGE_ID,
+      funnel_id: FUNNEL_ID,
+      position: 1,
+      name: 'Get Noticed',
+      status: StageStatus.COMPLETE,
+      completed_at: new Date(),
+      unlocked_at: new Date(),
+    } as FunnelStage);
 
     await expect(service.completeStage(FUNNEL_ID, STAGE_ID, USER_ID)).rejects.toBeInstanceOf(
       ForbiddenException,
@@ -290,7 +272,6 @@ describe('FunnelsService - stage completion', () => {
     await expect(service.completeStage(FUNNEL_ID, STAGE_ID, USER_ID)).rejects.toThrow(
       'Funnel must be active before a stage can be completed.',
     );
-    expect(stageRepo.findOne).not.toHaveBeenCalled();
     expect(queryRunner.startTransaction).not.toHaveBeenCalled();
   });
 
@@ -304,7 +285,7 @@ describe('FunnelsService - stage completion', () => {
 
   it('AC-09: hides stages that belong to a different funnel with 404', async () => {
     funnelAction.findOwnedById.mockResolvedValue({ id: FUNNEL_ID, status: FunnelStatus.ACTIVE } as Funnel);
-    stageRepo.findOne.mockResolvedValueOnce(null);
+    funnelAction.findStageById.mockResolvedValueOnce(null);
 
     await expect(service.completeStage(FUNNEL_ID, STAGE_ID, USER_ID)).rejects.toBeInstanceOf(
       NotFoundException,
@@ -313,7 +294,7 @@ describe('FunnelsService - stage completion', () => {
 
   it('AC-10: rolls back if the next-stage unlock write fails', async () => {
     funnelAction.findOwnedById.mockResolvedValue({ id: FUNNEL_ID, status: FunnelStatus.ACTIVE } as Funnel);
-    stageRepo.findOne.mockResolvedValueOnce({
+    funnelAction.findStageById.mockResolvedValueOnce({
       id: STAGE_ID,
       funnel_id: FUNNEL_ID,
       position: 1,
@@ -321,7 +302,7 @@ describe('FunnelsService - stage completion', () => {
       status: StageStatus.ACTIVE,
       completed_at: null,
       unlocked_at: new Date(),
-    });
+    } as FunnelStage);
     funnelAction.countTasksForStage.mockResolvedValue({ total: 2, pending: 0 });
     funnelAction.updateStageStatusIfActive.mockResolvedValue(1);
     funnelAction.findNextStage.mockResolvedValue({
@@ -342,7 +323,7 @@ describe('FunnelsService - stage completion', () => {
 
   it('EC-01: returns idempotently when a concurrent request already completed the stage', async () => {
     funnelAction.findOwnedById.mockResolvedValue({ id: FUNNEL_ID, status: FunnelStatus.ACTIVE } as Funnel);
-    stageRepo.findOne.mockResolvedValueOnce({
+    funnelAction.findStageById.mockResolvedValueOnce({
       id: STAGE_ID,
       funnel_id: FUNNEL_ID,
       position: 1,
@@ -350,7 +331,7 @@ describe('FunnelsService - stage completion', () => {
       status: StageStatus.ACTIVE,
       completed_at: null,
       unlocked_at: new Date(),
-    });
+    } as FunnelStage);
     funnelAction.countTasksForStage.mockResolvedValue({ total: 2, pending: 0 });
     funnelAction.updateStageStatusIfActive.mockResolvedValue(0);
     funnelAction.findStageById
