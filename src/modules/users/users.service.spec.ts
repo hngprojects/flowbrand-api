@@ -2,6 +2,7 @@ import {
   ConflictException,
   InternalServerErrorException,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
@@ -35,6 +36,16 @@ const mockUser = {
   is_verified: false,
   is_active: true,
   roles: [{ role: 'user' }],
+};
+
+const mockFullUser = {
+  ...mockUser,
+  country: 'Nigeria',
+  avatar_url: null,
+  auth_provider: 'local',
+  is_verified: true,
+  created_at: new Date('2024-01-15'),
+  updated_at: new Date('2024-06-01'),
 };
 
 describe('UsersService', () => {
@@ -191,6 +202,140 @@ describe('UsersService', () => {
 
       await expect(service.remove(USER_ID)).rejects.toBeInstanceOf(NotFoundException);
       expect(mockUserModelAction.delete).not.toHaveBeenCalled();
+    });
+  });
+
+// getProfile
+  describe('getProfile', () => {
+    it('returns camelCase profile for authenticated user', async () => {
+      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+
+      const result = await service.getProfile(USER_ID);
+
+      expect(result).toMatchObject({
+        id: USER_ID,
+        fullName: 'Test User',
+        email: USER_EMAIL,
+      });
+    });
+
+    it('response never contains password_hash, deleted_at, or provider_user_id', async () => {
+      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+
+      const result = await service.getProfile(USER_ID) as unknown as Record<string, unknown>;
+
+      expect(result).not.toHaveProperty('password_hash');
+      expect(result).not.toHaveProperty('deleted_at');
+      expect(result).not.toHaveProperty('provider_user_id');
+    });
+
+    it('throws 404 when user not found', async () => {
+      mockUserModelAction.get.mockResolvedValue(null);
+
+      await expect(service.getProfile(USER_ID)).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+// updateProfile
+  describe('updateProfile', () => {
+    it('updates full_name and returns updated profile', async () => {
+      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+      mockUserModelAction.update.mockResolvedValue({ ...mockFullUser, full_name: 'New Name' });
+
+      const result = await service.updateProfile(USER_ID, { fullName: 'New Name' });
+
+      expect(result.fullName).toBe('New Name');
+      expect(mockUserModelAction.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          updatePayload: { full_name: 'New Name' },
+        }),
+      );
+    });
+
+    it('updates country and returns updated profile', async () => {
+      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, country: 'Ghana' });
+      mockUserModelAction.update.mockResolvedValue({ ...mockFullUser, country: 'Nigeria' });
+
+      const result = await service.updateProfile(USER_ID, { country: 'Nigeria' });
+
+      expect(result.country).toBe('Nigeria');
+    });
+
+    it('throws 422 when email is present in body', async () => {
+      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+
+      await expect(
+        service.updateProfile(USER_ID, { email: 'hacker@example.com' } as never),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+
+      expect(mockUserModelAction.update).not.toHaveBeenCalled();
+    });
+
+    it('returns unchanged profile without DB write when body is empty', async () => {
+      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+
+      await service.updateProfile(USER_ID, {});
+
+      expect(mockUserModelAction.update).not.toHaveBeenCalled();
+    });
+
+    it('only-country update leaves full_name unchanged in DB', async () => {
+      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+      mockUserModelAction.update.mockResolvedValue({ ...mockFullUser, country: 'Ghana' });
+
+      await service.updateProfile(USER_ID, { country: 'Ghana' });
+
+      const updateCall = mockUserModelAction.update.mock.calls[0][0] as {
+        updatePayload: Record<string, unknown>;
+      };
+      expect(updateCall.updatePayload).not.toHaveProperty('full_name');
+    });
+
+    it('no DB write when submitted values are identical to stored values', async () => {
+      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, full_name: 'Test User' });
+
+      await service.updateProfile(USER_ID, { fullName: 'Test User' });
+
+      expect(mockUserModelAction.update).not.toHaveBeenCalled();
+    });
+
+    it('trims whitespace from fullName before MinLength check', async () => {
+      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+      mockUserModelAction.update.mockResolvedValue({ ...mockFullUser, full_name: 'Trimmed' });
+
+      const result = await service.updateProfile(USER_ID, { fullName: 'Trimmed' });
+
+      expect(result.fullName).toBe('Trimmed');
+    });
+
+    it('normalises country casing before comparison', async () => {
+      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, country: 'Ghana' });
+      mockUserModelAction.update.mockResolvedValue({ ...mockFullUser, country: 'Nigeria' });
+
+      // 'nigeria' (lowercase) should resolve to canonical 'Nigeria'
+      await service.updateProfile(USER_ID, { country: 'nigeria' as never });
+
+      const updateCall = mockUserModelAction.update.mock.calls[0][0] as {
+        updatePayload: Record<string, unknown>;
+      };
+      expect(updateCall.updatePayload['country']).toBe('Nigeria');
+    });
+
+    it('throws 404 when user not found', async () => {
+      mockUserModelAction.get.mockResolvedValue(null);
+
+      await expect(service.updateProfile(USER_ID, { fullName: 'X' })).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('throws 500 when DB update returns null', async () => {
+      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+      mockUserModelAction.update.mockResolvedValue(null);
+
+      await expect(
+        service.updateProfile(USER_ID, { fullName: 'Different Name' }),
+      ).rejects.toBeInstanceOf(InternalServerErrorException);
     });
   });
 });
