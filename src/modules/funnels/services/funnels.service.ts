@@ -289,10 +289,11 @@ export class FunnelsService {
       const nextStage = await this.funnelAction.findNextStage(queryRunner.manager, funnelId, currentStage.position + 1);
 
       if (nextStage) {
-        await queryRunner.manager.update(
-          FunnelStage,
-          { id: nextStage.id, funnel_id: funnelId, status: StageStatus.LOCKED },
-          { status: StageStatus.ACTIVE, unlocked_at: completedAt },
+        await this.funnelAction.activateStageIfLocked(
+          queryRunner.manager,
+          nextStage.id,
+          funnelId,
+          completedAt,
         );
       }
 

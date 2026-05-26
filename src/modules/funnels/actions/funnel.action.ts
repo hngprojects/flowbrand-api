@@ -40,6 +40,21 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
     return res.affected ?? 0;
   }
 
+  async activateStageIfLocked(
+    manager: EntityManager,
+    stageId: string,
+    funnelId: string,
+    unlockedAt: Date,
+  ): Promise<number> {
+    const res = await manager.update(
+      FunnelStage,
+      { id: stageId, funnel_id: funnelId, status: StageStatus.LOCKED },
+      { status: StageStatus.ACTIVE, unlocked_at: unlockedAt },
+    );
+
+    return res.affected ?? 0;
+  }
+
   async findStageById(manager: EntityManager, stageId: string, funnelId: string): Promise<FunnelStage | null> {
     return manager.findOne(FunnelStage, { where: { id: stageId, funnel_id: funnelId } });
   }

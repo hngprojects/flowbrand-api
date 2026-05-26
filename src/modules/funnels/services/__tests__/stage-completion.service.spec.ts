@@ -56,6 +56,7 @@ describe('FunnelsService - stage completion', () => {
       findOwnedById: jest.fn(),
       countTasksForStage: jest.fn(),
       updateStageStatusIfActive: jest.fn(),
+      activateStageIfLocked: jest.fn(),
       findStageById: jest.fn(),
       findNextStage: jest.fn(),
     } as unknown as jest.Mocked<FunnelModelAction>;
@@ -315,7 +316,7 @@ describe('FunnelsService - stage completion', () => {
       completed_at: null,
       unlocked_at: null,
     } as FunnelStage);
-    queryRunner.manager.update.mockRejectedValueOnce(new Error('unlock failed'));
+    funnelAction.activateStageIfLocked.mockRejectedValueOnce(new Error('unlock failed'));
 
     await expect(service.completeStage(FUNNEL_ID, STAGE_ID, USER_ID)).rejects.toThrow('unlock failed');
     expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
