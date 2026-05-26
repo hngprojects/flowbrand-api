@@ -571,6 +571,9 @@ export class AuthService {
     }
 
     await this.usersService.update(user.id, { password: newPassword });
+    await this.authMetadataModelAction.updateByUserId(user.id, {
+      password_changed_at: new Date(),
+    });
     await this.revokeAllUserSessions(user.id);
     await this.redisService.del(`password-reset:rate:${user.id}`);
 
