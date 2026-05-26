@@ -15,10 +15,12 @@ import { FunnelsController } from './funnels.controller';
 // Providers / actions
 import { FunnelModelAction } from './actions/funnel.action';
 import { FunnelStageModelAction } from './actions/funnel-stage.action';
+import { StageTaskModelAction } from './actions/stage-task.action';
 
 // Two service implementations live in the module; import and alias both
 import { FunnelsService as FunnelsReadService } from './funnels.service';
 import { FunnelsService as FunnelsGenService } from './services/funnels.service';
+import { StageProgressService } from './services/stage-progress.service';
 
 @Module({
   imports: [
@@ -30,8 +32,10 @@ import { FunnelsService as FunnelsGenService } from './services/funnels.service'
   providers: [
     FunnelsReadService,
     FunnelsGenService,
+    StageProgressService,
     FunnelModelAction,
     FunnelStageModelAction,
+    StageTaskModelAction,
   ],
   exports: [FunnelsGenService, FunnelModelAction],
 })

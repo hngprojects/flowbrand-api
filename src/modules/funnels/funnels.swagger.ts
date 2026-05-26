@@ -1,15 +1,19 @@
 import { HttpStatus, applyDecorators } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConflictResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiQuery,
   ApiUnauthorizedResponse,
+  ApiUnprocessableEntityResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import * as SYS_MSG from '../../constants/system.messages';
+import { CompleteTaskDto } from './dto/complete-task.dto';
 
 /**
  * Decorator factories for Funnel Display API endpoints
@@ -78,6 +82,67 @@ export function GetStageDetailDecorators() {
     ApiForbiddenResponse({
       description: 'Stage is locked until the prior stage is completed',
       schema: { example: forbiddenStageLockedExample('/api/funnels/{id}/stages/{stageId}') },
+    }),
+  );
+}
+
+export function CompleteTaskDecorators() {
+  return applyDecorators(
+    ApiOperation({ summary: 'Mark a task complete or reopen it (active stage only)' }),
+    ApiBody({ type: CompleteTaskDto }),
+    ApiOkResponse({ description: 'Updated task status', schema: { example: taskUpdatedExample } }),
+    ApiUnauthorizedResponse({
+      description: 'Missing or invalid bearer token',
+      schema: { example: unauthorizedExample },
+    }),
+    ApiNotFoundResponse({
+      description: 'Funnel, stage, or task not found or not owned by the authenticated user',
+      schema: { example: notFoundExample('/api/funnels/{id}/stages/{stageId}/tasks/{taskId}') },
+    }),
+    ApiUnprocessableEntityResponse({
+      description: SYS_MSG.STAGE_NOT_ACTIVE_FOR_UPDATE,
+      schema: {
+        example: unprocessableExample(
+          SYS_MSG.STAGE_NOT_ACTIVE_FOR_UPDATE,
+          '/api/funnels/{id}/stages/{stageId}/tasks/{taskId}',
+        ),
+      },
+    }),
+  );
+}
+
+export function CompleteStageDecorators() {
+  return applyDecorators(
+    ApiOperation({ summary: 'Mark a stage complete and unlock the next stage' }),
+    ApiOkResponse({
+      description: 'Stage completed; next stage unlocked when present',
+      schema: { example: stageCompletedExample },
+    }),
+    ApiUnauthorizedResponse({
+      description: 'Missing or invalid bearer token',
+      schema: { example: unauthorizedExample },
+    }),
+    ApiNotFoundResponse({
+      description: 'Funnel or stage not found or not owned by the authenticated user',
+      schema: { example: notFoundExample('/api/funnels/{id}/stages/{stageId}/complete') },
+    }),
+    ApiConflictResponse({
+      description: SYS_MSG.STAGE_ALREADY_COMPLETE,
+      schema: {
+        example: conflictExample(
+          SYS_MSG.STAGE_ALREADY_COMPLETE,
+          '/api/funnels/{id}/stages/{stageId}/complete',
+        ),
+      },
+    }),
+    ApiUnprocessableEntityResponse({
+      description: `${SYS_MSG.STAGE_TASKS_INCOMPLETE} / ${SYS_MSG.STAGE_NOT_ACTIVE_FOR_COMPLETION}`,
+      schema: {
+        example: unprocessableExample(
+          SYS_MSG.STAGE_TASKS_INCOMPLETE,
+          '/api/funnels/{id}/stages/{stageId}/complete',
+        ),
+      },
     }),
   );
 }
@@ -201,6 +266,54 @@ export const forbiddenStageLockedExample = (path: string) => ({
   statusCode: HttpStatus.FORBIDDEN,
   error: 'ForbiddenException',
   message: SYS_MSG.FUNNEL_STAGE_LOCKED_MESSAGE('Validation', 'Discovery'),
+  path,
+  timestamp: '2026-05-18T12:00:00.000Z',
+});
+
+export const taskUpdatedExample = {
+  success: true,
+  statusCode: HttpStatus.OK,
+  message: SYS_MSG.TASK_STATUS_UPDATED_SUCCESSFULLY,
+  data: {
+    taskId: '550e8400-e29b-41d4-a716-446655440020',
+    stageId: '550e8400-e29b-41d4-a716-446655440010',
+    status: 'complete',
+    completedAt: '2026-05-26T09:46:22.230Z',
+  },
+};
+
+export const stageCompletedExample = {
+  success: true,
+  statusCode: HttpStatus.OK,
+  message: SYS_MSG.STAGE_COMPLETED_SUCCESSFULLY,
+  data: {
+    stageId: '550e8400-e29b-41d4-a716-446655440010',
+    status: 'complete',
+    completedAt: '2026-05-26T09:46:22.230Z',
+    nextStage: {
+      stageId: '550e8400-e29b-41d4-a716-446655440011',
+      position: 2,
+      name: 'Spark Interest',
+      status: 'active',
+      unlockedAt: '2026-05-26T09:46:22.230Z',
+    },
+  },
+};
+
+export const unprocessableExample = (message: string, path: string) => ({
+  success: false,
+  statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+  error: 'UnprocessableEntityException',
+  message,
+  path,
+  timestamp: '2026-05-18T12:00:00.000Z',
+});
+
+export const conflictExample = (message: string, path: string) => ({
+  success: false,
+  statusCode: HttpStatus.CONFLICT,
+  error: 'ConflictException',
+  message,
   path,
   timestamp: '2026-05-18T12:00:00.000Z',
 });

@@ -119,6 +119,15 @@ export const FUNNEL_STAGE_LOCKED_MESSAGE = (stageName: string, priorStageName: s
   `The ${stageName} stage is locked. Complete all tasks in ${priorStageName} and mark it complete to unlock.`;
 export const FUNNEL_UNAUTHORIZED_ACCESS = 'You do not have permission to access this funnel';
 
+// Stage and task progression (BE-308)
+export const FUNNEL_TASK_NOT_FOUND = 'Task not found or not owned by you';
+export const TASK_STATUS_UPDATED_SUCCESSFULLY = 'Task status updated successfully';
+export const STAGE_COMPLETED_SUCCESSFULLY = 'Stage completed successfully';
+export const STAGE_NOT_ACTIVE_FOR_UPDATE = 'Tasks can only be updated while the stage is active.';
+export const STAGE_NOT_ACTIVE_FOR_COMPLETION = 'Only an active stage can be completed.';
+export const STAGE_ALREADY_COMPLETE = 'This stage is already complete.';
+export const STAGE_TASKS_INCOMPLETE = 'Complete all tasks in this stage before marking it complete.';
+
 // Password Reset Messages
 export const PASSWORD_RESET_OTP_SENT = 'If your email is registered, you will receive a password reset code.';
 export const PASSWORD_RESET_INVALID_OTP = 'Invalid or expired reset code.';

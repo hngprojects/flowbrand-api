@@ -1,9 +1,23 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  Res,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../constants/system.messages';
 import { CreateFunnelDocs, GetFunnelStatusDocs } from './docs/funnels-swagger.doc';
 import { CreateFunnelDto, FunnelIdParamDto } from './dto/create-funnel.dto';
+import { CompleteTaskDto } from './dto/complete-task.dto';
+import { StageProgressService } from './services/stage-progress.service';
 
 // Swagger decorator factories
 import {
@@ -12,6 +26,8 @@ import {
   GetFunnelDecorators,
   GetStagesSummaryDecorators,
   GetStageDetailDecorators,
+  CompleteTaskDecorators,
+  CompleteStageDecorators,
 } from './funnels.swagger';
 
 // Two services exist in the module: the read-only API service (top-level)
@@ -26,6 +42,7 @@ export class FunnelsController {
   constructor(
     private readonly funnelsReadService: FunnelsReadService,
     private readonly funnelsGenService: FunnelsGenService,
+    private readonly stageProgressService: StageProgressService,
   ) {}
 
   @ListFunnelsDecorators()
@@ -54,6 +71,40 @@ export class FunnelsController {
     @Param('stageId', ParseUUIDPipe) stageId: string,
   ) {
     return this.funnelsReadService.getStageDetail(userId, id, stageId);
+  }
+
+  @CompleteTaskDecorators()
+  @Patch(':id/stages/:stageId/tasks/:taskId')
+  @HttpCode(HttpStatus.OK)
+  async completeTask(
+    @CurrentUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('stageId', ParseUUIDPipe) stageId: string,
+    @Param('taskId', ParseUUIDPipe) taskId: string,
+    @Body() dto: CompleteTaskDto,
+  ) {
+    const data = await this.stageProgressService.completeTask(userId, id, stageId, taskId, dto.status);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.TASK_STATUS_UPDATED_SUCCESSFULLY,
+      data,
+    };
+  }
+
+  @CompleteStageDecorators()
+  @Post(':id/stages/:stageId/complete')
+  @HttpCode(HttpStatus.OK)
+  async completeStage(
+    @CurrentUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('stageId', ParseUUIDPipe) stageId: string,
+  ) {
+    const data = await this.stageProgressService.completeStage(userId, id, stageId);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.STAGE_COMPLETED_SUCCESSFULLY,
+      data,
+    };
   }
 
   // Generation endpoints (idempotent create + status polling)
