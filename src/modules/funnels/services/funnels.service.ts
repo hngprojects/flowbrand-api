@@ -31,41 +31,11 @@ import type {
   BusinessContext,
   GenerateFunnelJobPayload,
 } from '../interfaces/generate-funnel-job.interface';
+import type { FunnelGenerationCreateResult, FunnelStatusResult, StageCompletionResult } from '../interfaces/funnels.interfaces';
 
 const STAGE_NAMES = ['Get Noticed', 'Spark Interest', 'Make First Sale', 'Bring Them Back'] as const;
 const QUEUE_DELAY_MS = 250;
 const DEFAULT_BUSINESS_NAME = 'My Business';
-
-export interface FunnelGenerationCreateResult {
-  statusCode: HttpStatus;
-  message: string;
-  funnelId: string;
-  status: FunnelStatus;
-}
-
-export interface FunnelStatusResult {
-  funnelId: string;
-  status: FunnelStatus;
-  redirect?: { to: string };
-  error?: { code: string; message: string; retry_endpoint: string };
-}
-
-export interface StageCompletionResult {
-  completedStage: {
-    stageId: string;
-    position: number;
-    name: string;
-    status: StageStatus;
-    completedAt: string;
-  };
-  unlockedStage: {
-    stageId: string;
-    position: number;
-    name: string;
-    status: StageStatus;
-    unlockedAt: string;
-  } | null;
-}
 
 @Injectable()
 export class FunnelsService {
