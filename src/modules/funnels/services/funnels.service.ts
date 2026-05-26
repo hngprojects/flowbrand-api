@@ -205,48 +205,49 @@ export class FunnelsService {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
 
-    const funnel = await this.funnelAction.findOwnedById(funnelId, userId);
-    if (!funnel) {
-      throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
-    }
-
-    if (funnel.status !== FunnelStatus.ACTIVE) {
-      throw new UnprocessableEntityException('Funnel must be active before a stage can be completed.');
-    }
-
-    const currentStage = await this.funnelAction.findStageById(queryRunner.manager, stageId, funnelId);
-
-    if (!currentStage) {
-      throw new NotFoundException(SYS_MSG.FUNNEL_OR_STAGE_NOT_FOUND);
-    }
-
-    if (currentStage.status === StageStatus.COMPLETE) {
-      const unlockedStage = await this.funnelAction.findNextStage(
-        queryRunner.manager,
-        funnelId,
-        currentStage.position + 1,
-      );
-
-      return {
-        statusCode: HttpStatus.OK,
-        message: SYS_MSG.STAGE_ALREADY_COMPLETE,
-        data: this.buildStageCompletionResult(currentStage, unlockedStage),
-      };
-    }
-
-    if (currentStage.status === StageStatus.LOCKED) {
-      const priorStage = await this.funnelAction.findNextStage(
-        queryRunner.manager,
-        funnelId,
-        currentStage.position - 1,
-      );
-      const priorName = priorStage?.name ?? 'previous';
-      throw new ForbiddenException(SYS_MSG.FUNNEL_STAGE_LOCKED_MESSAGE(currentStage.name, priorName));
-    }
-
     await queryRunner.startTransaction();
-
     try {
+      const funnel = await this.funnelAction.findOwnedById(funnelId, userId, queryRunner.manager);
+      if (!funnel) {
+        throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
+      }
+
+      if (funnel.status !== FunnelStatus.ACTIVE) {
+        throw new UnprocessableEntityException(SYS_MSG.STAGE_COMPLETION_REQUIRES_ACTIVE_FUNNEL);
+      }
+
+      const currentStage = await this.funnelAction.findStageById(queryRunner.manager, stageId, funnelId);
+
+      if (!currentStage) {
+        throw new NotFoundException(SYS_MSG.FUNNEL_OR_STAGE_NOT_FOUND);
+      }
+
+      if (currentStage.status === StageStatus.COMPLETE) {
+        const unlockedStage = await this.funnelAction.findNextStage(
+          queryRunner.manager,
+          funnelId,
+          currentStage.position + 1,
+        );
+
+        await queryRunner.rollbackTransaction();
+
+        return {
+          statusCode: HttpStatus.OK,
+          message: SYS_MSG.STAGE_ALREADY_COMPLETE,
+          data: this.buildStageCompletionResult(currentStage, unlockedStage),
+        };
+      }
+
+      if (currentStage.status === StageStatus.LOCKED) {
+        const priorStage = await this.funnelAction.findNextStage(
+          queryRunner.manager,
+          funnelId,
+          currentStage.position - 1,
+        );
+        const priorName = priorStage?.name ?? 'previous';
+        throw new ForbiddenException(SYS_MSG.FUNNEL_STAGE_LOCKED_MESSAGE(currentStage.name, priorName));
+      }
+
       const taskCounts = await this.funnelAction.countTasksForStage(queryRunner.manager, stageId);
 
       const totalTasks = Number(taskCounts.total ?? 0);
@@ -282,7 +283,7 @@ export class FunnelsService {
           };
         }
 
-        throw new ConflictException('Stage completion failed due to a concurrent update. Please retry.');
+        throw new ConflictException(SYS_MSG.STAGE_COMPLETION_CONCURRENT_UPDATE);
       }
 
       const nextStage = await this.funnelAction.findNextStage(queryRunner.manager, funnelId, currentStage.position + 1);
@@ -412,7 +413,7 @@ export class FunnelsService {
             stageId: unlockedStage.id,
             position: unlockedStage.position,
             name: unlockedStage.name,
-            status: StageStatus.ACTIVE,
+            status: unlockedStage.status,
             unlockedAt: (unlockedStage.unlocked_at ?? new Date()).toISOString(),
           }
         : null,

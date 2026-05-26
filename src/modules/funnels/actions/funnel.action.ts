@@ -71,8 +71,14 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
 
   // Status endpoint helper. Returns funnel only if the caller owns it, so
   // cross-user polling falls through to 404 (SEC-01: do not reveal existence).
-  async findOwnedById(funnelId: string, userId: string): Promise<Funnel | null> {
-    return this.funnelRepository.findOne({
+  async findOwnedById(
+    funnelId: string,
+    userId: string,
+    manager?: EntityManager,
+  ): Promise<Funnel | null> {
+    const repo = manager ? manager.getRepository(Funnel) : this.funnelRepository;
+
+    return repo.findOne({
       where: { id: funnelId, user_id: userId },
     });
   }

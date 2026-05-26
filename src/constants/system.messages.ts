@@ -122,6 +122,10 @@ export const STAGE_ALREADY_COMPLETE = 'Stage already complete';
 export const STAGE_HAS_PENDING_TASKS = (count: number) =>
   `Cannot complete stage: ${count} task(s) are still pending.`;
 export const STAGE_HAS_NO_TASKS = 'Stage has no tasks. Cannot be marked complete.';
+export const STAGE_COMPLETION_REQUIRES_ACTIVE_FUNNEL =
+  'Funnel must be active before a stage can be completed.';
+export const STAGE_COMPLETION_CONCURRENT_UPDATE =
+  'Stage completion failed due to a concurrent update. Please retry.';
 export const FUNNEL_UNAUTHORIZED_ACCESS = 'You do not have permission to access this funnel';
 
 // Password Reset Messages

@@ -234,7 +234,8 @@ describe('FunnelsService - stage completion', () => {
 
     expect(result.statusCode).toBe(HttpStatus.OK);
     expect(result.message).toBe(SYS_MSG.STAGE_ALREADY_COMPLETE);
-    expect(queryRunner.startTransaction).not.toHaveBeenCalled();
+    expect(queryRunner.startTransaction).toHaveBeenCalledTimes(1);
+    expect(queryRunner.rollbackTransaction).toHaveBeenCalledTimes(1);
     expect(queryRunner.commitTransaction).not.toHaveBeenCalled();
   });
 
@@ -263,16 +264,16 @@ describe('FunnelsService - stage completion', () => {
     await expect(service.completeStage(FUNNEL_ID, STAGE_ID, USER_ID)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
-    expect(queryRunner.startTransaction).not.toHaveBeenCalled();
+    expect(queryRunner.startTransaction).toHaveBeenCalledTimes(1);
   });
 
   it('AC-07: rejects a funnel that is still generating with 422', async () => {
     funnelAction.findOwnedById.mockResolvedValue({ id: FUNNEL_ID, status: FunnelStatus.GENERATING } as Funnel);
 
     await expect(service.completeStage(FUNNEL_ID, STAGE_ID, USER_ID)).rejects.toThrow(
-      'Funnel must be active before a stage can be completed.',
+      SYS_MSG.STAGE_COMPLETION_REQUIRES_ACTIVE_FUNNEL,
     );
-    expect(queryRunner.startTransaction).not.toHaveBeenCalled();
+    expect(queryRunner.startTransaction).toHaveBeenCalledTimes(1);
   });
 
   it('AC-08: hides cross-user funnels with 404', async () => {
@@ -323,19 +324,14 @@ describe('FunnelsService - stage completion', () => {
 
   it('EC-01: returns idempotently when a concurrent request already completed the stage', async () => {
     funnelAction.findOwnedById.mockResolvedValue({ id: FUNNEL_ID, status: FunnelStatus.ACTIVE } as Funnel);
-    funnelAction.findStageById.mockResolvedValueOnce({
-      id: STAGE_ID,
-      funnel_id: FUNNEL_ID,
-      position: 1,
-      name: 'Get Noticed',
-      status: StageStatus.ACTIVE,
-      completed_at: null,
-      unlocked_at: new Date(),
-    } as FunnelStage);
     funnelAction.countTasksForStage.mockResolvedValue({ total: 2, pending: 0 });
     funnelAction.updateStageStatusIfActive.mockResolvedValue(0);
-    funnelAction.findStageById
-      .mockResolvedValueOnce({
+    funnelAction.findStageById.mockImplementation((_manager, stageId) => {
+      if (stageId !== STAGE_ID) {
+        return Promise.resolve(null);
+      }
+
+      return Promise.resolve({
         id: STAGE_ID,
         funnel_id: FUNNEL_ID,
         position: 1,
@@ -343,16 +339,8 @@ describe('FunnelsService - stage completion', () => {
         status: StageStatus.COMPLETE,
         completed_at: new Date('2026-05-26T10:00:00.000Z'),
         unlocked_at: new Date('2026-05-26T09:00:00.000Z'),
-      } as FunnelStage)
-      .mockResolvedValueOnce({
-        id: NEXT_STAGE_ID,
-        funnel_id: FUNNEL_ID,
-        position: 2,
-        name: 'Spark Interest',
-        status: StageStatus.ACTIVE,
-        completed_at: null,
-        unlocked_at: new Date('2026-05-26T10:00:00.000Z'),
       } as FunnelStage);
+    });
     funnelAction.findNextStage.mockResolvedValue({
       id: NEXT_STAGE_ID,
       funnel_id: FUNNEL_ID,

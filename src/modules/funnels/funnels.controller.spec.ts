@@ -60,9 +60,9 @@ describe('FunnelsController - stage completion route', () => {
 
     const res = { status: jest.fn().mockReturnThis() } as unknown as Response;
 
-    const result = await controller.completeStage('funnel-1', 'stage-1', 'user-1', res);
+    const result = await controller.completeStage('user-1', 'funnel-1', 'stage-1', res);
 
-    expect(GEN_SERVICE_MOCK.completeStage).toHaveBeenCalledWith('stage-1', 'user-1', 'funnel-1');
+    expect(GEN_SERVICE_MOCK.completeStage).toHaveBeenCalledWith('funnel-1', 'stage-1', 'user-1');
     expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
     expect(result).toEqual(expect.objectContaining({ statusCode: HttpStatus.OK }));
   });
@@ -85,7 +85,7 @@ describe('FunnelsController - stage completion route', () => {
 
     const res = { status: jest.fn().mockReturnThis() } as unknown as Response;
 
-    const result = await controller.completeStage('funnel-1', 'stage-1', 'user-1', res);
+    const result = await controller.completeStage('user-1', 'funnel-1', 'stage-1', res);
 
     expect(result.message).toBe('Stage already complete');
     expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
