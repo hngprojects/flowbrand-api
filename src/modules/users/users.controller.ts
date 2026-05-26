@@ -18,6 +18,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ChangePasswordDocs } from './docs/users-swagger.docs';
 
 @ApiTags('users')
 @ApiBearerAuth('JWT')
@@ -57,6 +58,7 @@ export class UsersController {
   }
 
   @Patch('/me/password')
+  @ChangePasswordDocs()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Change user password' })
   async changePassword(@CurrentUser('sub') userId: string, @Body() dto: ChangePasswordDto) {

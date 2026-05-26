@@ -10,6 +10,7 @@ export const AUTH_LOGIN_SUCCESSFUL = 'Login successful';
 export const AUTH_LOGOUT_SUCCESSFUL = 'Logout successful';
 export const AUTH_TOKEN_REFRESHED = 'Token refreshed successfully';
 export const AUTH_INVALID_CREDENTIALS = 'Invalid email or password';
+export const AUTH_INVALID_TOKEN = 'Invalid or expired token';
 export const AUTH_INVALID_REFRESH_TOKEN = 'Invalid or expired refresh token';
 export const AUTH_UNAUTHENTICATED_MESSAGE = 'Unauthenticated';
 export const AUTH_TERMS_REQUIRED = 'You must accept the terms and conditions to register';
