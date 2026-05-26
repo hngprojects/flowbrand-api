@@ -2,7 +2,7 @@ import { AbstractModelAction } from '@hng-sdk/orm';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { StageTask } from '../entities/stage-task.entity';
+import { StageTask, TASK_STATUS_COMPLETE } from '../entities/stage-task.entity';
 
 export interface StageTaskCounts {
   total: number;
@@ -32,18 +32,17 @@ export class StageTaskModelAction extends AbstractModelAction<StageTask> {
     return this.stageTaskRepository.save(task);
   }
 
-  /** Total tasks and how many are complete for a stage (for the unlock guard). */
+  /**
+   * Total tasks and how many are complete for a stage (for the unlock guard).
+   * Uses typed `count()` calls so the "complete" status is checked against the
+   * `StageTaskStatus` union rather than a hardcoded SQL string.
+   */
   async countByStage(stageId: string): Promise<StageTaskCounts> {
-    const raw = await this.stageTaskRepository
-      .createQueryBuilder('t')
-      .select('COUNT(*)', 'total')
-      .addSelect("SUM(CASE WHEN t.status = 'complete' THEN 1 ELSE 0 END)", 'complete')
-      .where('t.stage_id = :stageId', { stageId })
-      .getRawOne<{ total: string | number; complete: string | number }>();
+    const [total, complete] = await Promise.all([
+      this.stageTaskRepository.count({ where: { stage_id: stageId } }),
+      this.stageTaskRepository.count({ where: { stage_id: stageId, status: TASK_STATUS_COMPLETE } }),
+    ]);
 
-    return {
-      total: Number(raw?.total ?? 0),
-      complete: Number(raw?.complete ?? 0),
-    };
+    return { total, complete };
   }
 }

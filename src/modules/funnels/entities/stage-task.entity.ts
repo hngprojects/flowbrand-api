@@ -5,6 +5,9 @@ import { FunnelStage } from './funnel-stage.entity';
 export const STAGE_TASK_STATUS = ['pending', 'complete'] as const;
 export type StageTaskStatus = (typeof STAGE_TASK_STATUS)[number];
 
+/** Typed reference to the "complete" status; renaming the union breaks this at compile time. */
+export const TASK_STATUS_COMPLETE: StageTaskStatus = 'complete';
+
 @Entity('stage_tasks')
 export class StageTask extends BaseEntity {
   @Index()
