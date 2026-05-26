@@ -175,3 +175,7 @@ export const GENERATION_RATE_LIMIT_EXCEEDED =
 export const UPLOAD_NOT_READY = 'One or more uploaded documents are not yet ready for funnel generation.';
 export const UPLOAD_OWNERSHIP_INVALID = 'One or more uploaded documents do not belong to you.';
 export const GENERATION_FAILED = 'Funnel generation failed. Please retry from the dashboard.';
+
+// User State (M4-BE-013)
+export const USER_STATE_RETRIEVED = 'User state retrieved successfully';
+export const USER_NOT_FOUND_BY_TOKEN = 'User associated with this token no longer exists';
