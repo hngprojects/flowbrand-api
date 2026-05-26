@@ -232,11 +232,12 @@ export class UsersService {
       }
     }
 
+    const revokedCount = sessions.filter(s => !s.is_revoked).length;
     this.logger.debug({
-      message: `Revoked ${sessions.length} sessions for user`,
+      message: `Revoked ${revokedCount} sessions for user`,
       userId,
-      sessionCount: sessions.length,
-    });
+      sessionCount: revokedCount,
+    });    
   }
 
   async changePassword(userId: string, dto: ChangePasswordDto): Promise<ChangePasswordResponse> {
@@ -274,11 +275,15 @@ export class UsersService {
 
     const saveNewPassword = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
 
-    await this.userModelAction.update({
+    const updated = await this.userModelAction.update({
       ...NO_TRANSACTION,
       identifierOptions: { id: userId },
       updatePayload: { password_hash: saveNewPassword },
     })
+
+    if (!updated) {
+      throw new InternalServerErrorException(SYS_MSG.USER_UPDATE_FAILED);
+    }
 
     await this.authMetaModelData.updateByUserId(userId, {
       password_changed_at: new Date(),
