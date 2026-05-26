@@ -60,7 +60,6 @@ export class UsersController {
   @Patch('/me/password')
   @ChangePasswordDocs()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Change user password' })
   async changePassword(@CurrentUser('sub') userId: string, @Body() dto: ChangePasswordDto) {
     return await this.usersService.changePassword(userId, dto);
   }

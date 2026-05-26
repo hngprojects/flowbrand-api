@@ -134,8 +134,8 @@ export const PASSWORD_RESET_INVALID_TOKEN = 'Invalid or expired reset token.';
 export const PASSWORD_CHANGE_SUCCESSFUL = 'Password changed successfully';
 export const INCORRECT_OLD_PASSWORD = 'The old password you entered is incorrect.';
 export const PASSWORD_CHANGE_NOT_SUPPORTED = 'Password change is not supported for accounts registered via Google OAuth';
-export const PASSWORD_CHANGE_NOT_SUCCESSFUL = 'New password cannot be the same as the old password'
-export const INCORRECT_CONFIRM_PASSWORD = 'The value of the confirm password does not match the new password'
+export const PASSWORD_CHANGE_NOT_SUCCESSFUL = 'New password cannot be the same as the old password';
+export const INCORRECT_CONFIRM_PASSWORD = 'The value of the confirm password does not match the new password';
 
 
 // Waitlist
