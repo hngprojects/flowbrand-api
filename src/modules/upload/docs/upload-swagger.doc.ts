@@ -12,10 +12,10 @@ import {
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import {
-  UploadBatchResponseDto,
+  UploadBatchDataDto,
   UploadFilesDto,
   UploadNotFoundResponseDto,
-  UploadProgressResponseDto,
+  UploadProgressDataDto,
   UploadRejectedResponseDto,
   UploadTooManyFilesResponseDto,
 } from '../dto/upload-files.dto';
@@ -38,12 +38,12 @@ export const UploadFunnelDocumentsDocs = () =>
     ApiBody({ type: UploadFilesDto }),
 
     ApiCreatedResponse({
-      type: UploadBatchResponseDto,
+      type: UploadBatchDataDto,
       description:
         '201 when at least one file accepted. ' +
-        'The DTO is served under `data` in the standard envelope: ' +
-        '`{ success, statusCode, message, data: <UploadBatchResponseDto> }`. ' +
-        'Per-file status (parsing, ready, or failed) is inside `data`. Poll until ready.',
+        'The payload is served under `data` in the standard envelope: ' +
+        '`{ success, statusCode, message, data: <UploadBatchDataDto> }`. ' +
+        'Per-file status (parsing, ready, or failed) is inside `data.uploads[]`. Poll until ready.',
     }),
     ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' }),
     ApiUnprocessableEntityResponse({
@@ -65,11 +65,11 @@ export const GetFunnelUploadProgressDocs = () =>
       summary: 'Poll upload progress for an owned document',
     }),
     ApiOkResponse({
-      type: UploadProgressResponseDto,
+      type: UploadProgressDataDto,
       description:
         '200 when the upload belongs to the user and progress is available. ' +
-        'The DTO is served under `data` in the standard envelope: ' +
-        '`{ success, statusCode, message, data: <UploadProgressResponseDto> }`.',
+        'The payload is served under `data` in the standard envelope: ' +
+        '`{ success, statusCode, message, data: <UploadProgressDataDto> }`.',
     }),
     ApiNotFoundResponse({
       type: UploadNotFoundResponseDto,

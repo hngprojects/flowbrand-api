@@ -17,7 +17,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../constants/system.messages';
 import { MAX_FILES_PER_UPLOAD, MAX_UPLOAD_BYTES } from './constants/upload.constants';
 import { GetFunnelUploadProgressDocs, UploadFunnelDocumentsDocs } from './docs/upload-swagger.doc';
-import { UploadBatchResponseDto, UploadProgressResponseDto } from './dto/upload-files.dto';
+import { UploadBatchDataDto, UploadProgressDataDto } from './dto/upload-files.dto';
 import { UploadService } from './upload.service';
 
 const uploadInterceptor = FilesInterceptor('files', MAX_FILES_PER_UPLOAD, {
@@ -45,7 +45,7 @@ export class UploadController {
     return {
       statusCode: HttpStatus.CREATED,
       message: SYS_MSG.UPLOAD_BATCH_ACCEPTED,
-      data: UploadBatchResponseDto.from(result),
+      data: UploadBatchDataDto.from(result),
     };
   }
 
@@ -57,7 +57,7 @@ export class UploadController {
     return {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.FUNNEL_UPLOAD_PROGRESS_RETRIEVED,
-      data: UploadProgressResponseDto.from(progress),
+      data: UploadProgressDataDto.from(progress),
     };
   }
 }
