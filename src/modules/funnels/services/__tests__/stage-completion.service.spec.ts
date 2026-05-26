@@ -55,6 +55,10 @@ describe('FunnelsService - stage completion', () => {
       findByIdempotency: jest.fn(),
       findGeneratingForUser: jest.fn(),
       findOwnedById: jest.fn(),
+      countTasksForStage: jest.fn(),
+      updateStageStatusIfActive: jest.fn(),
+      findStageById: jest.fn(),
+      findNextStage: jest.fn(),
     } as unknown as jest.Mocked<FunnelModelAction>;
 
     stageRepo = {
@@ -116,9 +120,9 @@ describe('FunnelsService - stage completion', () => {
         completed_at: null,
         unlocked_at: new Date('2026-05-26T10:00:00.000Z'),
       });
-    queryRunner.manager.createQueryBuilder.mockReturnValue(createQueryBuilderMock(3, 0));
-    queryRunner.manager.update.mockResolvedValue({ affected: 1 });
-    queryRunner.manager.findOne.mockResolvedValueOnce({
+    funnelAction.countTasksForStage.mockResolvedValue({ total: 3, pending: 0 });
+    funnelAction.updateStageStatusIfActive.mockResolvedValue(1);
+    funnelAction.findNextStage.mockResolvedValue({
       id: NEXT_STAGE_ID,
       funnel_id: FUNNEL_ID,
       position: 2,
@@ -126,7 +130,8 @@ describe('FunnelsService - stage completion', () => {
       status: StageStatus.ACTIVE,
       completed_at: null,
       unlocked_at: new Date('2026-05-26T10:00:00.000Z'),
-    });
+    } as FunnelStage);
+    queryRunner.manager.update.mockResolvedValue({ affected: 1 });
 
     const result = await service.completeStage(FUNNEL_ID, STAGE_ID, USER_ID);
 
@@ -160,9 +165,9 @@ describe('FunnelsService - stage completion', () => {
       completed_at: null,
       unlocked_at: new Date('2026-05-26T10:00:00.000Z'),
     });
-    queryRunner.manager.createQueryBuilder.mockReturnValue(createQueryBuilderMock(2, 0));
-    queryRunner.manager.update.mockResolvedValue({ affected: 1 });
-    queryRunner.manager.findOne.mockResolvedValueOnce(null);
+    funnelAction.countTasksForStage.mockResolvedValue({ total: 2, pending: 0 });
+    funnelAction.updateStageStatusIfActive.mockResolvedValue(1);
+    funnelAction.findNextStage.mockResolvedValue(null);
 
     const result = await service.completeStage(FUNNEL_ID, STAGE_ID, USER_ID);
 
@@ -182,7 +187,7 @@ describe('FunnelsService - stage completion', () => {
       completed_at: null,
       unlocked_at: new Date(),
     });
-    queryRunner.manager.createQueryBuilder.mockReturnValue(createQueryBuilderMock(3, 2));
+    funnelAction.countTasksForStage.mockResolvedValue({ total: 3, pending: 2 });
 
     await expect(service.completeStage(FUNNEL_ID, STAGE_ID, USER_ID)).rejects.toThrow(
       SYS_MSG.STAGE_HAS_PENDING_TASKS(2),
@@ -201,7 +206,7 @@ describe('FunnelsService - stage completion', () => {
       completed_at: null,
       unlocked_at: new Date(),
     });
-    queryRunner.manager.createQueryBuilder.mockReturnValue(createQueryBuilderMock(0, 0));
+    funnelAction.countTasksForStage.mockResolvedValue({ total: 0, pending: 0 });
 
     await expect(service.completeStage(FUNNEL_ID, STAGE_ID, USER_ID)).rejects.toThrow(
       SYS_MSG.STAGE_HAS_NO_TASKS,
@@ -230,6 +235,16 @@ describe('FunnelsService - stage completion', () => {
         completed_at: null,
         unlocked_at: new Date('2026-05-26T10:00:00.000Z'),
       });
+
+    funnelAction.findNextStage.mockResolvedValue({
+      id: NEXT_STAGE_ID,
+      funnel_id: FUNNEL_ID,
+      position: 2,
+      name: 'Spark Interest',
+      status: StageStatus.ACTIVE,
+      completed_at: null,
+      unlocked_at: new Date('2026-05-26T10:00:00.000Z'),
+    } as FunnelStage);
 
     const result = await service.completeStage(FUNNEL_ID, STAGE_ID, USER_ID);
 
@@ -260,6 +275,8 @@ describe('FunnelsService - stage completion', () => {
         completed_at: new Date(),
         unlocked_at: new Date(),
       });
+
+      funnelAction.findNextStage.mockResolvedValue(null);
 
     await expect(service.completeStage(FUNNEL_ID, STAGE_ID, USER_ID)).rejects.toBeInstanceOf(
       ForbiddenException,
@@ -305,8 +322,9 @@ describe('FunnelsService - stage completion', () => {
       completed_at: null,
       unlocked_at: new Date(),
     });
-    queryRunner.manager.createQueryBuilder.mockReturnValue(createQueryBuilderMock(2, 0));
-    queryRunner.manager.findOne.mockResolvedValueOnce({
+    funnelAction.countTasksForStage.mockResolvedValue({ total: 2, pending: 0 });
+    funnelAction.updateStageStatusIfActive.mockResolvedValue(1);
+    funnelAction.findNextStage.mockResolvedValue({
       id: NEXT_STAGE_ID,
       funnel_id: FUNNEL_ID,
       position: 2,
@@ -314,10 +332,8 @@ describe('FunnelsService - stage completion', () => {
       status: StageStatus.LOCKED,
       completed_at: null,
       unlocked_at: null,
-    });
-    queryRunner.manager.update
-      .mockResolvedValueOnce({ affected: 1 })
-      .mockRejectedValueOnce(new Error('unlock failed'));
+    } as FunnelStage);
+    queryRunner.manager.update.mockRejectedValueOnce(new Error('unlock failed'));
 
     await expect(service.completeStage(FUNNEL_ID, STAGE_ID, USER_ID)).rejects.toThrow('unlock failed');
     expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
@@ -335,9 +351,9 @@ describe('FunnelsService - stage completion', () => {
       completed_at: null,
       unlocked_at: new Date(),
     });
-    queryRunner.manager.createQueryBuilder.mockReturnValue(createQueryBuilderMock(2, 0));
-    queryRunner.manager.update.mockResolvedValue({ affected: 0 });
-    queryRunner.manager.findOne
+    funnelAction.countTasksForStage.mockResolvedValue({ total: 2, pending: 0 });
+    funnelAction.updateStageStatusIfActive.mockResolvedValue(0);
+    funnelAction.findStageById
       .mockResolvedValueOnce({
         id: STAGE_ID,
         funnel_id: FUNNEL_ID,
@@ -346,7 +362,7 @@ describe('FunnelsService - stage completion', () => {
         status: StageStatus.COMPLETE,
         completed_at: new Date('2026-05-26T10:00:00.000Z'),
         unlocked_at: new Date('2026-05-26T09:00:00.000Z'),
-      })
+      } as FunnelStage)
       .mockResolvedValueOnce({
         id: NEXT_STAGE_ID,
         funnel_id: FUNNEL_ID,
@@ -355,7 +371,16 @@ describe('FunnelsService - stage completion', () => {
         status: StageStatus.ACTIVE,
         completed_at: null,
         unlocked_at: new Date('2026-05-26T10:00:00.000Z'),
-      });
+      } as FunnelStage);
+    funnelAction.findNextStage.mockResolvedValue({
+      id: NEXT_STAGE_ID,
+      funnel_id: FUNNEL_ID,
+      position: 2,
+      name: 'Spark Interest',
+      status: StageStatus.ACTIVE,
+      completed_at: null,
+      unlocked_at: new Date('2026-05-26T10:00:00.000Z'),
+    } as FunnelStage);
 
     const result = await service.completeStage(FUNNEL_ID, STAGE_ID, USER_ID);
 

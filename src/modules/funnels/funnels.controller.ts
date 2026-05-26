@@ -5,7 +5,7 @@ import * as SYS_MSG from '../../constants/system.messages';
 import { CreateFunnelDocs, GetFunnelStatusDocs } from './docs/funnels-swagger.doc';
 import { CreateFunnelDto, FunnelIdParamDto } from './dto/create-funnel.dto';
 
-// Swagger decorator factories
+// Swagger decorator factories (imported from docs/ per documentation conventions)
 import {
   FunnelControllerDecorators,
   ListFunnelsDecorators,
@@ -13,7 +13,7 @@ import {
   GetStagesSummaryDecorators,
   GetStageDetailDecorators,
   CompleteStageDecorators,
-} from './funnels.swagger';
+} from './docs/funnels-swagger.doc';
 
 // Two services exist in the module: the read-only API service (top-level)
 // and the generation service under `services/`. Import both and alias

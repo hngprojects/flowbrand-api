@@ -24,7 +24,6 @@ import { FunnelModelAction } from '../actions/funnel.action';
 import { CreateFunnelDto } from '../dto/create-funnel.dto';
 import { Funnel } from '../entities/funnel.entity';
 import { FunnelStage } from '../entities/funnel-stage.entity';
-import { StageTask } from '../entities/stage-task.entity';
 import { FunnelCreationPath } from '../enums/funnel-creation-path.enum';
 import { FunnelStatus } from '../enums/funnel-status.enum';
 import { StageStatus } from '../enums/stage-status.enum';
@@ -244,15 +243,10 @@ export class FunnelsService {
     await queryRunner.startTransaction();
 
     try {
-      const taskCounts = await queryRunner.manager
-        .createQueryBuilder(StageTask, 'task')
-        .select('COUNT(*)', 'total')
-        .addSelect('SUM(CASE WHEN task.status = :pendingStatus THEN 1 ELSE 0 END)', 'pending')
-        .where('task.stage_id = :stageId', { stageId, pendingStatus: 'pending' })
-        .getRawOne<{ total?: string | number; pending?: string | number }>();
+      const taskCounts = await this.funnelAction.countTasksForStage(queryRunner.manager, stageId);
 
-      const totalTasks = Number(taskCounts?.total ?? 0);
-      const pendingTasks = Number(taskCounts?.pending ?? 0);
+      const totalTasks = Number(taskCounts.total ?? 0);
+      const pendingTasks = Number(taskCounts.pending ?? 0);
 
       if (totalTasks === 0) {
         throw new UnprocessableEntityException(SYS_MSG.STAGE_HAS_NO_TASKS);
@@ -263,19 +257,16 @@ export class FunnelsService {
       }
 
       const completedAt = new Date();
-      const completionUpdate = await queryRunner.manager.update(
-        FunnelStage,
-        { id: stageId, funnel_id: funnelId, status: StageStatus.ACTIVE },
+      const affected = await this.funnelAction.updateStageStatusIfActive(
+        queryRunner.manager,
+        stageId,
+        funnelId,
         { status: StageStatus.COMPLETE, completed_at: completedAt },
       );
 
-      if ((completionUpdate.affected ?? 0) === 0) {
-        const latestStage = await queryRunner.manager.findOne(FunnelStage, {
-          where: { id: stageId, funnel_id: funnelId },
-        });
-        const unlockedStage = await queryRunner.manager.findOne(FunnelStage, {
-          where: { funnel_id: funnelId, position: currentStage.position + 1 },
-        });
+      if (affected === 0) {
+        const latestStage = await this.funnelAction.findStageById(queryRunner.manager, stageId, funnelId);
+        const unlockedStage = await this.funnelAction.findNextStage(queryRunner.manager, funnelId, currentStage.position + 1);
 
         await queryRunner.rollbackTransaction();
 
@@ -290,9 +281,7 @@ export class FunnelsService {
         throw new ConflictException('Stage completion failed due to a concurrent update. Please retry.');
       }
 
-      const nextStage = await queryRunner.manager.findOne(FunnelStage, {
-        where: { funnel_id: funnelId, position: currentStage.position + 1 },
-      });
+      const nextStage = await this.funnelAction.findNextStage(queryRunner.manager, funnelId, currentStage.position + 1);
 
       if (nextStage) {
         await queryRunner.manager.update(

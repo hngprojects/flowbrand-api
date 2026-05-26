@@ -36,7 +36,7 @@ describe('FunnelsController - stage completion route', () => {
     controller = module.get(FunnelsController);
   });
 
-  it('returns the service payload and sets HTTP 200 for stage completion', async () => {
+  it('AC-01: returns the service payload and sets HTTP 200 for stage completion', async () => {
     GEN_SERVICE_MOCK.completeStage.mockResolvedValue({
       statusCode: HttpStatus.OK,
       message: 'Stage completed successfully',
@@ -67,7 +67,7 @@ describe('FunnelsController - stage completion route', () => {
     expect(result).toEqual(expect.objectContaining({ statusCode: HttpStatus.OK }));
   });
 
-  it('passes through idempotent complete responses from the service', async () => {
+  it('EC-01: passes through idempotent complete responses from the service', async () => {
     GEN_SERVICE_MOCK.completeStage.mockResolvedValue({
       statusCode: HttpStatus.OK,
       message: 'Stage already complete',

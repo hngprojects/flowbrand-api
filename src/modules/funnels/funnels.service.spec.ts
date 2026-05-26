@@ -1,31 +1,59 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Repository } from 'typeorm';
 import { FunnelsService } from './funnels.service';
 
-function createMockQB(returnValues: any = {}) {
-  const qb: any = {
-    calls: [],
-    where() { this.calls.push(['where', Array.from(arguments)]); return this; },
-    orderBy() { this.calls.push(['orderBy', Array.from(arguments)]); return this; },
-    addOrderBy() { this.calls.push(['addOrderBy', Array.from(arguments)]); return this; },
-    leftJoinAndSelect() { this.calls.push(['leftJoinAndSelect', Array.from(arguments)]); return this; },
-    select() { this.calls.push(['select', Array.from(arguments)]); return this; },
-    addSelect() { this.calls.push(['addSelect', Array.from(arguments)]); return this; },
-    groupBy() { this.calls.push(['groupBy', Array.from(arguments)]); return this; },
-    skip() { this.calls.push(['skip', Array.from(arguments)]); return this; },
-    take() { this.calls.push(['take', Array.from(arguments)]); return this; },
+type MockQBReturn = {
+  getManyAndCount?: [unknown[], number];
+  funnels?: unknown[];
+  total?: number;
+  stages?: unknown[];
+  rawMany?: unknown[];
+  rawOne?: unknown;
+};
+
+type MockQB = {
+  calls: unknown[];
+  where: (...args: unknown[]) => MockQB;
+  orderBy: (...args: unknown[]) => MockQB;
+  addOrderBy: (...args: unknown[]) => MockQB;
+  leftJoinAndSelect: (...args: unknown[]) => MockQB;
+  select: (...args: unknown[]) => MockQB;
+  addSelect: (...args: unknown[]) => MockQB;
+  groupBy: (...args: unknown[]) => MockQB;
+  skip: (...args: unknown[]) => MockQB;
+  take: (...args: unknown[]) => MockQB;
+  getManyAndCount: () => Promise<[unknown[], number]>;
+  getMany: () => Promise<unknown[]>;
+  getRawMany: () => Promise<unknown[]>;
+  getRawOne: () => Promise<unknown>;
+};
+
+function createMockQB(returnValues: MockQBReturn = {}): MockQB {
+  const calls: unknown[] = [];
+  const qb: MockQB = {
+    calls,
+    where() { calls.push(['where', Array.from(arguments)]); return qb; },
+    orderBy() { calls.push(['orderBy', Array.from(arguments)]); return qb; },
+    addOrderBy() { calls.push(['addOrderBy', Array.from(arguments)]); return qb; },
+    leftJoinAndSelect() { calls.push(['leftJoinAndSelect', Array.from(arguments)]); return qb; },
+    select() { calls.push(['select', Array.from(arguments)]); return qb; },
+    addSelect() { calls.push(['addSelect', Array.from(arguments)]); return qb; },
+    groupBy() { calls.push(['groupBy', Array.from(arguments)]); return qb; },
+    skip() { calls.push(['skip', Array.from(arguments)]); return qb; },
+    take() { calls.push(['take', Array.from(arguments)]); return qb; },
     getManyAndCount: async () => returnValues.getManyAndCount ?? [returnValues.funnels ?? [], returnValues.total ?? 0],
     getMany: async () => returnValues.stages ?? [],
     getRawMany: async () => returnValues.rawMany ?? [],
     getRawOne: async () => returnValues.rawOne ?? { total: 0, complete: 0 },
-  };
+  } as unknown as MockQB;
   return qb;
 }
 
 describe('FunnelsService', () => {
   let service: FunnelsService;
-  let funnelRepo: any;
-  let stageRepo: any;
-  let taskRepo: any;
+  let funnelRepo: jest.Mocked<Pick<Repository<Record<string, unknown>>, 'findOne' | 'createQueryBuilder'>>;
+  let stageRepo: jest.Mocked<Pick<Repository<Record<string, unknown>>, 'findOne' | 'createQueryBuilder'>>;
+  let taskRepo: jest.Mocked<Pick<Repository<Record<string, unknown>>, 'createQueryBuilder'>>;
 
   beforeEach(() => {
     funnelRepo = {
@@ -40,13 +68,13 @@ describe('FunnelsService', () => {
       createQueryBuilder: jest.fn(),
     };
 
-    service = new FunnelsService(funnelRepo, stageRepo, taskRepo);
+    service = new FunnelsService(funnelRepo as never, stageRepo as never, taskRepo as never);
   });
 
   it('AC-01 - listForUser caps per_page at 20 and returns summaries', async () => {
-    const sampleFunnel: any = { id: 'f1', business_name: 'B', creation_path: 'cp', status: 'active', created_at: new Date(), stages: [{ position: 1, name: 'S1', status: 'active' }] };
+    const sampleFunnel: Record<string, unknown> = { id: 'f1', business_name: 'B', creation_path: 'cp', status: 'active', created_at: new Date(), stages: [{ position: 1, name: 'S1', status: 'active' }]
     const qb = createMockQB({ getManyAndCount: [ [sampleFunnel], 1 ] });
-    funnelRepo.createQueryBuilder.mockReturnValue(qb);
+    funnelRepo.createQueryBuilder.mockReturnValue(qb as never);
 
     const res = await service.listForUser('user-1', 1, 100);
     expect(res.funnels.length).toBe(1);
@@ -90,8 +118,8 @@ describe('FunnelsService', () => {
       ],
       rawMany: [{ stageId: 's1', total: 2, complete: 1 }],
     });
-    stageRepo.createQueryBuilder.mockReturnValue(qb);
-    taskRepo.createQueryBuilder.mockReturnValue(createMockQB({ rawMany: [{ stageId: 's1', total: 2, complete: 1 }] }));
+    stageRepo.createQueryBuilder.mockReturnValue(qb as never);
+    taskRepo.createQueryBuilder.mockReturnValue(createMockQB({ rawMany: [{ stageId: 's1', total: 2, complete: 1 }] }) as never);
 
     const res = await service.getStagesSummary('u1', 'f1');
     expect(res).toEqual([
@@ -126,7 +154,7 @@ describe('FunnelsService', () => {
       })
       .mockResolvedValueOnce({ id: 's1', funnel_id: 'f1', position: 1, name: 'Stage 1', status: 'complete' });
     taskRepo.createQueryBuilder.mockReturnValue(
-      createMockQB({ stages: [{ id: 't1', position: 1, name: 'Task 1', status: 'complete' }], rawOne: { total: 1, complete: 1 } }),
+      createMockQB({ stages: [{ id: 't1', position: 1, name: 'Task 1', status: 'complete' }], rawOne: { total: 1, complete: 1 } }) as never,
     );
 
     const res = await service.getStageDetail('u1', 'f1', 's2');
@@ -144,10 +172,10 @@ describe('FunnelsService', () => {
     funnelRepo.findOne.mockResolvedValue({ id: 'f1', user_id: 'u1' });
     const stages = [{ id: 's1', position: 1, name: 'S1', channel: 'email', status: 'active', tasks: [{ id: 't1', position: 1, name: 'T1', status: 'pending' }] }];
     const qbStages = createMockQB({ stages, rawMany: [{ stageId: 's1', total: 1, complete: 0 }] });
-    stageRepo.createQueryBuilder.mockReturnValue(qbStages);
+    stageRepo.createQueryBuilder.mockReturnValue(qbStages as never);
 
     const qbCounts = createMockQB({ rawMany: [{ stageId: 's1', total: 1, complete: 0 }] });
-    taskRepo.createQueryBuilder.mockReturnValue(qbCounts);
+    taskRepo.createQueryBuilder.mockReturnValue(qbCounts as never);
 
     const res = await service.getFullFunnel('u1', 'f1');
     expect(res.stages.length).toBe(1);
