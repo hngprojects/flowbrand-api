@@ -1,18 +1,18 @@
 import { applyDecorators, HttpStatus } from '@nestjs/common';
 import {
   ApiAcceptedResponse,
+  ApiBearerAuth,
   ApiConflictResponse,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiQuery,
   ApiResponse,
   ApiServiceUnavailableResponse,
+  ApiTags,
   ApiUnauthorizedResponse,
   ApiUnprocessableEntityResponse,
-  ApiTags,
-  ApiBearerAuth,
-  ApiForbiddenResponse,
-  ApiQuery,
 } from '@nestjs/swagger';
 import * as SYS_MSG from '../../../constants/system.messages';
 
@@ -141,13 +141,6 @@ export const GetFunnelStatusDocs = () =>
     }),
   );
 
-// ---------------------------------------------------------------------------
-// Re-usable Swagger decorator factories and example payloads used by the
-// funnels controller. These were previously in `funnels.swagger.ts` — they
-// belong in `docs/` so the controller imports documentation-only artifacts
-// from the `docs` folder.
-// ---------------------------------------------------------------------------
-
 export function FunnelControllerDecorators() {
   return applyDecorators(ApiTags('funnels'), ApiBearerAuth('JWT'));
 }
@@ -200,10 +193,6 @@ export function CompleteStageDecorators() {
     ApiUnprocessableEntityResponse({ description: 'Funnel is not active, the stage has no tasks, or one or more tasks are still pending', schema: { example: stagePendingTasksExample('/api/funnels/{id}
   );
 }
-
-// ============================================================================
-// Swagger Example Responses (moved from `funnels.swagger.ts`)
-// ============================================================================
 
 export const funnelListExample = {
   success: true,

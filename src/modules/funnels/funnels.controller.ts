@@ -2,11 +2,10 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patc
 import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../constants/system.messages';
-import { CreateFunnelDocs, GetFunnelStatusDocs } from './docs/funnels-swagger.doc';
 import { CreateFunnelDto, FunnelIdParamDto } from './dto/create-funnel.dto';
-
-// Swagger decorator factories (imported from docs/ per documentation conventions)
 import {
+  CreateFunnelDocs, 
+  GetFunnelStatusDocs,
   FunnelControllerDecorators,
   ListFunnelsDecorators,
   GetFunnelDecorators,
