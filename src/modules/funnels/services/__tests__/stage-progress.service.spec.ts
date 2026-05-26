@@ -92,6 +92,28 @@ describe('StageProgressService', () => {
       });
     });
 
+    it('reopens a complete task: status pending clears completedAt', async () => {
+      mockStageAction.findOwnedStage.mockResolvedValue(makeStage());
+      mockTaskAction.findOwnedTask.mockResolvedValue(
+        makeTask({ status: 'complete', is_complete: true, completed_at: new Date() }),
+      );
+      mockTaskAction.saveTask.mockImplementation((t: StageTask) =>
+        Promise.resolve({ ...t, is_complete: false, completed_at: null }),
+      );
+
+      const result = await service.completeTask(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, 'pending');
+
+      expect(mockTaskAction.saveTask).toHaveBeenCalledWith(
+        expect.objectContaining({ id: TASK_ID, status: 'pending' }),
+      );
+      expect(result).toEqual({
+        taskId: TASK_ID,
+        stageId: STAGE_ID,
+        status: 'pending',
+        completedAt: null,
+      });
+    });
+
     it('throws 404 when the funnel is not owned by the user', async () => {
       mockFunnelAction.findOwnedById.mockResolvedValue(null);
 
@@ -186,6 +208,15 @@ describe('StageProgressService', () => {
       await expect(service.completeStage(USER_ID, FUNNEL_ID, STAGE_ID)).rejects.toBeInstanceOf(
         UnprocessableEntityException,
       );
+    });
+
+    it('throws 404 when the stage does not belong to the funnel', async () => {
+      mockStageAction.findOwnedStage.mockResolvedValue(null);
+
+      await expect(service.completeStage(USER_ID, FUNNEL_ID, STAGE_ID)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(mockStageAction.completeAndUnlockNext).not.toHaveBeenCalled();
     });
   });
 });
