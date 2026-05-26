@@ -3,6 +3,10 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  Logger,
+  UnprocessableEntityException,
+  BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { QueryFailedError } from 'typeorm';
@@ -13,6 +17,11 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { UserRole } from './enums/user-role.enum';
 import * as SYS_MSG from '../../constants/system.messages';
+import { UserSessionModelAction } from './actions/user-session.action';
+import { RedisService } from '../redis/redis.service';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { AuthMetadataModelAction } from '../auth/actions/auth-metadata.action';
+import { ChangePasswordResponse } from './interfaces/change_password.interface';
 
 const BCRYPT_ROUNDS = 10;
 const NO_TRANSACTION = {
@@ -21,7 +30,13 @@ const NO_TRANSACTION = {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly userModelAction: UserModelAction) {}
+  private readonly logger = new Logger(UsersService.name);
+  constructor(
+    private readonly userModelAction: UserModelAction,
+    private readonly userSessionModelAction: UserSessionModelAction,
+    private readonly authMetaModelData: AuthMetadataModelAction,
+    private readonly redisService: RedisService,
+  ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
     const existing = await this.userModelAction.findByEmail(dto.email);
@@ -190,5 +205,93 @@ export class UsersService {
       ...NO_TRANSACTION,
       identifierOptions: { id },
     });
+  }
+
+  private async revokeAllUserSessions(userId: string): Promise<void> {
+    const sessions = await this.userSessionModelAction.findByUserId(userId);
+
+    if (!sessions || sessions.length === 0) {
+      this.logger.debug({
+        message: 'No active sessions found to revoke',
+        userId,
+      });
+      return;
+    }
+
+    for (const session of sessions) {
+      if (!session.is_revoked) {
+        await this.userSessionModelAction.updateById(session.id, {
+          is_revoked: true,
+          revoked_at: new Date(),
+        });
+
+        await Promise.all([
+          this.redisService.del(`active_session:${userId}:${session.id}`),
+          this.redisService.del(`sess:${userId}:${session.id}`),
+        ]);
+      }
+    }
+
+    this.logger.debug({
+      message: `Revoked ${sessions.length} sessions for user`,
+      userId,
+      sessionCount: sessions.length,
+    });
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto): Promise<ChangePasswordResponse> {
+    const user = await this.findById(userId);
+
+    if (user.auth_provider === 'google' && user.password_hash === null) {
+      throw new UnprocessableEntityException({
+        message: SYS_MSG.PASSWORD_CHANGE_NOT_SUPPORTED
+      })
+    }
+
+    const oldPassword = dto.oldPassword;
+    const newPassword = dto.newPassword;
+    const confirmPassword = dto.confirmPassword
+
+    const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password_hash!);
+
+    if(!isOldPasswordValid) {
+      throw new UnauthorizedException({
+        message: SYS_MSG.INCORRECT_OLD_PASSWORD
+      })
+    }
+
+    if(newPassword === oldPassword) {
+      throw new UnprocessableEntityException({
+        message: SYS_MSG.PASSWORD_CHANGE_NOT_SUCCESSFUL
+      })
+    }
+
+    if(confirmPassword !== newPassword) {
+      throw new BadRequestException({
+        message: SYS_MSG.INCORRECT_CONFIRM_PASSWORD
+      })
+    }
+
+    const saveNewPassword = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
+
+    await this.userModelAction.update({
+      ...NO_TRANSACTION,
+      identifierOptions: { id: userId },
+      updatePayload: { password_hash: saveNewPassword },
+    })
+
+    await this.authMetaModelData.updateByUserId(userId, {
+      password_changed_at: new Date(),
+    })
+    await this.revokeAllUserSessions(userId);
+
+    this.logger.log({
+      message: SYS_MSG.PASSWORD_CHANGE_SUCCESSFUL,
+      userId
+    })
+
+    return {
+      message: SYS_MSG.PASSWORD_CHANGE_SUCCESSFUL,
+    }
   }
 }
