@@ -32,6 +32,15 @@ export class UpdateUserProfileDto {
   })
   @IsOptional()
   @IsString()
+  @Transform(({ value }: { value: unknown }) => {
+    if (typeof value !== 'string') return value;
+    const trimmed = value.trim();
+    return (
+      ALLOWED_SSA_COUNTRIES.find(
+        (country) => country.toLowerCase() === trimmed.toLowerCase(),
+      ) ?? value
+    );
+  })
   @IsIn(ALLOWED_SSA_COUNTRIES)
   country?: string;
 }
