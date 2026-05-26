@@ -4,14 +4,14 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../constants/system.messages';
 import { CreateFunnelDto, FunnelIdParamDto } from './dto/create-funnel.dto';
 import {
-  CreateFunnelDocs, 
-  GetFunnelStatusDocs,
-  FunnelControllerDecorators,
-  ListFunnelsDecorators,
-  GetFunnelDecorators,
-  GetStagesSummaryDecorators,
-  GetStageDetailDecorators,
   CompleteStageDecorators,
+  CreateFunnelDocs,
+  FunnelControllerDecorators,
+  GetFunnelDecorators,
+  GetFunnelStatusDocs,
+  GetStageDetailDecorators,
+  GetStagesSummaryDecorators,
+  ListFunnelsDecorators,
 } from './docs/funnels-swagger.doc';
 
 // Two services exist in the module: the read-only API service (top-level)
