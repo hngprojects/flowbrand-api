@@ -16,6 +16,11 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
+import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
+import { GetProfileDocs, UpdateProfileDocs } from './docs/users-swagger.doc';
+import * as SYS_MSG from '../../constants/system.messages';
 
 @ApiTags('users')
 @ApiBearerAuth('JWT')
@@ -33,6 +38,33 @@ export class UsersController {
   @ApiOperation({ summary: 'List users (paginated)' })
   findAll(@Query() pagination: PaginationDto) {
     return this.usersService.findAll(pagination);
+  }
+
+  @Get('me')
+  @HttpCode(HttpStatus.OK)
+  @GetProfileDocs()
+  async getProfile(@CurrentUser() user: AuthenticatedUser) {
+    const data = await this.usersService.getProfile(user.userId);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.PROFILE_RETRIEVED_SUCCESSFULLY,
+      data,
+    };
+  }
+
+  @Patch('me')
+  @HttpCode(HttpStatus.OK)
+  @UpdateProfileDocs()
+  async updateProfile(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateUserProfileDto,
+  ) {
+    const data = await this.usersService.updateProfile(user.userId, dto);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.PROFILE_UPDATED_SUCCESSFULLY,
+      data,
+    };
   }
 
   @Get(':id')
