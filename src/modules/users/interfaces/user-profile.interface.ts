@@ -9,12 +9,3 @@ export interface IUserProfile {
   createdAt: Date;
   updatedAt: Date;
 }
-
-export interface IUpdateUserProfilePayload {
-  fullName?: string;
-  country?: string;
-}
-
-export interface IProfileUpdateAudit {
-  changedFields: Array<'full_name' | 'country'>;
-}

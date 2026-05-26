@@ -9,8 +9,6 @@ import {
 } from '@nestjs/swagger';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { UpdateUserProfileDto } from '../dto/update-user-profile.dto';
-import { UserProfileResponseDto } from '../dto/user-profile-response.dto';
-
 const profileDataExample = {
   id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   fullName: 'Jane Doe',
@@ -42,7 +40,6 @@ export const GetProfileDocs = () =>
     }),
     ApiOkResponse({
       description: 'Profile retrieved successfully',
-      type: UserProfileResponseDto,
       schema: {
         example: {
           success: true,
@@ -73,7 +70,6 @@ export const UpdateProfileDocs = () =>
     ApiBody({ type: UpdateUserProfileDto }),
     ApiOkResponse({
       description: 'Profile updated (or unchanged) — returns current profile',
-      type: UserProfileResponseDto,
       schema: {
         example: {
           success: true,
