@@ -191,7 +191,8 @@ export function CompleteStageDecorators() {
     ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token', schema: { example: unauthorizedExample } }),
     ApiNotFoundResponse({ description: 'Funnel or stage not found, or the stage does not belong to the caller', schema: { example: notFoundExample('/api/funnels/{id}/stages/{stageId}/complete') } }),
     ApiForbiddenResponse({ description: 'The requested stage is locked and cannot be completed yet', schema: { example: lockedStageExample('/api/funnels/{id}/stages/{stageId}/complete') } }),
-    ApiUnprocessableEntityResponse({ description: 'Funnel is not active, the stage has no tasks, or one or more tasks are still pending', schema: { example: stagePendingTasksExample('/api/funnels/{id}
+    ApiUnprocessableEntityResponse({ description: 'Funnel is not active, the stage has no tasks, or one or more tasks are still pending', schema: { example: stagePendingTasksExample
+    ('/api/funnels/{id}/stages/{stageId}/complete') } }),
   );
 }
 
