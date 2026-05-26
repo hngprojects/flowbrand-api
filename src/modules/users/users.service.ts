@@ -1,17 +1,33 @@
 import {
+  HttpStatus,
   ConflictException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
-import { QueryFailedError } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { UserModelAction } from './actions/user.action';
 import { CreateUserDto } from './dto/create-user.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { UserRole } from './enums/user-role.enum';
+import { WizardSession } from './../onboarding/entities/wizzard-session.entity';
+import { WizardStatus } from './../onboarding/enums/wizzard-status.enum';
+import { Funnel } from './../funnels/entities/funnel.entity';
+import { FunnelStatus } from './../funnels/enums/funnel-status.enum';
+import { FunnelStage } from './../funnels/entities/funnel-stage.entity';
+import { StageStatus } from './../funnels/enums/stage-status.enum';
+import { StageTask } from './../funnels/entities/stage-task.entity';
+import { RedisService } from './../redis/redis.service';
+import {
+  UserStateResponse,
+  OnboardingState,
+  ActiveFunnel,
+  CurrentStage,
+} from './interfaces/user-state.interface';
 import * as SYS_MSG from '../../constants/system.messages';
 
 const BCRYPT_ROUNDS = 10;
@@ -21,7 +37,20 @@ const NO_TRANSACTION = {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly userModelAction: UserModelAction) {}
+  constructor(
+    private readonly userModelAction: UserModelAction,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(WizardSession)
+    private readonly wizardSessionRepo: Repository<WizardSession>,
+    @InjectRepository(Funnel)
+    private readonly funnelRepo: Repository<Funnel>,
+    @InjectRepository(FunnelStage)
+    private readonly stageRepo: Repository<FunnelStage>,
+    @InjectRepository(StageTask)
+    private readonly taskRepo: Repository<StageTask>,
+    private readonly redisService: RedisService,
+  ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
     const existing = await this.userModelAction.findByEmail(dto.email);
@@ -190,5 +219,146 @@ export class UsersService {
       ...NO_TRANSACTION,
       identifierOptions: { id },
     });
+  }
+
+  /**
+   * BE-013: Get complete dashboard state for authenticated user
+   */
+  async getUserState(userId: string): Promise<UserStateResponse> {
+    const user = await this.userRepo.findOne({ where: { id: userId } })
+    if (!user) {
+      throw new NotFoundException(SYS_MSG.USER_NOT_FOUND_BY_TOKEN);
+    }
+
+    const cacheKey = `user-state:${userId}`;
+
+    const cached = await this.redisService.get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached) as UserStateResponse;
+    }
+
+    const onboarding = await this.getOnboardingState(userId);
+    const activeFunnel = await this.getActiveFunnelState(userId);
+    
+    const response: UserStateResponse = {
+      success: true,
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.USER_STATE_RETRIEVED,
+      data: {
+        onboarding,
+        activeFunnel,
+      },
+    };
+
+    await this.redisService.set(cacheKey, JSON.stringify(response), 20);
+    
+    return response;
+  }
+
+  async invalidateUserStateCache(userId: string): Promise<void> {
+    const cacheKey = `user-state:${userId}`;
+    await this.redisService.del(cacheKey);
+  }
+
+  private async getOnboardingState(userId: string): Promise<OnboardingState> {
+    const session = await this.wizardSessionRepo
+      .createQueryBuilder('ws')
+      .where('ws.user_id = :userId', { userId })
+      .orderBy('ws.created_at', 'DESC')
+      .getOne();
+
+    if (!session) {
+      return { status: 'not_started' };
+    }
+
+    if (session.status === WizardStatus.COMPLETE) {
+      return { status: 'complete' };
+    }
+
+    const now = new Date();
+    if (session.status === WizardStatus.IN_PROGRESS && session.expires_at > now) {
+      return {
+        status: 'in_progress',
+        sessionId: session.id,
+        stepsCompleted: session.steps_completed,
+      };
+    }
+
+    return { status: 'not_started' };
+  }
+
+  private async getActiveFunnelState(userId: string): Promise<ActiveFunnel | null> {
+    const funnels = await this.funnelRepo
+      .createQueryBuilder('f')
+      .where('f.user_id = :userId', { userId })
+      .andWhere('f.status != :failedStatus', { failedStatus: FunnelStatus.FAILED })
+      .orderBy('f.created_at', 'DESC')
+      .getMany();
+
+    if (funnels.length === 0) {
+      return null;
+    }
+
+    let activeFunnel: Funnel | null = null;
+    let generatingFunnel: Funnel | null = null;
+
+    for (const funnel of funnels) {
+      if (funnel.status === FunnelStatus.ACTIVE && !activeFunnel) {
+        activeFunnel = funnel;
+      }
+      if (funnel.status === FunnelStatus.GENERATING && !generatingFunnel) {
+        generatingFunnel = funnel;
+      }
+    }
+
+    const selectedFunnel = activeFunnel ?? generatingFunnel;
+    if (!selectedFunnel) {
+      return null;
+    }
+
+    if (selectedFunnel.status === FunnelStatus.GENERATING) {
+      return {
+        funnelId: selectedFunnel.id,
+        businessName: selectedFunnel.business_name,
+        status: 'generating',
+        createdAt: selectedFunnel.created_at,
+        currentStage: null,
+      };
+    }
+
+    const activeStage = await this.stageRepo
+      .createQueryBuilder('fs')
+      .where('fs.funnel_id = :funnelId', { funnelId: selectedFunnel.id })
+      .andWhere('fs.status = :activeStatus', { activeStatus: StageStatus.ACTIVE })
+      .getOne();
+
+    let currentStage: CurrentStage | null = null;
+    if (activeStage) {
+      const tasks = await this.taskRepo
+        .createQueryBuilder('st')
+        .where('st.stage_id = :stageId', { stageId: activeStage.id })
+        .getMany();
+
+      const tasksTotal = tasks.length;
+      const tasksComplete = tasks.filter(task => task.is_complete).length;
+
+      currentStage = {
+        stageId: activeStage.id,
+        position: activeStage.position,
+        name: activeStage.name,
+        status: activeStage.status,
+        unlockedAt: activeStage.unlocked_at,
+        tasksTotal,
+        tasksComplete,
+      };
+    }
+
+    return {
+      funnelId: selectedFunnel.id,
+      businessName: selectedFunnel.business_name,
+      status: 'active',
+      createdAt: selectedFunnel.created_at,
+      currentStage,
+    };
   }
 }
