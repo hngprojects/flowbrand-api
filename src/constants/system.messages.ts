@@ -117,6 +117,11 @@ export const FUNNEL_STAGE_NOT_FOUND = 'Funnel stage not found or not owned by yo
 export const FUNNEL_OR_STAGE_NOT_FOUND = 'Funnel or stage not found or not owned by you';
 export const FUNNEL_STAGE_LOCKED_MESSAGE = (stageName: string, priorStageName: string) =>
   `The ${stageName} stage is locked. Complete all tasks in ${priorStageName} and mark it complete to unlock.`;
+export const STAGE_COMPLETED_SUCCESSFULLY = 'Stage completed successfully';
+export const STAGE_ALREADY_COMPLETE = 'Stage already complete';
+export const STAGE_HAS_PENDING_TASKS = (count: number) =>
+  `Cannot complete stage: ${count} task(s) are still pending.`;
+export const STAGE_HAS_NO_TASKS = 'Stage has no tasks. Cannot be marked complete.';
 export const FUNNEL_UNAUTHORIZED_ACCESS = 'You do not have permission to access this funnel';
 
 // Password Reset Messages

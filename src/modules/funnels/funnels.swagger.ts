@@ -8,6 +8,7 @@ import {
   ApiQuery,
   ApiUnauthorizedResponse,
   ApiTags,
+  ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import * as SYS_MSG from '../../constants/system.messages';
 
@@ -78,6 +79,29 @@ export function GetStageDetailDecorators() {
     ApiForbiddenResponse({
       description: 'Stage is locked until the prior stage is completed',
       schema: { example: forbiddenStageLockedExample('/api/funnels/{id}/stages/{stageId}') },
+    }),
+  );
+}
+
+export function CompleteStageDecorators() {
+  return applyDecorators(
+    ApiOperation({ summary: 'Complete an active funnel stage and unlock the next stage' }),
+    ApiOkResponse({ description: 'Stage completed successfully', schema: { example: stageCompletionExample } }),
+    ApiUnauthorizedResponse({
+      description: 'Missing or invalid bearer token',
+      schema: { example: unauthorizedExample },
+    }),
+    ApiNotFoundResponse({
+      description: 'Funnel or stage not found, or the stage does not belong to the caller',
+      schema: { example: notFoundExample('/api/funnels/{id}/stages/{stageId}/complete') },
+    }),
+    ApiForbiddenResponse({
+      description: 'The requested stage is locked and cannot be completed yet',
+      schema: { example: lockedStageExample('/api/funnels/{id}/stages/{stageId}/complete') },
+    }),
+    ApiUnprocessableEntityResponse({
+      description: 'Funnel is not active, the stage has no tasks, or one or more tasks are still pending',
+      schema: { example: stagePendingTasksExample('/api/funnels/{id}/stages/{stageId}/complete') },
     }),
   );
 }
@@ -203,4 +227,44 @@ export const forbiddenStageLockedExample = (path: string) => ({
   message: SYS_MSG.FUNNEL_STAGE_LOCKED_MESSAGE('Validation', 'Discovery'),
   path,
   timestamp: '2026-05-18T12:00:00.000Z',
+});
+
+export const stageCompletionExample = {
+  success: true,
+  statusCode: HttpStatus.OK,
+  message: SYS_MSG.STAGE_COMPLETED_SUCCESSFULLY,
+  data: {
+    completedStage: {
+      stageId: '550e8400-e29b-41d4-a716-446655440011',
+      position: 1,
+      name: 'Get Noticed',
+      status: 'complete',
+      completedAt: '2026-05-26T10:00:00.000Z',
+    },
+    unlockedStage: {
+      stageId: '550e8400-e29b-41d4-a716-446655440012',
+      position: 2,
+      name: 'Spark Interest',
+      status: 'active',
+      unlockedAt: '2026-05-26T10:00:00.000Z',
+    },
+  },
+};
+
+export const stagePendingTasksExample = (path: string) => ({
+  success: false,
+  statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+  error: 'UnprocessableEntityException',
+  message: SYS_MSG.STAGE_HAS_PENDING_TASKS(2),
+  path,
+  timestamp: '2026-05-26T10:00:00.000Z',
+});
+
+export const lockedStageExample = (path: string) => ({
+  success: false,
+  statusCode: HttpStatus.FORBIDDEN,
+  error: 'ForbiddenException',
+  message: SYS_MSG.FUNNEL_STAGE_LOCKED_MESSAGE('Validation', 'Discovery'),
+  path,
+  timestamp: '2026-05-26T10:00:00.000Z',
 });

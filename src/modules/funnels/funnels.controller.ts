@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../constants/system.messages';
@@ -12,6 +12,7 @@ import {
   GetFunnelDecorators,
   GetStagesSummaryDecorators,
   GetStageDetailDecorators,
+  CompleteStageDecorators,
 } from './funnels.swagger';
 
 // Two services exist in the module: the read-only API service (top-level)
@@ -54,6 +55,19 @@ export class FunnelsController {
     @Param('stageId', ParseUUIDPipe) stageId: string,
   ) {
     return this.funnelsReadService.getStageDetail(userId, id, stageId);
+  }
+
+  @CompleteStageDecorators()
+  @Patch(':id/stages/:stageId/complete')
+  async completeStage(
+    @CurrentUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('stageId', ParseUUIDPipe) stageId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.funnelsGenService.completeStage(id, stageId, userId);
+    res.status(result.statusCode);
+    return result;
   }
 
   // Generation endpoints (idempotent create + status polling)
