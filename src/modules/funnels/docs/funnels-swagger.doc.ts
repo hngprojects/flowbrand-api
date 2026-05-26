@@ -148,7 +148,8 @@ export function FunnelControllerDecorators() {
 export function ListFunnelsDecorators() {
   return applyDecorators(
     ApiOperation({ summary: 'List funnels (paginated)' }),
-    ApiQuery({ name: 'page', required: false, schema: { default: 1, minimum: 1, type: 'integer' } }),
+    ApiQuery({ name: 'page', required: false, schema: 
+        { default: 1, minimum: 1, type: 'integer' } }),
     ApiQuery({ name: 'per_page', required: false, schema: { default: 20, maximum: 20, minimum: 1, type: 'integer' } }),
     ApiOkResponse({ description: 'Paginated funnel list', schema: { example: funnelListExample } }),
     ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token', schema: { example: unauthorizedExample } }),
