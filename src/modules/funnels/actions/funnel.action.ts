@@ -97,4 +97,20 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
       where: { id: funnelId, user_id: userId },
     });
   }
+
+  async findFunnelsByUserId(userId: string): Promise<Funnel[]> {
+    return this.repository
+      .createQueryBuilder('f')
+      .where('f.user_id = :userId', { userId })
+      .orderBy('f.created_at', 'DESC')
+      .getMany();
+  }
+
+  async findFunnelByIdAndUser(funnelId: string, userId: string): Promise<Funnel | null> {
+    return this.repository
+      .createQueryBuilder('f')
+      .where('f.id = :funnelId', { funnelId })
+      .andWhere('f.user_id = :userId', { userId })
+      .getOne();
+  }
 }

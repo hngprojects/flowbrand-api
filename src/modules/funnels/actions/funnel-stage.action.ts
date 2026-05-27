@@ -12,4 +12,12 @@ export class FunnelStageModelAction extends AbstractModelAction<FunnelStage> {
   ) {
     super(repository, FunnelStage);
   }
+
+  async findStagesByFunnelId(funnelId: string): Promise<FunnelStage[]> {
+    return this.repository
+      .createQueryBuilder('fs')
+      .where('fs.funnel_id = :funnelId', { funnelId })
+      .orderBy('fs.position', 'ASC')
+      .getMany();
+  }
 }

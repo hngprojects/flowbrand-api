@@ -4,22 +4,21 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
-import { QueryFailedError, Repository } from 'typeorm';
+import { QueryFailedError } from 'typeorm';
 import { UserModelAction } from './actions/user.action';
 import { CreateUserDto } from './dto/create-user.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { UserRole } from './enums/user-role.enum';
-import { WizardSession } from './../onboarding/entities/wizzard-session.entity';
-import { WizardStatus } from './../onboarding/enums/wizzard-status.enum';
-import { Funnel } from './../funnels/entities/funnel.entity';
-import { FunnelStatus } from './../funnels/enums/funnel-status.enum';
-import { FunnelStage } from './../funnels/entities/funnel-stage.entity';
-import { StageStatus } from './../funnels/enums/stage-status.enum';
-import { StageTask } from './../funnels/entities/stage-task.entity';
+import { WizardSessionModelAction } from '../onboarding/actions/wizard-session.action';
+import { FunnelModelAction } from '../funnels/actions/funnel.action';
+import { FunnelStageModelAction } from '../funnels/actions/funnel-stage.action';
+import { StageTaskModelAction } from '../funnels/actions/stage-task.action';
+import { WizardStatus } from '../onboarding/enums/wizzard-status.enum';
+import { FunnelStatus } from '../funnels/enums/funnel-status.enum';
+import { StageStatus } from '../funnels/enums/stage-status.enum';
 import { RedisService } from './../redis/redis.service';
 import {
   UserStateResponse,
@@ -37,17 +36,11 @@ const NO_TRANSACTION = {
 @Injectable()
 export class UsersService {
   constructor(
-    private readonly userModelAction: UserModelAction,
-    @InjectRepository(User)
-    private readonly userRepo: Repository<User>,
-    @InjectRepository(WizardSession)
-    private readonly wizardSessionRepo: Repository<WizardSession>,
-    @InjectRepository(Funnel)
-    private readonly funnelRepo: Repository<Funnel>,
-    @InjectRepository(FunnelStage)
-    private readonly stageRepo: Repository<FunnelStage>,
-    @InjectRepository(StageTask)
-    private readonly taskRepo: Repository<StageTask>,
+    private readonly userModelAction:UserModelAction,
+    private readonly wizardSessionModelAction: WizardSessionModelAction,
+    private readonly funnelModelAction: FunnelModelAction,
+    private readonly funnelStageModelAction: FunnelStageModelAction,
+    private readonly stageTaskModelAction: StageTaskModelAction,
     private readonly redisService: RedisService,
   ) {}
 
@@ -235,7 +228,7 @@ export class UsersService {
       }
     }
 
-    const user = await this.userRepo.findOne({ where: { id: userId } })
+    const user = await this.userModelAction.findById(userId)
     if (!user) {
       throw new NotFoundException(SYS_MSG.USER_NOT_FOUND_BY_TOKEN);
     }
@@ -260,14 +253,10 @@ export class UsersService {
   }
 
   private async getOnboardingState(userId: string): Promise<OnboardingState> {
-    const session = await this.wizardSessionRepo
-      .createQueryBuilder('ws')
-      .where('ws.user_id = :userId', { userId })
-      .orderBy('ws.created_at', 'DESC')
-      .getOne();
+    const session = await this.wizardSessionModelAction.findActiveSession(userId)
 
     if (!session) {
-      return { status: 'not_started' };
+      return { status: 'not_started' }
     }
 
     if (session.status === WizardStatus.COMPLETE) {
@@ -287,28 +276,16 @@ export class UsersService {
   }
 
   private async getActiveFunnelState(userId: string): Promise<ActiveFunnel | null> {
-    const funnels = await this.funnelRepo
-      .createQueryBuilder('f')
-      .where('f.user_id = :userId', { userId })
-      .andWhere('f.status != :failedStatus', { failedStatus: FunnelStatus.FAILED })
-      .orderBy('f.created_at', 'DESC')
-      .getMany();
+    const funnels = await this.funnelModelAction.findFunnelsByUserId(userId);
+    
+    const nonFailedFunnels = funnels.filter(f => f.status !== FunnelStatus.FAILED);
 
-    if (funnels.length === 0) {
+    if (nonFailedFunnels.length === 0) {
       return null;
     }
 
-    let activeFunnel: Funnel | null = null;
-    let generatingFunnel: Funnel | null = null;
-
-    for (const funnel of funnels) {
-      if (funnel.status === FunnelStatus.ACTIVE && !activeFunnel) {
-        activeFunnel = funnel;
-      }
-      if (funnel.status === FunnelStatus.GENERATING && !generatingFunnel) {
-        generatingFunnel = funnel;
-      }
-    }
+    const activeFunnel = nonFailedFunnels.find(f => f.status === FunnelStatus.ACTIVE);
+    const generatingFunnel = nonFailedFunnels.find(f => f.status === FunnelStatus.GENERATING);
 
     const selectedFunnel = activeFunnel ?? generatingFunnel;
     if (!selectedFunnel) {
@@ -325,18 +302,13 @@ export class UsersService {
       };
     }
 
-    const activeStage = await this.stageRepo
-      .createQueryBuilder('fs')
-      .where('fs.funnel_id = :funnelId', { funnelId: selectedFunnel.id })
-      .andWhere('fs.status = :activeStatus', { activeStatus: StageStatus.ACTIVE })
-      .getOne();
+    const stages = await this.funnelStageModelAction.findStagesByFunnelId(selectedFunnel.id);
+
+    const activeStage = stages.find(s => s.status === StageStatus.ACTIVE);
 
     let currentStage: CurrentStage | null = null;
     if (activeStage) {
-      const tasks = await this.taskRepo
-        .createQueryBuilder('st')
-        .where('st.stage_id = :stageId', { stageId: activeStage.id })
-        .getMany();
+      const tasks = await this.stageTaskModelAction.findTasksByStageId(activeStage.id);
 
       const tasksTotal = tasks.length;
       const tasksComplete = tasks.filter(task => task.is_complete).length;

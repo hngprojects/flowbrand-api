@@ -7,21 +7,14 @@ import { User } from './entities/user.entity';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { RedisService } from './../redis/redis.service';
-import { WizardSession } from './../onboarding/entities/wizzard-session.entity';
-import { Funnel } from './../funnels/entities/funnel.entity';
-import { FunnelStage } from './../funnels/entities/funnel-stage.entity';
-import { StageTask } from './../funnels/entities/stage-task.entity';
+import { OnboardingModule } from '../onboarding/onboarding.module';
+import { FunnelsModule } from '../funnels/funnels.module'
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      User, 
-      UserSession,
-      WizardSession,
-      Funnel,
-      FunnelStage,
-      StageTask,
-    ])
+    TypeOrmModule.forFeature([User, UserSession]),
+    OnboardingModule,
+    FunnelsModule
   ],
   controllers: [UsersController],
   providers: [UserModelAction, UserSessionModelAction, UsersService, RedisService,],
