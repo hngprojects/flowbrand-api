@@ -16,7 +16,7 @@ import { StageStatus } from './../enums/stage-status.enum';
 import { FunnelCreationPath } from './../enums/funnel-creation-path.enum';
 import { UploadDocumentStatus } from '../../upload/upload.types';
 import type { BusinessContext, GenerateFunnelJobPayload } from './../interfaces/generate-funnel-job.interface';
-import type { FunnelGenerationCreateResult, FunnelStatusResult, StageCompletionResult } from './../interfaces/funnels.interfaces';
+import type { FunnelGenerationCreateResult, FunnelStatusResult, StageCompletionResult, SubmitFeedbackResponse } from './../interfaces/funnels.interfaces';
 import { UploadedDocument } from '../../upload/entities/uploaded-document.entity';
 import { StageFeedbackModelAction } from '../actions/stage-feedback.action';
 import { SubmitStageFeedbackDto } from '../dto/submit-stage-feedback.dto';
@@ -422,7 +422,7 @@ export class FunnelsService {
     if (exceeded) throw new HttpException(SYS_MSG.GENERATION_RATE_LIMIT_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS);
   }
 
-  async submitFeedback(userId: string, funnelId: string, stageId: string, dto: SubmitStageFeedbackDto) {
+  async submitFeedback(userId: string, funnelId: string, stageId: string, dto: SubmitStageFeedbackDto): Promise<SubmitFeedbackResponse> {
     const funnel = await this.funnelAction.findOwnedById(funnelId, userId);
     if (!funnel) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
 

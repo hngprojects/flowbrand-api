@@ -1,7 +1,7 @@
 import { AbstractModelAction } from '@hng-sdk/orm';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, EntityManager } from 'typeorm';
+import { Repository } from 'typeorm';
 import { StageFeedback } from '../entities/stage-feedback.entity';
 
 @Injectable()
@@ -9,7 +9,6 @@ export class StageFeedbackModelAction extends AbstractModelAction<StageFeedback>
   constructor(
     @InjectRepository(StageFeedback)
     private readonly stageFeedbackRepository: Repository<StageFeedback>,
-    private readonly manager: EntityManager,
   ) {
     super(stageFeedbackRepository, StageFeedback);
   }
