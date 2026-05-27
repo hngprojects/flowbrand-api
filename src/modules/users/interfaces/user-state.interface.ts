@@ -33,9 +33,4 @@ export interface UserStateData {
   activeFunnel: ActiveFunnel | null;
 }
 
-export interface UserStateResponse {
-  success: boolean;
-  statusCode: number;
-  message: string;
-  data: UserStateData;
-}
+export type UserStateResponse = UserStateData;
