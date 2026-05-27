@@ -175,8 +175,8 @@ export class FunnelsService {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
 
-    await queryRunner.startTransaction();
     try {
+      await queryRunner.startTransaction();
       const funnel = await this.funnelAction.findOwnedById(funnelId, userId, queryRunner.manager);
       if (!funnel) {
         throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
