@@ -15,20 +15,180 @@ import {
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import * as SYS_MSG from '../../../constants/system.messages';
-import {
-  forbiddenStageLockedExample,
-  funnelFullExample,
-  funnelListExample,
-  funnelStageDetailExample,
-  funnelStagesSummaryExample,
-  lockedStageExample,
-  notFoundExample,
-  stageCompletionExample,
-  stagePendingTasksExample,
-  unauthorizedExample,
-} from '../funnels.swagger';
+
+// ============================================================================
+// Swagger Example Responses
+// ============================================================================
 
 const FUNNEL_ID_EXAMPLE = '550e8400-e29b-41d4-a716-446655440001';
+
+export const funnelListExample = {
+  success: true,
+  statusCode: HttpStatus.OK,
+  message: 'Operation successful',
+  data: {
+    funnels: [
+      {
+        funnelId: FUNNEL_ID_EXAMPLE,
+        businessName: 'Acme Studio',
+        creationPath: 'google-ads',
+        status: 'active',
+        createdAt: '2026-05-18T12:00:00.000Z',
+        stages: [{ position: 1, name: 'Discovery', status: 'complete' }],
+      },
+    ],
+    pagination: {
+      total: 1,
+      page: 1,
+      perPage: 20,
+      hasNext: false,
+    },
+  },
+};
+
+export const funnelFullExample = {
+  success: true,
+  statusCode: HttpStatus.OK,
+  message: 'Operation successful',
+  data: {
+    funnelId: FUNNEL_ID_EXAMPLE,
+    businessName: 'Acme Studio',
+    creationPath: 'google-ads',
+    status: 'active',
+    createdAt: '2026-05-18T12:00:00.000Z',
+    stages: [
+      {
+        stageId: '550e8400-e29b-41d4-a716-446655440010',
+        position: 1,
+        name: 'Discovery',
+        channel: 'email',
+        status: 'complete',
+        unlockedAt: '2026-05-17T12:00:00.000Z',
+        completedAt: '2026-05-17T13:00:00.000Z',
+        explanation: 'Understand the target audience.',
+        actionPrompt: 'Review the lead magnet.',
+        tasks: [{ id: 'task-1', position: 1, name: 'Define ICP', status: 'complete' }],
+        tasksTotal: 1,
+        tasksComplete: 1,
+      },
+    ],
+  },
+};
+
+export const funnelStagesSummaryExample = {
+  success: true,
+  statusCode: HttpStatus.OK,
+  message: 'Operation successful',
+  data: [
+    {
+      stageId: '550e8400-e29b-41d4-a716-446655440010',
+      position: 1,
+      name: 'Discovery',
+      channel: 'email',
+      status: 'complete',
+      unlockedAt: '2026-05-17T12:00:00.000Z',
+      completedAt: '2026-05-17T13:00:00.000Z',
+      tasksTotal: 1,
+      tasksComplete: 1,
+    },
+  ],
+};
+
+export const funnelStageDetailExample = {
+  success: true,
+  statusCode: HttpStatus.OK,
+  message: 'Operation successful',
+  data: {
+    stageId: '550e8400-e29b-41d4-a716-446655440010',
+    position: 2,
+    name: 'Validation',
+    channel: 'email',
+    status: 'active',
+    unlockedAt: '2026-05-18T12:00:00.000Z',
+    completedAt: null,
+    explanation: 'Validate demand before moving on.',
+    actionPrompt: 'Contact the first five leads.',
+    tasks: [{ id: 'task-2', position: 1, name: 'Send outreach', status: 'pending' }],
+    tasksTotal: 1,
+    tasksComplete: 0,
+  },
+};
+
+export const unauthorizedExample = {
+  success: false,
+  statusCode: HttpStatus.UNAUTHORIZED,
+  error: 'UnauthorizedException',
+  message: SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE,
+  path: '/api/funnels',
+  timestamp: '2026-05-18T12:00:00.000Z',
+};
+
+export const notFoundExample = (path: string) => ({
+  success: false,
+  statusCode: HttpStatus.NOT_FOUND,
+  error: 'NotFoundException',
+  message: path.includes('/stages/') ? SYS_MSG.FUNNEL_OR_STAGE_NOT_FOUND : SYS_MSG.FUNNEL_NOT_FOUND,
+  path,
+  timestamp: '2026-05-18T12:00:00.000Z',
+});
+
+export const forbiddenStageLockedExample = (path: string) => ({
+  success: false,
+  statusCode: HttpStatus.FORBIDDEN,
+  error: 'ForbiddenException',
+  message: SYS_MSG.FUNNEL_STAGE_LOCKED_MESSAGE('Validation', 'Discovery'),
+  path,
+  timestamp: '2026-05-18T12:00:00.000Z',
+});
+
+export const stageCompletionExample = {
+  success: true,
+  statusCode: HttpStatus.OK,
+  message: SYS_MSG.STAGE_COMPLETED_SUCCESSFULLY,
+  data: {
+    completedStage: {
+      stageId: '550e8400-e29b-41d4-a716-446655440011',
+      position: 1,
+      name: 'Get Noticed',
+      status: 'complete',
+      completedAt: '2026-05-26T10:00:00.000Z',
+    },
+    unlockedStage: {
+      stageId: '550e8400-e29b-41d4-a716-446655440012',
+      position: 2,
+      name: 'Spark Interest',
+      status: 'active',
+      unlockedAt: '2026-05-26T10:00:00.000Z',
+    },
+  },
+};
+
+export const stagePendingTasksExample = (path: string) => ({
+  success: false,
+  statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+  error: 'UnprocessableEntityException',
+  message: SYS_MSG.STAGE_HAS_PENDING_TASKS(2),
+  path,
+  timestamp: '2026-05-26T10:00:00.000Z',
+});
+
+export const lockedStageExample = (path: string) => ({
+  success: false,
+  statusCode: HttpStatus.FORBIDDEN,
+  error: 'ForbiddenException',
+  message: SYS_MSG.FUNNEL_STAGE_LOCKED_MESSAGE('Validation', 'Discovery'),
+  path,
+  timestamp: '2026-05-26T10:00:00.000Z',
+});
+
+
+// ============================================================================
+// Decorator Factories
+// ============================================================================
+
+export function FunnelControllerDecorators() {
+  return applyDecorators(ApiTags('funnels'), ApiBearerAuth('JWT'));
+}
 
 export const CreateFunnelDocs = () =>
   applyDecorators(
@@ -64,7 +224,7 @@ export const CreateFunnelDocs = () =>
         },
       },
     }),
-    ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' }),
+    ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.', schema: { example: unauthorizedExample } }),
     ApiConflictResponse({
       description: 'Another funnel is already generating for this user.',
       schema: {
@@ -139,7 +299,7 @@ export const GetFunnelStatusDocs = () =>
         },
       },
     }),
-    ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' }),
+    ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.', schema: { example: unauthorizedExample } }),
     ApiNotFoundResponse({
       description: 'Funnel not found, or it belongs to a different user.',
       schema: {
@@ -153,15 +313,10 @@ export const GetFunnelStatusDocs = () =>
     }),
   );
 
-export function FunnelControllerDecorators() {
-  return applyDecorators(ApiTags('funnels'), ApiBearerAuth('JWT'));
-}
-
 export function ListFunnelsDecorators() {
   return applyDecorators(
     ApiOperation({ summary: 'List funnels (paginated)' }),
-    ApiQuery({ name: 'page', required: false, schema: 
-        { default: 1, minimum: 1, type: 'integer' } }),
+    ApiQuery({ name: 'page', required: false, schema: { default: 1, minimum: 1, type: 'integer' } }),
     ApiQuery({ name: 'per_page', required: false, schema: { default: 20, maximum: 20, minimum: 1, type: 'integer' } }),
     ApiOkResponse({ description: 'Paginated funnel list', schema: { example: funnelListExample } }),
     ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token', schema: { example: unauthorizedExample } }),
