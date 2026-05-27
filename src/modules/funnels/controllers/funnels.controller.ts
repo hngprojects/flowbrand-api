@@ -21,30 +21,50 @@ export class FunnelsController {
 
   @ListFunnelsDecorators()
   @Get()
-  findAll(@CurrentUser('userId') userId: string, @Query('page') page?: number, @Query('per_page') perPage?: number) {
-    return this.funnelsService.listForUser(userId, Number(page), Number(perPage));
+  async findAll(@CurrentUser('userId') userId: string, @Query('page') page?: number, @Query('per_page') perPage?: number) {
+    const data = await this.funnelsService.listForUser(userId, Number(page), Number(perPage));
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.FUNNELS_RETRIEVED_SUCCESSFULLY,
+      data,
+    };
   }
 
   @GetFunnelDecorators()
   @Get(':id')
-  findOne(@CurrentUser('userId') userId: string, @Param('id', ParseUUIDPipe) id: string) {
-    return this.funnelsService.getFullFunnel(userId, id);
+  async findOne(@CurrentUser('userId') userId: string, @Param('id', ParseUUIDPipe) id: string) {
+    const data = await this.funnelsService.getFullFunnel(userId, id);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.FUNNEL_RETRIEVED_SUCCESSFULLY,
+      data,
+    };
   }
 
   @GetStagesSummaryDecorators()
   @Get(':id/stages')
-  getStages(@CurrentUser('userId') userId: string, @Param('id', ParseUUIDPipe) id: string) {
-    return this.funnelsService.getStagesSummary(userId, id);
+  async getStages(@CurrentUser('userId') userId: string, @Param('id', ParseUUIDPipe) id: string) {
+    const data = await this.funnelsService.getStagesSummary(userId, id);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.FUNNEL_STAGES_RETRIEVED_SUCCESSFULLY,
+      data,
+    };
   }
 
-  @GetStageDetailDecorators()
+   @GetStageDetailDecorators()
   @Get(':id/stages/:stageId')
-  getStage(
+  async getStage(
     @CurrentUser('userId') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Param('stageId', ParseUUIDPipe) stageId: string,
   ) {
-    return this.funnelsService.getStageDetail(userId, id, stageId);
+    const data = await this.funnelsService.getStageDetail(userId, id, stageId);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.FUNNEL_STAGE_RETRIEVED_SUCCESSFULLY,
+      data,
+    };
   }
 
   @CompleteStageDecorators()

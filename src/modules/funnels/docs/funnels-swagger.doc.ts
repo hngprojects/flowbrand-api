@@ -25,7 +25,7 @@ const FUNNEL_ID_EXAMPLE = '550e8400-e29b-41d4-a716-446655440001';
 export const funnelListExample = {
   success: true,
   statusCode: HttpStatus.OK,
-  message: 'Operation successful',
+  message: SYS_MSG.FUNNELS_RETRIEVED_SUCCESSFULLY,
   data: {
     funnels: [
       {
@@ -46,10 +46,11 @@ export const funnelListExample = {
   },
 };
 
+
 export const funnelFullExample = {
   success: true,
   statusCode: HttpStatus.OK,
-  message: 'Operation successful',
+  message: SYS_MSG.FUNNEL_RETRIEVED_SUCCESSFULLY,
   data: {
     funnelId: FUNNEL_ID_EXAMPLE,
     businessName: 'Acme Studio',
@@ -78,7 +79,7 @@ export const funnelFullExample = {
 export const funnelStagesSummaryExample = {
   success: true,
   statusCode: HttpStatus.OK,
-  message: 'Operation successful',
+  message: SYS_MSG.FUNNEL_STAGES_RETRIEVED_SUCCESSFULLY,
   data: [
     {
       stageId: '550e8400-e29b-41d4-a716-446655440010',
@@ -97,7 +98,7 @@ export const funnelStagesSummaryExample = {
 export const funnelStageDetailExample = {
   success: true,
   statusCode: HttpStatus.OK,
-  message: 'Operation successful',
+  message: SYS_MSG.FUNNEL_STAGE_RETRIEVED_SUCCESSFULLY,
   data: {
     stageId: '550e8400-e29b-41d4-a716-446655440010',
     position: 2,
