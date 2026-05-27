@@ -129,6 +129,7 @@ describe('FunnelsService', () => {
         { provide: RedisService, useValue: redisService },
         { provide: getQueueToken(QUEUES.FUNNEL_GENERATION), useValue: queue },
         { provide: DataSource, useValue: dataSource },
+        { provide: StageFeedbackModelAction, useValue: feedbackAction },
       ],
     }).compile();
 
@@ -447,6 +448,7 @@ describe('FunnelsService', () => {
   });
 
   describe('submitFeedback', () => {    
+
     it('returns 201 when valid feedback is submitted', async () => {
       funnelAction.findOwnedById.mockResolvedValue({ id: FUNNEL_ID } as Partial<Funnel> as Funnel);
       stageAction.get.mockResolvedValue({ id: 'stage-1', funnel_id: FUNNEL_ID, status: 'complete' } as Partial<FunnelStage> as FunnelStage);
