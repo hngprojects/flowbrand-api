@@ -268,6 +268,10 @@ export class UsersService {
       })
     }
 
+    if (dto.newPassword !== dto.confirmPassword) {
+      throw new UnprocessableEntityException(SYS_MSG.INCORRECT_CONFIRM_PASSWORD);
+    }
+
     const saveNewPassword = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
 
     const updated = await this.userModelAction.update({

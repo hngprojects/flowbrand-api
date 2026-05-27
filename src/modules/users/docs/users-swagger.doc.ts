@@ -118,8 +118,8 @@ export function UpdateProfileDocs() {
     }),
   );
 }
-export const ChangePasswordDocs = () =>
-  applyDecorators(
+export function ChangePasswordDocs() {
+  return applyDecorators(
     ApiBearerAuth('JWT'),
     ApiOperation({
       summary: 'Change user password',
@@ -189,3 +189,4 @@ export const ChangePasswordDocs = () =>
       },
     }),
   );
+}
