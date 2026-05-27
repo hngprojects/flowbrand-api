@@ -1,6 +1,7 @@
 import { InjectQueue } from '@nestjs/bull';
 import {
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -30,24 +31,11 @@ import type {
   BusinessContext,
   GenerateFunnelJobPayload,
 } from '../interfaces/generate-funnel-job.interface';
+import type { FunnelGenerationCreateResult, FunnelStatusResult, StageCompletionResult } from '../interfaces/funnels.interfaces';
 
 const STAGE_NAMES = ['Get Noticed', 'Spark Interest', 'Make First Sale', 'Bring Them Back'] as const;
 const QUEUE_DELAY_MS = 250;
 const DEFAULT_BUSINESS_NAME = 'My Business';
-
-export interface FunnelGenerationCreateResult {
-  statusCode: HttpStatus;
-  message: string;
-  funnelId: string;
-  status: FunnelStatus;
-}
-
-export interface FunnelStatusResult {
-  funnelId: string;
-  status: FunnelStatus;
-  redirect?: { to: string };
-  error?: { code: string; message: string; retry_endpoint: string };
-}
 
 @Injectable()
 export class FunnelsService {
@@ -179,6 +167,134 @@ export class FunnelsService {
     return base;
   }
 
+  async completeStage(
+    funnelId: string,
+    stageId: string,
+    userId: string,
+  ): Promise<{ statusCode: HttpStatus; message: string; data: StageCompletionResult }> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+
+    try {
+      await queryRunner.startTransaction();
+      const funnel = await this.funnelAction.findOwnedById(funnelId, userId, queryRunner.manager);
+      if (!funnel) {
+        throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
+      }
+
+      if (funnel.status !== FunnelStatus.ACTIVE) {
+        throw new UnprocessableEntityException(SYS_MSG.STAGE_COMPLETION_REQUIRES_ACTIVE_FUNNEL);
+      }
+
+      const currentStage = await this.funnelAction.findStageById(queryRunner.manager, stageId, funnelId);
+
+      if (!currentStage) {
+        throw new NotFoundException(SYS_MSG.FUNNEL_OR_STAGE_NOT_FOUND);
+      }
+
+      if (currentStage.status === StageStatus.COMPLETE) {
+        const unlockedStage = await this.funnelAction.findNextStage(
+          queryRunner.manager,
+          funnelId,
+          currentStage.position + 1,
+        );
+
+        await queryRunner.rollbackTransaction();
+
+        return {
+          statusCode: HttpStatus.OK,
+          message: SYS_MSG.STAGE_ALREADY_COMPLETE,
+          data: this.buildStageCompletionResult(currentStage, unlockedStage),
+        };
+      }
+
+      if (currentStage.status === StageStatus.LOCKED) {
+        const priorStage = await this.funnelAction.findNextStage(
+          queryRunner.manager,
+          funnelId,
+          currentStage.position - 1,
+        );
+        const priorName = priorStage?.name ?? 'previous';
+        throw new ForbiddenException(SYS_MSG.FUNNEL_STAGE_LOCKED_MESSAGE(currentStage.name, priorName));
+      }
+
+      const taskCounts = await this.funnelAction.countTasksForStage(queryRunner.manager, stageId);
+
+      const totalTasks = Number(taskCounts.total ?? 0);
+      const pendingTasks = Number(taskCounts.pending ?? 0);
+
+      if (totalTasks === 0) {
+        throw new UnprocessableEntityException(SYS_MSG.STAGE_HAS_NO_TASKS);
+      }
+
+      if (pendingTasks > 0) {
+        throw new UnprocessableEntityException(SYS_MSG.STAGE_HAS_PENDING_TASKS(pendingTasks));
+      }
+
+      const completedAt = new Date();
+      const affected = await this.funnelAction.updateStageStatusIfActive(
+        queryRunner.manager,
+        stageId,
+        funnelId,
+        { status: StageStatus.COMPLETE, completed_at: completedAt },
+      );
+
+      if (affected === 0) {
+        const latestStage = await this.funnelAction.findStageById(queryRunner.manager, stageId, funnelId);
+        const unlockedStage = await this.funnelAction.findNextStage(queryRunner.manager, funnelId, currentStage.position + 1);
+
+        await queryRunner.rollbackTransaction();
+
+        if (latestStage?.status === StageStatus.COMPLETE) {
+          return {
+            statusCode: HttpStatus.OK,
+            message: SYS_MSG.STAGE_ALREADY_COMPLETE,
+            data: this.buildStageCompletionResult(latestStage, unlockedStage),
+          };
+        }
+
+        throw new ConflictException(SYS_MSG.STAGE_COMPLETION_CONCURRENT_UPDATE);
+      }
+
+      const nextStage = await this.funnelAction.findNextStage(queryRunner.manager, funnelId, currentStage.position + 1);
+
+      if (nextStage) {
+        await this.funnelAction.activateStageIfLocked(
+          queryRunner.manager,
+          nextStage.id,
+          funnelId,
+          completedAt,
+        );
+      }
+
+      await queryRunner.commitTransaction();
+
+      const unlockedStage = nextStage
+        ? await this.funnelAction.findStageById(queryRunner.manager, nextStage.id, funnelId)
+        : null;
+
+      return {
+        statusCode: HttpStatus.OK,
+        message: SYS_MSG.STAGE_COMPLETED_SUCCESSFULLY,
+        data: this.buildStageCompletionResult(
+          {
+            ...currentStage,
+            status: StageStatus.COMPLETE,
+            completed_at: completedAt,
+          },
+          unlockedStage,
+        ),
+      };
+    } catch (error) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
   // Validates the requested source and pulls together the BusinessContext.
   private async validateSourceAndDeriveContext(
     userId: string,
@@ -252,6 +368,27 @@ export class FunnelsService {
     const first = docs[0]?.file_name;
     if (!first) return '';
     return first.replace(/\.[a-zA-Z0-9]+$/, '').slice(0, 100).trim();
+  }
+
+  private buildStageCompletionResult(currentStage: FunnelStage, unlockedStage: FunnelStage | null): StageCompletionResult {
+    return {
+      completedStage: {
+        stageId: currentStage.id,
+        position: currentStage.position,
+        name: currentStage.name,
+        status: StageStatus.COMPLETE,
+        completedAt: (currentStage.completed_at ?? new Date()).toISOString(),
+      },
+      unlockedStage: unlockedStage
+        ? {
+            stageId: unlockedStage.id,
+            position: unlockedStage.position,
+            name: unlockedStage.name,
+            status: unlockedStage.status,
+            unlockedAt: (unlockedStage.unlocked_at ?? new Date()).toISOString(),
+          }
+        : null,
+    };
   }
 
   private async checkRateLimit(userId: string): Promise<void> {
