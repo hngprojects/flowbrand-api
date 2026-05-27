@@ -188,6 +188,7 @@ export const GENERATION_FAILED = 'Funnel generation failed. Please retry from th
 // Profile
 export const PROFILE_RETRIEVED_SUCCESSFULLY = 'Profile retrieved successfully';
 export const PROFILE_UPDATED_SUCCESSFULLY = 'Profile updated successfully';
+export const PROFILE_NOT_FOUND = 'Profile not found';
 export const PROFILE_EMAIL_CHANGE_FORBIDDEN =
   'Email cannot be changed here. Please contact support.';
 export const PROFILE_UPDATE_FAILED = 'Failed to update profile';

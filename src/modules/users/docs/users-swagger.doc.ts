@@ -2,6 +2,7 @@ import { applyDecorators, HttpStatus } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiUnauthorizedResponse,
@@ -28,8 +29,15 @@ const unauthorizedExample = {
   message: SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE,
 };
 
-export const GetProfileDocs = () =>
-  applyDecorators(
+const notFoundExample = {
+  success: false,
+  statusCode: HttpStatus.NOT_FOUND,
+  error: 'NotFoundException',
+  message: SYS_MSG.PROFILE_NOT_FOUND,
+};
+
+export function GetProfileDocs() {
+  return applyDecorators(
     ApiBearerAuth('JWT'),
     ApiOperation({
       summary: 'Get the authenticated user\'s profile',
@@ -49,21 +57,26 @@ export const GetProfileDocs = () =>
         },
       },
     }),
+    ApiNotFoundResponse({
+      description: 'Profile not found',
+      schema: { example: notFoundExample },
+    }),
     ApiUnauthorizedResponse({
       description: 'Missing or invalid JWT / soft-deleted user',
       schema: { example: unauthorizedExample },
     }),
   );
+}
 
-export const UpdateProfileDocs = () =>
-  applyDecorators(
+export function UpdateProfileDocs() {
+  return applyDecorators(
     ApiBearerAuth('JWT'),
     ApiOperation({
       summary: 'Update the authenticated user\'s profile',
       description:
         'Accepts a partial body. Only `fullName` and `country` may be changed. ' +
         '`fullName` is trimmed before validation — a whitespace-only string returns HTTP 422. ' +
-        '`country` must be one of the allowed West African countries (canonical casing). ' +
+        '`country` must be one of the allowed SSA countries (canonical casing). ' +
         'Sending `email` in the body returns HTTP 422. ' +
         'An empty body or unchanged values return HTTP 200 without a DB write.',
     }),
@@ -92,8 +105,13 @@ export const UpdateProfileDocs = () =>
         },
       },
     }),
+    ApiNotFoundResponse({
+      description: 'Profile not found',
+      schema: { example: notFoundExample },
+    }),
     ApiUnauthorizedResponse({
       description: 'Missing or invalid JWT / soft-deleted user',
       schema: { example: unauthorizedExample },
     }),
   );
+}
