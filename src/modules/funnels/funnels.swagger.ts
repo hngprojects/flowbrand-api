@@ -204,3 +204,43 @@ export const forbiddenStageLockedExample = (path: string) => ({
   path,
   timestamp: '2026-05-18T12:00:00.000Z',
 });
+
+export const stageCompletionExample = {
+  success: true,
+  statusCode: HttpStatus.OK,
+  message: SYS_MSG.STAGE_COMPLETED_SUCCESSFULLY,
+  data: {
+    completedStage: {
+      stageId: '550e8400-e29b-41d4-a716-446655440011',
+      position: 1,
+      name: 'Get Noticed',
+      status: 'complete',
+      completedAt: '2026-05-26T10:00:00.000Z',
+    },
+    unlockedStage: {
+      stageId: '550e8400-e29b-41d4-a716-446655440012',
+      position: 2,
+      name: 'Spark Interest',
+      status: 'active',
+      unlockedAt: '2026-05-26T10:00:00.000Z',
+    },
+  },
+};
+
+export const stagePendingTasksExample = (path: string) => ({
+  success: false,
+  statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+  error: 'UnprocessableEntityException',
+  message: SYS_MSG.STAGE_HAS_PENDING_TASKS(2),
+  path,
+  timestamp: '2026-05-26T10:00:00.000Z',
+});
+
+export const lockedStageExample = (path: string) => ({
+  success: false,
+  statusCode: HttpStatus.FORBIDDEN,
+  error: 'ForbiddenException',
+  message: SYS_MSG.FUNNEL_STAGE_LOCKED_MESSAGE('Validation', 'Discovery'),
+  path,
+  timestamp: '2026-05-26T10:00:00.000Z',
+});

@@ -1,18 +1,18 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../constants/system.messages';
-import { CreateFunnelDocs, GetFunnelStatusDocs } from './docs/funnels-swagger.doc';
 import { CreateFunnelDto, FunnelIdParamDto } from './dto/create-funnel.dto';
-
-// Swagger decorator factories
 import {
+  CompleteStageDecorators,
+  CreateFunnelDocs,
   FunnelControllerDecorators,
-  ListFunnelsDecorators,
   GetFunnelDecorators,
-  GetStagesSummaryDecorators,
+  GetFunnelStatusDocs,
   GetStageDetailDecorators,
-} from './funnels.swagger';
+  GetStagesSummaryDecorators,
+  ListFunnelsDecorators,
+} from './docs/funnels-swagger.doc';
 
 // Two services exist in the module: the read-only API service (top-level)
 // and the generation service under `services/`. Import both and alias
@@ -54,6 +54,19 @@ export class FunnelsController {
     @Param('stageId', ParseUUIDPipe) stageId: string,
   ) {
     return this.funnelsReadService.getStageDetail(userId, id, stageId);
+  }
+
+  @CompleteStageDecorators()
+  @Patch(':funnelId/stages/:stageId/complete')
+  async completeStage(
+    @CurrentUser('userId') userId: string,
+    @Param('funnelId', ParseUUIDPipe) funnelId: string,
+    @Param('stageId', ParseUUIDPipe) stageId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.funnelsGenService.completeStage(funnelId, stageId, userId);
+    res.status(result.statusCode);
+    return result;
   }
 
   // Generation endpoints (idempotent create + status polling)
