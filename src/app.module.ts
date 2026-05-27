@@ -1,4 +1,5 @@
 import { BadRequestException, Module, ValidationPipe } from '@nestjs/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -45,6 +46,13 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
 @Module({
   imports: [
     LoggerModule,
+    EventEmitterModule.forRoot({
+      wildcard: true,
+      delimiter: '.',
+      global: true,
+      maxListeners: 20,
+      ignoreErrors: false,
+    }),
     ConfigModule.forRoot({
       isGlobal: true,
       load: [appConfig, databaseConfig, jwtConfig, redisConfig, llmConfig],
