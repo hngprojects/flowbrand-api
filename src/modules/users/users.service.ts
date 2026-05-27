@@ -204,9 +204,4 @@ export class UsersService {
   async getUserState(userId: string): Promise<UserStateResponse> {
     return this.userStateService.getUserState(userId);
   }
-
-  async invalidateUserStateCache(userId: string): Promise<void> {
-    const cacheKey = `user-state:${userId}`;
-    await this.redisService.del(cacheKey);
-  }
 }

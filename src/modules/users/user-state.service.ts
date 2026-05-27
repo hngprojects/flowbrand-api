@@ -84,6 +84,11 @@ export class UserStateService {
     return { status: 'not_started' };
   }
 
+  async invalidateUserStateCache(userId: string): Promise<void> {
+    const cacheKey = `user-state:${userId}`;
+    await this.redisService.del(cacheKey);
+  }
+
   private async getActiveFunnelState(userId: string): Promise<ActiveFunnel | null> {
     const funnels = await this.funnelModelAction.findFunnelsByUserId(userId);
     
