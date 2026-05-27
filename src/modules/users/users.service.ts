@@ -5,7 +5,6 @@ import {
   NotFoundException,
   Logger,
   UnprocessableEntityException,
-  BadRequestException,
   UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
@@ -20,8 +19,10 @@ import * as SYS_MSG from '../../constants/system.messages';
 import { UserSessionModelAction } from './actions/user-session.action';
 import { RedisService } from '../redis/redis.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
-import { AuthMetadataModelAction } from '../auth/actions/auth-metadata.action';
-import { ChangePasswordResponse } from './interfaces/change_password.interface';
+import { AuthMetaModelAction } from '../auth/actions/auth-metadata.action';
+import { IUserProfile } from './interfaces/user-profile.interface';
+import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
+import { ALLOWED_SSA_COUNTRIES } from './enums/allowed-ssa-countries.enum';
 
 const BCRYPT_ROUNDS = 10;
 const NO_TRANSACTION = {
@@ -34,7 +35,7 @@ export class UsersService {
   constructor(
     private readonly userModelAction: UserModelAction,
     private readonly userSessionModelAction: UserSessionModelAction,
-    private readonly authMetaModelDataAction: AuthMetadataModelAction,
+    private readonly authMetaModelAction: AuthMetaModelAction,
     private readonly redisService: RedisService,
   ) {}
 
@@ -239,7 +240,8 @@ export class UsersService {
     });    
   }
 
-  async changePassword(userId: string, dto: ChangePasswordDto): Promise<ChangePasswordResponse> {
+  /** Verifies the current password, updates the hash, and revokes all active sessions. */
+  async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
     const user = await this.findById(userId);
 
     if (!user.password_hash) {
@@ -251,7 +253,6 @@ export class UsersService {
     }
     const oldPassword = dto.oldPassword;
     const newPassword = dto.newPassword;
-    const confirmPassword = dto.confirmPassword
 
     const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password_hash);
 
@@ -267,12 +268,6 @@ export class UsersService {
       })
     }
 
-    if(confirmPassword !== newPassword) {
-      throw new BadRequestException({
-        message: SYS_MSG.INCORRECT_CONFIRM_PASSWORD
-      })
-    }
-
     const saveNewPassword = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
 
     const updated = await this.userModelAction.update({
@@ -285,14 +280,14 @@ export class UsersService {
       throw new InternalServerErrorException(SYS_MSG.USER_UPDATE_FAILED);
     }
 
-    const existingMeta = await this.authMetaModelDataAction.findByUserId(userId);
+    const existingMeta = await this.authMetaModelAction.findByUserId(userId);
     if (!existingMeta) {
-      await this.authMetaModelDataAction.createForUser({
+      await this.authMetaModelAction.createForUser({
         user_id: userId,
         password_changed_at: new Date(),
       });
     } else {
-      await this.authMetaModelDataAction.updateByUserId(userId, {
+      await this.authMetaModelAction.updateByUserId(userId, {
         password_changed_at: new Date(),
       });
     }
@@ -303,9 +298,75 @@ export class UsersService {
       message: SYS_MSG.PASSWORD_CHANGE_SUCCESSFUL,
       userId
     })
+  }
 
+   private toProfileResponse(user: User): IUserProfile {
     return {
-      message: SYS_MSG.PASSWORD_CHANGE_SUCCESSFUL,
+      id: user.id,
+      fullName: user.full_name,
+      email: user.email,
+      country: user.country,
+      avatarUrl: user.avatar_url,
+      authProvider: user.auth_provider,
+      isVerified: user.is_verified,
+      createdAt: user.created_at,
+      updatedAt: user.updated_at,
+    };
+  }
+
+  async getProfile(userId: string): Promise<IUserProfile> {
+    const user = await this.findById(userId);
+    return this.toProfileResponse(user);
+  }
+
+  async updateProfile(
+    userId: string,
+    dto: UpdateUserProfileDto & { email?: unknown },
+  ): Promise<IUserProfile> {
+    if ('email' in dto && dto.email !== undefined) {
+      throw new UnprocessableEntityException(SYS_MSG.PROFILE_EMAIL_CHANGE_FORBIDDEN);
     }
+
+    const user = await this.findById(userId);
+
+    let normalisedCountry: string | undefined;
+    if (dto.country !== undefined) {
+      normalisedCountry = ALLOWED_SSA_COUNTRIES.find(
+        (c) => c.toLowerCase() === dto.country!.toLowerCase(),
+      );
+      // If IsIn() passed in the DTO, a match is guaranteed — this is a safety net
+      if (!normalisedCountry) {
+        throw new UnprocessableEntityException(SYS_MSG.VALIDATION_FAILED);
+      }
+    }
+
+    const changedFields: Array<'full_name' | 'country'> = [];
+    const updatePayload: Partial<User> = {};
+
+    if (dto.fullName !== undefined && dto.fullName !== user.full_name) {
+      updatePayload.full_name = dto.fullName;
+      changedFields.push('full_name');
+    }
+
+    if (normalisedCountry !== undefined && normalisedCountry !== user.country) {
+      updatePayload.country = normalisedCountry;
+      changedFields.push('country');
+    }
+
+    if (changedFields.length === 0) {
+      return this.toProfileResponse(user);
+    }
+
+    const updated = await this.userModelAction.update({
+      ...NO_TRANSACTION,
+      identifierOptions: { id: userId},
+      updatePayload,
+    })
+
+    if (!updated) {
+      throw new InternalServerErrorException(SYS_MSG.PROFILE_UPDATE_FAILED);
+    }
+
+    return this.toProfileResponse(updated);
   }
 }
