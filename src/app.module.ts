@@ -46,16 +46,16 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
 @Module({
   imports: [
     LoggerModule,
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [appConfig, databaseConfig, jwtConfig, redisConfig, llmConfig],
+    }),
     EventEmitterModule.forRoot({
       wildcard: true,
       delimiter: '.',
       global: true,
       maxListeners: 20,
       ignoreErrors: false,
-    }),
-    ConfigModule.forRoot({
-      isGlobal: true,
-      load: [appConfig, databaseConfig, jwtConfig, redisConfig, llmConfig],
     }),
     TypeOrmModule.forRootAsync({
       useFactory: () => databaseConfig(),

@@ -280,6 +280,7 @@ export class FunnelGenerationProcessor {
         updatePayload: { status: FunnelStatus.FAILED },
         transactionOptions: { useTransaction: false },
       });
+      // Emit after funnelAction.update — no-transaction write is committed at this point.
       this.eventEmitter.emit(
         APP_EVENTS.FUNNEL_FAILED,
         new FunnelFailedEvent(job.data.userId, job.data.funnelId),

@@ -4,6 +4,5 @@ export class FeedbackSubmittedEvent {
     public readonly funnelId: string,
     public readonly stageId: string,
     public readonly feedbackId: string,
-    public readonly rating: number,
   ) {}
 }

@@ -10,24 +10,24 @@
  */
 export const APP_EVENTS = {
   // Funnel lifecycle
-  FUNNEL_GENERATED:   'funnel.generated',
-  FUNNEL_FAILED:      'funnel.failed',
+  FUNNEL_GENERATED: 'funnel.generated',
+  FUNNEL_FAILED: 'funnel.failed',
 
   // Stage progression
-  STAGE_UNLOCKED:     'stage.unlocked',
-  STAGE_COMPLETED:    'stage.completed',
+  STAGE_UNLOCKED: 'stage.unlocked',
+  STAGE_COMPLETED: 'stage.completed',
 
   // Task interactions
-  TASK_COMPLETED:     'task.completed',
-  TASK_REOPENED:      'task.reopened',
+  TASK_COMPLETED: 'task.completed',
+  TASK_REOPENED: 'task.reopened',
 
   // Feedback
   FEEDBACK_SUBMITTED: 'feedback.submitted',
 
   // User account
-  PROFILE_UPDATED:    'user.profile_updated',
-  PASSWORD_CHANGED:   'user.password_changed',
-  ACCOUNT_DELETED:    'user.account_deleted',
+  PROFILE_UPDATED: 'user.profile_updated',
+  PASSWORD_CHANGED: 'user.password_changed',
+  ACCOUNT_DELETED: 'user.account_deleted',
 } as const;
 
 export type AppEvent = (typeof APP_EVENTS)[keyof typeof APP_EVENTS];

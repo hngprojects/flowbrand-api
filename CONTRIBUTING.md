@@ -299,7 +299,7 @@ this.eventEmitter.emit(APP_EVENTS.STAGE_COMPLETED, new StageCompletedEvent(...))
 
 #### Rule 2 — Listeners must wrap all logic in try/catch and never rethrow
 
-`EventEmitter2` is synchronous. An uncaught exception in a listener propagates directly to the service that called `emit()` and can kill a user-facing request. Activity logging, notifications, and ana
+`EventEmitter2` is synchronous. An uncaught exception in a listener propagates directly to the service that called `emit()` and can kill a user-facing request. Activity logging, notifications, and analytics are not the critical path — they must not kill a user-facing request.
 
 ```ts
 @OnEvent(APP_EVENTS.STAGE_COMPLETED)
@@ -315,7 +315,7 @@ async handleStageCompleted(event: StageCompletedEvent): Promise<void> {
 
 #### Rule 3 — No PII in event payloads
 
-Event payloads can end up in activity logs and notification metadata. Do not include `email`, `password_hash`, `token_hash`, `refresh_token`, or `provider_user_id` in any event class. A `userId` UUID 
+Event payloads can end up in activity logs and notification metadata. Do not include `email`, `password_hash`, `token_hash`, `refresh_token`, or `provider_user_id` in any event class. A `userId` UUID is safe to include.
 
 ### 8. Testing Proof Is Required in Every PR
 
