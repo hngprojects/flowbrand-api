@@ -13,6 +13,7 @@ const SERVICE_MOCK = {
   createGeneration: jest.fn(),
   getStatus: jest.fn(),
   completeStage: jest.fn(),
+  submitFeedback: jest.fn(),
 };
 
 
@@ -80,5 +81,35 @@ describe('FunnelsController - stage completion route', () => {
 
     expect(SERVICE_MOCK.completeStage).toHaveBeenCalledWith('funnel-1', 'stage-1', 'user-1');
     expect(result).toEqual(expect.objectContaining({ statusCode: HttpStatus.OK }));
+  });
+});
+
+describe('FunnelsController - submit feedback route', () => {
+  let controller: FunnelsController;
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [FunnelsController],
+      providers: [
+        { provide: FunnelsService, useValue: SERVICE_MOCK },
+      ],
+    }).compile();
+
+    controller = module.get(FunnelsController);
+  });
+
+  it('passes payload to service and returns 201', async () => {
+    SERVICE_MOCK.submitFeedback.mockResolvedValue({
+      statusCode: HttpStatus.CREATED,
+      message: 'Feedback submitted successfully',
+      data: { feedbackId: 'fb-1', stageId: 'stage-1', comment: 'Great', submittedAt: '2026-05-26T10:00:00Z' },
+    });
+
+    const result = await controller.submitFeedback('user-1', 'funnel-1', 'stage-1', { comment: 'Great' });
+
+    expect(SERVICE_MOCK.submitFeedback).toHaveBeenCalledWith('user-1', 'funnel-1', 'stage-1', { comment: 'Great' });
+    expect(result.statusCode).toBe(HttpStatus.CREATED);
   });
 });
