@@ -1,5 +1,4 @@
 import {
-  HttpStatus,
   ConflictException,
   Injectable,
   InternalServerErrorException,
@@ -246,13 +245,8 @@ export class UsersService {
     const activeFunnel = await this.getActiveFunnelState(userId);
     
     const response: UserStateResponse = {
-      success: true,
-      statusCode: HttpStatus.OK,
-      message: SYS_MSG.USER_STATE_RETRIEVED,
-      data: {
         onboarding,
         activeFunnel,
-      },
     };
 
     await this.redisService.set(cacheKey, JSON.stringify(response), 20);
