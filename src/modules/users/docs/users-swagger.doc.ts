@@ -169,7 +169,7 @@ export function GetUserStateDocs() {
         example: {
           success: false,
           statusCode: HttpStatus.UNAUTHORIZED,
-          message: SYS_MSG.USER_UNAUTHORIZED,
+          message: SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE,
         },
       },
     }),

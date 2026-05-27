@@ -225,17 +225,22 @@ export class UsersService {
    * BE-013: Get complete dashboard state for authenticated user
    */
   async getUserState(userId: string): Promise<UserStateResponse> {
+    const cacheKey = `user-state:${userId}`;
+
+    const cached = await this.redisService.get(cacheKey);
+    if (cached) {
+      try {
+        return JSON.parse(cached) as UserStateResponse;
+      } catch {
+        await this.redisService.del(cacheKey);
+      }
+    }
+
     const user = await this.userRepo.findOne({ where: { id: userId } })
     if (!user) {
       throw new NotFoundException(SYS_MSG.USER_NOT_FOUND_BY_TOKEN);
     }
 
-    const cacheKey = `user-state:${userId}`;
-
-    const cached = await this.redisService.get(cacheKey);
-    if (cached) {
-      return JSON.parse(cached) as UserStateResponse;
-    }
 
     const onboarding = await this.getOnboardingState(userId);
     const activeFunnel = await this.getActiveFunnelState(userId);
