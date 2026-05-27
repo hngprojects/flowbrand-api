@@ -285,9 +285,18 @@ export class UsersService {
       throw new InternalServerErrorException(SYS_MSG.USER_UPDATE_FAILED);
     }
 
-    await this.authMetaModelDataAction.updateByUserId(userId, {
-      password_changed_at: new Date(),
-    })
+    const existingMeta = await this.authMetaModelDataAction.findByUserId(userId);
+    if (!existingMeta) {
+      await this.authMetaModelDataAction.createForUser({
+        user_id: userId,
+        password_changed_at: new Date(),
+      });
+    } else {
+      await this.authMetaModelDataAction.updateByUserId(userId, {
+        password_changed_at: new Date(),
+      });
+    }
+    
     await this.revokeAllUserSessions(userId);
 
     this.logger.log({
