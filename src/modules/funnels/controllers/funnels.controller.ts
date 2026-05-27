@@ -1,8 +1,8 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import * as SYS_MSG from '../../constants/system.messages';
-import { CreateFunnelDto, FunnelIdParamDto } from './dto/create-funnel.dto';
-import { FunnelsService } from './services/funnels.service';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import * as SYS_MSG from '../../../constants/system.messages';
+import { CreateFunnelDto, FunnelIdParamDto } from '../dto/create-funnel.dto';
+import { FunnelsService } from '../services/funnels.service';
 import {
   CompleteStageDecorators,
   CreateFunnelDocs,
@@ -12,7 +12,7 @@ import {
   GetStageDetailDecorators,
   GetStagesSummaryDecorators,
   ListFunnelsDecorators,
-} from './docs/funnels-swagger.doc';
+} from '../docs/funnels-swagger.doc';
 
 @FunnelControllerDecorators()
 @Controller('funnels')
