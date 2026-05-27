@@ -7,13 +7,13 @@ import { User } from './entities/user.entity';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { RedisModule } from '../redis/redis.module';
-import { AuthMetadataModelAction } from '../auth/actions/auth-metadata.action';
+import { AuthMetaModelAction } from '../auth/actions/auth-metadata.action';
 import { AuthMetadata } from '../auth/entities/auth-metadata.entity';
 
 @Module({
   imports: [TypeOrmModule.forFeature([User, UserSession, AuthMetadata]), RedisModule],
   controllers: [UsersController],
-  providers: [UserModelAction, UserSessionModelAction, UsersService, AuthMetadataModelAction],
+  providers: [UserModelAction, UserSessionModelAction, UsersService, AuthMetaModelAction],
   exports: [UsersService, UserModelAction, UserSessionModelAction],
 })
 export class UsersModule {}
