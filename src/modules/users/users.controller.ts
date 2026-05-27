@@ -44,6 +44,13 @@ export class UsersController {
     return this.usersService.findById(id);
   }
 
+  @Patch('/me/password')
+  @ChangePasswordDocs()
+  @HttpCode(HttpStatus.OK)
+  async changePassword(@CurrentUser('sub') userId: string, @Body() dto: ChangePasswordDto) {
+    return await this.usersService.changePassword(userId, dto);
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Update a user' })
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateUserDto) {
@@ -55,12 +62,5 @@ export class UsersController {
   @ApiOperation({ summary: 'Delete a user' })
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.remove(id);
-  }
-
-  @Patch('/me/password')
-  @ChangePasswordDocs()
-  @HttpCode(HttpStatus.OK)
-  async changePassword(@CurrentUser('sub') userId: string, @Body() dto: ChangePasswordDto) {
-    return await this.usersService.changePassword(userId, dto);
   }
 }

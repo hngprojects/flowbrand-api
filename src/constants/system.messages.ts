@@ -136,7 +136,7 @@ export const INCORRECT_OLD_PASSWORD = 'The old password you entered is incorrect
 export const PASSWORD_CHANGE_NOT_SUPPORTED = 'Password change is not supported for accounts registered via Google OAuth';
 export const PASSWORD_CHANGE_NOT_SUCCESSFUL = 'New password cannot be the same as the old password';
 export const INCORRECT_CONFIRM_PASSWORD = 'The value of the confirm password does not match the new password';
-
+export const PASSWORD_CHANGE_UNAVAILABLE = 'Password change is not available for this account';
 
 // Waitlist
 export const WAITLIST_JOINED_SUCCESSFULLY = 'Successfully joined the waitlist';
