@@ -20,6 +20,7 @@ import type { FunnelGenerationCreateResult, FunnelStatusResult, StageCompletionR
 import { UploadedDocument } from '../../upload/entities/uploaded-document.entity';
 import { StageFeedbackModelAction } from '../actions/stage-feedback.action';
 import { SubmitStageFeedbackDto } from '../dto/submit-stage-feedback.dto';
+import { StageFeedback } from '../entities/stage-feedback.entity';
 
 const STAGE_NAMES = ['Get Noticed', 'Spark Interest', 'Make First Sale', 'Bring Them Back'] as const;
 const QUEUE_DELAY_MS = 250;
@@ -438,9 +439,19 @@ export class FunnelsService {
       throw new ConflictException(SYS_MSG.FEEDBACK_ALREADY_SUBMITTED);
     }
 
-    // Comment is sanitized and verified by DTO transform
-    const feedback = await this.feedbackAction.createFeedback(userId, funnelId, stageId, dto.comment);
-
+    let feedback: StageFeedback;
+    try {
+      // Comment is sanitized and verified by DTO transform
+      feedback = await this.feedbackAction.createFeedback(userId, funnelId, stageId, dto.comment);
+    } catch(error: unknown) {
+      // Postgres Error 23505 = unique_violation (Race condition catch)
+      const dbError = error as { code?: string };
+      if (dbError?.code === '23505') {
+        throw new ConflictException(SYS_MSG.FEEDBACK_ALREADY_SUBMITTED);
+      }
+      throw error;
+    }
+   
     return {
       statusCode: HttpStatus.CREATED,
       message: SYS_MSG.FEEDBACK_SUBMITTED,
