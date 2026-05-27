@@ -171,7 +171,7 @@ export const AI_PROVIDER_TIMEOUT = (provider: string, timeoutMs: number) =>
 
 export const AI_PROVIDER_HTTP_ERROR = (provider: string, status: number) => `${provider} HTTP ${status}`;
 
-// Funnel generation (BE-305)
+// Funnel messages
 export const FUNNEL_GENERATION_STARTED = 'Funnel generation started.';
 export const FUNNEL_ALREADY_EXISTS = 'Funnel already exists.';
 export const GENERATION_IN_PROGRESS = 'A funnel is already being generated for your account.';
@@ -184,6 +184,9 @@ export const GENERATION_RATE_LIMIT_EXCEEDED =
 export const UPLOAD_NOT_READY = 'One or more uploaded documents are not yet ready for funnel generation.';
 export const UPLOAD_OWNERSHIP_INVALID = 'One or more uploaded documents do not belong to you.';
 export const GENERATION_FAILED = 'Funnel generation failed. Please retry from the dashboard.';
+export const FEEDBACK_SUBMITTED = 'Feedback submitted successfully';
+export const FEEDBACK_ALREADY_SUBMITTED = 'Feedback already submitted for this stage';
+export const FEEDBACK_STAGE_NOT_COMPLETE = 'Feedback can only be submitted for completed stages';
 
 // Profile
 export const PROFILE_RETRIEVED_SUCCESSFULLY = 'Profile retrieved successfully';
@@ -192,6 +195,3 @@ export const PROFILE_NOT_FOUND = 'Profile not found';
 export const PROFILE_EMAIL_CHANGE_FORBIDDEN =
   'Email cannot be changed here. Please contact support.';
 export const PROFILE_UPDATE_FAILED = 'Failed to update profile';
-export const FEEDBACK_SUBMITTED = 'Feedback submitted successfully';
-export const FEEDBACK_ALREADY_SUBMITTED = 'Feedback already submitted for this stage';
-export const FEEDBACK_STAGE_NOT_COMPLETE = 'Feedback can only be submitted for completed stages';
