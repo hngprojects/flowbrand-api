@@ -34,7 +34,7 @@ export class UsersService {
   constructor(
     private readonly userModelAction: UserModelAction,
     private readonly userSessionModelAction: UserSessionModelAction,
-    private readonly authMetaModelData: AuthMetadataModelAction,
+    private readonly authMetaModelDataAction: AuthMetadataModelAction,
     private readonly redisService: RedisService,
   ) {}
 
@@ -218,42 +218,42 @@ export class UsersService {
       return;
     }
 
-    for (const session of sessions) {
-      if (!session.is_revoked) {
+    const activeSessions = sessions.filter(s => !s.is_revoked);
+    await Promise.all(
+      activeSessions.map(async (session) => {
         await this.userSessionModelAction.updateById(session.id, {
           is_revoked: true,
           revoked_at: new Date(),
         });
-
         await Promise.all([
           this.redisService.del(`active_session:${userId}:${session.id}`),
           this.redisService.del(`sess:${userId}:${session.id}`),
         ]);
-      }
-    }
+      }),
+    );
 
-    const revokedCount = sessions.filter(s => !s.is_revoked).length;
     this.logger.debug({
-      message: `Revoked ${revokedCount} sessions for user`,
+      message: `Revoked ${activeSessions.length} sessions for user`,
       userId,
-      sessionCount: revokedCount,
+      sessionCount: activeSessions.length,
     });    
   }
 
   async changePassword(userId: string, dto: ChangePasswordDto): Promise<ChangePasswordResponse> {
     const user = await this.findById(userId);
 
-    if (user.auth_provider === 'google' && user.password_hash === null) {
+    if (!user.password_hash) {
       throw new UnprocessableEntityException({
-        message: SYS_MSG.PASSWORD_CHANGE_NOT_SUPPORTED
+        message: user.auth_provider === 'google' 
+          ? SYS_MSG.PASSWORD_CHANGE_NOT_SUPPORTED
+          : SYS_MSG.PASSWORD_CHANGE_UNAVAILABLE
       })
     }
-
     const oldPassword = dto.oldPassword;
     const newPassword = dto.newPassword;
     const confirmPassword = dto.confirmPassword
 
-    const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password_hash!);
+    const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password_hash);
 
     if(!isOldPasswordValid) {
       throw new UnauthorizedException({
@@ -285,7 +285,7 @@ export class UsersService {
       throw new InternalServerErrorException(SYS_MSG.USER_UPDATE_FAILED);
     }
 
-    await this.authMetaModelData.updateByUserId(userId, {
+    await this.authMetaModelDataAction.updateByUserId(userId, {
       password_changed_at: new Date(),
     })
     await this.revokeAllUserSessions(userId);
