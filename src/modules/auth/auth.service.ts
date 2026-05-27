@@ -13,7 +13,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import * as crypto from 'crypto';
 import { UserSessionModelAction } from '../users/actions/user-session.action';
-import { AuthMetadataModelAction } from './actions/auth-metadata.action';
+import { AuthMetaModelAction } from './actions/auth-metadata.action';
 import { OtpTokenModelAction } from './actions/otp-token.action';
 import * as bcrypt from 'bcrypt';
 import type { StringValue } from 'ms';
@@ -56,7 +56,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
     private readonly userSessionModelAction: UserSessionModelAction,
-    private readonly authMetadataModelAction: AuthMetadataModelAction,
+    private readonly authMetadataModelAction: AuthMetaModelAction,
     private readonly otpTokenModelAction: OtpTokenModelAction,
     private readonly emailService: EmailService,
     @Optional() private readonly logger = new Logger(AuthService.name),

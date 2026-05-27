@@ -146,6 +146,7 @@ export const PASSWORD_CHANGE_NOT_SUPPORTED = 'Password change is not supported f
 export const PASSWORD_CHANGE_NOT_SUCCESSFUL = 'New password cannot be the same as the old password';
 export const INCORRECT_CONFIRM_PASSWORD = 'The value of the confirm password does not match the new password';
 export const PASSWORD_CHANGE_UNAVAILABLE = 'Password change is not available for this account';
+export const PASSWORD_TOO_WEAK = 'Yout new password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
 
 // Waitlist
 export const WAITLIST_JOINED_SUCCESSFULLY = 'Successfully joined the waitlist';
