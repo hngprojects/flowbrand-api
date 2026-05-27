@@ -271,6 +271,7 @@ describe('UsersService', () => {
 
       await service.changePassword(USER_ID, changePasswordDto);
 
+      expect(mockRedisService.del).toHaveBeenCalledTimes(2);
       expect(mockRedisService.del).toHaveBeenCalledWith(`active_session:${USER_ID}:session-1`);
       expect(mockRedisService.del).toHaveBeenCalledWith(`sess:${USER_ID}:session-1`);
     });
@@ -334,6 +335,7 @@ describe('UsersService', () => {
       const logSpy = jest.spyOn(service['logger'], 'log');
       await service.changePassword(USER_ID, changePasswordDto);
 
+      expect(logSpy).toHaveBeenCalled();
       const logPayload = JSON.stringify(logSpy.mock.calls[0]);
       expect(logPayload).not.toContain(mockUser.password_hash);
       expect(logPayload).not.toContain(changePasswordDto.oldPassword);
@@ -380,6 +382,30 @@ describe('UsersService', () => {
       await service.changePassword(USER_ID, changePasswordDto);
 
       expect(mockUserSessionModelAction.updateById).not.toHaveBeenCalled();
+      expect(mockRedisService.del).not.toHaveBeenCalled();
+    });
+
+    it('AC-28: processes only non-revoked sessions when mix of revoked and active sessions exist', async () => {
+      mockUserSessionModelAction.findByUserId.mockResolvedValue([
+        { id: 'session-1', is_revoked: true },
+        { id: 'session-2', is_revoked: false },
+        { id: 'session-3', is_revoked: false },
+      ]);
+
+      await service.changePassword(USER_ID, changePasswordDto);
+
+      expect(mockUserSessionModelAction.updateById).toHaveBeenCalledTimes(2);
+      expect(mockUserSessionModelAction.updateById).toHaveBeenCalledWith('session-2', {
+        is_revoked: true,
+        revoked_at: expect.any(Date),
+      });
+      expect(mockUserSessionModelAction.updateById).toHaveBeenCalledWith('session-3', {
+        is_revoked: true,
+        revoked_at: expect.any(Date),
+      });
+      
+      expect(mockRedisService.del).toHaveBeenCalledTimes(4); 
+      expect(mockRedisService.del).not.toHaveBeenCalledWith(expect.stringContaining('session-1'));
     });
   });
 });
