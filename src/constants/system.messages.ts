@@ -184,3 +184,6 @@ export const GENERATION_RATE_LIMIT_EXCEEDED =
 export const UPLOAD_NOT_READY = 'One or more uploaded documents are not yet ready for funnel generation.';
 export const UPLOAD_OWNERSHIP_INVALID = 'One or more uploaded documents do not belong to you.';
 export const GENERATION_FAILED = 'Funnel generation failed. Please retry from the dashboard.';
+export const FEEDBACK_SUBMITTED = 'Feedback submitted successfully';
+export const FEEDBACK_ALREADY_SUBMITTED = 'Feedback already submitted for this stage';
+export const FEEDBACK_STAGE_NOT_COMPLETE = 'Feedback can only be submitted for completed stages';

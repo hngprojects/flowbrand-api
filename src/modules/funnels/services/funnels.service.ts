@@ -18,6 +18,8 @@ import { UploadDocumentStatus } from '../../upload/upload.types';
 import type { BusinessContext, GenerateFunnelJobPayload } from './../interfaces/generate-funnel-job.interface';
 import type { FunnelGenerationCreateResult, FunnelStatusResult, StageCompletionResult } from './../interfaces/funnels.interfaces';
 import { UploadedDocument } from '../../upload/entities/uploaded-document.entity';
+import { StageFeedbackModelAction } from '../actions/stage-feedback.action';
+import { SubmitStageFeedbackDto } from '../dto/submit-stage-feedback.dto';
 
 const STAGE_NAMES = ['Get Noticed', 'Spark Interest', 'Make First Sale', 'Bring Them Back'] as const;
 const QUEUE_DELAY_MS = 250;
@@ -34,6 +36,7 @@ export class FunnelsService {
     private readonly redisService: RedisService,
     @InjectQueue(QUEUES.FUNNEL_GENERATION) private readonly queue: Queue<GenerateFunnelJobPayload>,
     private readonly dataSource: DataSource,
+    private readonly feedbackAction: StageFeedbackModelAction,
   ) {}
 
   normalizePagination(page?: number, perPage?: number) {
@@ -417,5 +420,36 @@ export class FunnelsService {
     const key = `ratelimit:funnel-generate:${userId}`;
     const { exceeded } = await this.redisService.rateLimit(key, 5, 3600);
     if (exceeded) throw new HttpException(SYS_MSG.GENERATION_RATE_LIMIT_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS);
+  }
+
+  async submitFeedback(userId: string, funnelId: string, stageId: string, dto: SubmitStageFeedbackDto) {
+    const funnel = await this.funnelAction.findOwnedById(funnelId, userId);
+    if (!funnel) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
+
+    const stage = await this.stageAction.get({ identifierOptions: { id: stageId, funnel_id: funnelId } });
+    if (!stage) throw new NotFoundException(SYS_MSG.FUNNEL_STAGE_NOT_FOUND);
+
+    if (stage.status !== StageStatus.COMPLETE) {
+      throw new UnprocessableEntityException(SYS_MSG.FEEDBACK_STAGE_NOT_COMPLETE);
+    }
+
+    const existingFeedback = await this.feedbackAction.findExistingFeedback(userId, stageId);
+    if (existingFeedback) {
+      throw new ConflictException(SYS_MSG.FEEDBACK_ALREADY_SUBMITTED);
+    }
+
+    // Comment is sanitized and verified by DTO transform
+    const feedback = await this.feedbackAction.createFeedback(userId, funnelId, stageId, dto.comment);
+
+    return {
+      statusCode: HttpStatus.CREATED,
+      message: SYS_MSG.FEEDBACK_SUBMITTED,
+      data: {
+        feedbackId: feedback.id,
+        stageId: feedback.stage_id,
+        comment: feedback.comment,
+        submittedAt: (feedback.created_at ?? new Date()).toISOString(),
+      },
+    };
   }
 }
