@@ -255,6 +255,7 @@ describe('UsersService', () => {
         USER_ID,
         { password_changed_at: expect.any(Date) },
       );
+      expect(mockAuthMetaModelAction.findByUserId).toHaveBeenCalledWith(USER_ID);
     });
 
     it('AC-17: revokes all user sessions after successful password change', async () => {
@@ -306,15 +307,14 @@ describe('UsersService', () => {
       expect(error.message).toBe(SYS_MSG.PASSWORD_CHANGE_NOT_SUCCESSFUL);
     });
 
-    it('AC-21: confirm password mismatch is intentionally not validated at service level — enforced by DTO ValidationPipe', async () => {
-      await expect(
-        service.changePassword(USER_ID, {
-          ...changePasswordDto,
-          confirmPassword: 'Mismatch123!',
-        }),
-      ).resolves.toBeUndefined();
-
-      expect(mockUserModelAction.update).toHaveBeenCalled();
+    it('AC-21: throws UnprocessableEntityException when confirm password does not match new password — defense-in-depth', async () => {
+      const error = await service.changePassword(USER_ID, {
+        ...changePasswordDto,
+        confirmPassword: 'Mismatch123!',
+      }).catch(e => e);
+      
+      expect(error).toBeInstanceOf(UnprocessableEntityException);
+      expect(mockUserModelAction.update).not.toHaveBeenCalled();
     });
 
     it('AC-22: throws UnprocessableEntityException for Google OAuth account with no password hash', async () => {
@@ -420,6 +420,18 @@ describe('UsersService', () => {
       
       expect(mockRedisService.del).toHaveBeenCalledTimes(4); 
       expect(mockRedisService.del).not.toHaveBeenCalledWith(expect.stringContaining('session-1'));
+    });
+
+    it('AC-29: creates auth_metadata when it does not exist', async () => {
+      mockAuthMetaModelAction.findByUserId.mockResolvedValue(null);
+      mockAuthMetaModelAction.createForUser.mockResolvedValue({ user_id: USER_ID });
+
+      await service.changePassword(USER_ID, changePasswordDto);
+
+      expect(mockAuthMetaModelAction.createForUser).toHaveBeenCalledWith({
+        user_id: USER_ID,
+        password_changed_at: expect.any(Date) ,
+      });
     });
   });
 
