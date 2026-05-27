@@ -4,19 +4,13 @@ import {
   ApiOperation, 
   ApiUnauthorizedResponse, 
   ApiNotFoundResponse,
-  ApiOkResponse, 
-  ApiHeader
+  ApiOkResponse
 } from '@nestjs/swagger';
 import * as SYS_MSG from '../../../constants/system.messages';
 
 export function GetUserStateDocs() {
   return applyDecorators(
     ApiBearerAuth('JWT'),
-    ApiHeader({
-      name: 'Authorization',
-      description: 'Bearer token (e.g., "Bearer eyJhbGciOiJIUzI1NiIs...")',
-      required: true,
-    }),
     ApiOperation({
       summary: 'Get dashboard state for authenticated user',
       description:
