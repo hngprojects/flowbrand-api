@@ -58,7 +58,7 @@ export class UsersController {
 
   @Get('me/state')
   @GetUserStateDocs()
-  async getUserState(@CurrentUser('sub') userId: string) {
+  async getUserState(@CurrentUser('userId') userId: string) {
     return this.usersService.getUserState(userId)
   }
 }
