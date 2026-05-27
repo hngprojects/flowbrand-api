@@ -85,12 +85,6 @@ export class FunnelGenerationProcessor {
       await job.progress(100);
 
       this.logger.log({ message: 'Funnel generation complete', funnelId, jobId: job.id });
-
-      // Emit after writeFunnelData returns — transaction is committed at this point.
-      this.eventEmitter.emit(
-        APP_EVENTS.FUNNEL_GENERATED,
-        new FunnelGeneratedEvent(userId, funnelId, funnel.business_name),
-      );
     } catch (err) {
       const maxAttempts = job.opts.attempts ?? 3;
       const isLastAttempt = job.attemptsMade + 1 >= maxAttempts;
@@ -103,6 +97,13 @@ export class FunnelGenerationProcessor {
       }
       throw err;
     }
+
+    // Emit outside try/catch — listener failures cannot reach the catch block and
+    // cannot mark a successfully generated funnel as FAILED.
+    this.eventEmitter.emit(
+      APP_EVENTS.FUNNEL_GENERATED,
+      new FunnelGeneratedEvent(userId, funnelId, funnel.business_name),
+    );
   }
 
   private async tryAiGeneration(ctx: BusinessContext): Promise<LlmStageData[] | null> {

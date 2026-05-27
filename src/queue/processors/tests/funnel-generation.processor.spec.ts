@@ -336,7 +336,7 @@ describe('FunnelGenerationProcessor', () => {
       );
     });
 
-    it('AC-04: emitted payload is a FunnelGeneratedEvent instance', async () => {
+    it('AC-05: emitted payload is a FunnelGeneratedEvent instance with correct fields', async () => {
       mockLlmService.generateWithGemini.mockResolvedValue(makeValidStageData());
 
       await processor.handleGenerateFunnel(makeJob());

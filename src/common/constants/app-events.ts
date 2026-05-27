@@ -5,8 +5,9 @@
  * Naming convention: '<aggregate>.<past-tense-verb>'
  * The wildcard delimiter is '.', so 'stage.*' matches all stage events.
  *
- * RULE: emit AFTER queryRunner.commitTransaction() — never inside a transaction.
- * If the transaction rolls back, the event must not have fired.
+ * RULE: emit AFTER the database write completes — after commitTransaction() for
+ * transactional writes, or after the save/update call for non-transactional ones.
+ * Never emit inside a transaction: if it rolls back, the event must not have fired.
  */
 export const APP_EVENTS = {
   // Funnel lifecycle

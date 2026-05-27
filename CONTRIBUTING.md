@@ -8,7 +8,7 @@ Your participation helps keep the platform smarter, more reliable, and more impa
 
 ### 1. Clone the repository
 
-This project uses a shared-repo workflow. If you have write access to `hngprojects/flowbrand-api`, clone the repo directly and branch off `dev`. External contributors without write access can fork ins
+This project uses a shared-repo workflow. If you have write access to `hngprojects/flowbrand-api`, clone the repo directly and branch off `dev`. External contributors without write access can fork instead and open a cross-fork PR.
 
 ```sh
 git clone https://github.com/hngprojects/flowbrand-api.git
@@ -209,7 +209,7 @@ All controllers go through `TransformInterceptor`, which produces the consistent
 { "success": true, "statusCode": 200, "message": "...", "data": <payload> }
 ```
 
-**Never call `res.json()` directly** unless the endpoint performs a `res.redirect()`. Never include `success: true` in what you return — the interceptor adds it, and if you include it manually it lead
+**Never call `res.json()` directly** unless the endpoint performs a `res.redirect()`. Never include `success: true` in what you return — the interceptor adds it, and if you include it manually it leads to `body.data.success` nesting.
 
 #### Shape A — Structured with data ✅ (most endpoints)
 
@@ -252,9 +252,9 @@ return { paginationMeta: { ... }, payload: [...] };
 #### Rules and gotchas
 
 - **Shape A/B requires BOTH `statusCode` AND `message`.** Without `message`, the interceptor treats the whole object as Shape C data, causing `body.data.statusCode` instead of `body.statusCode`.
-- **Use `@Res({ passthrough: true })`** only when you must call `res.cookie()`, `res.clearCookie()`, or `res.status()` (dynamic status). Then `return` the structured object and the interceptor still f
+- **Use `@Res({ passthrough: true })`** only when you must call `res.cookie()`, `res.clearCookie()`, or `res.status()` (dynamic status). Then `return` the structured object and the interceptor still fires normally.
 - **Keep plain `@Res()`** (without passthrough) only for `res.redirect()` endpoints — these bypass the interceptor entirely.
-- **Keep `@HttpCode()` in sync** with the `statusCode` field you return. The JSON `statusCode` comes from your return value; the HTTP status header comes from `@HttpCode()` or `res.status()`. They mus
+- **Keep `@HttpCode()` in sync** with the `statusCode` field you return. The JSON `statusCode` comes from your return value; the HTTP status header comes from `@HttpCode()` or `res.status()`. They must match. Use `@Res({ passthrough: true })` + `res.status()` when the status is dynamic (e.g. 200 vs 201 vs 202 depending on a service result).
 
 **Dynamic-status pattern example** — when the service decides the status code (202 for a new job, 200 for an idempotent repeat):
 
