@@ -8,7 +8,8 @@ import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { RedisService } from './../redis/redis.service';
 import { OnboardingModule } from '../onboarding/onboarding.module';
-import { FunnelsModule } from '../funnels/funnels.module'
+import { FunnelsModule } from '../funnels/funnels.module';
+import { UserStateService } from './user-state.service';
 
 @Module({
   imports: [
@@ -17,7 +18,13 @@ import { FunnelsModule } from '../funnels/funnels.module'
     FunnelsModule
   ],
   controllers: [UsersController],
-  providers: [UserModelAction, UserSessionModelAction, UsersService, RedisService,],
+  providers: [
+    UserModelAction, 
+    UserSessionModelAction, 
+    UsersService, 
+    UserStateService, 
+    RedisService,
+  ],
   exports: [UsersService, UserModelAction, UserSessionModelAction],
 })
 export class UsersModule {}
