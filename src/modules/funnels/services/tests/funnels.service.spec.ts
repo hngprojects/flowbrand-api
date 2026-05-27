@@ -23,6 +23,7 @@ import { FunnelStage } from '../.././entities/funnel-stage.entity';
 import { FunnelCreationPath } from '../.././enums/funnel-creation-path.enum';
 import { FunnelStatus } from '../.././enums/funnel-status.enum';
 import { FunnelsService } from '.././funnels.service';
+import { Logger } from '@nestjs/common';
 
 const USER_ID = '00000000-0000-4000-8000-0000000000a1';
 const OTHER_USER_ID = '00000000-0000-4000-8000-0000000000b2';
@@ -48,6 +49,12 @@ const COMPLETE_WIZARD: Partial<WizardSession> = {
 };
 
 describe('FunnelsService', () => {
+  beforeAll(() => {
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+  });
+  afterAll(() => {
+    jest.restoreAllMocks();
+  });
   let service: FunnelsService;
   let funnelAction: jest.Mocked<FunnelModelAction>;
   let stageAction: jest.Mocked<FunnelStageModelAction>;

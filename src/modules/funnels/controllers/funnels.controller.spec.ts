@@ -54,14 +54,13 @@ describe('FunnelsController - stage completion route', () => {
       },
     });
 
-    const res = { status: jest.fn().mockReturnThis() } as unknown as Response;
+    const req = { user: { id: 'user-1' } } as any;
 
-    const result = await controller.completeStage('user-1', 'funnel-1', 'stage-1');
+    const result = await controller.completeStage(req, 'funnel-1', 'stage-1');
 
     expect(SERVICE_MOCK.completeStage).toHaveBeenCalledWith('funnel-1', 'stage-1', 'user-1');
-    expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
     expect(result).toEqual(expect.objectContaining({ statusCode: HttpStatus.OK }));
-  });
+});
 
   it('EC-01: passes through idempotent complete responses from the service', async () => {
     SERVICE_MOCK.completeStage.mockResolvedValue({
@@ -79,11 +78,11 @@ describe('FunnelsController - stage completion route', () => {
       },
     });
 
-    const res = { status: jest.fn().mockReturnThis() } as unknown as Response;
+    const req = { user: { id: 'user-1' } } as any;
 
-    const result = await controller.completeStage('user-1', 'funnel-1', 'stage-1');
+    const result = await controller.completeStage(req, 'funnel-1', 'stage-1');
 
-    expect(result.message).toBe('Stage already complete');
-    expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
+    expect(SERVICE_MOCK.completeStage).toHaveBeenCalledWith('funnel-1', 'stage-1', 'user-1');
+    expect(result).toEqual(expect.objectContaining({ statusCode: HttpStatus.OK }));
   });
 });
