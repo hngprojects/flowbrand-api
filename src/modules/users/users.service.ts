@@ -322,7 +322,7 @@ export class UsersService {
 
       await queryRunner.commitTransaction();
 
-      this.logger.log(userId, 'account_deleted');
+      this.logger.log('account.deleted', { userId });
 
       await this.accountDeletionQueue.add(
         'hard-delete',
@@ -339,7 +339,7 @@ export class UsersService {
         userId,
         error: errorMessage
       });
-      
+
       throw new InternalServerErrorException(SYS_MSG.ACCOUNT_DELETION_FAILED);
     } finally {
       await queryRunner.release();

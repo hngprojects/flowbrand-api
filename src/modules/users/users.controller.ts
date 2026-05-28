@@ -68,6 +68,21 @@ export class UsersController {
     };
   }
 
+  @Delete('me')
+  @DeleteAccountDocs()
+  async deleteAccount(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: DeleteAccountDto,
+  ) {
+    return this.usersService.deleteAccount(userId, dto.confirmation);
+  }
+
+  @Get('me/state')
+  @GetUserStateDocs()
+  async getUserState(@CurrentUser('userId') userId: string) {
+    return this.usersService.getUserState(userId)
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a user by id' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
@@ -85,20 +100,5 @@ export class UsersController {
   @ApiOperation({ summary: 'Delete a user' })
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.remove(id);
-  }
-
-  @Get('me/state')
-  @GetUserStateDocs()
-  async getUserState(@CurrentUser('userId') userId: string) {
-    return this.usersService.getUserState(userId)
-  }
-
-  @Delete('me')
-  @DeleteAccountDocs()
-  async deleteAccount(
-    @CurrentUser('userId') userId: string,
-    @Body() dto: DeleteAccountDto,
-  ) {
-    return this.usersService.deleteAccount(userId, dto.confirmation);
   }
 }
