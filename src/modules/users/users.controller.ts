@@ -16,11 +16,11 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
-import { CurrentUser } from '../../common/decorators/current-user.decorator'; 
-import { GetUserStateDocs } from './docs/users-swagger.doc';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
-import { GetProfileDocs, UpdateProfileDocs } from './docs/users-swagger.doc';
+import { GetProfileDocs, UpdateProfileDocs, GetUserStateDocs, DeleteAccountDocs } from './docs/users-swagger.doc';
+import { DeleteAccountDto } from './dto/delete-account.dto';
 import * as SYS_MSG from '../../constants/system.messages';
 
 @ApiTags('users')
@@ -91,5 +91,14 @@ export class UsersController {
   @GetUserStateDocs()
   async getUserState(@CurrentUser('userId') userId: string) {
     return this.usersService.getUserState(userId)
+  }
+
+  @Delete('me')
+  @DeleteAccountDocs()
+  async deleteAccount(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: DeleteAccountDto,
+  ) {
+    return this.usersService.deleteAccount(userId, dto.confirmation);
   }
 }
