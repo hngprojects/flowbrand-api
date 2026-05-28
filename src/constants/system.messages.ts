@@ -160,6 +160,15 @@ export const CONTACT_MESSAGE_SENT_SUCCESSFULLY = 'Message sent successfully';
 export const CONTACT_CREATED = 'Contact message submitted successfully';
 export const CONTACT_SPAM_DETECTED = 'Submission contains prohibited content';
 
+// Notifications
+export const NOTIFICATIONS_RETRIEVED_SUCCESSFULLY = 'Notifications retrieved successfully';
+export const NOTIFICATION_UNREAD_COUNT_RETRIEVED = 'Notification unread count retrieved successfully';
+export const NOTIFICATION_MARKED_AS_READ = 'Notification marked as read';
+export const NOTIFICATIONS_MARKED_AS_READ = 'Notifications marked as read';
+export const NOTIFICATIONS_MARKED_AS_UNREAD = 'Notifications marked as unread';
+export const NOTIFICATION_DELETED = 'Notification deleted.';
+export const NOTIFICATION_NOT_FOUND = 'Notification not found';
+
 // Spam Detection
 export const SPAM_PROHIBITED_CONTENT = 'Submission contains prohibited content';
 export const SPAM_TOO_MANY_LINKS = 'Message contains too many links. Please limit to 2 URLs.';
