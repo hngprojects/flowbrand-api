@@ -63,7 +63,9 @@ const mockUser = (): Partial<User> => ({
 });
 
 const mockFullUser = {
-  ...mockUser,
+  id: USER_ID,
+  email: USER_EMAIL,
+  full_name: 'Test User',
   country: 'Nigeria',
   avatar_url: null,
   auth_provider: 'local',
