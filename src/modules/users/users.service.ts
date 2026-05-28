@@ -7,6 +7,10 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { QueryFailedError } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { APP_EVENTS } from '../../common/constants/app-events';
+import { ProfileUpdatedEvent } from '../../common/events/profile-updated.event';
+import { AccountDeletedEvent } from '../../common/events/account-deleted.event';
 import { UserModelAction } from './actions/user.action';
 import { CreateUserDto } from './dto/create-user.dto';
 import { PaginationDto } from './dto/pagination.dto';
@@ -30,6 +34,7 @@ export class UsersService {
   constructor(
     private readonly userModelAction:UserModelAction,
     private readonly userStateService: UserStateService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
@@ -199,6 +204,7 @@ export class UsersService {
       ...NO_TRANSACTION,
       identifierOptions: { id },
     });
+    this.eventEmitter.emit(APP_EVENTS.ACCOUNT_DELETED, new AccountDeletedEvent(id));
   }
 
   async getUserState(userId: string): Promise<UserStateResponse> {
@@ -271,6 +277,8 @@ export class UsersService {
     if (!updated) {
       throw new InternalServerErrorException(SYS_MSG.PROFILE_UPDATE_FAILED);
     }
+
+    this.eventEmitter.emit(APP_EVENTS.PROFILE_UPDATED, new ProfileUpdatedEvent(userId, changedFields));
 
     return this.toProfileResponse(updated);
   }
