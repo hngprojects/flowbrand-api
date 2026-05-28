@@ -59,7 +59,7 @@ export class AccountDeletionProcessor {
 
       this.logger.info('account.hard_delete.completed', { userId, email });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
+      const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error('account.hard_delete.failed', { 
         userId, 
         email, 

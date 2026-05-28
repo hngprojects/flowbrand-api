@@ -286,8 +286,10 @@ export function DeleteAccountDocs() {
         example: {
           success: true,
           statusCode: HttpStatus.OK,
-          message: SYS_MSG.ACCOUNT_DELETED_SUCCESSFULLY,
-          data: null,
+          message: 'Operation successful',
+          data: {
+            message: SYS_MSG.ACCOUNT_DELETED_SUCCESSFULLY,
+          },
         },
       },
     }),

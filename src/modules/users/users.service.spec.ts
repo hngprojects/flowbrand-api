@@ -596,25 +596,8 @@ describe('UsersService - deleteAccount', () => {
   describe('AC-11: Google OAuth account deletion', () => {
   it('should nullify provider_user_id for Google OAuth accounts', async () => {
     mockUserModelAction.findById.mockResolvedValue(mockGoogleUser);
-    
-    // Spy on commitTransaction to see if it's called
-    const commitSpy = jest.spyOn(mockQueryRunner, 'commitTransaction');
-    
-    // Also spy on rollback to see if it's called instead
-    const rollbackSpy = jest.spyOn(mockQueryRunner, 'rollbackTransaction');
 
     await service.deleteAccount(USER_ID, 'DELETE');
-
-    // Check what was called
-    console.log('Commit called:', commitSpy.mock.calls.length);
-    console.log('Rollback called:', rollbackSpy.mock.calls.length);
-    
-    // Log all update calls
-    console.log('Update calls:', mockQueryRunner.manager.update.mock.calls.map(call => ({
-      entity: call[0].name,
-      id: call[1],
-      data: call[2]
-    })));
 
     expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
   });
@@ -632,7 +615,7 @@ describe('UsersService - deleteAccount', () => {
 
   describe('EC-01: re-registration during retention window', () => {
     it('should throw ConflictException when user exists with deleted_at not null', async () => {
-      const deletedUser = { ...mockLocalUser, deleted_at: new Date() };
+      const deletedUser = { ...mockLocalUser, is_active: false, deleted_at: new Date() };
       mockUserModelAction.findByEmail.mockResolvedValue(deletedUser);
 
       const createDto = {
@@ -642,7 +625,9 @@ describe('UsersService - deleteAccount', () => {
         termsAccepted: true,
       };
 
-      await expect(service.create(createDto)).rejects.toThrow(ConflictException);
+      await expect(service.create(createDto)).rejects.toThrow(
+        SYS_MSG.ACCOUNT_EXISTS_WITH_RETENTION
+      );
       expect(mockUserModelAction.create).not.toHaveBeenCalled();
     });
   });

@@ -294,7 +294,7 @@ export class UsersService {
 
     const user = await this.userModelAction.findById(userId);
     if (!user) {
-      throw new NotFoundException(SYS_MSG.USER_NOT_FOUND);
+      throw new NotFoundException(SYS_MSG.USER_NOT_FOUND(userId));
     }
 
     if (user.deleted_at !== null) {
@@ -302,10 +302,11 @@ export class UsersService {
     }
 
     const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
+    let committed = false
     try {
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+
       const now = new Date();
       const thirtyDaysLater = 30 * 24 * 60 * 60 * 1000;
 
@@ -321,6 +322,7 @@ export class UsersService {
       }
 
       await queryRunner.commitTransaction();
+      committed = true;
 
       this.logger.log('account.deleted', { userId });
 
@@ -330,15 +332,23 @@ export class UsersService {
         { delay: thirtyDaysLater },
       );
 
-      return { message: SYS_MSG.ACCOUNT_DELETED_SUCCESSFULLY };
+      return { message: SYS_MSG.ACCOUNT_DELETED_SUCCESSFULLY, };
     } catch (error) {
-      await queryRunner.rollbackTransaction();
-
+      if (!committed) {
+        await queryRunner.rollbackTransaction();
+      } 
+      
       const errorMessage = error instanceof Error ? error.message : String(error)
       this.logger.error('account.deletion.failed', {
         userId,
-        error: errorMessage
+        error: errorMessage,
+        committed
       });
+
+      if (committed) {
+      this.logger.warn('account.deleted.but.queue.failed', { userId, error: errorMessage });
+        return { message: SYS_MSG.ACCOUNT_DELETED_SUCCESSFULLY, };
+      }
 
       throw new InternalServerErrorException(SYS_MSG.ACCOUNT_DELETION_FAILED);
     } finally {
