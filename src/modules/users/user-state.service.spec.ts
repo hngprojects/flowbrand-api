@@ -31,7 +31,7 @@ const mockFunnelModelAction = {
 
 // Mock FunnelStageModelAction
 const mockFunnelStageModelAction = {
-  findStagesByFunnelId: jest.fn(),
+  getStagesByFunnelId: jest.fn(),
 };
 
 // Mock StageTaskModelAction
@@ -302,7 +302,7 @@ describe('UserStateService', () => {
 
       expect(result.activeFunnel?.status).toBe('generating');
       expect(result.activeFunnel?.currentStage).toBeNull();
-      expect(mockFunnelStageModelAction.findStagesByFunnelId).not.toHaveBeenCalled();
+      expect(mockFunnelStageModelAction.getStagesByFunnelId).not.toHaveBeenCalled();
     });
   });
 
@@ -315,7 +315,7 @@ describe('UserStateService', () => {
         mockSession({ status: WizardStatus.COMPLETE })
       );
       mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([mockFunnel()]);
-      mockFunnelStageModelAction.findStagesByFunnelId.mockResolvedValue([mockStage()]);
+      mockFunnelStageModelAction.getStagesByFunnelId.mockResolvedValue([mockStage()]);
 
       const tasks = [mockTask(true), mockTask(true), mockTask(false), mockTask(false)];
       mockStageTaskModelAction.findTasksByStageId.mockResolvedValue(tasks);
@@ -340,7 +340,7 @@ describe('UserStateService', () => {
         mockSession({ status: WizardStatus.COMPLETE })
       );
       mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([mockFunnel()]);
-      mockFunnelStageModelAction.findStagesByFunnelId.mockResolvedValue([]);
+      mockFunnelStageModelAction.getStagesByFunnelId.mockResolvedValue([]);
 
       const result = await service.getUserState(USER_ID);
 
@@ -358,7 +358,7 @@ describe('UserStateService', () => {
         mockSession({ status: WizardStatus.COMPLETE })
       );
       mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([mockFunnel()]);
-      mockFunnelStageModelAction.findStagesByFunnelId.mockResolvedValue([]);
+      mockFunnelStageModelAction.getStagesByFunnelId.mockResolvedValue([]);
 
       const result = await service.getUserState(USER_ID);
 
@@ -387,7 +387,7 @@ describe('UserStateService', () => {
           created_at: new Date('2026-01-01'), // older
         }),
       ]);
-      mockFunnelStageModelAction.findStagesByFunnelId.mockResolvedValue([mockStage()]);
+      mockFunnelStageModelAction.getStagesByFunnelId.mockResolvedValue([mockStage()]);
 
       const tasks = [mockTask(true), mockTask(false)];
       mockStageTaskModelAction.findTasksByStageId.mockResolvedValue(tasks);
@@ -408,7 +408,7 @@ describe('UserStateService', () => {
         mockSession({ status: WizardStatus.COMPLETE })
       );
       mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([mockFunnel()]);
-      mockFunnelStageModelAction.findStagesByFunnelId.mockResolvedValue([mockStage()]);
+      mockFunnelStageModelAction.getStagesByFunnelId.mockResolvedValue([mockStage()]);
 
       const tasks = [mockTask(true), mockTask(false)];
       mockStageTaskModelAction.findTasksByStageId.mockResolvedValue(tasks);
