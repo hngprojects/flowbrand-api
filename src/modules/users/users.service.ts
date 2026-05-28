@@ -4,10 +4,14 @@ import {
   InternalServerErrorException,
   NotFoundException,
   UnprocessableEntityException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { QueryFailedError } from 'typeorm';
+import { QueryFailedError, DataSource } from 'typeorm';
+import { InjectQueue } from '@nestjs/bull';
+import type { Queue } from 'bull';
 import { UserModelAction } from './actions/user.action';
+import { UserSessionModelAction } from './actions/user-session.action';
 import { CreateUserDto } from './dto/create-user.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -19,6 +23,8 @@ import * as SYS_MSG from '../../constants/system.messages';
 import { IUserProfile } from './interfaces/user-profile.interface';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { ALLOWED_SSA_COUNTRIES } from './enums/allowed-ssa-countries.enum';
+import { ACCOUNT_DELETION_QUEUE } from './processors/account-deletion.processor';
+import { PinoLoggerService } from './../../common/logger/pino-logger.service';
 
 const BCRYPT_ROUNDS = 10;
 const NO_TRANSACTION = {
@@ -30,6 +36,11 @@ export class UsersService {
   constructor(
     private readonly userModelAction:UserModelAction,
     private readonly userStateService: UserStateService,
+    private readonly userSessionModelAction: UserSessionModelAction,
+    private readonly logger: PinoLoggerService,
+    @InjectQueue(ACCOUNT_DELETION_QUEUE)
+    private readonly accountDeletionQueue: Queue,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
@@ -273,5 +284,65 @@ export class UsersService {
     }
 
     return this.toProfileResponse(updated);
+  }
+
+  async deleteAccount(userId: string, confirmation: string): Promise<{ message: string }> {
+    // Defensive check (DTO already validates, but double-check)
+    if (confirmation !== 'DELETE') {
+      throw new UnprocessableEntityException(SYS_MSG.ACCOUNT_DELETION_CONFIRMATION_REQUIRED);
+    }
+
+    const user = await this.userModelAction.findById(userId);
+    if (!user) {
+      throw new NotFoundException(SYS_MSG.USER_NOT_FOUND);
+    }
+
+    if (user.deleted_at !== null) {
+      throw new UnauthorizedException(SYS_MSG.ACCOUNT_ALREADY_DELETED);
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const now = new Date();
+      const thirtyDaysLater = 30 * 24 * 60 * 60 * 1000;
+
+      await queryRunner.manager.update(User, userId, {
+        deleted_at: now,
+        is_active: false,
+      });
+
+      await this.userSessionModelAction.revokeAllUserSessions(userId, queryRunner.manager);
+
+      if (user.auth_provider === 'google') {
+        await queryRunner.manager.update(User, userId, { provider_user_id: null });
+      }
+
+      await queryRunner.commitTransaction();
+
+      this.logger.log(userId, 'account_deleted');
+
+      await this.accountDeletionQueue.add(
+        'hard-delete',
+        { userId, email: user.email },
+        { delay: thirtyDaysLater },
+      );
+
+      return { message: SYS_MSG.ACCOUNT_DELETED_SUCCESSFULLY };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      this.logger.error('account.deletion.failed', {
+        userId,
+        error: errorMessage
+      });
+      
+      throw new InternalServerErrorException(SYS_MSG.ACCOUNT_DELETION_FAILED);
+    } finally {
+      await queryRunner.release();
+    }
   }
 }
