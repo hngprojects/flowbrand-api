@@ -6,6 +6,7 @@ import {
   Logger,
   UnprocessableEntityException,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { QueryFailedError } from 'typeorm';
@@ -263,7 +264,7 @@ export class UsersService {
     }
 
     if(newPassword === oldPassword) {
-      throw new UnprocessableEntityException({
+      throw new BadRequestException({
         message: SYS_MSG.PASSWORD_CHANGE_NOT_SUCCESSFUL
       })
     }
