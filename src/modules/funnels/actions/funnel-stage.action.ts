@@ -13,11 +13,19 @@ export class FunnelStageModelAction extends AbstractModelAction<FunnelStage> {
     super(repository, FunnelStage);
   }
 
-  async findStagesByFunnelId(funnelId: string): Promise<FunnelStage[]> {
-    return this.repository
-      .createQueryBuilder('fs')
-      .where('fs.funnel_id = :funnelId', { funnelId })
-      .orderBy('fs.position', 'ASC')
+  async getStagesByFunnelId(funnelId: string): Promise<FunnelStage[]> {
+    return this.repository.createQueryBuilder('s')
+      .where('s.funnel_id = :funnelId', { funnelId })
+      .orderBy('s.position', 'ASC')
+      .getMany();
+  }
+
+  async getStagesWithTasks(funnelId: string): Promise<FunnelStage[]> {
+    return this.repository.createQueryBuilder('s')
+      .where('s.funnel_id = :funnelId', { funnelId })
+      .orderBy('s.position', 'ASC')
+      .leftJoinAndSelect('s.tasks', 't')
+      .addOrderBy('t.position', 'ASC')
       .getMany();
   }
 }

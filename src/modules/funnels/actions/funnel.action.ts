@@ -1,23 +1,26 @@
 import { AbstractModelAction } from '@hng-sdk/orm';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, type QueryDeepPartialEntity, Repository } from 'typeorm';
+import { EntityManager, Repository, QueryDeepPartialEntity, In } from 'typeorm';
 import { Funnel } from '../entities/funnel.entity';
 import { FunnelStatus } from '../enums/funnel-status.enum';
 import { FunnelStage } from '../entities/funnel-stage.entity';
 import { StageTask } from '../entities/stage-task.entity';
 import { StageStatus } from '../enums/stage-status.enum';
+import { WizardSession } from '../../onboarding/entities/wizzard-session.entity';
+import { WizardStatus } from '../../onboarding/enums/wizzard-status.enum';
+import { UploadedDocument } from '../../upload/entities/uploaded-document.entity';
 
 @Injectable()
 export class FunnelModelAction extends AbstractModelAction<Funnel> {
   constructor(
     @InjectRepository(Funnel)
     private readonly funnelRepository: Repository<Funnel>,
+    private readonly manager: EntityManager,
   ) {
     super(funnelRepository, Funnel);
   }
 
-  // Count tasks for a stage using the provided EntityManager (transaction aware).
   async countTasksForStage(manager: EntityManager, stageId: string): Promise<{ total: number; pending: number }> {
     const row = await manager
       .createQueryBuilder(StageTask, 'task')
@@ -29,7 +32,6 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
     return { total: Number(row?.total ?? 0), pending: Number(row?.pending ?? 0) };
   }
 
-  // Update a stage's status only when it currently has the expected status (optimistic update).
   async updateStageStatusIfActive(
     manager: EntityManager,
     stageId: string,
@@ -51,7 +53,6 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
       { id: stageId, funnel_id: funnelId, status: StageStatus.LOCKED },
       { status: StageStatus.ACTIVE, unlocked_at: unlockedAt },
     );
-
     return res.affected ?? 0;
   }
 
@@ -63,38 +64,38 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
     return manager.findOne(FunnelStage, { where: { funnel_id: funnelId, position } });
   }
 
-  // Idempotency lookup. Returns the existing funnel if (user_id,
-  // idempotency_key) already exists, otherwise null. The global UNIQUE
-  // constraint on idempotency_key plus the user_id filter together prevent
-  // cross-user reuse.
-  async findByIdempotency(
-    userId: string,
-    idempotencyKey: string,
-  ): Promise<Funnel | null> {
+  async findByIdempotency(userId: string, idempotencyKey: string): Promise<Funnel | null> {
     return this.funnelRepository.findOne({
       where: { user_id: userId, idempotency_key: idempotencyKey },
     });
   }
 
-  // Concurrent-generation guard. Returns the in-flight funnel for this user
-  // (if any) so the caller can return 409 GENERATION_IN_PROGRESS.
   async findGeneratingForUser(userId: string): Promise<Funnel | null> {
     return this.funnelRepository.findOne({
       where: { user_id: userId, status: FunnelStatus.GENERATING },
     });
   }
 
-  // Status endpoint helper. Returns funnel only if the caller owns it, so
-  // cross-user polling falls through to 404 (SEC-01: do not reveal existence).
-  async findOwnedById(
-    funnelId: string,
-    userId: string,
-    manager?: EntityManager,
-  ): Promise<Funnel | null> {
+  async findOwnedById(funnelId: string, userId: string, manager?: EntityManager): Promise<Funnel | null> {
     const repo = manager ? manager.getRepository(Funnel) : this.funnelRepository;
+    return repo.findOne({ where: { id: funnelId, user_id: userId } });
+  }
 
-    return repo.findOne({
-      where: { id: funnelId, user_id: userId },
+  async listForUserPaginated(userId: string, page: number, perPage: number): Promise<[Funnel[], number]> {
+    return this.funnelRepository.createQueryBuilder('f')
+      .where('f.user_id = :userId', { userId })
+      .orderBy('f.created_at', 'DESC')
+      .skip((page - 1) * perPage)
+      .take(perPage)
+      .leftJoinAndSelect('f.stages', 's')
+      .addOrderBy('s.position', 'ASC')
+      .getManyAndCount();
+  }
+
+  async getLatestCompletedWizard(userId: string): Promise<WizardSession | null> {
+    return this.manager.getRepository(WizardSession).findOne({
+      where: { user_id: userId, status: WizardStatus.COMPLETE },
+      order: { updated_at: 'DESC' },
     });
   }
 
@@ -112,5 +113,11 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
       .where('f.id = :funnelId', { funnelId })
       .andWhere('f.user_id = :userId', { userId })
       .getOne();
+  }
+
+  async getUploadedDocuments(userId: string, ids: string[]): Promise<UploadedDocument[]> {
+    return this.manager.getRepository(UploadedDocument).find({
+      where: { id: In(ids), user_id: userId },
+    });
   }
 }

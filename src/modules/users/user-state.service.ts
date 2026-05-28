@@ -116,7 +116,7 @@ export class UserStateService {
       };
     }
 
-    const stages = await this.funnelStageModelAction.findStagesByFunnelId(selectedFunnel.id);
+    const stages = await this.funnelStageModelAction.getStagesByFunnelId(selectedFunnel.id);
 
     const activeStage = stages.find(s => s.status === StageStatus.ACTIVE);
 
