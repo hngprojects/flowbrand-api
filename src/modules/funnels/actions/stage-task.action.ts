@@ -40,4 +40,12 @@ export class StageTaskModelAction extends AbstractModelAction<StageTask> {
       .where('t.stage_id = :stageId', { stageId })
       .getRawOne();
   }
+
+  async findOwnedTask(taskId: string, stageId: string): Promise<StageTask | null> {
+    return this.repository.findOne({ where: { id: taskId, stage_id: stageId } });
+  }
+
+  async saveTask(task: StageTask): Promise<StageTask> {
+    return this.repository.save(task);
+  }
 }
