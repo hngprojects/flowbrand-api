@@ -372,7 +372,7 @@ describe('UsersService', () => {
       await service.changePassword(USER_ID, changePasswordDto);
 
       expect(logSpy).toHaveBeenCalled();
-      const logPayload = JSON.stringify(logSpy.mock.calls[0]);
+      const logPayload = JSON.stringify(logSpy.mock.calls);
       expect(logPayload).not.toContain(mockUser().password_hash);
       expect(logPayload).not.toContain(changePasswordDto.oldPassword);
       expect(logPayload).not.toContain(changePasswordDto.newPassword);

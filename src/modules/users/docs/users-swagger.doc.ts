@@ -323,8 +323,8 @@ export function ChangePasswordDocs() {
       schema: {
         example: {
           success: false,
-          statusCode: HttpStatus.BAD_REQUEST,
-          error: 'BadRequestException',
+          statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          error: 'UnprocessableEntityException',
           message: SYS_MSG.INCORRECT_CONFIRM_PASSWORD,
         },
       },
