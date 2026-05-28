@@ -558,18 +558,18 @@ describe('FunnelsService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('AC-09: completing an already-complete task is idempotent → 200', async () => {
+    it('AC-09: completing an already-complete task is idempotent → 200, no DB write', async () => {
       (taskAction.get as jest.Mock).mockResolvedValue({ ...COMPLETE_TASK });
-      (taskAction.save as jest.Mock).mockResolvedValue({ ...COMPLETE_TASK });
 
       const result = await service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' });
 
       expect(result.statusCode).toBe(HttpStatus.OK);
       expect(result.data.isComplete).toBe(true);
       expect(result.data.completedAt).toBe('2026-05-26T10:00:00.000Z');
+      expect(taskAction.save).not.toHaveBeenCalled();
     });
 
-    it('SEC-04: rate limit exceeded → 429 HttpException', async () => {
+    it('SEC-04a: rate limit exceeded → 429 HttpException', async () => {
       redisService.rateLimit.mockResolvedValue({ count: 31, exceeded: true });
 
       await expect(
@@ -577,7 +577,7 @@ describe('FunnelsService', () => {
       ).rejects.toThrow(HttpException);
     });
 
-    it('SEC-04: rate limit check fires before any DB lookup', async () => {
+    it('SEC-04b: rate limit check fires before any DB lookup', async () => {
       redisService.rateLimit.mockResolvedValue({ count: 31, exceeded: true });
 
       await expect(

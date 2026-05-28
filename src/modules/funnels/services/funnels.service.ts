@@ -18,6 +18,7 @@ import { RedisService } from '../../redis/redis.service';
 import { FunnelModelAction } from './../actions/funnel.action';
 import { FunnelStageModelAction } from './../actions/funnel-stage.action';
 import { StageTaskModelAction } from './../actions/stage-task.action';
+import { StageTask } from './../entities/stage-task.entity';
 import { CreateFunnelDto } from './../dto/create-funnel.dto';
 import { Funnel } from './../entities/funnel.entity';
 import { FunnelStage } from './../entities/funnel-stage.entity';
@@ -481,12 +482,28 @@ export class FunnelsService {
     if (exceeded) throw new HttpException(SYS_MSG.GENERATION_RATE_LIMIT_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS);
   }
 
+  private buildTaskResponse(task: StageTask): UpdateTaskStatusResponse {
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.TASK_UPDATED_SUCCESSFULLY,
+      data: {
+        taskId: task.id,
+        name: task.name,
+        status: task.status,
+        isComplete: task.is_complete,
+        completedAt: task.completed_at ? task.completed_at.toISOString() : null,
+        position: task.position,
+      },
+    };
+  }
+
   private async checkTaskUpdateRateLimit(userId: string): Promise<void> {
     const key = `ratelimit:task-update:${userId}`;
     const { exceeded } = await this.redisService.rateLimit(key, 30, 60);
     if (exceeded) throw new HttpException(SYS_MSG.TASK_UPDATE_RATE_LIMIT_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS);
   }
 
+  /** Validates ownership chain (funnel → stage → task), enforces locked-stage guard, and toggles task status. */
   async updateTaskStatus(
     userId: string,
     funnelId: string,
@@ -507,21 +524,14 @@ export class FunnelsService {
     const task = await this.taskAction.get({ identifierOptions: { id: taskId, stage_id: stageId } });
     if (!task) throw new NotFoundException(SYS_MSG.STAGE_TASK_NOT_FOUND);
 
+    if (task.status === dto.status) {
+      return this.buildTaskResponse(task);
+    }
+
     task.status = dto.status;
     const updated = await this.taskAction.save({ entity: task, transactionOptions: { useTransaction: false } });
 
-    return {
-      statusCode: HttpStatus.OK,
-      message: SYS_MSG.TASK_UPDATED_SUCCESSFULLY,
-      data: {
-        taskId: updated.id,
-        name: updated.name,
-        status: updated.status,
-        isComplete: updated.is_complete,
-        completedAt: updated.completed_at ? updated.completed_at.toISOString() : null,
-        position: updated.position,
-      },
-    };
+    return this.buildTaskResponse(updated);
   }
 
   async submitFeedback(
