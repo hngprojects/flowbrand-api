@@ -201,7 +201,85 @@ export class UserModelAction extends AbstractModelAction<User> {
 
 Services depend on the model action, not the repository.
 
-### 6. Testing Proof Is Required in Every PR
+### 6. Controller Return Shapes — Let the Interceptor Do the Wrapping
+
+All controllers go through `TransformInterceptor`, which produces the consistent envelope:
+
+```json
+{ "success": true, "statusCode": 200, "message": "...", "data": <payload> }
+```
+
+**Never call `res.json()` directly** unless the endpoint performs a `res.redirect()`. Never include `success: true` in what you return — the interceptor adds it, and if you include it manually it leads to `body.data.success` nesting.
+
+#### Shape A — Structured with data ✅ (most endpoints)
+
+Use when you need an explicit message *and* a data payload.
+
+```ts
+return {
+  statusCode: HttpStatus.OK,
+  message: SYS_MSG.AUTH_LOGIN_SUCCESSFUL,
+  data: { accessToken, user },
+};
+// → { "success": true, "statusCode": 200, "message": "...", "data": { "accessToken": "..." } }
+```
+
+#### Shape B — Structured without data ✅ (message-only responses)
+
+Omit the `data` key; the interceptor fills it with `null`.
+
+```ts
+return { statusCode: HttpStatus.OK, message: SYS_MSG.OTP_SENT_SUCCESSFULLY };
+// → { "success": true, "statusCode": 200, "message": "...", "data": null }
+```
+
+#### Shape C — Plain service result ✅ (pass-through)
+
+Use when the service already returns the payload and no custom message is needed.
+
+```ts
+return this.usersService.findById(userId);
+// → { "success": true, "statusCode": 200, "message": "Operation successful", "data": { "id": "..." } }
+```
+
+#### Shape D — Pagination ✅ (existing convention, unchanged)
+
+```ts
+return { paginationMeta: { ... }, payload: [...] };
+// → { "success": true, "statusCode": 200, "message": "Operation successful", "data": [...], "meta": { ... } }
+```
+
+#### Rules and gotchas
+
+- **Shape A/B requires BOTH `statusCode` AND `message`.** Without `message`, the interceptor treats the whole object as Shape C data, causing `body.data.statusCode` instead of `body.statusCode`.
+- **Use `@Res({ passthrough: true })`** only when you must call `res.cookie()`, `res.clearCookie()`, or `res.status()` (dynamic status). Then `return` the structured object and the interceptor still fires normally.
+- **Keep plain `@Res()`** (without passthrough) only for `res.redirect()` endpoints — these bypass the interceptor entirely.
+- **Keep `@HttpCode()` in sync** with the `statusCode` field you return. The JSON `statusCode` comes from your return value; the HTTP status header comes from `@HttpCode()` or `res.status()`. They must match. Use `@Res({ passthrough: true })` + `res.status()` when the status is dynamic (e.g. 200 vs 201 vs 202 depending on a service result).
+
+**Dynamic-status pattern example** — when the service decides the status code (202 for a new job, 200 for an idempotent repeat):
+
+```ts
+@Post('generate')
+@CreateFunnelDocs()
+async generate(
+  @CurrentUser('userId') userId: string,
+  @Body() dto: CreateFunnelDto,
+  @Res({ passthrough: true }) res: Response,
+) {
+  const result = await this.service.generate(userId, dto);
+  // Set the HTTP status header to match the body — 202 ACCEPTED or 200 OK
+  res.status(result.statusCode);
+  return {
+    statusCode: result.statusCode, // 202 | 200
+    message: result.message,
+    data: { id: result.id, status: result.status },
+  };
+}
+// → HTTP 202  { "success": true, "statusCode": 202, "message": "...", "data": { ... } }
+// → HTTP 200  { "success": true, "statusCode": 200, "message": "...", "data": { ... } }
+```
+
+### 7. Testing Proof Is Required in Every PR
 
 Every PR must include at least one of the following:
 
@@ -343,6 +421,24 @@ pnpm lint
 - Follow existing patterns in `src/common` and `src/modules`.
 - Prefer small, composable services and keep controllers thin.
 
+### JSDoc on exported service methods
+
+Every public method on an exported service must have a one-line JSDoc comment. This is what populates IDE tooltips and makes the module's public API navigable without reading the implementation.
+
+```ts
+/** Registers a new user, hashes their password, and dispatches a verification OTP. */
+async register(dto: RegisterDto): Promise<{ message: string }> {
+  // ...
+}
+
+/** Validates credentials, enforces lockout policy, and issues JWT + refresh token. */
+async login(dto: LoginDto): Promise<AuthResponse> {
+  // ...
+}
+```
+
+You don't need `@param` or `@returns` tags if the types are already annotated. The one-liner is enough. Private methods and internal helpers don't require JSDoc.
+
 ## Tests
 
 Run the suite locally before opening a PR:
@@ -406,16 +502,36 @@ If you add or change behavior, include or update tests.
 
 ## Pull Request Title Rules
 
-- PR titles must follow the Conventional Commits format used for commits.
-- Include the ticket number if applicable.
+PR titles must follow the same Conventional Commits format as commit messages. The title is the first thing a reviewer reads — get it right.
 
-### Examples
+### Format
+
+```text
+type(scope): BE-<num> short description in imperative mood
+```
+
+- `type` is lowercase: `feat`, `fix`, `refactor`, `docs`, `chore`, etc.
+- `scope` is the module or domain in lowercase: `auth`, `funnels`, `upload`, etc.
+- Include the ticket number when one exists.
+
+### Correct Examples
 
 - `feat(auth): BE-1234 add Google OAuth strategy`
-- `fix(funnels): BE-5678 correct pagination logic`
+- `fix(funnels): BE-5678 correct pagination offset cap`
+- `refactor(api): normalise response envelope across all controllers`
 - `docs: restructure contributing guide`
 
-> A clear title makes it easier for reviewers to understand the purpose of the PR at a glance.
+### Wrong — flagged in review
+
+| Bad title | Problem |
+| --- | --- |
+| `Feat(funnel): implement funnel display APIs` | Capital `F` — type must be lowercase |
+| `Feature/BE-307-funnel-list` | Branch-name pasted as PR title — no colon, no description |
+| `feat(funnel): implement funnel display APIs` | "implement ... APIs" is vague — name the specific change |
+
+The branch name is **not** the PR title. Write a fresh, human-readable summary.
+
+> A clear title lets reviewers understand the scope at a glance and makes the git log useful.
 
 ## Reporting Issues
 

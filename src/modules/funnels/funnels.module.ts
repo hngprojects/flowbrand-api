@@ -5,34 +5,36 @@ import { QUEUES } from '../../common/constants/queue.constants';
 import { WizardSession } from '../onboarding/entities/wizzard-session.entity';
 import { RedisModule } from '../redis/redis.module';
 import { UploadedDocument } from '../upload/entities/uploaded-document.entity';
-
 import { Funnel } from './entities/funnel.entity';
 import { FunnelStage } from './entities/funnel-stage.entity';
 import { StageTask } from './entities/stage-task.entity';
-
-import { FunnelsController } from './funnels.controller';
-
-// Providers / actions
+import { FunnelsController } from './controllers/funnels.controller';
 import { FunnelModelAction } from './actions/funnel.action';
 import { FunnelStageModelAction } from './actions/funnel-stage.action';
-
-// Two service implementations live in the module; import and alias both
-import { FunnelsService as FunnelsReadService } from './funnels.service';
-import { FunnelsService as FunnelsGenService } from './services/funnels.service';
+import { StageTaskModelAction } from './actions/stage-task.action';
+import { FunnelsService } from './services/funnels.service';
+import { StageFeedback } from './entities/stage-feedback.entity';
+import { StageFeedbackModelAction } from './actions/stage-feedback.action';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Funnel, FunnelStage, StageTask, WizardSession, UploadedDocument]),
+    TypeOrmModule.forFeature([Funnel, FunnelStage, StageTask, WizardSession, UploadedDocument, StageFeedback]),
     BullModule.registerQueue({ name: QUEUES.FUNNEL_GENERATION }),
     RedisModule,
   ],
   controllers: [FunnelsController],
   providers: [
-    FunnelsReadService,
-    FunnelsGenService,
+    FunnelsService,
     FunnelModelAction,
     FunnelStageModelAction,
+    StageTaskModelAction,
+    StageFeedbackModelAction,
   ],
-  exports: [FunnelsGenService, FunnelModelAction],
+  exports: [
+    FunnelsService,
+    FunnelModelAction,
+    FunnelStageModelAction,
+    StageTaskModelAction,
+  ],
 })
 export class FunnelsModule {}

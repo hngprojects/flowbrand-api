@@ -1,11 +1,5 @@
 import { applyDecorators, HttpStatus } from '@nestjs/common';
-import {
-  ApiBadRequestResponse,
-  ApiBody,
-  ApiCreatedResponse,
-  ApiOkResponse,
-  ApiOperation,
-} from '@nestjs/swagger';
+import { ApiBadRequestResponse, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { JoinWaitlistDto } from '../dto/join-waitlist.dto';
 
@@ -31,6 +25,7 @@ export const JoinWaitlistDocs = () =>
       description: 'Email added to the waitlist and confirmation email queued.',
       schema: {
         example: {
+          success: true,
           statusCode: HttpStatus.CREATED,
           message: SYS_MSG.WAITLIST_JOINED_SUCCESSFULLY,
           data: waitlistEntryExample,
@@ -41,6 +36,7 @@ export const JoinWaitlistDocs = () =>
       description: 'Email is already on the waitlist (idempotent).',
       schema: {
         example: {
+          success: true,
           statusCode: HttpStatus.OK,
           message: SYS_MSG.WAITLIST_ALREADY_JOINED,
           data: waitlistEntryExample,

@@ -62,22 +62,6 @@ export class AuthController {
     };
   }
 
-  private buildAuthResponse(
-    statusCode: HttpStatus,
-    message: string,
-    result: Awaited<ReturnType<AuthService['login']>>,
-  ) {
-    return {
-      statusCode,
-      message,
-      data: {
-        accessToken: result.accessToken,
-        user: result.user,
-        redirectUrl: AuthController.REDIRECT_URL,
-      },
-    };
-  }
-
   private getFrontendBaseUrl(): string {
     return (process.env.FRONTEND_URL ?? 'http://localhost:3000').replace(/\/$/, '');
   }
@@ -86,14 +70,9 @@ export class AuthController {
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @RegisterDocs()
-  async register(@Body() dto: RegisterDto, @Res() res: Response) {
+  async register(@Body() dto: RegisterDto) {
     const { message } = await this.authService.register(dto);
-
-    res.status(HttpStatus.CREATED).json({
-      success: true,
-      statusCode: HttpStatus.CREATED,
-      message,
-    });
+    return { statusCode: HttpStatus.CREATED, message };
   }
 
   @Public()
@@ -103,20 +82,23 @@ export class AuthController {
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(dto);
     res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
-    return this.buildAuthResponse(HttpStatus.OK, SYS_MSG.AUTH_LOGIN_SUCCESSFUL, result);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.AUTH_LOGIN_SUCCESSFUL,
+      data: {
+        accessToken: result.accessToken,
+        user: result.user,
+        redirectUrl: AuthController.REDIRECT_URL,
+      },
+    };
   }
 
   @Public()
   @Post('refresh-token')
   @HttpCode(HttpStatus.OK)
   @RefreshDocs()
-  async refresh(
-    @Body() dto: RefreshTokenDto,
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const refreshToken =
-      dto.refreshToken ?? (req.cookies?.refreshToken as string | undefined);
+  async refresh(@Body() dto: RefreshTokenDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const refreshToken = dto.refreshToken ?? (req.cookies?.refreshToken as string | undefined);
 
     if (!refreshToken) {
       throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_REFRESH_TOKEN);
@@ -124,11 +106,19 @@ export class AuthController {
 
     const result = await this.authService.refresh(refreshToken);
     res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
-    return this.buildAuthResponse(HttpStatus.OK, SYS_MSG.AUTH_TOKEN_REFRESHED, result);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.AUTH_TOKEN_REFRESHED,
+      data: {
+        accessToken: result.accessToken,
+        user: result.user,
+        redirectUrl: AuthController.REDIRECT_URL,
+      },
+    };
   }
 
   @Post('logout')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   @LogoutDocs()
   async logout(
     @CurrentUser('sub') userId: string,
@@ -141,51 +131,59 @@ export class AuthController {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
     });
+    return { statusCode: HttpStatus.OK, message: SYS_MSG.AUTH_LOGOUT_SUCCESSFUL };
   }
 
   @Public()
   @Post('send-otp')
   @HttpCode(HttpStatus.OK)
   @SendOtpDocs()
-  async sendOtp(@Body() dto: SendOtpDto, @Res() res: Response): Promise<void> {
+  async sendOtp(@Body() dto: SendOtpDto) {
     const result = await this.authService.sendOtp(dto.email);
-    res.json({ statusCode: HttpStatus.OK, message: result.message });
+    return { statusCode: HttpStatus.OK, message: result.message };
   }
 
   @Public()
   @Post('verify-otp')
   @HttpCode(HttpStatus.OK)
   @VerifyOtpDocs()
-  async verifyOtp(@Body() dto: VerifyOtpDto, @Res() res: Response): Promise<void> {
+  async verifyOtp(@Body() dto: VerifyOtpDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.verifyOtp(dto.email, dto.otp_code);
     res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
-    res.json(this.buildAuthResponse(HttpStatus.OK, SYS_MSG.OTP_VERIFIED_SUCCESSFULLY, result));
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.OTP_VERIFIED_SUCCESSFULLY,
+      data: {
+        accessToken: result.accessToken,
+        user: result.user,
+        redirectUrl: AuthController.REDIRECT_URL,
+      },
+    };
   }
 
   @Public()
   @Post('resend-otp')
   @HttpCode(HttpStatus.OK)
   @ResendOtpDocs()
-  async resendOtp(@Body() dto: ResendOtpDto, @Res() res: Response): Promise<void> {
+  async resendOtp(@Body() dto: ResendOtpDto) {
     const result = await this.authService.resendOtp(dto.email);
-    res.json({ statusCode: HttpStatus.OK, message: result.message });
+    return { statusCode: HttpStatus.OK, message: result.message };
   }
 
   @Public()
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ForgotPasswordDocs()
-  async forgotPassword(@Body() dto: ForgotPasswordDto, @Res() res: Response): Promise<void> {
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
     const result = await this.authService.forgotPassword(dto.email);
-    res.json({ statusCode: HttpStatus.OK, message: result.message });
+    return { statusCode: HttpStatus.OK, message: result.message };
   }
 
-  /** Step 2 of password reset: validates OTP and returns a single-use reset_token. */
   @Public()
   @Post('verify-reset-otp')
   @HttpCode(HttpStatus.OK)
   @VerifyResetOtpDocs()
-  async verifyResetOtp(@Body() dto: VerifyResetOtpDto): Promise<object> {
+  async verifyResetOtp(@Body() dto: VerifyResetOtpDto) {
     const result = await this.authService.verifyResetOtp(dto.email, dto.otp_code);
     return { statusCode: HttpStatus.OK, message: SYS_MSG.PASSWORD_RESET_OTP_VERIFIED, data: result };
   }
@@ -194,13 +192,18 @@ export class AuthController {
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @ResetPasswordDocs()
-  async resetPassword(@Body() dto: ResetPasswordDto, @Res() res: Response): Promise<void> {
+  async resetPassword(@Body() dto: ResetPasswordDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.resetPassword(dto.reset_token, dto.password);
-
-    // Set refresh token cookie for auto-login
     res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
-
-    res.json(this.buildAuthResponse(HttpStatus.OK, SYS_MSG.PASSWORD_RESET_SUCCESSFUL, result));
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.PASSWORD_RESET_SUCCESSFUL,
+      data: {
+        accessToken: result.accessToken,
+        user: result.user,
+        redirectUrl: AuthController.REDIRECT_URL,
+      },
+    };
   }
 
   @Get('me')
@@ -239,13 +242,10 @@ export class AuthController {
   @Post('google/exchange')
   @HttpCode(HttpStatus.OK)
   @GoogleExchangeDocs()
-  async googleExchange(@Body() dto: GoogleExchangeDto, @Res() res: Response): Promise<void> {
+  async googleExchange(@Body() dto: GoogleExchangeDto, @Res({ passthrough: true }) res: Response) {
     const oauthResult = await this.authService.exchangeCode(dto.code);
-
     res.cookie('refreshToken', oauthResult.refreshToken, this.getRefreshCookieOptions());
-
-    // Return access token and user info matching the standard response template
-    res.json({
+    return {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
       data: {
@@ -253,6 +253,6 @@ export class AuthController {
         user: oauthResult.data.user,
         redirectUrl: AuthController.REDIRECT_URL,
       },
-    });
+    };
   }
 }
