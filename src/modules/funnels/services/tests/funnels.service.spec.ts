@@ -107,7 +107,7 @@ describe('FunnelsService', () => {
 
     redisService = { rateLimit: jest.fn().mockResolvedValue({ count: 1, exceeded: false }) };
     queue = { add: jest.fn().mockResolvedValue({ id: 'job-1' }) };
-    
+
     queryRunner = {
       connect: jest.fn().mockResolvedValue(undefined),
       startTransaction: jest.fn().mockResolvedValue(undefined),
@@ -166,8 +166,11 @@ describe('FunnelsService', () => {
 
       expect(queryRunner.manager.save).toHaveBeenCalledWith(Funnel, expect.any(Object));
       expect(queryRunner.manager.save).toHaveBeenCalledWith(FunnelStage, expect.any(Array));
-      const stagesArg = (queryRunner.manager.save.mock.calls.find((c) => c[0] === FunnelStage) ??
-        [])[1] as Array<{ position: number; name: string; status: string }>;
+      const stagesArg = (queryRunner.manager.save.mock.calls.find((c) => c[0] === FunnelStage) ?? [])[1] as Array<{
+        position: number;
+        name: string;
+        status: string;
+      }>;
       expect(stagesArg).toHaveLength(4);
       expect(stagesArg.map((s) => s.position)).toEqual([1, 2, 3, 4]);
       expect(stagesArg.map((s) => s.name)).toEqual([
@@ -242,9 +245,7 @@ describe('FunnelsService', () => {
       funnelAction.findGeneratingForUser.mockResolvedValue(null);
       funnelAction.getLatestCompletedWizard.mockResolvedValue(null);
 
-      await expect(service.createGeneration(USER_ID, BASE_DTO)).rejects.toThrow(
-        UnprocessableEntityException,
-      );
+      await expect(service.createGeneration(USER_ID, BASE_DTO)).rejects.toThrow(UnprocessableEntityException);
     });
   });
 
@@ -288,9 +289,7 @@ describe('FunnelsService', () => {
       funnelAction.getLatestCompletedWizard.mockResolvedValue(COMPLETE_WIZARD as WizardSession);
       queue.add.mockRejectedValueOnce(new Error('Redis is down'));
 
-      await expect(service.createGeneration(USER_ID, BASE_DTO)).rejects.toThrow(
-        ServiceUnavailableException,
-      );
+      await expect(service.createGeneration(USER_ID, BASE_DTO)).rejects.toThrow(ServiceUnavailableException);
 
       expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
       expect(queryRunner.commitTransaction).not.toHaveBeenCalled();
@@ -351,7 +350,7 @@ describe('FunnelsService', () => {
         created_at: new Date(),
         stages: [{ position: 1, name: 'S1', status: 'active' }],
       };
-      
+
       funnelAction.listForUserPaginated.mockResolvedValue([[sampleFunnel], 1]);
 
       const res = await service.listForUser('user-1', 1, 100);
@@ -376,11 +375,18 @@ describe('FunnelsService', () => {
 
     it('EC-01 - getFullFunnel queries correctly', async () => {
       funnelAction.findOwnedById.mockResolvedValue({ id: 'f1', user_id: 'u1' } as any);
-      
+
       stageAction.getStagesWithTasks.mockResolvedValue([
-        { id: 's1', position: 1, name: 'S1', channel: 'email', status: 'active', tasks: [{ id: 't1', position: 1, name: 'T1', status: 'pending' }] } as any
+        {
+          id: 's1',
+          position: 1,
+          name: 'S1',
+          channel: 'email',
+          status: 'active',
+          tasks: [{ id: 't1', position: 1, name: 'T1', status: 'pending' }],
+        } as any,
       ]);
-      
+
       taskAction.getStageCounts.mockResolvedValue([{ stageId: 's1', total: 1, complete: 0 }]);
 
       const res = await service.getFullFunnel('u1', 'f1');
@@ -395,7 +401,15 @@ describe('FunnelsService', () => {
     it('getStagesSummary returns lean stage payloads', async () => {
       funnelAction.findOwnedById.mockResolvedValue({ id: 'f1', user_id: 'u1' } as any);
       stageAction.getStagesByFunnelId.mockResolvedValue([
-        { id: 's1', position: 1, name: 'S1', channel: 'email', status: 'active', unlocked_at: null, completed_at: null } as any
+        {
+          id: 's1',
+          position: 1,
+          name: 'S1',
+          channel: 'email',
+          status: 'active',
+          unlocked_at: null,
+          completed_at: null,
+        } as any,
       ]);
       taskAction.getStageCounts.mockResolvedValue([{ stageId: 's1', total: 2, complete: 1 }]);
 
@@ -419,7 +433,7 @@ describe('FunnelsService', () => {
   describe('getStageDetail', () => {
     it('getStageDetail enforces lock and returns ForbiddenException with message', async () => {
       funnelAction.findOwnedById.mockResolvedValue({ id: 'f1', user_id: 'u1' } as any);
-      
+
       // first call finds the locked stage; second call finds the prior completed stage
       stageAction.get
         .mockResolvedValueOnce({ id: 's2', funnel_id: 'f1', position: 2, name: 'Stage 2', status: 'locked' } as any)
@@ -430,13 +444,23 @@ describe('FunnelsService', () => {
 
     it('getStageDetail returns a full stage payload when unlocked', async () => {
       funnelAction.findOwnedById.mockResolvedValue({ id: 'f1', user_id: 'u1' } as any);
-      
+
       stageAction.get.mockResolvedValueOnce({
-        id: 's2', funnel_id: 'f1', position: 2, name: 'Stage 2', channel: 'email', status: 'active',
-        explanation: 'Ex', action_prompt: 'Act', unlocked_at: new Date(), completed_at: null,
+        id: 's2',
+        funnel_id: 'f1',
+        position: 2,
+        name: 'Stage 2',
+        channel: 'email',
+        status: 'active',
+        explanation: 'Ex',
+        action_prompt: 'Act',
+        unlocked_at: new Date(),
+        completed_at: null,
       } as any);
 
-      taskAction.getTasksByStageId.mockResolvedValue([{ id: 't1', position: 1, name: 'Task 1', status: 'complete' } as any]);
+      taskAction.getTasksByStageId.mockResolvedValue([
+        { id: 't1', position: 1, name: 'Task 1', status: 'complete' } as any,
+      ]);
       taskAction.getSingleStageCount.mockResolvedValue({ total: 1, complete: 1 });
 
       const res = await service.getStageDetail('u1', 'f1', 's2');
@@ -453,8 +477,24 @@ describe('FunnelsService', () => {
 
   describe('updateTaskStatus', () => {
     const ACTIVE_STAGE = { id: STAGE_ID, funnel_id: FUNNEL_ID, status: 'active' } as any;
-    const PENDING_TASK = { id: TASK_ID, stage_id: STAGE_ID, name: 'Create lead magnet', position: 1, status: 'pending', is_complete: false, completed_at: null } as any;
-    const COMPLETE_TASK = { id: TASK_ID, stage_id: STAGE_ID, name: 'Create lead magnet', position: 1, status: 'complete', is_complete: true, completed_at: new Date('2026-05-26T10:00:00Z') } as any;
+    const PENDING_TASK = {
+      id: TASK_ID,
+      stage_id: STAGE_ID,
+      name: 'Create lead magnet',
+      position: 1,
+      status: 'pending',
+      is_complete: false,
+      completed_at: null,
+    } as any;
+    const COMPLETE_TASK = {
+      id: TASK_ID,
+      stage_id: STAGE_ID,
+      name: 'Create lead magnet',
+      position: 1,
+      status: 'complete',
+      is_complete: true,
+      completed_at: new Date('2026-05-26T10:00:00Z'),
+    } as any;
 
     beforeEach(() => {
       funnelAction.findOwnedById.mockResolvedValue({ id: FUNNEL_ID } as Partial<Funnel> as Funnel);
@@ -489,29 +529,33 @@ describe('FunnelsService', () => {
     it('AC-03: taskId from a different stage → 404', async () => {
       (taskAction.get as jest.Mock).mockResolvedValue(null);
 
-      await expect(service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' }))
-        .rejects.toThrow(NotFoundException);
+      await expect(
+        service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' }),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('AC-04: stageId from a different funnel → 404', async () => {
       stageAction.get.mockResolvedValue(null);
 
-      await expect(service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' }))
-        .rejects.toThrow(NotFoundException);
+      await expect(
+        service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' }),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('AC-05: funnelId owned by a different user → 404', async () => {
       funnelAction.findOwnedById.mockResolvedValue(null);
 
-      await expect(service.updateTaskStatus(OTHER_USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' }))
-        .rejects.toThrow(NotFoundException);
+      await expect(
+        service.updateTaskStatus(OTHER_USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' }),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('AC-06: parent stage is locked → 403 ForbiddenException', async () => {
       stageAction.get.mockResolvedValue({ id: STAGE_ID, funnel_id: FUNNEL_ID, status: 'locked' } as any);
 
-      await expect(service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' }))
-        .rejects.toThrow(ForbiddenException);
+      await expect(
+        service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' }),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('AC-09: completing an already-complete task is idempotent → 200', async () => {
@@ -528,22 +572,28 @@ describe('FunnelsService', () => {
     it('SEC-04: rate limit exceeded → 429 HttpException', async () => {
       redisService.rateLimit.mockResolvedValue({ count: 31, exceeded: true });
 
-      await expect(service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' }))
-        .rejects.toThrow(HttpException);
+      await expect(
+        service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' }),
+      ).rejects.toThrow(HttpException);
     });
 
     it('SEC-04: rate limit check fires before any DB lookup', async () => {
       redisService.rateLimit.mockResolvedValue({ count: 31, exceeded: true });
 
-      await expect(service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' }))
-        .rejects.toThrow(HttpException);
+      await expect(
+        service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' }),
+      ).rejects.toThrow(HttpException);
 
       expect(funnelAction.findOwnedById).not.toHaveBeenCalled();
     });
 
     it('sets task.status from dto before calling save', async () => {
       (taskAction.get as jest.Mock).mockResolvedValue({ ...PENDING_TASK });
-      (taskAction.save as jest.Mock).mockImplementation(async ({ entity }) => ({ ...entity, is_complete: true, completed_at: new Date() }));
+      (taskAction.save as jest.Mock).mockImplementation(async ({ entity }) => ({
+        ...entity,
+        is_complete: true,
+        completed_at: new Date(),
+      }));
 
       await service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' });
 
@@ -553,10 +603,13 @@ describe('FunnelsService', () => {
   });
 
   describe('submitFeedback', () => {
-
     it('returns 201 when valid feedback is submitted', async () => {
       funnelAction.findOwnedById.mockResolvedValue({ id: FUNNEL_ID } as Partial<Funnel> as Funnel);
-      stageAction.get.mockResolvedValue({ id: 'stage-1', funnel_id: FUNNEL_ID, status: 'complete' } as Partial<FunnelStage> as FunnelStage);
+      stageAction.get.mockResolvedValue({
+        id: 'stage-1',
+        funnel_id: FUNNEL_ID,
+        status: 'complete',
+      } as Partial<FunnelStage> as FunnelStage);
       (feedbackAction.findExistingFeedback as jest.Mock).mockResolvedValue(null);
       (feedbackAction.createFeedback as jest.Mock).mockResolvedValue({
         id: 'fb-1',
@@ -573,19 +626,31 @@ describe('FunnelsService', () => {
 
     it('returns 409 if feedback already submitted', async () => {
       funnelAction.findOwnedById.mockResolvedValue({ id: FUNNEL_ID } as Partial<Funnel> as Funnel);
-      stageAction.get.mockResolvedValue({ id: 'stage-1', funnel_id: FUNNEL_ID, status: 'complete' } as Partial<FunnelStage> as FunnelStage);
-      (feedbackAction.findExistingFeedback as jest.Mock).mockResolvedValue({ id: 'existing-fb' } as Partial<StageFeedback> as StageFeedback);
+      stageAction.get.mockResolvedValue({
+        id: 'stage-1',
+        funnel_id: FUNNEL_ID,
+        status: 'complete',
+      } as Partial<FunnelStage> as FunnelStage);
+      (feedbackAction.findExistingFeedback as jest.Mock).mockResolvedValue({
+        id: 'existing-fb',
+      } as Partial<StageFeedback> as StageFeedback);
 
-      await expect(service.submitFeedback(USER_ID, FUNNEL_ID, 'stage-1', { comment: 'Great' }))
-        .rejects.toThrow(ConflictException);
+      await expect(service.submitFeedback(USER_ID, FUNNEL_ID, 'stage-1', { comment: 'Great' })).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('returns 422 if stage is not complete', async () => {
       funnelAction.findOwnedById.mockResolvedValue({ id: FUNNEL_ID } as Partial<Funnel> as Funnel);
-      stageAction.get.mockResolvedValue({ id: 'stage-1', funnel_id: FUNNEL_ID, status: 'active' } as Partial<FunnelStage> as FunnelStage);
+      stageAction.get.mockResolvedValue({
+        id: 'stage-1',
+        funnel_id: FUNNEL_ID,
+        status: 'active',
+      } as Partial<FunnelStage> as FunnelStage);
 
-      await expect(service.submitFeedback(USER_ID, FUNNEL_ID, 'stage-1', { comment: 'Great' }))
-        .rejects.toThrow(UnprocessableEntityException);
+      await expect(service.submitFeedback(USER_ID, FUNNEL_ID, 'stage-1', { comment: 'Great' })).rejects.toThrow(
+        UnprocessableEntityException,
+      );
     });
   });
 });

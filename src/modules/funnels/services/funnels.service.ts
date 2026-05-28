@@ -1,4 +1,14 @@
-import { Injectable, NotFoundException, ForbiddenException, ConflictException, ServiceUnavailableException, UnprocessableEntityException, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  ConflictException,
+  ServiceUnavailableException,
+  UnprocessableEntityException,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import type { Queue } from 'bull';
 import { DataSource } from 'typeorm';
@@ -16,7 +26,13 @@ import { StageStatus } from './../enums/stage-status.enum';
 import { FunnelCreationPath } from './../enums/funnel-creation-path.enum';
 import { UploadDocumentStatus } from '../../upload/upload.types';
 import type { BusinessContext, GenerateFunnelJobPayload } from './../interfaces/generate-funnel-job.interface';
-import type { FunnelGenerationCreateResult, FunnelStatusResult, StageCompletionResult, SubmitFeedbackResponse, UpdateTaskStatusResponse } from './../interfaces/funnels.interfaces';
+import type {
+  FunnelGenerationCreateResult,
+  FunnelStatusResult,
+  StageCompletionResult,
+  SubmitFeedbackResponse,
+  UpdateTaskStatusResponse,
+} from './../interfaces/funnels.interfaces';
 import { UploadedDocument } from '../../upload/entities/uploaded-document.entity';
 import { StageFeedbackModelAction } from '../actions/stage-feedback.action';
 import { SubmitStageFeedbackDto } from '../dto/submit-stage-feedback.dto';
@@ -54,8 +70,8 @@ export class FunnelsService {
 
     for (const row of raw) {
       const stageId = (row.stageId ?? row.stage_id) as string | undefined;
-      const total = Number((row.total ?? 0));
-      const complete = Number((row.complete ?? 0));
+      const total = Number(row.total ?? 0);
+      const complete = Number(row.complete ?? 0);
 
       if (stageId) {
         map.set(stageId, {
@@ -93,7 +109,7 @@ export class FunnelsService {
     const stages = await this.stageAction.getStagesWithTasks(funnelId);
     const stageIds = stages.map((s) => s.id);
     let countsMap = new Map<string, { total: number; complete: number }>();
-    
+
     if (stageIds.length) {
       const rawCounts = await this.taskAction.getStageCounts(stageIds);
       countsMap = this.mapStageCounts(rawCounts);
@@ -111,7 +127,7 @@ export class FunnelsService {
       actionPrompt: s.action_prompt,
       tasks: (s.tasks ?? []).map((t) => ({ id: t.id, position: t.position, name: t.name, status: t.status })),
       tasksTotal: countsMap.get(s.id)?.total ?? (s.tasks ?? []).length,
-      tasksComplete: countsMap.get(s.id)?.complete ?? ((s.tasks ?? []).filter((t) => t.status === 'complete').length),
+      tasksComplete: countsMap.get(s.id)?.complete ?? (s.tasks ?? []).filter((t) => t.status === 'complete').length,
     }));
 
     return {
@@ -131,7 +147,7 @@ export class FunnelsService {
     const stages = await this.stageAction.getStagesByFunnelId(funnelId);
     const stageIds = stages.map((s) => s.id);
     let countsSummary = new Map<string, { total: number; complete: number }>();
-    
+
     if (stageIds.length) {
       const rawCounts = await this.taskAction.getStageCounts(stageIds);
       countsSummary = this.mapStageCounts(rawCounts);
@@ -158,7 +174,9 @@ export class FunnelsService {
     if (!stage) throw new NotFoundException(SYS_MSG.FUNNEL_STAGE_NOT_FOUND);
 
     if (stage.status === StageStatus.LOCKED) {
-      const prior = await this.stageAction.get({ identifierOptions: { funnel_id: funnelId, position: stage.position - 1 } });
+      const prior = await this.stageAction.get({
+        identifierOptions: { funnel_id: funnelId, position: stage.position - 1 },
+      });
       const priorName = prior ? prior.name : 'previous';
       throw new ForbiddenException(SYS_MSG.FUNNEL_STAGE_LOCKED_MESSAGE(stage.name, priorName));
     }
@@ -275,7 +293,11 @@ export class FunnelsService {
     return base;
   }
 
-  async completeStage(funnelId: string, stageId: string, userId: string): Promise<{ statusCode: HttpStatus; message: string; data: StageCompletionResult }> {
+  async completeStage(
+    funnelId: string,
+    stageId: string,
+    userId: string,
+  ): Promise<{ statusCode: HttpStatus; message: string; data: StageCompletionResult }> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
 
@@ -292,7 +314,11 @@ export class FunnelsService {
       if (!currentStage) throw new NotFoundException(SYS_MSG.FUNNEL_OR_STAGE_NOT_FOUND);
 
       if (currentStage.status === StageStatus.COMPLETE) {
-        const unlockedStage = await this.funnelAction.findNextStage(queryRunner.manager, funnelId, currentStage.position + 1);
+        const unlockedStage = await this.funnelAction.findNextStage(
+          queryRunner.manager,
+          funnelId,
+          currentStage.position + 1,
+        );
         await queryRunner.rollbackTransaction();
         return {
           statusCode: HttpStatus.OK,
@@ -302,21 +328,33 @@ export class FunnelsService {
       }
 
       if (currentStage.status === StageStatus.LOCKED) {
-        const priorStage = await this.funnelAction.findNextStage(queryRunner.manager, funnelId, currentStage.position - 1);
+        const priorStage = await this.funnelAction.findNextStage(
+          queryRunner.manager,
+          funnelId,
+          currentStage.position - 1,
+        );
         const priorName = priorStage?.name ?? 'previous';
         throw new ForbiddenException(SYS_MSG.FUNNEL_STAGE_LOCKED_MESSAGE(currentStage.name, priorName));
       }
 
       const taskCounts = await this.funnelAction.countTasksForStage(queryRunner.manager, stageId);
       if (taskCounts.total === 0) throw new UnprocessableEntityException(SYS_MSG.STAGE_HAS_NO_TASKS);
-      if (taskCounts.pending > 0) throw new UnprocessableEntityException(SYS_MSG.STAGE_HAS_PENDING_TASKS(taskCounts.pending));
+      if (taskCounts.pending > 0)
+        throw new UnprocessableEntityException(SYS_MSG.STAGE_HAS_PENDING_TASKS(taskCounts.pending));
 
       const completedAt = new Date();
-      const affected = await this.funnelAction.updateStageStatusIfActive(queryRunner.manager, stageId, funnelId, { status: StageStatus.COMPLETE, completed_at: completedAt });
+      const affected = await this.funnelAction.updateStageStatusIfActive(queryRunner.manager, stageId, funnelId, {
+        status: StageStatus.COMPLETE,
+        completed_at: completedAt,
+      });
 
       if (affected === 0) {
         const latestStage = await this.funnelAction.findStageById(queryRunner.manager, stageId, funnelId);
-        const unlockedStage = await this.funnelAction.findNextStage(queryRunner.manager, funnelId, currentStage.position + 1);
+        const unlockedStage = await this.funnelAction.findNextStage(
+          queryRunner.manager,
+          funnelId,
+          currentStage.position + 1,
+        );
         await queryRunner.rollbackTransaction();
         if (latestStage?.status === StageStatus.COMPLETE) {
           return {
@@ -335,7 +373,9 @@ export class FunnelsService {
 
       await queryRunner.commitTransaction();
 
-      const unlockedStage = nextStage ? await this.funnelAction.findStageById(queryRunner.manager, nextStage.id, funnelId) : null;
+      const unlockedStage = nextStage
+        ? await this.funnelAction.findStageById(queryRunner.manager, nextStage.id, funnelId)
+        : null;
       return {
         statusCode: HttpStatus.OK,
         message: SYS_MSG.STAGE_COMPLETED_SUCCESSFULLY,
@@ -352,7 +392,10 @@ export class FunnelsService {
     }
   }
 
-  private async validateSourceAndDeriveContext(userId: string, dto: CreateFunnelDto): Promise<{ businessName: string; businessContext: BusinessContext }> {
+  private async validateSourceAndDeriveContext(
+    userId: string,
+    dto: CreateFunnelDto,
+  ): Promise<{ businessName: string; businessContext: BusinessContext }> {
     if (dto.source === FunnelCreationPath.WIZARD) {
       const session = await this.funnelAction.getLatestCompletedWizard(userId);
       if (!session) throw new UnprocessableEntityException(SYS_MSG.ONBOARDING_INCOMPLETE);
@@ -371,13 +414,19 @@ export class FunnelsService {
 
     const ids = dto.upload_ids ?? [];
     const uniqueIds = [...new Set(ids)];
-    if (uniqueIds.length !== ids.length || uniqueIds.length === 0) throw new UnprocessableEntityException(SYS_MSG.UPLOAD_OWNERSHIP_INVALID);
+    if (uniqueIds.length !== ids.length || uniqueIds.length === 0)
+      throw new UnprocessableEntityException(SYS_MSG.UPLOAD_OWNERSHIP_INVALID);
 
     const docs = await this.funnelAction.getUploadedDocuments(userId, uniqueIds);
     if (docs.length !== uniqueIds.length) throw new UnprocessableEntityException(SYS_MSG.UPLOAD_OWNERSHIP_INVALID);
-    if (docs.some((d) => d.status !== UploadDocumentStatus.READY)) throw new UnprocessableEntityException(SYS_MSG.UPLOAD_NOT_READY);
+    if (docs.some((d) => d.status !== UploadDocumentStatus.READY))
+      throw new UnprocessableEntityException(SYS_MSG.UPLOAD_NOT_READY);
 
-    const parsedJoin = docs.map((d) => d.parsed_text ?? '').filter(Boolean).join('\n').slice(0, 4000);
+    const parsedJoin = docs
+      .map((d) => d.parsed_text ?? '')
+      .filter(Boolean)
+      .join('\n')
+      .slice(0, 4000);
     const businessName = this.deriveNameFromFiles(docs) || DEFAULT_BUSINESS_NAME;
     const businessContext: BusinessContext = {
       businessType: 'unknown',
@@ -396,10 +445,16 @@ export class FunnelsService {
   private deriveNameFromFiles(docs: UploadedDocument[]): string {
     const first = docs[0]?.file_name;
     if (!first) return '';
-    return first.replace(/\.[a-zA-Z0-9]+$/, '').slice(0, 100).trim();
+    return first
+      .replace(/\.[a-zA-Z0-9]+$/, '')
+      .slice(0, 100)
+      .trim();
   }
 
-  private buildStageCompletionResult(currentStage: FunnelStage, unlockedStage: FunnelStage | null): StageCompletionResult {
+  private buildStageCompletionResult(
+    currentStage: FunnelStage,
+    unlockedStage: FunnelStage | null,
+  ): StageCompletionResult {
     return {
       completedStage: {
         stageId: currentStage.id,
@@ -408,13 +463,15 @@ export class FunnelsService {
         status: StageStatus.COMPLETE,
         completedAt: (currentStage.completed_at ?? new Date()).toISOString(),
       },
-      unlockedStage: unlockedStage ? {
-        stageId: unlockedStage.id,
-        position: unlockedStage.position,
-        name: unlockedStage.name,
-        status: unlockedStage.status,
-        unlockedAt: (unlockedStage.unlocked_at ?? new Date()).toISOString(),
-      } : null,
+      unlockedStage: unlockedStage
+        ? {
+            stageId: unlockedStage.id,
+            position: unlockedStage.position,
+            name: unlockedStage.name,
+            status: unlockedStage.status,
+            unlockedAt: (unlockedStage.unlocked_at ?? new Date()).toISOString(),
+          }
+        : null,
     };
   }
 
@@ -467,7 +524,12 @@ export class FunnelsService {
     };
   }
 
-  async submitFeedback(userId: string, funnelId: string, stageId: string, dto: SubmitStageFeedbackDto): Promise<SubmitFeedbackResponse> {
+  async submitFeedback(
+    userId: string,
+    funnelId: string,
+    stageId: string,
+    dto: SubmitStageFeedbackDto,
+  ): Promise<SubmitFeedbackResponse> {
     const funnel = await this.funnelAction.findOwnedById(funnelId, userId);
     if (!funnel) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
 
@@ -487,7 +549,7 @@ export class FunnelsService {
     try {
       // Comment is sanitized and verified by DTO transform
       feedback = await this.feedbackAction.createFeedback(userId, funnelId, stageId, dto.comment);
-    } catch(error: unknown) {
+    } catch (error: unknown) {
       // Postgres Error 23505 = unique_violation (Race condition catch)
       const dbError = error as { code?: string };
       if (dbError?.code === '23505') {
@@ -495,7 +557,7 @@ export class FunnelsService {
       }
       throw error;
     }
-   
+
     return {
       statusCode: HttpStatus.CREATED,
       message: SYS_MSG.FEEDBACK_SUBMITTED,

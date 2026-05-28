@@ -25,7 +25,11 @@ export class FunnelsController {
 
   @ListFunnelsDecorators()
   @Get()
-  async findAll(@CurrentUser('userId') userId: string, @Query('page') page?: number, @Query('per_page') perPage?: number) {
+  async findAll(
+    @CurrentUser('userId') userId: string,
+    @Query('page') page?: number,
+    @Query('per_page') perPage?: number,
+  ) {
     const data = await this.funnelsService.listForUser(userId, Number(page), Number(perPage));
     return {
       statusCode: HttpStatus.OK,
@@ -56,7 +60,7 @@ export class FunnelsController {
     };
   }
 
-   @GetStageDetailDecorators()
+  @GetStageDetailDecorators()
   @Get(':id/stages/:stageId')
   async getStage(
     @CurrentUser('userId') userId: string,

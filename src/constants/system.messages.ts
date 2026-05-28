@@ -119,13 +119,10 @@ export const FUNNEL_STAGE_LOCKED_MESSAGE = (stageName: string, priorStageName: s
   `The ${stageName} stage is locked. Complete all tasks in ${priorStageName} and mark it complete to unlock.`;
 export const STAGE_COMPLETED_SUCCESSFULLY = 'Stage completed successfully';
 export const STAGE_ALREADY_COMPLETE = 'Stage already complete';
-export const STAGE_HAS_PENDING_TASKS = (count: number) =>
-  `Cannot complete stage: ${count} task(s) are still pending.`;
+export const STAGE_HAS_PENDING_TASKS = (count: number) => `Cannot complete stage: ${count} task(s) are still pending.`;
 export const STAGE_HAS_NO_TASKS = 'Stage has no tasks. Cannot be marked complete.';
-export const STAGE_COMPLETION_REQUIRES_ACTIVE_FUNNEL =
-  'Funnel must be active before a stage can be completed.';
-export const STAGE_COMPLETION_CONCURRENT_UPDATE =
-  'Stage completion failed due to a concurrent update. Please retry.';
+export const STAGE_COMPLETION_REQUIRES_ACTIVE_FUNNEL = 'Funnel must be active before a stage can be completed.';
+export const STAGE_COMPLETION_CONCURRENT_UPDATE = 'Stage completion failed due to a concurrent update. Please retry.';
 export const FUNNEL_UNAUTHORIZED_ACCESS = 'You do not have permission to access this funnel';
 
 // Password Reset Messages
@@ -198,6 +195,5 @@ export const TASK_UPDATE_RATE_LIMIT_EXCEEDED = 'Too many task update requests. P
 export const PROFILE_RETRIEVED_SUCCESSFULLY = 'Profile retrieved successfully';
 export const PROFILE_UPDATED_SUCCESSFULLY = 'Profile updated successfully';
 export const PROFILE_NOT_FOUND = 'Profile not found';
-export const PROFILE_EMAIL_CHANGE_FORBIDDEN =
-  'Email cannot be changed here. Please contact support.';
+export const PROFILE_EMAIL_CHANGE_FORBIDDEN = 'Email cannot be changed here. Please contact support.';
 export const PROFILE_UPDATE_FAILED = 'Failed to update profile';
