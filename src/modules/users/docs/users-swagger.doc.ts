@@ -10,6 +10,7 @@ import {
 } from '@nestjs/swagger';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { UpdateUserProfileDto } from '../dto/update-user-profile.dto';
+import { DeleteAccountDto } from '../dto/delete-account.dto';
 
 const profileDataExample = {
   id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -264,6 +265,48 @@ export function GetUserStateDocs() {
           message: SYS_MSG.USER_NOT_FOUND_BY_TOKEN,
         },
       },
+    }),
+  );
+}
+
+export function DeleteAccountDocs() {
+  return applyDecorators(
+    ApiBearerAuth('JWT'),
+    ApiOperation({
+      summary: 'Delete user account',
+      description:
+        'Soft deletes the account immediately (sets deleted_at, is_active=false, revokes all sessions). ' +
+        'Schedules a hard delete job 30 days later to permanently remove all user data. ' +
+        'Requires confirmation string "DELETE" (case-sensitive).',
+    }),
+    ApiBody({ type: DeleteAccountDto }),
+    ApiOkResponse({
+      description: 'Account deleted successfully',
+      schema: {
+        example: {
+          success: true,
+          statusCode: HttpStatus.OK,
+          message: SYS_MSG.ACCOUNT_DELETED_SUCCESSFULLY,
+          data: null,
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'Invalid confirmation string',
+      schema: {
+        example: {
+          success: false,
+          statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          message: SYS_MSG.ACCOUNT_DELETION_CONFIRMATION_REQUIRED,
+        },
+      },
+    }),
+    ApiNotFoundResponse({
+      description: 'User not found',
+    }),
+    ApiUnauthorizedResponse({
+      description: 'Account already deleted or unauthenticated',
     }),
   );
 }
