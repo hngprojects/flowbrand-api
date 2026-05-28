@@ -16,6 +16,8 @@ import { PaginationDto } from './dto/pagination.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { UserRole } from './enums/user-role.enum';
+import { UserStateService } from './user-state.service';
+import { UserStateResponse } from './interfaces/user-state.interface';
 import * as SYS_MSG from '../../constants/system.messages';
 import { UserSessionModelAction } from './actions/user-session.action';
 import { RedisService } from '../redis/redis.service';
@@ -39,6 +41,7 @@ export class UsersService {
     private readonly userSessionModelAction: UserSessionModelAction,
     private readonly authMetaModelAction: AuthMetadataModelAction,
     private readonly redisService: RedisService,
+    private readonly userStateService: UserStateService,
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
@@ -306,7 +309,11 @@ export class UsersService {
     })
   }
 
-   private toProfileResponse(user: User): IUserProfile {
+  async getUserState(userId: string): Promise<UserStateResponse> {
+    return this.userStateService.getUserState(userId);
+  }
+
+  private toProfileResponse(user: User): IUserProfile {
     return {
       id: user.id,
       fullName: user.full_name,

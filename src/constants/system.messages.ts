@@ -23,6 +23,7 @@ export const AUTH_EMAIL_UNVERIFIED = 'Please verify your email address to log in
 export const USER_EMAIL_IN_USE = 'Email already in use';
 export const USER_NOT_FOUND = (id: string) => `User ${id} not found`;
 export const USER_UPDATE_FAILED = 'Failed to update user';
+export const USER_UNAUTHORIZED = "User not authorized"
 
 // OAuth and external auth messages
 export const GOOGLE_ACCOUNT_NO_EMAIL = 'Google account has no email';
@@ -128,6 +129,8 @@ export const STAGE_COMPLETION_REQUIRES_ACTIVE_FUNNEL =
 export const STAGE_COMPLETION_CONCURRENT_UPDATE =
   'Stage completion failed due to a concurrent update. Please retry.';
 export const FUNNEL_UNAUTHORIZED_ACCESS = 'You do not have permission to access this funnel';
+export const FUNNEL_TASK_NOT_FOUND = 'Funnel task not found or not accessible.';
+export const TASK_STATUS_UPDATED_SUCCESSFULLY = 'Task updated successfully';
 
 // Password Reset Messages
 export const PASSWORD_RESET_OTP_SENT = 'If your email is registered, you will receive a password reset code.';
@@ -181,7 +184,7 @@ export const AI_PROVIDER_TIMEOUT = (provider: string, timeoutMs: number) =>
 
 export const AI_PROVIDER_HTTP_ERROR = (provider: string, status: number) => `${provider} HTTP ${status}`;
 
-// Funnel generation (BE-305)
+// Funnel messages
 export const FUNNEL_GENERATION_STARTED = 'Funnel generation started.';
 export const FUNNEL_ALREADY_EXISTS = 'Funnel already exists.';
 export const GENERATION_IN_PROGRESS = 'A funnel is already being generated for your account.';
@@ -194,7 +197,13 @@ export const GENERATION_RATE_LIMIT_EXCEEDED =
 export const UPLOAD_NOT_READY = 'One or more uploaded documents are not yet ready for funnel generation.';
 export const UPLOAD_OWNERSHIP_INVALID = 'One or more uploaded documents do not belong to you.';
 export const GENERATION_FAILED = 'Funnel generation failed. Please retry from the dashboard.';
+export const FEEDBACK_SUBMITTED = 'Feedback submitted successfully';
+export const FEEDBACK_ALREADY_SUBMITTED = 'Feedback already submitted for this stage';
+export const FEEDBACK_STAGE_NOT_COMPLETE = 'Feedback can only be submitted for completed stages';
 
+// User State (M4-BE-013)
+export const USER_STATE_RETRIEVED = 'User state retrieved successfully';
+export const USER_NOT_FOUND_BY_TOKEN = 'User associated with this token no longer exists';
 // Profile
 export const PROFILE_RETRIEVED_SUCCESSFULLY = 'Profile retrieved successfully';
 export const PROFILE_UPDATED_SUCCESSFULLY = 'Profile updated successfully';

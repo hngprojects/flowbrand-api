@@ -99,6 +99,22 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
     });
   }
 
+  async findFunnelsByUserId(userId: string): Promise<Funnel[]> {
+    return this.repository
+      .createQueryBuilder('f')
+      .where('f.user_id = :userId', { userId })
+      .orderBy('f.created_at', 'DESC')
+      .getMany();
+  }
+
+  async findFunnelByIdAndUser(funnelId: string, userId: string): Promise<Funnel | null> {
+    return this.repository
+      .createQueryBuilder('f')
+      .where('f.id = :funnelId', { funnelId })
+      .andWhere('f.user_id = :userId', { userId })
+      .getOne();
+  }
+
   async getUploadedDocuments(userId: string, ids: string[]): Promise<UploadedDocument[]> {
     return this.manager.getRepository(UploadedDocument).find({
       where: { id: In(ids), user_id: userId },

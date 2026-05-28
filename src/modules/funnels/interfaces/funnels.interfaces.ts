@@ -35,3 +35,23 @@ export interface StageCompletionResult {
 }
 
 export type FunnelStageEntity = FunnelStage;
+
+export interface SubmitFeedbackResponse {
+  statusCode: number;
+  message: string;
+  data: {
+    feedbackId: string;
+    stageId: string;
+    comment: string | null;
+    submittedAt: string;
+  };
+}
+
+export interface TaskUpdateResult {
+  taskId: string;
+  name: string;
+  status: 'pending' | 'complete';
+  isComplete: boolean;
+  completedAt: string | null;
+  position: number;
+}

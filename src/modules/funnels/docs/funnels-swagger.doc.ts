@@ -13,6 +13,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
   ApiUnprocessableEntityResponse,
+  ApiCreatedResponse,
 } from '@nestjs/swagger';
 import * as SYS_MSG from '../../../constants/system.messages';
 
@@ -363,5 +364,124 @@ export function CompleteStageDecorators() {
       description: 'Funnel is not active, the stage has no tasks, or one or more tasks are still pending',
       schema: { example: stagePendingTasksExample('/api/funnels/{id}/stages/{stageId}/complete') },
     }),
+  );
+}
+
+export const taskUpdateSuccessExample = {
+  success: true,
+  statusCode: HttpStatus.OK,
+  message: SYS_MSG.TASK_STATUS_UPDATED_SUCCESSFULLY,
+  data: {
+    taskId: '550e8400-e29b-41d4-a716-446655440020',
+    name: 'Define ICP',
+    status: 'complete',
+    isComplete: true,
+    completedAt: '2026-05-26T10:00:00.000Z',
+    position: 1,
+  },
+};
+
+export const taskUpdateIdempotentExample = {
+  success: true,
+  statusCode: HttpStatus.OK,
+  message: SYS_MSG.TASK_STATUS_UPDATED_SUCCESSFULLY,
+  data: {
+    taskId: '550e8400-e29b-41d4-a716-446655440020',
+    name: 'Define ICP',
+    status: 'pending',
+    isComplete: false,
+    completedAt: null,
+    position: 1,
+  },
+};
+
+export const taskNotFoundExample = (path: string) => ({
+  success: false,
+  statusCode: HttpStatus.NOT_FOUND,
+  error: 'NotFoundException',
+  message: SYS_MSG.FUNNEL_TASK_NOT_FOUND,
+  path,
+  timestamp: '2026-05-26T10:00:00.000Z',
+});
+
+export const taskStageLockedExample = (path: string) => ({
+  success: false,
+  statusCode: HttpStatus.FORBIDDEN,
+  error: 'ForbiddenException',
+  message: SYS_MSG.FUNNEL_STAGE_LOCKED_MESSAGE('Spark Interest', 'Get Noticed'),
+  path,
+  timestamp: '2026-05-26T10:00:00.000Z',
+});
+
+export const taskValidationFailedExample = (path: string) => ({
+  success: false,
+  statusCode: HttpStatus.BAD_REQUEST,
+  error: 'BadRequestException',
+  message: ['status must be one of the following values: pending, complete'],
+  path,
+  timestamp: '2026-05-26T10:00:00.000Z',
+});
+
+export function UpdateTaskStatusDecorators() {
+  const path = '/api/funnels/{funnelId}/stages/{stageId}/tasks/{taskId}';
+  return applyDecorators(
+    ApiOperation({
+      summary: 'Mark a funnel stage task as complete or incomplete',
+      description:
+        'Toggles a single task between `pending` and `complete`. The parent stage ' +
+        'must not be locked. Marking an already-complete task complete (or a pending ' +
+        'task pending) is idempotent and returns 200 with the current state.',
+    }),
+    ApiOkResponse({ description: 'Task status updated successfully', schema: { example: taskUpdateSuccessExample } }),
+    ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token', schema: { example: unauthorizedExample } }),
+    ApiForbiddenResponse({ description: 'Parent stage is locked', schema: { example: taskStageLockedExample(path) } }),
+    ApiNotFoundResponse({
+      description: 'Funnel, stage, or task not found, or not owned by the authenticated user',
+      schema: { example: taskNotFoundExample(path) },
+    }),
+    ApiResponse({
+      status: HttpStatus.BAD_REQUEST,
+      description: 'Validation failed (status missing or not one of pending/complete)',
+      schema: { example: taskValidationFailedExample(path) },
+    }),
+  );
+}
+
+export const feedbackSuccessExample = {
+  success: true,
+  statusCode: HttpStatus.CREATED,
+  message: SYS_MSG.FEEDBACK_SUBMITTED,
+  data: {
+    feedbackId: '550e8400-e29b-41d4-a716-446655440000',
+    stageId: '550e8400-e29b-41d4-a716-446655440010',
+    comment: 'This stage was really useful.',
+    submittedAt: '2026-05-26T10:00:00.000Z',
+  },
+};
+
+export const feedbackConflictExample = {
+  success: false,
+  statusCode: HttpStatus.CONFLICT,
+  error: 'ConflictException',
+  message: SYS_MSG.FEEDBACK_ALREADY_SUBMITTED,
+  timestamp: '2026-05-26T10:00:00.000Z',
+};
+
+export const feedbackNotCompleteExample = {
+  success: false,
+  statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+  error: 'UnprocessableEntityException',
+  message: SYS_MSG.FEEDBACK_STAGE_NOT_COMPLETE,
+  timestamp: '2026-05-26T10:00:00.000Z',
+};
+
+export function SubmitFeedbackDocs() {
+  return applyDecorators(
+    ApiOperation({ summary: 'Submit feedback for a completed stage' }),
+    ApiCreatedResponse({ description: 'Feedback successfully submitted', schema: { example: feedbackSuccessExample } }),
+    ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token', schema: { example: unauthorizedExample } }),
+    ApiNotFoundResponse({ description: 'Funnel or stage not found', schema: { example: notFoundExample('/api/funnels/{funnelId}/stages/{stageId}/feedback') } }),
+    ApiConflictResponse({ description: 'Feedback already submitted for this stage', schema: { example: feedbackConflictExample } }),
+    ApiUnprocessableEntityResponse({ description: 'Stage is not complete', schema: { example: feedbackNotCompleteExample } }),
   );
 }

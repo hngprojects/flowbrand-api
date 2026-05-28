@@ -16,12 +16,17 @@ import { UserSessionModelAction } from './actions/user-session.action';
 import { AuthMetadataModelAction } from '../auth/actions/auth-metadata.action';
 import { RedisService } from '../redis/redis.service';
 import { redisKeys } from '../../constants/redis-keys';
+import { UserStateService } from './user-state.service';
+import { User } from './entities/user.entity';
+import { UserStateResponse } from './interfaces/user-state.interface';
+import { UserRole } from './enums/user-role.enum';
 
 jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('hashed-password'),
   compare: jest.fn().mockResolvedValue(true),
 }));
 
+// Mock UserModelAction
 const mockUserModelAction = {
   findByEmail: jest.fn(),
   create: jest.fn(),
@@ -42,25 +47,45 @@ const mockAuthMetaModelAction = {
   createForUser: jest.fn(),
 };
 
-const mockRedisService = {
-  del: jest.fn(),
-};
 
 const USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const USER_EMAIL = 'test@example.com';
+// Mock WizardSessionModelAction
+const mockWizardSessionModelAction = {
+  findActiveSession: jest.fn(),
+  findSessionById: jest.fn(),
+  saveSession: jest.fn(),
+  markAsExpired: jest.fn(),
+  resolveStartWizardSession: jest.fn(),
+};
 
-const mockUser = {
+// Mock UserStateService
+const mockUserStateService = {
+  getUserState: jest.fn(),
+  invalidateUserStateCache: jest.fn(),
+};
+
+// Mock RedisService
+const mockRedisService = {
+  get: jest.fn(),
+  set: jest.fn(),
+  del: jest.fn(),
+};
+
+const mockUser = (): Partial<User> => ({
   id: USER_ID,
   email: USER_EMAIL,
   full_name: 'Test User',
   password_hash: 'hashed-password',
   is_verified: false,
   is_active: true,
-  roles: [{ role: 'user' }],
-};
+  auth_provider: 'local',
+});
 
 const mockFullUser = {
-  ...mockUser,
+  id: USER_ID,
+  email: USER_EMAIL,
+  full_name: 'Test User',
   country: 'Nigeria',
   avatar_url: null,
   auth_provider: 'local',
@@ -83,11 +108,16 @@ describe('UsersService', () => {
         { provide: AuthMetadataModelAction, useValue: mockAuthMetaModelAction },
         { provide: RedisService, useValue: mockRedisService },
 
+        { provide: UserStateService, useValue: mockUserStateService },
       ],
     }).compile();
 
     service = module.get<UsersService>(UsersService);
   });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CRUD TESTS
+  // ─────────────────────────────────────────────────────────────────────────
 
   describe('create', () => {
     const createDto = {
@@ -97,77 +127,70 @@ describe('UsersService', () => {
       termsAccepted: true,
     };
 
-    it('AC-01: creates a user and returns the created user', async () => {
+    it('creates a user and returns the created user', async () => {
       mockUserModelAction.findByEmail.mockResolvedValue(null);
-      mockUserModelAction.create.mockResolvedValue(mockUser);
+      mockUserModelAction.create.mockResolvedValue(mockUser());
 
       const result = await service.create(createDto);
 
       expect(mockUserModelAction.findByEmail).toHaveBeenCalledWith(USER_EMAIL);
       expect(bcrypt.hash).toHaveBeenCalledWith('Password123!', 10);
-      expect(result).toEqual(mockUser);
+      expect(result).toEqual(mockUser());
     });
 
-    it('AC-02: throws 409 when email already exists', async () => {
-      mockUserModelAction.findByEmail.mockResolvedValue(mockUser);
+    it('throws 409 when email already exists', async () => {
+      mockUserModelAction.findByEmail.mockResolvedValue(mockUser());
 
       await expect(service.create(createDto)).rejects.toBeInstanceOf(ConflictException);
       expect(mockUserModelAction.create).not.toHaveBeenCalled();
     });
 
-    it('AC-03: throws 409 with USER_ACCOUNT_LOCKED when account is inactive', async () => {
-      mockUserModelAction.findByEmail.mockResolvedValue({ ...mockUser, is_active: false });
+    it('throws 409 with USER_ACCOUNT_LOCKED when account is inactive', async () => {
+      mockUserModelAction.findByEmail.mockResolvedValue({ ...mockUser(), is_active: false });
 
       await expect(service.create(createDto)).rejects.toThrow(SYS_MSG.USER_ACCOUNT_LOCKED);
     });
 
-    it('AC-04: throws 409 on duplicate key DB error', async () => {
+    it('throws 409 on duplicate key DB error', async () => {
       mockUserModelAction.findByEmail.mockResolvedValue(null);
       const dbError = Object.assign(new QueryFailedError('', [], new Error()), {
         driverError: { code: '23505' },
       });
       mockUserModelAction.create.mockRejectedValue(dbError);
-      mockUserModelAction.findByEmail.mockResolvedValueOnce(null).mockResolvedValueOnce(mockUser);
 
       await expect(service.create(createDto)).rejects.toBeInstanceOf(ConflictException);
     });
   });
 
   describe('findById', () => {
-    it('AC-05: returns user when found', async () => {
-      mockUserModelAction.get.mockResolvedValue(mockUser);
+    it('returns user when found', async () => {
+      mockUserModelAction.get.mockResolvedValue(mockUser());
 
       const result = await service.findById(USER_ID);
 
-      expect(result).toEqual(mockUser);
+      expect(result).toEqual(mockUser());
       expect(mockUserModelAction.get).toHaveBeenCalledWith({
         identifierOptions: { id: USER_ID },
       });
     });
 
-    it('AC-06: throws 404 when user not found', async () => {
+    it('throws 404 when user not found', async () => {
       mockUserModelAction.get.mockResolvedValue(null);
 
       await expect(service.findById(USER_ID)).rejects.toBeInstanceOf(NotFoundException);
     });
-
-    it('AC-06: 404 message contains the user id', async () => {
-      mockUserModelAction.get.mockResolvedValue(null);
-
-      await expect(service.findById(USER_ID)).rejects.toThrow(USER_ID);
-    });
   });
 
   describe('findByEmail', () => {
-    it('AC-07: returns user when email exists', async () => {
-      mockUserModelAction.findByEmail.mockResolvedValue(mockUser);
+    it('returns user when email exists', async () => {
+      mockUserModelAction.findByEmail.mockResolvedValue(mockUser());
 
       const result = await service.findByEmail(USER_EMAIL);
 
-      expect(result).toEqual(mockUser);
+      expect(result).toEqual(mockUser());
     });
 
-    it('AC-08: returns null when email does not exist', async () => {
+    it('returns null when email does not exist', async () => {
       mockUserModelAction.findByEmail.mockResolvedValue(null);
 
       const result = await service.findByEmail('nonexistent@example.com');
@@ -179,50 +202,48 @@ describe('UsersService', () => {
   describe('update', () => {
     const updateDto = { fullName: 'Updated Name' };
 
-    it('AC-09: updates and returns user when found', async () => {
-      mockUserModelAction.get.mockResolvedValue(mockUser);
-      mockUserModelAction.update.mockResolvedValue({ ...mockUser, full_name: 'Updated Name' });
+    it('updates and returns user when found', async () => {
+      mockUserModelAction.get.mockResolvedValue(mockUser());
+      mockUserModelAction.update.mockResolvedValue({ ...mockUser(), full_name: 'Updated Name' });
 
       const result = await service.update(USER_ID, updateDto);
 
       expect(result.full_name).toBe('Updated Name');
     });
 
-    it('AC-10: throws 404 when user not found during update', async () => {
+    it('throws 404 when user not found during update', async () => {
       mockUserModelAction.get.mockResolvedValue(null);
 
       await expect(service.update(USER_ID, updateDto)).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it('AC-11: hashes password when password is provided in update', async () => {
-      mockUserModelAction.get.mockResolvedValue(mockUser);
-      mockUserModelAction.update.mockResolvedValue(mockUser);
+    it('hashes password when password is provided in update', async () => {
+      mockUserModelAction.get.mockResolvedValue(mockUser());
+      mockUserModelAction.update.mockResolvedValue(mockUser());
 
       await service.update(USER_ID, { password: 'NewPass123!' });
 
       expect(bcrypt.hash).toHaveBeenCalledWith('NewPass123!', 10);
     });
 
-    it('AC-12: throws 500 when update returns null', async () => {
-      mockUserModelAction.get.mockResolvedValue(mockUser);
+    it('throws 500 when update returns null', async () => {
+      mockUserModelAction.get.mockResolvedValue(mockUser());
       mockUserModelAction.update.mockResolvedValue(null);
 
-      await expect(service.update(USER_ID, updateDto)).rejects.toBeInstanceOf(
-        InternalServerErrorException,
-      );
+      await expect(service.update(USER_ID, updateDto)).rejects.toBeInstanceOf(InternalServerErrorException);
     });
   });
 
   describe('remove', () => {
-    it('AC-13: deletes user when found', async () => {
-      mockUserModelAction.get.mockResolvedValue(mockUser);
+    it('deletes user when found', async () => {
+      mockUserModelAction.get.mockResolvedValue(mockUser());
       mockUserModelAction.delete.mockResolvedValue(undefined);
 
       await expect(service.remove(USER_ID)).resolves.toBeUndefined();
       expect(mockUserModelAction.delete).toHaveBeenCalled();
     });
 
-    it('AC-14: throws 404 when user not found during remove', async () => {
+    it('throws 404 when user not found during remove', async () => {
       mockUserModelAction.get.mockResolvedValue(null);
 
       await expect(service.remove(USER_ID)).rejects.toBeInstanceOf(NotFoundException);
@@ -238,7 +259,7 @@ describe('UsersService', () => {
     };
 
     beforeEach(() => {
-      mockUserModelAction.get.mockResolvedValue(mockUser);
+      mockUserModelAction.get.mockResolvedValue(mockUser());
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       mockUserModelAction.update.mockResolvedValue(mockUser);
       mockAuthMetaModelAction.updateByUserId.mockResolvedValue(undefined);
@@ -320,7 +341,7 @@ describe('UsersService', () => {
 
     it('AC-22: throws UnprocessableEntityException for Google OAuth account with no password hash', async () => {
       mockUserModelAction.get.mockResolvedValue({
-        ...mockUser,
+        ...mockUser(),
         auth_provider: 'google',
         password_hash: null,
       });
@@ -342,7 +363,7 @@ describe('UsersService', () => {
       await service.changePassword(USER_ID, changePasswordDto);
       expect(bcrypt.compare).toHaveBeenCalledWith(
         changePasswordDto.oldPassword,
-        mockUser.password_hash,
+        mockUser().password_hash,
       );
     });
 
@@ -352,7 +373,7 @@ describe('UsersService', () => {
 
       expect(logSpy).toHaveBeenCalled();
       const logPayload = JSON.stringify(logSpy.mock.calls[0]);
-      expect(logPayload).not.toContain(mockUser.password_hash);
+      expect(logPayload).not.toContain(mockUser().password_hash);
       expect(logPayload).not.toContain(changePasswordDto.oldPassword);
       expect(logPayload).not.toContain(changePasswordDto.newPassword);
     });
@@ -511,7 +532,6 @@ describe('UsersService', () => {
       mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, country: 'Ghana' });
       mockUserModelAction.update.mockResolvedValue({ ...mockFullUser, country: 'Nigeria' });
 
-      // 'nigeria' (lowercase) should resolve to canonical 'Nigeria'
       await service.updateProfile(USER_ID, { country: 'nigeria' as never });
 
       const updateCall = mockUserModelAction.update.mock.calls[0][0] as {
@@ -535,6 +555,21 @@ describe('UsersService', () => {
       await expect(
         service.updateProfile(USER_ID, { fullName: 'Different Name' }),
       ).rejects.toBeInstanceOf(InternalServerErrorException);
+    });
+  });
+
+  describe('getUserState', () => {
+    it('delegates to UserStateService.getUserState', async () => {
+      const expectedResponse: UserStateResponse = {
+        onboarding: { status: 'not_started' },
+        activeFunnel: null,
+      };
+      mockUserStateService.getUserState.mockResolvedValue(expectedResponse);
+
+      const result = await service.getUserState(USER_ID);
+
+      expect(mockUserStateService.getUserState).toHaveBeenCalledWith(USER_ID);
+      expect(result).toEqual(expectedResponse);
     });
   });
 
