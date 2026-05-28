@@ -45,7 +45,7 @@ export class UserSessionModelAction extends AbstractModelAction<UserSession> {
     return (await this.create({ createPayload, transactionOptions: { useTransaction: false } }));
   }
 
-  async revokeAllUserSessions(userId: string, manager?: EntityManager): Promise<string[]> {
+  async revokeAllUserSessionsInDb(userId: string, manager?: EntityManager): Promise<string[]> {
     const repo = manager ? manager.getRepository(UserSession) : this.repository;
 
     const activeSessions = await repo.find({

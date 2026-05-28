@@ -13,10 +13,12 @@ import { UserStateService } from './user-state.service';
 import { BullModule } from '@nestjs/bull';
 import { ConfigService } from '@nestjs/config'
 import { AccountDeletionProcessor, ACCOUNT_DELETION_QUEUE } from './processors/account-deletion.processor';
+import { AuthMetadata } from '../auth/entities/auth-metadata.entity';
+import { AuthMetadataModelAction } from '../auth/actions/auth-metadata.action';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, UserSession]),
+    TypeOrmModule.forFeature([User, UserSession, AuthMetadata]),
     OnboardingModule,
     FunnelsModule,
     RedisModule,
@@ -48,6 +50,7 @@ import { AccountDeletionProcessor, ACCOUNT_DELETION_QUEUE } from './processors/a
     UsersService, 
     UserStateService,
     AccountDeletionProcessor,
+    AuthMetadataModelAction,
   ],
   exports: [UsersService, UserModelAction, UserSessionModelAction],
 })

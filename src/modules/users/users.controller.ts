@@ -19,7 +19,7 @@ import { UsersService } from './users.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
-import { GetProfileDocs, UpdateProfileDocs, GetUserStateDocs, DeleteAccountDocs } from './docs/users-swagger.doc';
+import { GetProfileDocs, UpdateProfileDocs, GetUserStateDocs, DeleteAccountDocs, ChangePasswordDocs } from './docs/users-swagger.doc';
 import { DeleteAccountDto } from './dto/delete-account.dto';
 import * as SYS_MSG from '../../constants/system.messages';
 
@@ -87,6 +87,18 @@ export class UsersController {
   @ApiOperation({ summary: 'Get a user by id' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.findById(id);
+  }
+
+  @Patch('me/password')
+  @ChangePasswordDocs()
+  @HttpCode(HttpStatus.OK)
+  async changePassword(@CurrentUser('sub') userId: string, @Body() dto: ChangePasswordDto) {
+    await this.usersService.changePassword(userId, dto);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.PASSWORD_CHANGE_SUCCESSFUL,
+      data: null,
+    }
   }
 
   @Patch(':id')

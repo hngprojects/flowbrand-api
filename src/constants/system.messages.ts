@@ -10,6 +10,7 @@ export const AUTH_LOGIN_SUCCESSFUL = 'Login successful';
 export const AUTH_LOGOUT_SUCCESSFUL = 'Logout successful';
 export const AUTH_TOKEN_REFRESHED = 'Token refreshed successfully';
 export const AUTH_INVALID_CREDENTIALS = 'Invalid email or password';
+export const AUTH_INVALID_TOKEN = 'Invalid or expired token';
 export const AUTH_INVALID_REFRESH_TOKEN = 'Invalid or expired refresh token';
 export const AUTH_UNAUTHENTICATED_MESSAGE = 'Unauthenticated';
 export const AUTH_TERMS_REQUIRED = 'You must accept the terms and conditions to register';
@@ -140,6 +141,15 @@ export const PASSWORD_RESET_RATE_LIMITED = 'Too many password reset requests. Pl
 export const PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED = 'Too many verification attempts. Please try again later.';
 export const PASSWORD_RESET_OTP_VERIFIED = 'OTP verified. Use the reset token to set your new password.';
 export const PASSWORD_RESET_INVALID_TOKEN = 'Invalid or expired reset token.';
+
+//Password Change Messages
+export const PASSWORD_CHANGE_SUCCESSFUL = 'Password changed successfully';
+export const INCORRECT_OLD_PASSWORD = 'The old password you entered is incorrect.';
+export const PASSWORD_CHANGE_NOT_SUPPORTED = 'Password change is not supported for accounts registered via Google OAuth';
+export const PASSWORD_CHANGE_NOT_SUCCESSFUL = 'New password cannot be the same as the old password';
+export const INCORRECT_CONFIRM_PASSWORD = 'The value of the confirm password does not match the new password';
+export const PASSWORD_CHANGE_UNAVAILABLE = 'Password change is not available for this account';
+export const PASSWORD_TOO_WEAK = 'Your new password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
 
 // Waitlist
 export const WAITLIST_JOINED_SUCCESSFULLY = 'Successfully joined the waitlist';
