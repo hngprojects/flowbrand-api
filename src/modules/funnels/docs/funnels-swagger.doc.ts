@@ -2,6 +2,7 @@ import { applyDecorators, HttpStatus } from '@nestjs/common';
 import {
   ApiAcceptedResponse,
   ApiBearerAuth,
+  ApiBody,
   ApiConflictResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -15,6 +16,7 @@ import {
   ApiUnprocessableEntityResponse,
   ApiCreatedResponse,
 } from '@nestjs/swagger';
+import { UpdateTaskStatusDto } from '../dto/update-task-status.dto';
 import * as SYS_MSG from '../../../constants/system.messages';
 
 // ============================================================================
@@ -472,6 +474,7 @@ export const updateTaskStatusExample = {
 export function UpdateTaskStatusDocs() {
   return applyDecorators(
     ApiOperation({ summary: 'Toggle a stage task between pending and complete' }),
+    ApiBody({ type: UpdateTaskStatusDto }),
     ApiOkResponse({ description: 'Task updated successfully', schema: { example: updateTaskStatusExample } }),
     ApiUnauthorizedResponse({
       description: 'Missing or invalid bearer token',

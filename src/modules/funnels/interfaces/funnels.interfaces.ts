@@ -49,7 +49,7 @@ export interface SubmitFeedbackResponse {
 }
 
 export interface UpdateTaskStatusResponse {
-  statusCode: number;
+  statusCode: HttpStatus;
   message: string;
   data: {
     taskId: string;
