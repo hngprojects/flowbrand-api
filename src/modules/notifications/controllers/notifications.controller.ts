@@ -4,6 +4,7 @@ import * as SYS_MSG from '../../../constants/system.messages';
 import { ListNotificationsQueryDto } from '../dto/list-notifications.query.dto';
 import { NotificationFilter } from '../enums/notification-filter.enum';
 import { NotificationsService } from '../notifications.service';
+import { NotificationFeedItem } from '../interfaces/notification-feed.interface';
 import {
   DeleteNotificationDocs,
   GetUnreadCountDocs,
@@ -49,7 +50,18 @@ export class NotificationsController {
   @Patch(':id/read')
   @MarkNotificationReadDocs()
   async markAsRead(@CurrentUser('userId') userId: string, @Param('id', ParseUUIDPipe) id: string) {
-    const data = await this.notificationsService.markRead(userId, id);
+    const n = await this.notificationsService.markRead(userId, id);
+
+    const data: NotificationFeedItem = {
+      id: n.id,
+      type: n.type,
+      title: n.title,
+      body: n.body,
+      is_read: n.is_read,
+      read_at: n.read_at,
+      metadata: n.metadata ?? {},
+      created_at: n.created_at,
+    };
 
     return {
       statusCode: HttpStatus.OK,

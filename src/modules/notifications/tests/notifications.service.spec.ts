@@ -88,7 +88,18 @@ describe('NotificationsService', () => {
 
   describe('getFeed', () => {
     it('AC-01/EC-02: returns paginated items with a separate unread count', async () => {
-      const notifications = [{ id: 'notif-1', is_read: false } as Notification];
+      const notifications = [
+        {
+          id: 'notif-1',
+          is_read: false,
+          type: 'feed_event',
+          title: 'T',
+          body: 'B',
+          read_at: null,
+          metadata: {},
+          created_at: new Date(),
+        } as Notification,
+      ];
       mockNotificationAction.listForUserPaginated.mockResolvedValue([notifications, 1]);
       mockNotificationAction.countUnread.mockResolvedValue(1);
 

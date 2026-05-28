@@ -24,6 +24,11 @@ describe('NotificationsController', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    // inject a fake authenticated user for CurrentUser decorator
+    app.use((req: any, _res: any, next: any) => {
+      req.user = { userId: 'test-user' };
+      next();
+    });
     await app.init();
   });
 
@@ -49,7 +54,7 @@ describe('NotificationsController', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data.total_count).toBe(0);
-    expect(notificationsServiceMock.getFeed).toHaveBeenCalledWith(undefined, NotificationFilter.ALL, 1, 20);
+    expect(notificationsServiceMock.getFeed).toHaveBeenCalledWith('test-user', NotificationFilter.ALL, 1, 20);
   });
 
   it('EC-04/SEC-02: rejects invalid UUIDs before invoking the service', async () => {

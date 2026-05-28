@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, Min, Max } from 'class-validator';
 import { NotificationFilter } from '../enums/notification-filter.enum';
 
 export class ListNotificationsQueryDto {
@@ -14,6 +14,7 @@ export class ListNotificationsQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(1000)
   page?: number = 1;
 
   @ApiPropertyOptional({ default: 20, minimum: 1, maximum: 50 })
