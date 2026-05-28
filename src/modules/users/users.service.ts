@@ -4,9 +4,8 @@ import {
   InternalServerErrorException,
   Logger,
   NotFoundException,
-  Logger,
-  UnprocessableEntityException,
   UnauthorizedException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { QueryFailedError } from 'typeorm';
