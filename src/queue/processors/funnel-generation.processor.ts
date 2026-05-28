@@ -12,7 +12,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import type { Job } from 'bull';
 import { DataSource } from 'typeorm';
 import { APP_EVENTS } from '../../common/constants/app-events';
-import { FunnelFailedEvent, FunnelGeneratedEvent } from '../../common/events';
+import { emitSafely, FunnelFailedEvent, FunnelGeneratedEvent } from '../../common/events';
 import { JOBS, QUEUES } from '../../common/constants/queue.constants';
 import { FunnelModelAction } from '../../modules/funnels/actions/funnel.action';
 import { Funnel } from '../../modules/funnels/entities/funnel.entity';
@@ -98,15 +98,7 @@ export class FunnelGenerationProcessor {
       throw err;
     }
 
-    this.emitSafely(APP_EVENTS.FUNNEL_GENERATED, new FunnelGeneratedEvent(userId, funnelId, funnel.business_name));
-  }
-
-  private emitSafely(eventName: string, payload: object): void {
-    try {
-      this.eventEmitter.emit(eventName, payload);
-    } catch (error) {
-      this.logger.warn({ message: 'Domain event listener failed', eventName, error: (error as Error).message });
-    }
+    emitSafely(this.eventEmitter, this.logger, APP_EVENTS.FUNNEL_GENERATED, new FunnelGeneratedEvent(userId, funnelId, funnel.business_name));
   }
 
   private async tryAiGeneration(ctx: BusinessContext): Promise<LlmStageData[] | null> {
@@ -284,7 +276,7 @@ export class FunnelGenerationProcessor {
         updatePayload: { status: FunnelStatus.FAILED },
         transactionOptions: { useTransaction: false },
       });
-      this.emitSafely(APP_EVENTS.FUNNEL_FAILED, new FunnelFailedEvent(job.data.userId, job.data.funnelId));
+      emitSafely(this.eventEmitter, this.logger, APP_EVENTS.FUNNEL_FAILED, new FunnelFailedEvent(job.data.userId, job.data.funnelId));
     }
   }
 

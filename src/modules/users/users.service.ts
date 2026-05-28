@@ -11,6 +11,7 @@ import { QueryFailedError } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { APP_EVENTS } from '../../common/constants/app-events';
 import { ProfileUpdatedEvent, AccountDeletedEvent } from '../../common/events';
+import { emitSafely } from '../../common/events/emit-safely';
 import { UserModelAction } from './actions/user.action';
 import { CreateUserDto } from './dto/create-user.dto';
 import { PaginationDto } from './dto/pagination.dto';
@@ -206,15 +207,7 @@ export class UsersService {
       ...NO_TRANSACTION,
       identifierOptions: { id },
     });
-    this.emitSafely(APP_EVENTS.ACCOUNT_DELETED, new AccountDeletedEvent(id));
-  }
-
-  private emitSafely(eventName: string, payload: object): void {
-    try {
-      this.eventEmitter.emit(eventName, payload);
-    } catch (error) {
-      this.logger.warn({ message: 'Domain event listener failed', eventName, error: (error as Error).message });
-    }
+    emitSafely(this.eventEmitter, this.logger, APP_EVENTS.ACCOUNT_DELETED, new AccountDeletedEvent(id));
   }
 
   async getUserState(userId: string): Promise<UserStateResponse> {
@@ -288,7 +281,7 @@ export class UsersService {
       throw new InternalServerErrorException(SYS_MSG.PROFILE_UPDATE_FAILED);
     }
 
-    this.emitSafely(APP_EVENTS.PROFILE_UPDATED, new ProfileUpdatedEvent(userId, changedFields));
+    emitSafely(this.eventEmitter, this.logger, APP_EVENTS.PROFILE_UPDATED, new ProfileUpdatedEvent(userId, changedFields));
 
     return this.toProfileResponse(updated);
   }

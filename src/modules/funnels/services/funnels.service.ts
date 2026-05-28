@@ -5,6 +5,7 @@ import { DataSource } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { APP_EVENTS } from '../../../common/constants/app-events';
 import { StageCompletedEvent, StageUnlockedEvent, FeedbackSubmittedEvent, TaskCompletedEvent, TaskReopenedEvent } from '../../../common/events';
+import { emitSafely } from '../../../common/events/emit-safely';
 import { JOBS, QUEUES } from '../../../common/constants/queue.constants';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { RedisService } from '../../redis/redis.service';
@@ -339,14 +340,12 @@ export class FunnelsService {
 
       await queryRunner.commitTransaction();
 
-      this.emitSafely(
-        APP_EVENTS.STAGE_COMPLETED,
+      emitSafely(this.eventEmitter, this.logger, APP_EVENTS.STAGE_COMPLETED,
         new StageCompletedEvent(userId, funnelId, stageId, currentStage.position, currentStage.name, nextStage?.id ?? null, nextStage?.name ?? null),
       );
 
       if (nextStage) {
-        this.emitSafely(
-          APP_EVENTS.STAGE_UNLOCKED,
+        emitSafely(this.eventEmitter, this.logger, APP_EVENTS.STAGE_UNLOCKED,
           new StageUnlockedEvent(userId, funnelId, nextStage.id, nextStage.position, nextStage.name),
         );
       }
@@ -434,14 +433,6 @@ export class FunnelsService {
     };
   }
 
-  private emitSafely(eventName: string, payload: object): void {
-    try {
-      this.eventEmitter.emit(eventName, payload);
-    } catch (error) {
-      this.logger.warn({ message: 'Domain event listener failed', eventName, error: (error as Error).message });
-    }
-  }
-
   private async checkRateLimit(userId: string): Promise<void> {
     const key = `ratelimit:funnel-generate:${userId}`;
     const { exceeded } = await this.redisService.rateLimit(key, 5, 3600);
@@ -480,9 +471,9 @@ export class FunnelsService {
     const saved = await this.taskAction.saveTask(task);
 
     if (status === 'complete') {
-      this.emitSafely(APP_EVENTS.TASK_COMPLETED, new TaskCompletedEvent(userId, funnelId, stageId, taskId, saved.name));
+      emitSafely(this.eventEmitter, this.logger, APP_EVENTS.TASK_COMPLETED, new TaskCompletedEvent(userId, funnelId, stageId, taskId, saved.name));
     } else {
-      this.emitSafely(APP_EVENTS.TASK_REOPENED, new TaskReopenedEvent(userId, funnelId, stageId, taskId, saved.name));
+      emitSafely(this.eventEmitter, this.logger, APP_EVENTS.TASK_REOPENED, new TaskReopenedEvent(userId, funnelId, stageId, taskId, saved.name));
     }
 
     return this.buildTaskUpdateResult(saved);
@@ -528,8 +519,7 @@ export class FunnelsService {
       throw error;
     }
 
-    this.emitSafely(
-      APP_EVENTS.FEEDBACK_SUBMITTED,
+    emitSafely(this.eventEmitter, this.logger, APP_EVENTS.FEEDBACK_SUBMITTED,
       new FeedbackSubmittedEvent(userId, funnelId, stageId, feedback.id),
     );
 

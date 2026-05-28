@@ -30,7 +30,7 @@ export const APP_EVENTS = {
   USER_SIGNED_UP: 'user.signed_up',
   USER_SIGNED_IN: 'user.signed_in',
   PROFILE_UPDATED: 'user.profile_updated',
-  // Emission wired once the change-password endpoint
+  // Emission wired once the change-password endpoint is merged
   PASSWORD_CHANGED: 'user.password_changed',
   ACCOUNT_DELETED: 'user.account_deleted',
 } as const;
