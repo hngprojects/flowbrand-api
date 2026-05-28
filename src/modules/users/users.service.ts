@@ -265,7 +265,7 @@ export class UsersService {
     }
 
     if(newPassword === oldPassword) {
-      throw new BadRequestException({
+      throw new UnprocessableEntityException({
         message: SYS_MSG.PASSWORD_CHANGE_NOT_SUCCESSFUL
       })
     }
