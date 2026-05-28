@@ -10,10 +10,12 @@ import { RedisModule } from '../redis/redis.module';
 import { OnboardingModule } from '../onboarding/onboarding.module';
 import { FunnelsModule } from '../funnels/funnels.module';
 import { UserStateService } from './user-state.service';
+import { AuthMetadata } from '../auth/entities/auth-metadata.entity';
+import { AuthMetadataModelAction } from '../auth/actions/auth-metadata.action';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, UserSession]),
+    TypeOrmModule.forFeature([User, UserSession, AuthMetadata]),
     OnboardingModule,
     FunnelsModule,
     RedisModule
@@ -24,6 +26,7 @@ import { UserStateService } from './user-state.service';
     UserSessionModelAction, 
     UsersService, 
     UserStateService,
+    AuthMetadataModelAction,
   ],
   exports: [UsersService, UserModelAction, UserSessionModelAction],
 })

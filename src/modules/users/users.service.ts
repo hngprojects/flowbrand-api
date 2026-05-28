@@ -3,7 +3,9 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  Logger,
   UnprocessableEntityException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { QueryFailedError } from 'typeorm';
@@ -16,9 +18,14 @@ import { UserRole } from './enums/user-role.enum';
 import { UserStateService } from './user-state.service';
 import { UserStateResponse } from './interfaces/user-state.interface';
 import * as SYS_MSG from '../../constants/system.messages';
+import { UserSessionModelAction } from './actions/user-session.action';
+import { RedisService } from '../redis/redis.service';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { AuthMetadataModelAction } from '../auth/actions/auth-metadata.action';
 import { IUserProfile } from './interfaces/user-profile.interface';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { ALLOWED_SSA_COUNTRIES } from './enums/allowed-ssa-countries.enum';
+import { redisKeys } from '../../constants/redis-keys';
 
 const BCRYPT_ROUNDS = 10;
 const NO_TRANSACTION = {
@@ -27,8 +34,12 @@ const NO_TRANSACTION = {
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
   constructor(
-    private readonly userModelAction:UserModelAction,
+    private readonly userModelAction: UserModelAction,
+    private readonly userSessionModelAction: UserSessionModelAction,
+    private readonly authMetaModelAction: AuthMetadataModelAction,
+    private readonly redisService: RedisService,
     private readonly userStateService: UserStateService,
   ) {}
 
@@ -201,6 +212,102 @@ export class UsersService {
     });
   }
 
+  private async revokeAllUserSessions(userId: string): Promise<void> {
+    const sessions = await this.userSessionModelAction.findByUserId(userId);
+
+    if (!sessions || sessions.length === 0) {
+      this.logger.debug({
+        message: 'No active sessions found to revoke',
+        userId,
+      });
+      return;
+    }
+
+    const activeSessions = sessions.filter(s => !s.is_revoked);
+    await Promise.all(
+      activeSessions.map(async (session) => {
+        await this.userSessionModelAction.updateById(session.id, {
+          is_revoked: true,
+          revoked_at: new Date(),
+        });
+        await Promise.all([
+          this.redisService.del(redisKeys.activeSession(userId, session.id)),
+          this.redisService.del(redisKeys.session(userId, session.id)),
+        ]);
+      }),
+    );
+
+    this.logger.debug({
+      message: `Revoked ${activeSessions.length} sessions for user`,
+      userId,
+      sessionCount: activeSessions.length,
+    });    
+  }
+
+  /** Verifies the current password, updates the hash, and revokes all active sessions. */
+  async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
+    const user = await this.findById(userId);
+
+    if (!user.password_hash) {
+      throw new UnprocessableEntityException({
+        message: user.auth_provider === 'google' 
+          ? SYS_MSG.PASSWORD_CHANGE_NOT_SUPPORTED
+          : SYS_MSG.PASSWORD_CHANGE_UNAVAILABLE
+      })
+    }
+    const oldPassword = dto.oldPassword;
+    const newPassword = dto.newPassword;
+
+    const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password_hash);
+
+    if(!isOldPasswordValid) {
+      throw new UnauthorizedException({
+        message: SYS_MSG.INCORRECT_OLD_PASSWORD
+      })
+    }
+
+    if(newPassword === oldPassword) {
+      throw new UnprocessableEntityException({
+        message: SYS_MSG.PASSWORD_CHANGE_NOT_SUCCESSFUL
+      })
+    }
+
+    if (dto.newPassword !== dto.confirmPassword) {
+      throw new UnprocessableEntityException(SYS_MSG.INCORRECT_CONFIRM_PASSWORD);
+    }
+
+    const saveNewPassword = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
+
+    const updated = await this.userModelAction.update({
+      ...NO_TRANSACTION,
+      identifierOptions: { id: userId },
+      updatePayload: { password_hash: saveNewPassword },
+    })
+
+    if (!updated) {
+      throw new InternalServerErrorException(SYS_MSG.USER_UPDATE_FAILED);
+    }
+
+    const existingMeta = await this.authMetaModelAction.findByUserId(userId);
+    if (!existingMeta) {
+      await this.authMetaModelAction.createForUser({
+        user_id: userId,
+        password_changed_at: new Date(),
+      });
+    } else {
+      await this.authMetaModelAction.updateByUserId(userId, {
+        password_changed_at: new Date(),
+      });
+    }
+    
+    await this.revokeAllUserSessions(userId);
+
+    this.logger.log({
+      message: SYS_MSG.PASSWORD_CHANGE_SUCCESSFUL,
+      userId
+    })
+  }
+
   async getUserState(userId: string): Promise<UserStateResponse> {
     return this.userStateService.getUserState(userId);
   }
@@ -264,9 +371,9 @@ export class UsersService {
 
     const updated = await this.userModelAction.update({
       ...NO_TRANSACTION,
-      identifierOptions: { id: userId },
+      identifierOptions: { id: userId},
       updatePayload,
-    });
+    })
 
     if (!updated) {
       throw new InternalServerErrorException(SYS_MSG.PROFILE_UPDATE_FAILED);

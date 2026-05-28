@@ -1,7 +1,9 @@
 import {
+  BadRequestException,
   ConflictException,
   InternalServerErrorException,
   NotFoundException,
+  UnauthorizedException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -10,17 +12,19 @@ import { QueryFailedError } from 'typeorm';
 import * as SYS_MSG from '../../constants/system.messages';
 import { UserModelAction } from './actions/user.action';
 import { UsersService } from './users.service';
+import { UserSessionModelAction } from './actions/user-session.action';
+import { AuthMetadataModelAction } from '../auth/actions/auth-metadata.action';
+import { RedisService } from '../redis/redis.service';
+import { redisKeys } from '../../constants/redis-keys';
 import { UserStateService } from './user-state.service';
 import { User } from './entities/user.entity';
 import { UserStateResponse } from './interfaces/user-state.interface';
+import { UserRole } from './enums/user-role.enum';
 
 jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('hashed-password'),
-  compare: jest.fn(),
+  compare: jest.fn().mockResolvedValue(true),
 }));
-
-const USER_ID = 'user-uuid-001';
-const USER_EMAIL = 'test@example.com';
 
 // Mock UserModelAction
 const mockUserModelAction = {
@@ -32,6 +36,20 @@ const mockUserModelAction = {
   delete: jest.fn(),
 };
 
+const mockUserSessionModelAction = {
+  findByUserId: jest.fn(),
+  updateById: jest.fn()
+};
+
+const mockAuthMetaModelAction = {
+  updateByUserId: jest.fn(),
+  findByUserId: jest.fn(),
+  createForUser: jest.fn(),
+};
+
+
+const USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const USER_EMAIL = 'test@example.com';
 // Mock WizardSessionModelAction
 const mockWizardSessionModelAction = {
   findActiveSession: jest.fn(),
@@ -58,6 +76,10 @@ const mockUser = (): Partial<User> => ({
   id: USER_ID,
   email: USER_EMAIL,
   full_name: 'Test User',
+  password_hash: 'hashed-password',
+  is_verified: false,
+  is_active: true,
+  auth_provider: 'local',
 });
 
 const mockFullUser = {
@@ -82,6 +104,10 @@ describe('UsersService', () => {
       providers: [
         UsersService,
         { provide: UserModelAction, useValue: mockUserModelAction },
+        { provide: UserSessionModelAction, useValue: mockUserSessionModelAction },
+        { provide: AuthMetadataModelAction, useValue: mockAuthMetaModelAction },
+        { provide: RedisService, useValue: mockRedisService },
+
         { provide: UserStateService, useValue: mockUserStateService },
       ],
     }).compile();
@@ -225,48 +251,209 @@ describe('UsersService', () => {
     });
   });
 
-  describe('getUserState', () => {
-    it('delegates to UserStateService.getUserState', async () => {
-      const expectedResponse: UserStateResponse = {
-        onboarding: { status: 'not_started' },
-        activeFunnel: null,
-      };
-      mockUserStateService.getUserState.mockResolvedValue(expectedResponse);
+  describe('changePassword', () => {
+    const changePasswordDto = {
+      oldPassword: 'CurrentPass123!',
+      newPassword: 'NewPass456@',
+      confirmPassword: 'NewPass456@',
+    };
 
-      const result = await service.getUserState(USER_ID);
-
-      expect(mockUserStateService.getUserState).toHaveBeenCalledWith(USER_ID);
-      expect(result).toEqual(expectedResponse);
+    beforeEach(() => {
+      mockUserModelAction.get.mockResolvedValue(mockUser());
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      mockUserModelAction.update.mockResolvedValue(mockUser);
+      mockAuthMetaModelAction.updateByUserId.mockResolvedValue(undefined);
+      mockAuthMetaModelAction.findByUserId.mockResolvedValue({ user_id: USER_ID });
+      mockUserSessionModelAction.findByUserId.mockResolvedValue([]);
     });
-  });
 
-  describe('getProfile', () => {
-    it('returns camelCase profile for authenticated user', async () => {
-      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+    it('AC-15: returns success message when old password is correct and new password is valid', async () => {
+      await expect(service.changePassword(USER_ID, changePasswordDto)).resolves.toBeUndefined();
+    });
 
-      const result = await service.getProfile(USER_ID);
+    it('AC-16: updates auth_metadata.password_changed_at after successful change', async () => {
+      await service.changePassword(USER_ID, changePasswordDto);
+      expect(mockAuthMetaModelAction.updateByUserId).toHaveBeenCalledWith(
+        USER_ID,
+        { password_changed_at: expect.any(Date) },
+      );
+      expect(mockAuthMetaModelAction.findByUserId).toHaveBeenCalledWith(USER_ID);
+    });
 
-      expect(result).toMatchObject({
-        id: USER_ID,
-        fullName: 'Test User',
-        email: USER_EMAIL,
+    it('AC-17: revokes all user sessions after successful password change', async () => {
+      const mockSessions = [
+        { id: 'session-1', is_revoked: false },
+        { id: 'session-2', is_revoked: false },
+      ];
+      mockUserSessionModelAction.findByUserId.mockResolvedValue(mockSessions);
+
+      await service.changePassword(USER_ID, changePasswordDto);
+
+      expect(mockUserSessionModelAction.updateById).toHaveBeenCalledTimes(2);
+      expect(mockUserSessionModelAction.updateById).toHaveBeenCalledWith('session-1', {
+        is_revoked: true,
+        revoked_at: expect.any(Date),
+      });
+      expect(mockUserSessionModelAction.updateById).toHaveBeenCalledWith('session-2', {
+        is_revoked: true,
+        revoked_at: expect.any(Date),
       });
     });
 
-    it('response never contains password_hash, deleted_at, or provider_user_id', async () => {
-      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+    it('AC-18: deletes Redis keys for all sessions after successful password change', async () => {
+      const mockSessions = [{ id: 'session-1', is_revoked: false }];
+      mockUserSessionModelAction.findByUserId.mockResolvedValue(mockSessions);
 
-      const result = await service.getProfile(USER_ID) as unknown as Record<string, unknown>;
+      await service.changePassword(USER_ID, changePasswordDto);
 
-      expect(result).not.toHaveProperty('password_hash');
-      expect(result).not.toHaveProperty('deleted_at');
-      expect(result).not.toHaveProperty('provider_user_id');
+      expect(mockRedisService.del).toHaveBeenCalledTimes(2);
+      expect(mockRedisService.del).toHaveBeenCalledWith(redisKeys.activeSession(USER_ID, 'session-1'));
+      expect(mockRedisService.del).toHaveBeenCalledWith(redisKeys.session(USER_ID, 'session-1'));
     });
 
-    it('throws 404 when user not found', async () => {
+    it('AC-19: throws UnauthorizedException when old password is incorrect', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      const error = await service.changePassword(USER_ID, changePasswordDto).catch(e => e);
+      expect(error).toBeInstanceOf(UnauthorizedException);
+      expect(error.message).toBe(SYS_MSG.INCORRECT_OLD_PASSWORD);
+    });
+
+    it('AC-20: throws UnprocessableEntityException when new password is same as old password', async () => {
+      const error = await service.changePassword(USER_ID, {
+        ...changePasswordDto,
+        newPassword: changePasswordDto.oldPassword,
+        confirmPassword: changePasswordDto.oldPassword,
+      }).catch(e => e);
+      expect(error).toBeInstanceOf(UnprocessableEntityException);
+      expect(error.message).toBe(SYS_MSG.PASSWORD_CHANGE_NOT_SUCCESSFUL);
+    });
+
+    it('AC-21: throws UnprocessableEntityException when confirm password does not match new password — defense-in-depth', async () => {
+      const error = await service.changePassword(USER_ID, {
+        ...changePasswordDto,
+        confirmPassword: 'Mismatch123!',
+      }).catch(e => e);
+      
+      expect(error).toBeInstanceOf(UnprocessableEntityException);
+      expect(mockUserModelAction.update).not.toHaveBeenCalled();
+    });
+
+    it('AC-22: throws UnprocessableEntityException for Google OAuth account with no password hash', async () => {
+      mockUserModelAction.get.mockResolvedValue({
+        ...mockUser(),
+        auth_provider: 'google',
+        password_hash: null,
+      });
+
+      const error = await service.changePassword(USER_ID, changePasswordDto).catch(e => e);
+      expect(error).toBeInstanceOf(UnprocessableEntityException);
+      expect(error.message).toBe(SYS_MSG.PASSWORD_CHANGE_NOT_SUPPORTED);
+      expect(bcrypt.compare).not.toHaveBeenCalled();
+    });
+
+    it('AC-23: throws NotFoundException when user does not exist', async () => {
       mockUserModelAction.get.mockResolvedValue(null);
 
-      await expect(service.getProfile(USER_ID)).rejects.toBeInstanceOf(NotFoundException);
+      const error = await service.changePassword(USER_ID, changePasswordDto).catch(e => e);
+      expect(error).toBeInstanceOf(NotFoundException);
+    });
+
+    it('SEC-01: calls bcrypt.compare with plain text password and stored hash, never compares plain text directly', async () => {
+      await service.changePassword(USER_ID, changePasswordDto);
+      expect(bcrypt.compare).toHaveBeenCalledWith(
+        changePasswordDto.oldPassword,
+        mockUser().password_hash,
+      );
+    });
+
+    it('SEC-02: logger does not include password hash in log payload', async () => {
+      const logSpy = jest.spyOn(service['logger'], 'log');
+      await service.changePassword(USER_ID, changePasswordDto);
+
+      expect(logSpy).toHaveBeenCalled();
+      const logPayload = JSON.stringify(logSpy.mock.calls);
+      expect(logPayload).not.toContain(mockUser().password_hash);
+      expect(logPayload).not.toContain(changePasswordDto.oldPassword);
+      expect(logPayload).not.toContain(changePasswordDto.newPassword);
+    });
+
+    it('SEC-03: hashes new password with correct bcrypt cost factor before saving', async () => {
+      await service.changePassword(USER_ID, changePasswordDto);
+      expect(bcrypt.hash).toHaveBeenCalledWith(changePasswordDto.newPassword, 10);
+    });
+
+    it('SEC-04: saves hashed password not plain text to the database', async () => {
+      await service.changePassword(USER_ID, changePasswordDto);
+      expect(mockUserModelAction.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          updatePayload: { password_hash: 'hashed-password' },
+        }),
+      );
+    });
+
+    it('AC-25: second rapid request fails with UnauthorizedException because hash has already changed', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+
+      await service.changePassword(USER_ID, changePasswordDto);
+
+      const error = await service.changePassword(USER_ID, changePasswordDto).catch(e => e);
+      expect(error).toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('AC-26: skips session revocation when user has no active sessions', async () => {
+      mockUserSessionModelAction.findByUserId.mockResolvedValue([]);
+
+      await service.changePassword(USER_ID, changePasswordDto);
+
+      expect(mockUserSessionModelAction.updateById).not.toHaveBeenCalled();
+      expect(mockRedisService.del).not.toHaveBeenCalled();
+    });
+
+    it('AC-27: skips already revoked sessions during revocation', async () => {
+      mockUserSessionModelAction.findByUserId.mockResolvedValue([
+        { id: 'session-1', is_revoked: true },
+      ]);
+
+      await service.changePassword(USER_ID, changePasswordDto);
+
+      expect(mockUserSessionModelAction.updateById).not.toHaveBeenCalled();
+      expect(mockRedisService.del).not.toHaveBeenCalled();
+    });
+
+    it('AC-28: processes only non-revoked sessions when mix of revoked and active sessions exist', async () => {
+      mockUserSessionModelAction.findByUserId.mockResolvedValue([
+        { id: 'session-1', is_revoked: true },
+        { id: 'session-2', is_revoked: false },
+        { id: 'session-3', is_revoked: false },
+      ]);
+
+      await service.changePassword(USER_ID, changePasswordDto);
+
+      expect(mockUserSessionModelAction.updateById).toHaveBeenCalledTimes(2);
+      expect(mockUserSessionModelAction.updateById).toHaveBeenCalledWith('session-2', {
+        is_revoked: true,
+        revoked_at: expect.any(Date),
+      });
+      expect(mockUserSessionModelAction.updateById).toHaveBeenCalledWith('session-3', {
+        is_revoked: true,
+        revoked_at: expect.any(Date),
+      });
+      
+      expect(mockRedisService.del).toHaveBeenCalledTimes(4); 
+      expect(mockRedisService.del).not.toHaveBeenCalledWith(expect.stringContaining('session-1'));
+    });
+
+    it('AC-29: creates auth_metadata when it does not exist', async () => {
+      mockAuthMetaModelAction.findByUserId.mockResolvedValue(null);
+      mockAuthMetaModelAction.createForUser.mockResolvedValue({ user_id: USER_ID });
+
+      await service.changePassword(USER_ID, changePasswordDto);
+
+      expect(mockAuthMetaModelAction.createForUser).toHaveBeenCalledWith({
+        user_id: USER_ID,
+        password_changed_at: expect.any(Date) ,
+      });
     });
   });
 
@@ -368,6 +555,51 @@ describe('UsersService', () => {
       await expect(
         service.updateProfile(USER_ID, { fullName: 'Different Name' }),
       ).rejects.toBeInstanceOf(InternalServerErrorException);
+    });
+  });
+
+  describe('getUserState', () => {
+    it('delegates to UserStateService.getUserState', async () => {
+      const expectedResponse: UserStateResponse = {
+        onboarding: { status: 'not_started' },
+        activeFunnel: null,
+      };
+      mockUserStateService.getUserState.mockResolvedValue(expectedResponse);
+
+      const result = await service.getUserState(USER_ID);
+
+      expect(mockUserStateService.getUserState).toHaveBeenCalledWith(USER_ID);
+      expect(result).toEqual(expectedResponse);
+    });
+  });
+
+  describe('getProfile', () => {
+    it('returns camelCase profile for authenticated user', async () => {
+      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+
+      const result = await service.getProfile(USER_ID);
+
+      expect(result).toMatchObject({
+        id: USER_ID,
+        fullName: 'Test User',
+        email: USER_EMAIL,
+      });
+    });
+
+    it('response never contains password_hash, deleted_at, or provider_user_id', async () => {
+      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+
+      const result = await service.getProfile(USER_ID) as unknown as Record<string, unknown>;
+
+      expect(result).not.toHaveProperty('password_hash');
+      expect(result).not.toHaveProperty('deleted_at');
+      expect(result).not.toHaveProperty('provider_user_id');
+    });
+
+    it('throws 404 when user not found', async () => {
+      mockUserModelAction.get.mockResolvedValue(null);
+
+      await expect(service.getProfile(USER_ID)).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 });

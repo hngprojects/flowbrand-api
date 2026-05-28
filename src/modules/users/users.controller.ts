@@ -16,11 +16,12 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
-import { CurrentUser } from '../../common/decorators/current-user.decorator'; 
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { GetUserStateDocs } from './docs/users-swagger.doc';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
-import { GetProfileDocs, UpdateProfileDocs } from './docs/users-swagger.doc';
+import { GetProfileDocs, UpdateProfileDocs, ChangePasswordDocs } from './docs/users-swagger.doc';
 import * as SYS_MSG from '../../constants/system.messages';
 
 @ApiTags('users')
@@ -72,6 +73,18 @@ export class UsersController {
   @ApiOperation({ summary: 'Get a user by id' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.findById(id);
+  }
+
+  @Patch('me/password')
+  @ChangePasswordDocs()
+  @HttpCode(HttpStatus.OK)
+  async changePassword(@CurrentUser('sub') userId: string, @Body() dto: ChangePasswordDto) {
+    await this.usersService.changePassword(userId, dto);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.PASSWORD_CHANGE_SUCCESSFUL,
+      data: null,
+    }
   }
 
   @Patch(':id')
