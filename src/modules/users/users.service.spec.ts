@@ -13,7 +13,7 @@ import * as SYS_MSG from '../../constants/system.messages';
 import { UserModelAction } from './actions/user.action';
 import { UsersService } from './users.service';
 import { UserSessionModelAction } from './actions/user-session.action';
-import { AuthMetaModelAction } from '../auth/actions/auth-metadata.action';
+import { AuthMetadataModelAction } from '../auth/actions/auth-metadata.action';
 import { RedisService } from '../redis/redis.service';
 
 jest.mock('bcrypt', () => ({
@@ -79,7 +79,7 @@ describe('UsersService', () => {
         UsersService,
         { provide: UserModelAction, useValue: mockUserModelAction },
         { provide: UserSessionModelAction, useValue: mockUserSessionModelAction },
-        { provide: AuthMetaModelAction, useValue: mockAuthMetaModelAction },
+        { provide: AuthMetadataModelAction, useValue: mockAuthMetaModelAction },
         { provide: RedisService, useValue: mockRedisService },
 
       ],

@@ -20,10 +20,11 @@ import * as SYS_MSG from '../../constants/system.messages';
 import { UserSessionModelAction } from './actions/user-session.action';
 import { RedisService } from '../redis/redis.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
-import { AuthMetaModelAction } from '../auth/actions/auth-metadata.action';
+import { AuthMetadataModelAction } from '../auth/actions/auth-metadata.action';
 import { IUserProfile } from './interfaces/user-profile.interface';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { ALLOWED_SSA_COUNTRIES } from './enums/allowed-ssa-countries.enum';
+import { redisKeys } from '../../constants/redis-keys';
 
 const BCRYPT_ROUNDS = 10;
 const NO_TRANSACTION = {
@@ -36,7 +37,7 @@ export class UsersService {
   constructor(
     private readonly userModelAction: UserModelAction,
     private readonly userSessionModelAction: UserSessionModelAction,
-    private readonly authMetaModelAction: AuthMetaModelAction,
+    private readonly authMetaModelAction: AuthMetadataModelAction,
     private readonly redisService: RedisService,
   ) {}
 
@@ -228,8 +229,8 @@ export class UsersService {
           revoked_at: new Date(),
         });
         await Promise.all([
-          this.redisService.del(`active_session:${userId}:${session.id}`),
-          this.redisService.del(`sess:${userId}:${session.id}`),
+          this.redisService.del(redisKeys.activeSession(userId, session.id)),
+          this.redisService.del(redisKeys.session(userId, session.id)),
         ]);
       }),
     );
