@@ -24,6 +24,8 @@ import { FunnelCreationPath } from '../.././enums/funnel-creation-path.enum';
 import { FunnelStatus } from '../.././enums/funnel-status.enum';
 import { FunnelsService } from '.././funnels.service';
 import { Logger } from '@nestjs/common';
+import { StageFeedbackModelAction } from '../../actions/stage-feedback.action';
+import { StageFeedback } from '../../entities/stage-feedback.entity';
 
 const USER_ID = '00000000-0000-4000-8000-0000000000a1';
 const OTHER_USER_ID = '00000000-0000-4000-8000-0000000000b2';
@@ -70,6 +72,7 @@ describe('FunnelsService', () => {
     manager: { save: jest.Mock; create: jest.Mock };
   };
   let dataSource: { createQueryRunner: jest.Mock };
+  let feedbackAction: jest.Mocked<Partial<StageFeedbackModelAction>>;
 
   beforeEach(async () => {
     // Mock the Funnel action
@@ -95,6 +98,8 @@ describe('FunnelsService', () => {
       getTasksByStageId: jest.fn(),
       getSingleStageCount: jest.fn(),
     } as unknown as jest.Mocked<StageTaskModelAction>;
+
+    feedbackAction = { findExistingFeedback: jest.fn(), createFeedback: jest.fn() };
 
     redisService = { rateLimit: jest.fn().mockResolvedValue({ count: 1, exceeded: false }) };
     queue = { add: jest.fn().mockResolvedValue({ id: 'job-1' }) };
@@ -124,6 +129,7 @@ describe('FunnelsService', () => {
         { provide: RedisService, useValue: redisService },
         { provide: getQueueToken(QUEUES.FUNNEL_GENERATION), useValue: queue },
         { provide: DataSource, useValue: dataSource },
+        { provide: StageFeedbackModelAction, useValue: feedbackAction },
       ],
     }).compile();
 
@@ -438,6 +444,43 @@ describe('FunnelsService', () => {
         tasksComplete: 1,
       });
       expect(res.tasks[0]).toEqual({ id: 't1', position: 1, name: 'Task 1', status: 'complete' });
+    });
+  });
+
+  describe('submitFeedback', () => {    
+
+    it('returns 201 when valid feedback is submitted', async () => {
+      funnelAction.findOwnedById.mockResolvedValue({ id: FUNNEL_ID } as Partial<Funnel> as Funnel);
+      stageAction.get.mockResolvedValue({ id: 'stage-1', funnel_id: FUNNEL_ID, status: 'complete' } as Partial<FunnelStage> as FunnelStage);
+      (feedbackAction.findExistingFeedback as jest.Mock).mockResolvedValue(null);
+      (feedbackAction.createFeedback as jest.Mock).mockResolvedValue({
+        id: 'fb-1',
+        stage_id: 'stage-1',
+        comment: 'Great stage',
+        created_at: new Date('2026-05-26T10:00:00Z'),
+      } as Partial<StageFeedback> as StageFeedback);
+
+      const result = await service.submitFeedback(USER_ID, FUNNEL_ID, 'stage-1', { comment: 'Great stage' });
+
+      expect(result.statusCode).toBe(HttpStatus.CREATED);
+      expect(result.data.comment).toBe('Great stage');
+    });
+
+    it('returns 409 if feedback already submitted', async () => {
+      funnelAction.findOwnedById.mockResolvedValue({ id: FUNNEL_ID } as Partial<Funnel> as Funnel);
+      stageAction.get.mockResolvedValue({ id: 'stage-1', funnel_id: FUNNEL_ID, status: 'complete' } as Partial<FunnelStage> as FunnelStage);
+      (feedbackAction.findExistingFeedback as jest.Mock).mockResolvedValue({ id: 'existing-fb' } as Partial<StageFeedback> as StageFeedback);
+
+      await expect(service.submitFeedback(USER_ID, FUNNEL_ID, 'stage-1', { comment: 'Great' }))
+        .rejects.toThrow(ConflictException);
+    });
+
+    it('returns 422 if stage is not complete', async () => {
+      funnelAction.findOwnedById.mockResolvedValue({ id: FUNNEL_ID } as Partial<Funnel> as Funnel);
+      stageAction.get.mockResolvedValue({ id: 'stage-1', funnel_id: FUNNEL_ID, status: 'active' } as Partial<FunnelStage> as FunnelStage);
+
+      await expect(service.submitFeedback(USER_ID, FUNNEL_ID, 'stage-1', { comment: 'Great' }))
+        .rejects.toThrow(UnprocessableEntityException);
     });
   });
 });
