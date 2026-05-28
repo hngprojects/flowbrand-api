@@ -9,10 +9,8 @@ import * as bcrypt from 'bcrypt';
 import { QueryFailedError } from 'typeorm';
 import * as SYS_MSG from '../../constants/system.messages';
 import { UserModelAction } from './actions/user.action';
-import { WizardSessionModelAction } from '../onboarding/actions/wizard-session.action';
 import { UsersService } from './users.service';
 import { UserStateService } from './user-state.service';
-import { RedisService } from '../redis/redis.service';
 import { User } from './entities/user.entity';
 import { UserStateResponse } from './interfaces/user-state.interface';
 
@@ -84,9 +82,7 @@ describe('UsersService', () => {
       providers: [
         UsersService,
         { provide: UserModelAction, useValue: mockUserModelAction },
-        { provide: WizardSessionModelAction, useValue: mockWizardSessionModelAction },
         { provide: UserStateService, useValue: mockUserStateService },
-        { provide: RedisService, useValue: mockRedisService },
       ],
     }).compile();
 

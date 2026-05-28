@@ -13,9 +13,7 @@ import { PaginationDto } from './dto/pagination.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { UserRole } from './enums/user-role.enum';
-import { WizardSessionModelAction } from '../onboarding/actions/wizard-session.action';
 import { UserStateService } from './user-state.service';
-import { RedisService } from './../redis/redis.service';
 import { UserStateResponse } from './interfaces/user-state.interface';
 import * as SYS_MSG from '../../constants/system.messages';
 import { IUserProfile } from './interfaces/user-profile.interface';
@@ -31,9 +29,7 @@ const NO_TRANSACTION = {
 export class UsersService {
   constructor(
     private readonly userModelAction:UserModelAction,
-    private readonly wizardSessionModelAction: WizardSessionModelAction,
     private readonly userStateService: UserStateService,
-    private readonly redisService: RedisService,
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {

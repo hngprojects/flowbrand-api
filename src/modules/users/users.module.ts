@@ -6,7 +6,7 @@ import { UserSession } from './entities/user-session.entity';
 import { User } from './entities/user.entity';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
-import { RedisService } from './../redis/redis.service';
+import { RedisModule } from '../redis/redis.module';
 import { OnboardingModule } from '../onboarding/onboarding.module';
 import { FunnelsModule } from '../funnels/funnels.module';
 import { UserStateService } from './user-state.service';
@@ -15,15 +15,15 @@ import { UserStateService } from './user-state.service';
   imports: [
     TypeOrmModule.forFeature([User, UserSession]),
     OnboardingModule,
-    FunnelsModule
+    FunnelsModule,
+    RedisModule
   ],
   controllers: [UsersController],
   providers: [
     UserModelAction, 
     UserSessionModelAction, 
     UsersService, 
-    UserStateService, 
-    RedisService,
+    UserStateService,
   ],
   exports: [UsersService, UserModelAction, UserSessionModelAction],
 })
