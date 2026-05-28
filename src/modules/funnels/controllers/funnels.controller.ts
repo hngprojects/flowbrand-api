@@ -13,8 +13,10 @@ import {
   GetStagesSummaryDecorators,
   ListFunnelsDecorators,
   SubmitFeedbackDocs,
+  UpdateTaskStatusDocs,
 } from '../docs/funnels-swagger.doc';
 import { SubmitStageFeedbackDto } from '../dto/submit-stage-feedback.dto';
+import { UpdateTaskStatusDto } from '../dto/update-task-status.dto';
 
 @FunnelControllerDecorators()
 @Controller('funnels')
@@ -77,6 +79,18 @@ export class FunnelsController {
     @Param('stageId', ParseUUIDPipe) stageId: string,
   ) {
     return this.funnelsService.completeStage(funnelId, stageId, userId);
+  }
+
+  @UpdateTaskStatusDocs()
+  @Patch(':funnelId/stages/:stageId/tasks/:taskId')
+  async updateTaskStatus(
+    @CurrentUser('userId') userId: string,
+    @Param('funnelId', ParseUUIDPipe) funnelId: string,
+    @Param('stageId', ParseUUIDPipe) stageId: string,
+    @Param('taskId', ParseUUIDPipe) taskId: string,
+    @Body() dto: UpdateTaskStatusDto,
+  ) {
+    return this.funnelsService.updateTaskStatus(userId, funnelId, stageId, taskId, dto);
   }
 
   @Post('generate')

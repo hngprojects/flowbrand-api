@@ -405,3 +405,79 @@ export function SubmitFeedbackDocs() {
     ApiUnprocessableEntityResponse({ description: 'Stage is not complete', schema: { example: feedbackNotCompleteExample } }),
   );
 }
+
+export const updateTaskStatusExample = {
+  success: true,
+  statusCode: HttpStatus.OK,
+  message: SYS_MSG.TASK_UPDATED_SUCCESSFULLY,
+  data: {
+    taskId: '550e8400-e29b-41d4-a716-446655440020',
+    name: 'Create lead magnet',
+    status: 'complete',
+    isComplete: true,
+    completedAt: '2026-05-26T10:00:00.000Z',
+    position: 1,
+  },
+};
+
+export function UpdateTaskStatusDocs() {
+  return applyDecorators(
+    ApiOperation({ summary: 'Toggle a stage task between pending and complete' }),
+    ApiOkResponse({ description: 'Task updated successfully', schema: { example: updateTaskStatusExample } }),
+    ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token', schema: { example: unauthorizedExample } }),
+    ApiNotFoundResponse({
+      description: 'Funnel, stage, or task not found — or the resource does not belong to the authenticated user',
+      schema: {
+        example: {
+          success: false,
+          statusCode: HttpStatus.NOT_FOUND,
+          error: 'NotFoundException',
+          message: SYS_MSG.STAGE_TASK_NOT_FOUND,
+          path: '/api/funnels/{funnelId}/stages/{stageId}/tasks/{taskId}',
+          timestamp: '2026-05-26T10:00:00.000Z',
+        },
+      },
+    }),
+    ApiForbiddenResponse({
+      description: 'The parent stage is locked and cannot be interacted with',
+      schema: {
+        example: {
+          success: false,
+          statusCode: HttpStatus.FORBIDDEN,
+          error: 'ForbiddenException',
+          message: SYS_MSG.TASK_UPDATE_STAGE_LOCKED,
+          path: '/api/funnels/{funnelId}/stages/{stageId}/tasks/{taskId}',
+          timestamp: '2026-05-26T10:00:00.000Z',
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.BAD_REQUEST,
+      description: 'Missing or invalid status value — must be "pending" or "complete"',
+      schema: {
+        example: {
+          success: false,
+          statusCode: HttpStatus.BAD_REQUEST,
+          error: 'Bad Request',
+          message: SYS_MSG.VALIDATION_FAILED,
+          path: '/api/funnels/{funnelId}/stages/{stageId}/tasks/{taskId}',
+          timestamp: '2026-05-26T10:00:00.000Z',
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.TOO_MANY_REQUESTS,
+      description: 'Rate limit exceeded: 30 updates per 60 seconds per user',
+      schema: {
+        example: {
+          success: false,
+          statusCode: HttpStatus.TOO_MANY_REQUESTS,
+          error: 'HttpException',
+          message: SYS_MSG.TASK_UPDATE_RATE_LIMIT_EXCEEDED,
+          path: '/api/funnels/{funnelId}/stages/{stageId}/tasks/{taskId}',
+          timestamp: '2026-05-26T10:00:00.000Z',
+        },
+      },
+    }),
+  );
+}
