@@ -31,6 +31,8 @@ const USER_ID = '00000000-0000-4000-8000-0000000000a1';
 const OTHER_USER_ID = '00000000-0000-4000-8000-0000000000b2';
 const IDEMPOTENCY_KEY = '11111111-1111-4111-8111-111111111111';
 const FUNNEL_ID = '22222222-2222-4222-8222-222222222222';
+const STAGE_ID = '33333333-3333-4333-8333-333333333333';
+const TASK_ID = '44444444-4444-4444-8444-444444444444';
 
 const BASE_DTO = {
   source: FunnelCreationPath.WIZARD,
@@ -97,6 +99,8 @@ describe('FunnelsService', () => {
       getStageCounts: jest.fn(),
       getTasksByStageId: jest.fn(),
       getSingleStageCount: jest.fn(),
+      get: jest.fn(),
+      save: jest.fn(),
     } as unknown as jest.Mocked<StageTaskModelAction>;
 
     feedbackAction = { findExistingFeedback: jest.fn(), createFeedback: jest.fn() };
@@ -447,7 +451,108 @@ describe('FunnelsService', () => {
     });
   });
 
-  describe('submitFeedback', () => {    
+  describe('updateTaskStatus', () => {
+    const ACTIVE_STAGE = { id: STAGE_ID, funnel_id: FUNNEL_ID, status: 'active' } as any;
+    const PENDING_TASK = { id: TASK_ID, stage_id: STAGE_ID, name: 'Create lead magnet', position: 1, status: 'pending', is_complete: false, completed_at: null } as any;
+    const COMPLETE_TASK = { id: TASK_ID, stage_id: STAGE_ID, name: 'Create lead magnet', position: 1, status: 'complete', is_complete: true, completed_at: new Date('2026-05-26T10:00:00Z') } as any;
+
+    beforeEach(() => {
+      funnelAction.findOwnedById.mockResolvedValue({ id: FUNNEL_ID } as Partial<Funnel> as Funnel);
+      stageAction.get.mockResolvedValue(ACTIVE_STAGE);
+      redisService.rateLimit.mockResolvedValue({ count: 1, exceeded: false });
+    });
+
+    it('AC-01: marking pending→complete returns 200 with isComplete=true and completedAt set', async () => {
+      (taskAction.get as jest.Mock).mockResolvedValue({ ...PENDING_TASK });
+      (taskAction.save as jest.Mock).mockResolvedValue({ ...COMPLETE_TASK });
+
+      const result = await service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' });
+
+      expect(result.statusCode).toBe(HttpStatus.OK);
+      expect(result.data.status).toBe('complete');
+      expect(result.data.isComplete).toBe(true);
+      expect(result.data.completedAt).toBe('2026-05-26T10:00:00.000Z');
+    });
+
+    it('AC-02: marking complete→pending returns 200 with isComplete=false and completedAt=null', async () => {
+      (taskAction.get as jest.Mock).mockResolvedValue({ ...COMPLETE_TASK });
+      (taskAction.save as jest.Mock).mockResolvedValue({ ...PENDING_TASK });
+
+      const result = await service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'pending' });
+
+      expect(result.statusCode).toBe(HttpStatus.OK);
+      expect(result.data.status).toBe('pending');
+      expect(result.data.isComplete).toBe(false);
+      expect(result.data.completedAt).toBeNull();
+    });
+
+    it('AC-03: taskId from a different stage → 404', async () => {
+      (taskAction.get as jest.Mock).mockResolvedValue(null);
+
+      await expect(service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' }))
+        .rejects.toThrow(NotFoundException);
+    });
+
+    it('AC-04: stageId from a different funnel → 404', async () => {
+      stageAction.get.mockResolvedValue(null);
+
+      await expect(service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' }))
+        .rejects.toThrow(NotFoundException);
+    });
+
+    it('AC-05: funnelId owned by a different user → 404', async () => {
+      funnelAction.findOwnedById.mockResolvedValue(null);
+
+      await expect(service.updateTaskStatus(OTHER_USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' }))
+        .rejects.toThrow(NotFoundException);
+    });
+
+    it('AC-06: parent stage is locked → 403 ForbiddenException', async () => {
+      stageAction.get.mockResolvedValue({ id: STAGE_ID, funnel_id: FUNNEL_ID, status: 'locked' } as any);
+
+      await expect(service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' }))
+        .rejects.toThrow(ForbiddenException);
+    });
+
+    it('AC-09: completing an already-complete task is idempotent → 200', async () => {
+      (taskAction.get as jest.Mock).mockResolvedValue({ ...COMPLETE_TASK });
+      (taskAction.save as jest.Mock).mockResolvedValue({ ...COMPLETE_TASK });
+
+      const result = await service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' });
+
+      expect(result.statusCode).toBe(HttpStatus.OK);
+      expect(result.data.isComplete).toBe(true);
+      expect(result.data.completedAt).toBe('2026-05-26T10:00:00.000Z');
+    });
+
+    it('SEC-04: rate limit exceeded → 429 HttpException', async () => {
+      redisService.rateLimit.mockResolvedValue({ count: 31, exceeded: true });
+
+      await expect(service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' }))
+        .rejects.toThrow(HttpException);
+    });
+
+    it('SEC-04: rate limit check fires before any DB lookup', async () => {
+      redisService.rateLimit.mockResolvedValue({ count: 31, exceeded: true });
+
+      await expect(service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' }))
+        .rejects.toThrow(HttpException);
+
+      expect(funnelAction.findOwnedById).not.toHaveBeenCalled();
+    });
+
+    it('sets task.status from dto before calling save', async () => {
+      (taskAction.get as jest.Mock).mockResolvedValue({ ...PENDING_TASK });
+      (taskAction.save as jest.Mock).mockImplementation(async ({ entity }) => ({ ...entity, is_complete: true, completed_at: new Date() }));
+
+      await service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, { status: 'complete' });
+
+      const savedArg = (taskAction.save as jest.Mock).mock.calls[0][0];
+      expect(savedArg.entity.status).toBe('complete');
+    });
+  });
+
+  describe('submitFeedback', () => {
 
     it('returns 201 when valid feedback is submitted', async () => {
       funnelAction.findOwnedById.mockResolvedValue({ id: FUNNEL_ID } as Partial<Funnel> as Funnel);

@@ -16,11 +16,12 @@ import { StageStatus } from './../enums/stage-status.enum';
 import { FunnelCreationPath } from './../enums/funnel-creation-path.enum';
 import { UploadDocumentStatus } from '../../upload/upload.types';
 import type { BusinessContext, GenerateFunnelJobPayload } from './../interfaces/generate-funnel-job.interface';
-import type { FunnelGenerationCreateResult, FunnelStatusResult, StageCompletionResult, SubmitFeedbackResponse } from './../interfaces/funnels.interfaces';
+import type { FunnelGenerationCreateResult, FunnelStatusResult, StageCompletionResult, SubmitFeedbackResponse, UpdateTaskStatusResponse } from './../interfaces/funnels.interfaces';
 import { UploadedDocument } from '../../upload/entities/uploaded-document.entity';
 import { StageFeedbackModelAction } from '../actions/stage-feedback.action';
 import { SubmitStageFeedbackDto } from '../dto/submit-stage-feedback.dto';
 import { StageFeedback } from '../entities/stage-feedback.entity';
+import { UpdateTaskStatusDto } from '../dto/update-task-status.dto';
 
 const STAGE_NAMES = ['Get Noticed', 'Spark Interest', 'Make First Sale', 'Bring Them Back'] as const;
 const QUEUE_DELAY_MS = 250;
@@ -421,6 +422,49 @@ export class FunnelsService {
     const key = `ratelimit:funnel-generate:${userId}`;
     const { exceeded } = await this.redisService.rateLimit(key, 5, 3600);
     if (exceeded) throw new HttpException(SYS_MSG.GENERATION_RATE_LIMIT_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS);
+  }
+
+  private async checkTaskUpdateRateLimit(userId: string): Promise<void> {
+    const key = `ratelimit:task-update:${userId}`;
+    const { exceeded } = await this.redisService.rateLimit(key, 30, 60);
+    if (exceeded) throw new HttpException(SYS_MSG.TASK_UPDATE_RATE_LIMIT_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS);
+  }
+
+  async updateTaskStatus(
+    userId: string,
+    funnelId: string,
+    stageId: string,
+    taskId: string,
+    dto: UpdateTaskStatusDto,
+  ): Promise<UpdateTaskStatusResponse> {
+    await this.checkTaskUpdateRateLimit(userId);
+
+    const funnel = await this.funnelAction.findOwnedById(funnelId, userId);
+    if (!funnel) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
+
+    const stage = await this.stageAction.get({ identifierOptions: { id: stageId, funnel_id: funnelId } });
+    if (!stage) throw new NotFoundException(SYS_MSG.FUNNEL_STAGE_NOT_FOUND);
+
+    if (stage.status === StageStatus.LOCKED) throw new ForbiddenException(SYS_MSG.TASK_UPDATE_STAGE_LOCKED);
+
+    const task = await this.taskAction.get({ identifierOptions: { id: taskId, stage_id: stageId } });
+    if (!task) throw new NotFoundException(SYS_MSG.STAGE_TASK_NOT_FOUND);
+
+    task.status = dto.status;
+    const updated = await this.taskAction.save({ entity: task, transactionOptions: { useTransaction: false } });
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.TASK_UPDATED_SUCCESSFULLY,
+      data: {
+        taskId: updated.id,
+        name: updated.name,
+        status: updated.status,
+        isComplete: updated.is_complete,
+        completedAt: updated.completed_at ? updated.completed_at.toISOString() : null,
+        position: updated.position,
+      },
+    };
   }
 
   async submitFeedback(userId: string, funnelId: string, stageId: string, dto: SubmitStageFeedbackDto): Promise<SubmitFeedbackResponse> {
