@@ -1,12 +1,1 @@
-export { FunnelGeneratedEvent } from './funnel-generated.event';
-export { FunnelFailedEvent } from './funnel-failed.event';
-export { StageUnlockedEvent } from './stage-unlocked.event';
-export { StageCompletedEvent } from './stage-completed.event';
-export { TaskCompletedEvent } from './task-completed.event';
-export { TaskReopenedEvent } from './task-reopened.event';
-export { FeedbackSubmittedEvent } from './feedback-submitted.event';
-export { UserSignedUpEvent } from './user-signed-up.event';
-export { UserSignedInEvent } from './user-signed-in.event';
-export { ProfileUpdatedEvent } from './profile-updated.event';
-export { PasswordChangedEvent } from './password-changed.event';
-export { AccountDeletedEvent } from './account-deleted.event';
+export * from './events';
