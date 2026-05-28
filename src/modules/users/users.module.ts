@@ -10,13 +10,16 @@ import { RedisModule } from '../redis/redis.module';
 import { OnboardingModule } from '../onboarding/onboarding.module';
 import { FunnelsModule } from '../funnels/funnels.module';
 import { UserStateService } from './user-state.service';
+import { BullModule } from '@nestjs/bull';
+import { AccountDeletionProcessor, ACCOUNT_DELETION_QUEUE } from './processors/account-deletion.processor';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, UserSession]),
     OnboardingModule,
     FunnelsModule,
-    RedisModule
+    RedisModule,
+    BullModule.registerQueue({ name: ACCOUNT_DELETION_QUEUE }),
   ],
   controllers: [UsersController],
   providers: [
@@ -24,6 +27,7 @@ import { UserStateService } from './user-state.service';
     UserSessionModelAction, 
     UsersService, 
     UserStateService,
+    AccountDeletionProcessor,
   ],
   exports: [UsersService, UserModelAction, UserSessionModelAction],
 })
