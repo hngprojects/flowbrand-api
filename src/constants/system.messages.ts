@@ -128,6 +128,8 @@ export const STAGE_COMPLETION_REQUIRES_ACTIVE_FUNNEL =
 export const STAGE_COMPLETION_CONCURRENT_UPDATE =
   'Stage completion failed due to a concurrent update. Please retry.';
 export const FUNNEL_UNAUTHORIZED_ACCESS = 'You do not have permission to access this funnel';
+export const FUNNEL_TASK_NOT_FOUND = 'Funnel task not found or not accessible.';
+export const TASK_STATUS_UPDATED_SUCCESSFULLY = 'Task updated successfully';
 
 // Password Reset Messages
 export const PASSWORD_RESET_OTP_SENT = 'If your email is registered, you will receive a password reset code.';
