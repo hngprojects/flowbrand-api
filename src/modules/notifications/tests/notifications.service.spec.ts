@@ -80,14 +80,14 @@ describe('NotificationsService', () => {
   });
 
   describe('normalizePagination', () => {
-    it('caps per_page at 50 and defaults invalid values', () => {
+    it('EC-03: caps per_page at 50 and defaults invalid values', () => {
       expect(service.normalizePagination(-1, 120)).toEqual({ page: 1, per_page: 50 });
       expect(service.normalizePagination(undefined, undefined)).toEqual({ page: 1, per_page: 20 });
     });
   });
 
   describe('getFeed', () => {
-    it('returns paginated items with a separate unread count', async () => {
+    it('AC-01/EC-02: returns paginated items with a separate unread count', async () => {
       const notifications = [{ id: 'notif-1', is_read: false } as Notification];
       mockNotificationAction.listForUserPaginated.mockResolvedValue([notifications, 1]);
       mockNotificationAction.countUnread.mockResolvedValue(1);
@@ -108,7 +108,7 @@ describe('NotificationsService', () => {
   });
 
   describe('getUnreadCount', () => {
-    it('returns the unread count for the user', async () => {
+    it('AC-05: returns the unread count for the user', async () => {
       mockNotificationAction.countUnread.mockResolvedValue(7);
 
       await expect(service.getUnreadCount('user-1')).resolves.toEqual({ count: 7 });
@@ -116,7 +116,7 @@ describe('NotificationsService', () => {
   });
 
   describe('markRead', () => {
-    it('returns the current state when notification is already read', async () => {
+    it('AC-07: returns the current state when notification is already read', async () => {
       const notification = { id: 'notif-1', is_read: true } as Notification;
       mockNotificationAction.findOwnedById.mockResolvedValue(notification);
 
@@ -124,7 +124,7 @@ describe('NotificationsService', () => {
       expect(mockNotificationAction.markAsRead).not.toHaveBeenCalled();
     });
 
-    it('updates unread notifications and returns the refreshed entity', async () => {
+    it('AC-06: updates unread notifications and returns the refreshed entity', async () => {
       const before = { id: 'notif-1', is_read: false } as Notification;
       const after = { id: 'notif-1', is_read: true } as Notification;
       mockNotificationAction.findOwnedById.mockResolvedValueOnce(before).mockResolvedValueOnce(after);
@@ -134,7 +134,7 @@ describe('NotificationsService', () => {
       expect(mockNotificationAction.markAsRead).toHaveBeenCalledWith('notif-1', 'user-1');
     });
 
-    it('EC-04: throws when the notification does not belong to the user', async () => {
+    it('EC-04/SEC-02: throws when the notification does not belong to the user', async () => {
       mockNotificationAction.findOwnedById.mockResolvedValue(null);
 
       await expect(service.markRead('user-1', 'notif-404')).rejects.toBeInstanceOf(NotFoundException);
@@ -142,13 +142,13 @@ describe('NotificationsService', () => {
   });
 
   describe('bulk updates', () => {
-    it('marks all as read', async () => {
+    it('AC-09/EC-01/SEC-03: marks all as read', async () => {
       mockNotificationAction.markAllAsRead.mockResolvedValue(3);
 
       await expect(service.markAllAsRead('user-1')).resolves.toEqual({ updated_count: 3 });
     });
 
-    it('marks all as unread', async () => {
+    it('AC-10/EC-01/SEC-03: marks all as unread', async () => {
       mockNotificationAction.markAllAsUnread.mockResolvedValue(4);
 
       await expect(service.markAllAsUnread('user-1')).resolves.toEqual({ updated_count: 4 });
@@ -156,7 +156,7 @@ describe('NotificationsService', () => {
   });
 
   describe('deleteNotification', () => {
-    it('deletes owned notifications', async () => {
+    it('AC-11: deletes owned notifications', async () => {
       mockNotificationAction.findOwnedById.mockResolvedValue({ id: 'notif-1' } as Notification);
       mockNotificationAction.deleteOwnedById.mockResolvedValue(1);
 
@@ -164,7 +164,7 @@ describe('NotificationsService', () => {
       expect(mockNotificationAction.deleteOwnedById).toHaveBeenCalledWith('notif-1', 'user-1');
     });
 
-    it('throws when the notification does not exist', async () => {
+    it('AC-12: throws when the notification does not exist', async () => {
       mockNotificationAction.findOwnedById.mockResolvedValue(null);
 
       await expect(service.deleteNotification('user-1', 'notif-404')).rejects.toBeInstanceOf(NotFoundException);

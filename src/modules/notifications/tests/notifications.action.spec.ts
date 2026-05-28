@@ -42,7 +42,7 @@ describe('NotificationModelAction', () => {
     action = module.get(NotificationModelAction);
   });
 
-  it('lists notifications with the requested filter and pagination', async () => {
+  it('AC-01/AC-02/AC-03: lists notifications with the requested filter and pagination', async () => {
     queryBuilder.getManyAndCount.mockResolvedValue([[{ id: 'notif-1' } as Notification], 1]);
 
     await expect(action.listForUserPaginated('user-1', NotificationFilter.UNREAD, 3, 10)).resolves.toEqual([[{ id: 'notif-1' }], 1]);
@@ -52,14 +52,14 @@ describe('NotificationModelAction', () => {
     expect(queryBuilder.take).toHaveBeenCalledWith(10);
   });
 
-  it('counts unread notifications only for the current user', async () => {
+  it('AC-05: counts unread notifications only for the current user', async () => {
     queryBuilder.getCount.mockResolvedValue(4);
 
     await expect(action.countUnread('user-1')).resolves.toBe(4);
     expect(queryBuilder.andWhere).toHaveBeenCalledWith('notification.is_read = false');
   });
 
-  it('updates a single notification as read with a scoped WHERE clause', async () => {
+  it('AC-06/AC-07/AC-08: updates a single notification as read with a scoped WHERE clause', async () => {
     queryBuilder.execute.mockResolvedValue({ affected: 1 });
 
     await expect(action.markAsRead('notif-1', 'user-1')).resolves.toBe(1);
@@ -68,7 +68,7 @@ describe('NotificationModelAction', () => {
     expect(queryBuilder.andWhere).toHaveBeenCalledWith('is_read = false');
   });
 
-  it('bulk marks unread notifications as read with one update query', async () => {
+  it('AC-09/EC-01/SEC-03: bulk marks unread notifications as read with one update query', async () => {
     queryBuilder.execute.mockResolvedValue({ affected: 5 });
 
     await expect(action.markAllAsRead('user-1')).resolves.toBe(5);
@@ -76,14 +76,14 @@ describe('NotificationModelAction', () => {
     expect(queryBuilder.where).toHaveBeenCalledWith('user_id = :userId', { userId: 'user-1' });
   });
 
-  it('bulk marks read notifications as unread with one update query', async () => {
+  it('AC-10/EC-01/SEC-03: bulk marks read notifications as unread with one update query', async () => {
     queryBuilder.execute.mockResolvedValue({ affected: 2 });
 
     await expect(action.markAllAsUnread('user-1')).resolves.toBe(2);
     expect(queryBuilder.set).toHaveBeenCalledWith({ is_read: false, read_at: null });
   });
 
-  it('deletes a notification only for the owning user', async () => {
+  it('AC-11/AC-12: deletes a notification only for the owning user', async () => {
     repositoryMock.delete.mockResolvedValue({ affected: 1 });
 
     await expect(action.deleteOwnedById('notif-1', 'user-1')).resolves.toBe(1);

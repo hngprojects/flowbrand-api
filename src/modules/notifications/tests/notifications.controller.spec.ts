@@ -35,7 +35,7 @@ describe('NotificationsController', () => {
     jest.clearAllMocks();
   });
 
-  it('returns the feed envelope for valid requests', async () => {
+  it('AC-01/EC-02: returns the feed envelope for valid requests', async () => {
     notificationsServiceMock.getFeed.mockResolvedValue({
       items: [],
       total_count: 0,
@@ -52,7 +52,7 @@ describe('NotificationsController', () => {
     expect(notificationsServiceMock.getFeed).toHaveBeenCalledWith(undefined, NotificationFilter.ALL, 1, 20);
   });
 
-  it('rejects invalid UUIDs before invoking the service', async () => {
+  it('EC-04/SEC-02: rejects invalid UUIDs before invoking the service', async () => {
     const response = await request(app.getHttpServer()).patch('/v1/notifications/not-a-uuid/read');
 
     expect(response.status).toBe(400);
