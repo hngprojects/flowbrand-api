@@ -7,7 +7,6 @@ import {
   ApiOperation,
   ApiUnauthorizedResponse,
   ApiResponse,
-  ApiBadRequestResponse,
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import { UpdateUserProfileDto } from '../dto/update-user-profile.dto';
@@ -166,7 +165,7 @@ export function ChangePasswordDocs() {
         },
       },
     }),
-    ApiBadRequestResponse({
+    ApiUnprocessableEntityResponse({
       description: 'New password and confirm password do not match.',
       schema: {
         example: {

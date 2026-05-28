@@ -13,8 +13,9 @@ import * as SYS_MSG from '../../constants/system.messages';
 import { UserModelAction } from './actions/user.action';
 import { UsersService } from './users.service';
 import { UserSessionModelAction } from './actions/user-session.action';
-import { AuthMetaModelAction } from '../auth/actions/auth-metadata.action';
+import { AuthMetadataModelAction } from '../auth/actions/auth-metadata.action';
 import { RedisService } from '../redis/redis.service';
+import { redisKeys } from '../../constants/redis-keys';
 
 jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('hashed-password'),
@@ -79,7 +80,7 @@ describe('UsersService', () => {
         UsersService,
         { provide: UserModelAction, useValue: mockUserModelAction },
         { provide: UserSessionModelAction, useValue: mockUserSessionModelAction },
-        { provide: AuthMetaModelAction, useValue: mockAuthMetaModelAction },
+        { provide: AuthMetadataModelAction, useValue: mockAuthMetaModelAction },
         { provide: RedisService, useValue: mockRedisService },
 
       ],
@@ -285,8 +286,8 @@ describe('UsersService', () => {
       await service.changePassword(USER_ID, changePasswordDto);
 
       expect(mockRedisService.del).toHaveBeenCalledTimes(2);
-      expect(mockRedisService.del).toHaveBeenCalledWith(`active_session:${USER_ID}:session-1`);
-      expect(mockRedisService.del).toHaveBeenCalledWith(`sess:${USER_ID}:session-1`);
+      expect(mockRedisService.del).toHaveBeenCalledWith(redisKeys.activeSession(USER_ID, 'session-1'));
+      expect(mockRedisService.del).toHaveBeenCalledWith(redisKeys.session(USER_ID, 'session-1'));
     });
 
     it('AC-19: throws UnauthorizedException when old password is incorrect', async () => {
