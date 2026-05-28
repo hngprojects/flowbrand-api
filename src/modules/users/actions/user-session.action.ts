@@ -1,7 +1,7 @@
 import { AbstractModelAction } from '@hng-sdk/orm';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, EntityManager } from 'typeorm';
 import { UserSession } from './../entities/user-session.entity';
 
 @Injectable()
@@ -41,5 +41,21 @@ export class UserSessionModelAction extends AbstractModelAction<UserSession> {
 
   async createSession(createPayload: Partial<UserSession>): Promise<UserSession> {
     return (await this.create({ createPayload, transactionOptions: { useTransaction: false } }));
+  }
+
+  async revokeAllUserSessions(userId: string, manager?: EntityManager): Promise<void> {
+    const repo = manager ? manager.getRepository(UserSession) : this.repository;
+    
+    await repo.update(
+      { user_id: userId, is_revoked: false },
+      { is_revoked: true, revoked_at: new Date() },
+    );
+  }
+
+  async hasActiveSessions(userId: string): Promise<boolean> {
+    const count = await this.repository.count({
+      where: { user_id: userId, is_revoked: false },
+    });
+    return count > 0;
   }
 }
