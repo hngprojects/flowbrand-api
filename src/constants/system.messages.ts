@@ -188,6 +188,12 @@ export const FEEDBACK_SUBMITTED = 'Feedback submitted successfully';
 export const FEEDBACK_ALREADY_SUBMITTED = 'Feedback already submitted for this stage';
 export const FEEDBACK_STAGE_NOT_COMPLETE = 'Feedback can only be submitted for completed stages';
 
+// Stage task update
+export const STAGE_TASK_NOT_FOUND = 'Task not found or does not belong to this stage';
+export const TASK_UPDATED_SUCCESSFULLY = 'Task updated successfully';
+export const TASK_UPDATE_STAGE_LOCKED = 'Cannot update tasks in a locked stage';
+export const TASK_UPDATE_RATE_LIMIT_EXCEEDED = 'Too many task update requests. Please slow down and try again.';
+
 // Profile
 export const PROFILE_RETRIEVED_SUCCESSFULLY = 'Profile retrieved successfully';
 export const PROFILE_UPDATED_SUCCESSFULLY = 'Profile updated successfully';
