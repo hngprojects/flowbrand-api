@@ -5,7 +5,7 @@ import { Repository } from 'typeorm';
 import { AuthMetadata } from './../entities/auth-metadata.entity';
 
 @Injectable()
-export class AuthMetaModelAction extends AbstractModelAction<AuthMetadata> {
+export class AuthMetadataModelAction extends AbstractModelAction<AuthMetadata> {
   constructor(
     @InjectRepository(AuthMetadata)
     repository: Repository<AuthMetadata>,

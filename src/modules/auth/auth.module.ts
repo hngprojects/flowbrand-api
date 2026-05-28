@@ -13,7 +13,7 @@ import { User } from '../users/entities/user.entity';
 import { UserSession } from '../users/entities/user-session.entity';
 import { AuthMetadata } from './entities/auth-metadata.entity';
 import { OtpToken } from './entities/otp-token.entity';
-import { AuthMetaModelAction } from './actions/auth-metadata.action';
+import { AuthMetadataModelAction } from './actions/auth-metadata.action';
 import { OtpTokenModelAction } from './actions/otp-token.action';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
@@ -31,7 +31,7 @@ import { GoogleStrategy } from './strategies/google.strategy';
     EmailModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, GoogleStrategy, OtpTokenModelAction, AuthMetaModelAction],
+  providers: [AuthService, JwtStrategy, GoogleStrategy, OtpTokenModelAction, AuthMetadataModelAction],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

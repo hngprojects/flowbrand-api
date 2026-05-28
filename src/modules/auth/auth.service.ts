@@ -13,7 +13,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import * as crypto from 'crypto';
 import { UserSessionModelAction } from '../users/actions/user-session.action';
-import { AuthMetaModelAction } from './actions/auth-metadata.action';
+import { AuthMetadataModelAction } from './actions/auth-metadata.action';
 import { OtpTokenModelAction } from './actions/otp-token.action';
 import * as bcrypt from 'bcrypt';
 import type { StringValue } from 'ms';
@@ -31,6 +31,7 @@ import { RegisterDto } from './dto/register.dto';
 import type { GoogleOAuthProfile, OAuthLoginResponse } from './interface/google-oauth.interface';
 import { maskEmail } from '../../utils/pii.utils';
 import { JwtPayload } from './strategies/jwt.strategy';
+import { redisKeys } from '../../constants/redis-keys';
 
 export interface AuthTokens {
   accessToken: string;
@@ -38,8 +39,6 @@ export interface AuthTokens {
 }
 
 const REDIS_SESSION_TTL_SECONDS = 15 * 60;
-const ACTIVE_SESSION_KEY_PREFIX = 'active_session';
-const LEGACY_SESSION_KEY_PREFIX = 'sess';
 const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 const ACCOUNT_LOCK_DURATION_MS = 60 * 60 * 1000;
 
@@ -56,7 +55,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
     private readonly userSessionModelAction: UserSessionModelAction,
-    private readonly authMetadataModelAction: AuthMetaModelAction,
+    private readonly authMetadataModelAction: AuthMetadataModelAction,
     private readonly otpTokenModelAction: OtpTokenModelAction,
     private readonly emailService: EmailService,
     @Optional() private readonly logger = new Logger(AuthService.name),
@@ -267,8 +266,8 @@ export class AuthService {
   async logout(userId: string, sessionId: string): Promise<void> {
     if (!sessionId) return;
 
-    const redisKey = `${ACTIVE_SESSION_KEY_PREFIX}:${userId}:${sessionId}`;
-    const legacyRedisKey = `${LEGACY_SESSION_KEY_PREFIX}:${userId}:${sessionId}`;
+    const redisKey = redisKeys.activeSession(userId, sessionId);
+    const legacyRedisKey = redisKeys.session(userId, sessionId);
     await Promise.all([
       this.userSessionAction.updateById(sessionId, {
         is_revoked: true,
@@ -527,7 +526,7 @@ export class AuthService {
         { secret: env.JWT_ACCESS_SECRET, expiresIn: '15m' },
       );
       // 900 s matches the 15 m token expiry — key is atomically consumed in resetPassword.
-      await this.redisService.set(`password-reset:jti:${user.id}`, jti, 900);
+      await this.redisService.set(redisKeys.passwordResetJti(user.id), jti, 900);
 
       this.logger.log({ message: 'Password reset OTP verified', userId: user.id });
 
@@ -555,7 +554,7 @@ export class AuthService {
     }
 
     // Atomically consume the JTI — rejects replays and tokens not issued via verifyResetOtp.
-    const storedJti = await this.redisService.getdel(`password-reset:jti:${payload.userId}`);
+    const storedJti = await this.redisService.getdel(redisKeys.passwordResetJti(payload.userId));
     if (!storedJti || storedJti !== payload.jti) {
       throw new BadRequestException(SYS_MSG.PASSWORD_RESET_INVALID_TOKEN);
     }
@@ -575,7 +574,7 @@ export class AuthService {
       password_changed_at: new Date(),
     });
     await this.revokeAllUserSessions(user.id);
-    await this.redisService.del(`password-reset:rate:${user.id}`);
+    await this.redisService.del(redisKeys.passwordResetRate(user.id));
 
     const authResponse = await this.issueTokens(user);
 
@@ -603,8 +602,8 @@ export class AuthService {
         });
 
         await Promise.all([
-          this.redisService.del(`active_session:${userId}:${session.id}`),
-          this.redisService.del(`sess:${userId}:${session.id}`),
+          this.redisService.del(redisKeys.activeSession(userId, session.id)),
+          this.redisService.del(redisKeys.session(userId, session.id)),
         ]);
       }
     }
@@ -697,8 +696,8 @@ export class AuthService {
   }
 
   private async persistRedisSession(userId: string, sessionId: string): Promise<void> {
-    const redisKey = `${ACTIVE_SESSION_KEY_PREFIX}:${userId}:${sessionId}`;
-    const legacyRedisKey = `${LEGACY_SESSION_KEY_PREFIX}:${userId}:${sessionId}`;
+    const redisKey = redisKeys.activeSession(userId, sessionId);
+    const legacyRedisKey = redisKeys.session(userId, sessionId);
     const redisValue = JSON.stringify({ userId, sessionId });
     await Promise.all([
       this.redisService.setStrict(redisKey, redisValue, REDIS_SESSION_TTL_SECONDS),
