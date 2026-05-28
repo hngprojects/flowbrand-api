@@ -13,6 +13,8 @@ import { PaginationDto } from './dto/pagination.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { UserRole } from './enums/user-role.enum';
+import { UserStateService } from './user-state.service';
+import { UserStateResponse } from './interfaces/user-state.interface';
 import * as SYS_MSG from '../../constants/system.messages';
 import { IUserProfile } from './interfaces/user-profile.interface';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
@@ -25,7 +27,10 @@ const NO_TRANSACTION = {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly userModelAction: UserModelAction) {}
+  constructor(
+    private readonly userModelAction:UserModelAction,
+    private readonly userStateService: UserStateService,
+  ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
     const existing = await this.userModelAction.findByEmail(dto.email);
@@ -194,6 +199,10 @@ export class UsersService {
       ...NO_TRANSACTION,
       identifierOptions: { id },
     });
+  }
+
+  async getUserState(userId: string): Promise<UserStateResponse> {
+    return this.userStateService.getUserState(userId);
   }
 
   private toProfileResponse(user: User): IUserProfile {

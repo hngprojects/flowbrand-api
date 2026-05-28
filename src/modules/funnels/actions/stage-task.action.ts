@@ -12,6 +12,13 @@ export class StageTaskModelAction extends AbstractModelAction<StageTask> {
   ) {
     super(repository, StageTask);
   }
+  async findTasksByStageId(stageId: string): Promise<StageTask[]> {
+  return this.repository
+    .createQueryBuilder('st')
+    .where('st.stage_id = :stageId', { stageId })
+    .getMany();
+  }
+
 
   async getTasksByStageId(stageId: string): Promise<StageTask[]> {
     return this.repository.createQueryBuilder('t')

@@ -22,6 +22,7 @@ export const AUTH_EMAIL_UNVERIFIED = 'Please verify your email address to log in
 export const USER_EMAIL_IN_USE = 'Email already in use';
 export const USER_NOT_FOUND = (id: string) => `User ${id} not found`;
 export const USER_UPDATE_FAILED = 'Failed to update user';
+export const USER_UNAUTHORIZED = "User not authorized"
 
 // OAuth and external auth messages
 export const GOOGLE_ACCOUNT_NO_EMAIL = 'Google account has no email';
@@ -191,6 +192,9 @@ export const TASK_UPDATED_SUCCESSFULLY = 'Task updated successfully';
 export const TASK_UPDATE_STAGE_LOCKED = 'Cannot update tasks in a locked stage';
 export const TASK_UPDATE_RATE_LIMIT_EXCEEDED = 'Too many task update requests. Please slow down and try again.';
 
+// User State (M4-BE-013)
+export const USER_STATE_RETRIEVED = 'User state retrieved successfully';
+export const USER_NOT_FOUND_BY_TOKEN = 'User associated with this token no longer exists';
 // Profile
 export const PROFILE_RETRIEVED_SUCCESSFULLY = 'Profile retrieved successfully';
 export const PROFILE_UPDATED_SUCCESSFULLY = 'Profile updated successfully';
