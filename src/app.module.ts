@@ -10,7 +10,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { appConfig } from './config/app.config';
 import { databaseConfig } from './config/database.config';
-import './config/env';
+import { env } from './config/env';
 import { jwtConfig } from './config/jwt.config';
 import { redisConfig } from './config/redis.config';
 import * as SYS_MSG from './constants/system.messages';
@@ -55,7 +55,9 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
       delimiter: '.',
       global: true,
       maxListeners: 20,
-      ignoreErrors: false,
+      // true in production — listener bugs degrade silently rather than killing user requests.
+      // false in dev/test — surfaces Rule 2 violations (see CONTRIBUTING.md §7) immediately.
+      ignoreErrors: env.NODE_ENV === 'production',
     }),
     TypeOrmModule.forRootAsync({
       useFactory: () => databaseConfig(),

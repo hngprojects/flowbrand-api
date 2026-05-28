@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -31,6 +32,8 @@ const NO_TRANSACTION = {
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     private readonly userModelAction:UserModelAction,
     private readonly userStateService: UserStateService,
@@ -204,7 +207,15 @@ export class UsersService {
       ...NO_TRANSACTION,
       identifierOptions: { id },
     });
-    this.eventEmitter.emit(APP_EVENTS.ACCOUNT_DELETED, new AccountDeletedEvent(id));
+    this.emitSafely(APP_EVENTS.ACCOUNT_DELETED, new AccountDeletedEvent(id));
+  }
+
+  private emitSafely(eventName: string, payload: object): void {
+    try {
+      this.eventEmitter.emit(eventName, payload);
+    } catch (error) {
+      this.logger.warn({ message: 'Domain event listener failed', eventName, error: (error as Error).message });
+    }
   }
 
   async getUserState(userId: string): Promise<UserStateResponse> {
@@ -278,7 +289,7 @@ export class UsersService {
       throw new InternalServerErrorException(SYS_MSG.PROFILE_UPDATE_FAILED);
     }
 
-    this.eventEmitter.emit(APP_EVENTS.PROFILE_UPDATED, new ProfileUpdatedEvent(userId, changedFields));
+    this.emitSafely(APP_EVENTS.PROFILE_UPDATED, new ProfileUpdatedEvent(userId, changedFields));
 
     return this.toProfileResponse(updated);
   }

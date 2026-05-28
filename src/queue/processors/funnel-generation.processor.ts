@@ -98,12 +98,15 @@ export class FunnelGenerationProcessor {
       throw err;
     }
 
-    // Emit outside try/catch — listener failures cannot reach the catch block and
-    // cannot mark a successfully generated funnel as FAILED.
-    this.eventEmitter.emit(
-      APP_EVENTS.FUNNEL_GENERATED,
-      new FunnelGeneratedEvent(userId, funnelId, funnel.business_name),
-    );
+    this.emitSafely(APP_EVENTS.FUNNEL_GENERATED, new FunnelGeneratedEvent(userId, funnelId, funnel.business_name));
+  }
+
+  private emitSafely(eventName: string, payload: object): void {
+    try {
+      this.eventEmitter.emit(eventName, payload);
+    } catch (error) {
+      this.logger.warn({ message: 'Domain event listener failed', eventName, error: (error as Error).message });
+    }
   }
 
   private async tryAiGeneration(ctx: BusinessContext): Promise<LlmStageData[] | null> {
@@ -281,11 +284,7 @@ export class FunnelGenerationProcessor {
         updatePayload: { status: FunnelStatus.FAILED },
         transactionOptions: { useTransaction: false },
       });
-      // Emit after funnelAction.update — no-transaction write is committed at this point.
-      this.eventEmitter.emit(
-        APP_EVENTS.FUNNEL_FAILED,
-        new FunnelFailedEvent(job.data.userId, job.data.funnelId),
-      );
+      this.emitSafely(APP_EVENTS.FUNNEL_FAILED, new FunnelFailedEvent(job.data.userId, job.data.funnelId));
     }
   }
 

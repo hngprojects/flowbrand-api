@@ -12,6 +12,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import { JOBS, QUEUES } from '../../../../common/constants/queue.constants';
+import { APP_EVENTS } from '../../../../common/constants/app-events';
 import { WizardSession } from '../../../onboarding/entities/wizzard-session.entity';
 import { WizardStatus } from '../../../onboarding/enums/wizzard-status.enum';
 import { RedisService } from '../../../redis/redis.service';
@@ -74,8 +75,10 @@ describe('FunnelsService', () => {
   };
   let dataSource: { createQueryRunner: jest.Mock };
   let feedbackAction: jest.Mocked<Partial<StageFeedbackModelAction>>;
+  let mockEventEmitter: { emit: jest.Mock };
 
   beforeEach(async () => {
+    mockEventEmitter = { emit: jest.fn() };
     // Mock the Funnel action
     funnelAction = {
       findByIdempotency: jest.fn(),
@@ -131,7 +134,7 @@ describe('FunnelsService', () => {
         { provide: getQueueToken(QUEUES.FUNNEL_GENERATION), useValue: queue },
         { provide: DataSource, useValue: dataSource },
         { provide: StageFeedbackModelAction, useValue: feedbackAction },
-        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        { provide: EventEmitter2, useValue: mockEventEmitter },
       ],
     }).compile();
 
@@ -466,6 +469,10 @@ describe('FunnelsService', () => {
 
       expect(result.statusCode).toBe(HttpStatus.CREATED);
       expect(result.data.comment).toBe('Great stage');
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        APP_EVENTS.FEEDBACK_SUBMITTED,
+        expect.objectContaining({ userId: USER_ID, funnelId: FUNNEL_ID, stageId: 'stage-1', feedbackId: 'fb-1' }),
+      );
     });
 
     it('returns 409 if feedback already submitted', async () => {

@@ -8,7 +8,7 @@ Your participation helps keep the platform smarter, more reliable, and more impa
 
 ### 1. Clone the repository
 
-This project uses a shared-repo workflow. If you have write access to `hngprojects/flowbrand-api`, clone the repo directly and branch off `dev`. External contributors without write access can fork instead and open a cross-fork PR.
+This project uses a shared-repo workflow. If you have write access to `hngprojects/flowbrand-api`, clone the repo directly and branch off `dev`. External contributors without write access can fork ins
 
 ```sh
 git clone https://github.com/hngprojects/flowbrand-api.git
@@ -209,7 +209,7 @@ All controllers go through `TransformInterceptor`, which produces the consistent
 { "success": true, "statusCode": 200, "message": "...", "data": <payload> }
 ```
 
-**Never call `res.json()` directly** unless the endpoint performs a `res.redirect()`. Never include `success: true` in what you return — the interceptor adds it, and if you include it manually it leads to `body.data.success` nesting.
+**Never call `res.json()` directly** unless the endpoint performs a `res.redirect()`. Never include `success: true` in what you return — the interceptor adds it, and if you include it manually it le
 
 #### Shape A — Structured with data ✅ (most endpoints)
 
@@ -252,9 +252,9 @@ return { paginationMeta: { ... }, payload: [...] };
 #### Rules and gotchas
 
 - **Shape A/B requires BOTH `statusCode` AND `message`.** Without `message`, the interceptor treats the whole object as Shape C data, causing `body.data.statusCode` instead of `body.statusCode`.
-- **Use `@Res({ passthrough: true })`** only when you must call `res.cookie()`, `res.clearCookie()`, or `res.status()` (dynamic status). Then `return` the structured object and the interceptor still fires normally.
+- **Use `@Res({ passthrough: true })`** only when you must call `res.cookie()`, `res.clearCookie()`, or `res.status()` (dynamic status). Then `return` the structured object and the interceptor still f
 - **Keep plain `@Res()`** (without passthrough) only for `res.redirect()` endpoints — these bypass the interceptor entirely.
-- **Keep `@HttpCode()` in sync** with the `statusCode` field you return. The JSON `statusCode` comes from your return value; the HTTP status header comes from `@HttpCode()` or `res.status()`. They must match. Use `@Res({ passthrough: true })` + `res.status()` when the status is dynamic (e.g. 200 vs 201 vs 202 depending on a service result).
+- **Keep `@HttpCode()` in sync** with the `statusCode` field you return. The JSON `statusCode` comes from your return value; the HTTP status header comes from `@HttpCode()` or `res.status()`. They mus
 
 **Dynamic-status pattern example** — when the service decides the status code (202 for a new job, 200 for an idempotent repeat):
 
@@ -299,11 +299,15 @@ this.eventEmitter.emit(APP_EVENTS.STAGE_COMPLETED, new StageCompletedEvent(...))
 
 #### Rule 2 — Listeners must wrap all logic in try/catch and never rethrow
 
-`EventEmitter2` is synchronous. An uncaught exception in a listener propagates directly to the service that called `emit()` and can kill a user-facing request. Activity logging, notifications, and analytics are not the critical path — they must not kill a user-facing request.
+`EventEmitter2` is synchronous. An uncaught exception in a listener propagates directly to the service that called `emit()` and can kill a user-facing request. Activity logging, notifications, and ana
+
+> **Fire-and-forget**: `emit()` returns before any `async` listener settles. This means `ignoreErrors` only catches synchronous throws — async listener rejections become unhandled promise rejections
 
 ```ts
 @OnEvent(APP_EVENTS.STAGE_COMPLETED)
 async handleStageCompleted(event: StageCompletedEvent): Promise<void> {
+  // emit() is fire-and-forget — this method runs after the caller has already returned.
+  // Any rejection here is an unhandled promise rejection if not caught below.
   try {
     await this.activityAction.create({ ... });
   } catch (err) {
@@ -315,7 +319,9 @@ async handleStageCompleted(event: StageCompletedEvent): Promise<void> {
 
 #### Rule 3 — No PII in event payloads
 
-Event payloads can end up in activity logs and notification metadata. Do not include `email`, `password_hash`, `token_hash`, `refresh_token`, or `provider_user_id` in any event class. A `userId` UUID is safe to include.
+Event payloads can end up in activity logs and notification metadata. Do not include `email`, `password_hash`, `token_hash`, `refresh_token`, or `provider_user_id` in any event class. A `userId` UUID 
+
+`business_name` is acceptable in event payloads (e.g. `FunnelGeneratedEvent`) because it serves a legitimate operational purpose — activity logs need it for display. Be aware that sole proprietors s
 
 ### 8. Testing Proof Is Required in Every PR
 

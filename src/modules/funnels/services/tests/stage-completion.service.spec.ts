@@ -5,6 +5,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import { QUEUES } from '../../../../common/constants/queue.constants';
+import { APP_EVENTS } from '../../../../common/constants/app-events';
 import * as SYS_MSG from '../../../../constants/system.messages';
 import { WizardSession } from '../../../onboarding/entities/wizzard-session.entity';
 import { RedisService } from '../../../redis/redis.service';
@@ -52,8 +53,10 @@ describe('FunnelsService - stage completion', () => {
     };
   };
   let dataSource: { createQueryRunner: jest.Mock; getRepository: jest.Mock };
+  let mockEventEmitter: { emit: jest.Mock };
 
   beforeEach(async () => {
+    mockEventEmitter = { emit: jest.fn() };
     funnelAction = {
       findByIdempotency: jest.fn(),
       findGeneratingForUser: jest.fn(),
@@ -96,7 +99,7 @@ describe('FunnelsService - stage completion', () => {
         { provide: getRepositoryToken(UploadedDocument), useValue: { find: jest.fn() } },
         { provide: getQueueToken(QUEUES.FUNNEL_GENERATION), useValue: { add: jest.fn() } },
         { provide: DataSource, useValue: dataSource },
-        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        { provide: EventEmitter2, useValue: mockEventEmitter },
       ],
     }).compile();
 
@@ -155,6 +158,14 @@ describe('FunnelsService - stage completion', () => {
     expect(queryRunner.startTransaction).toHaveBeenCalledTimes(1);
     expect(queryRunner.commitTransaction).toHaveBeenCalledTimes(1);
     expect(queryRunner.rollbackTransaction).not.toHaveBeenCalled();
+    expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+      APP_EVENTS.STAGE_COMPLETED,
+      expect.objectContaining({ userId: USER_ID, funnelId: FUNNEL_ID, stageId: STAGE_ID, unlockedNextStageId: NEXT_STAGE_ID }),
+    );
+    expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+      APP_EVENTS.STAGE_UNLOCKED,
+      expect.objectContaining({ userId: USER_ID, funnelId: FUNNEL_ID, stageId: NEXT_STAGE_ID }),
+    );
   });
 
   it('AC-02: completes the last stage and returns unlockedStage null', async () => {
@@ -177,6 +188,11 @@ describe('FunnelsService - stage completion', () => {
     expect(result.data.unlockedStage).toBeNull();
     expect(result.data.completedStage.status).toBe(StageStatus.COMPLETE);
     expect(queryRunner.commitTransaction).toHaveBeenCalledTimes(1);
+    expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+      APP_EVENTS.STAGE_COMPLETED,
+      expect.objectContaining({ userId: USER_ID, funnelId: FUNNEL_ID, stageId: STAGE_ID, unlockedNextStageId: null }),
+    );
+    expect(mockEventEmitter.emit).not.toHaveBeenCalledWith(APP_EVENTS.STAGE_UNLOCKED, expect.anything());
   });
 
   it('AC-03: returns 422 when at least one task is still pending', async () => {

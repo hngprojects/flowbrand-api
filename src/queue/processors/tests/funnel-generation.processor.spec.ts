@@ -354,6 +354,18 @@ describe('FunnelGenerationProcessor', () => {
 
       expect(mockEventEmitter.emit).not.toHaveBeenCalledWith(APP_EVENTS.FUNNEL_GENERATED, expect.anything());
     });
+
+    it('AC-09: a throwing FUNNEL_GENERATED listener does not fail the job or mark funnel FAILED', async () => {
+      mockLlmService.generateWithGemini.mockResolvedValue(makeValidStageData());
+      mockEventEmitter.emit.mockImplementationOnce((eventName: string) => {
+        if (eventName === APP_EVENTS.FUNNEL_GENERATED) throw new Error('listener crashed');
+      });
+
+      await expect(processor.handleGenerateFunnel(makeJob())).resolves.toBeUndefined();
+      expect(mockFunnelAction.update).not.toHaveBeenCalledWith(
+        expect.objectContaining({ updatePayload: { status: FunnelStatus.FAILED } }),
+      );
+    });
   });
 
   describe('Event emission — FUNNEL_FAILED', () => {

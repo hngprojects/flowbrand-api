@@ -1,6 +1,9 @@
 export class ProfileUpdatedEvent {
+  public readonly updatedFields: ReadonlyArray<string>;
   constructor(
     public readonly userId: string,
-    public readonly updatedFields: ReadonlyArray<string>,
-  ) {}
+    updatedFields: ReadonlyArray<string>,
+  ) {
+    this.updatedFields = Object.freeze([...updatedFields]);
+  }
 }
