@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bull';
 import { Test, TestingModule } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import { JOBS, QUEUES } from '../../../../common/constants/queue.constants';
 import { WizardSession } from '../../../onboarding/entities/wizzard-session.entity';
@@ -130,6 +131,7 @@ describe('FunnelsService', () => {
         { provide: getQueueToken(QUEUES.FUNNEL_GENERATION), useValue: queue },
         { provide: DataSource, useValue: dataSource },
         { provide: StageFeedbackModelAction, useValue: feedbackAction },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 

@@ -2,6 +2,7 @@ import { ForbiddenException, HttpStatus, NotFoundException, UnprocessableEntityE
 import { getQueueToken } from '@nestjs/bull';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test, TestingModule } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import { QUEUES } from '../../../../common/constants/queue.constants';
 import * as SYS_MSG from '../../../../constants/system.messages';
@@ -9,6 +10,9 @@ import { WizardSession } from '../../../onboarding/entities/wizzard-session.enti
 import { RedisService } from '../../../redis/redis.service';
 import { UploadedDocument } from '../../../upload/entities/uploaded-document.entity';
 import { FunnelModelAction } from '../../actions/funnel.action';
+import { FunnelStageModelAction } from '../../actions/funnel-stage.action';
+import { StageTaskModelAction } from '../../actions/stage-task.action';
+import { StageFeedbackModelAction } from '../../actions/stage-feedback.action';
 import { Funnel } from '../../entities/funnel.entity';
 import { FunnelStage } from '../../entities/funnel-stage.entity';
 import { FunnelStatus } from '../../enums/funnel-status.enum';
@@ -84,11 +88,15 @@ describe('FunnelsService - stage completion', () => {
       providers: [
         FunnelsService,
         { provide: FunnelModelAction, useValue: funnelAction },
+        { provide: FunnelStageModelAction, useValue: {} },
+        { provide: StageTaskModelAction, useValue: {} },
+        { provide: StageFeedbackModelAction, useValue: {} },
         { provide: RedisService, useValue: { rateLimit: jest.fn() } },
         { provide: getRepositoryToken(WizardSession), useValue: { findOne: jest.fn() } },
         { provide: getRepositoryToken(UploadedDocument), useValue: { find: jest.fn() } },
         { provide: getQueueToken(QUEUES.FUNNEL_GENERATION), useValue: { add: jest.fn() } },
         { provide: DataSource, useValue: dataSource },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 

@@ -2,6 +2,7 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bull';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test, TestingModule } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
@@ -73,6 +74,7 @@ describe('FunnelsService - task status update', () => {
         { provide: getRepositoryToken(WizardSession), useValue: {} },
         { provide: getRepositoryToken(UploadedDocument), useValue: {} },
         { provide: getRepositoryToken(StageFeedback), useValue: {} },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 

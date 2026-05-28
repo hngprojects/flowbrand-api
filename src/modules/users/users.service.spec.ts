@@ -5,6 +5,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as bcrypt from 'bcrypt';
 import { QueryFailedError } from 'typeorm';
 import * as SYS_MSG from '../../constants/system.messages';
@@ -83,15 +84,16 @@ describe('UsersService', () => {
         UsersService,
         { provide: UserModelAction, useValue: mockUserModelAction },
         { provide: UserStateService, useValue: mockUserStateService },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 
     service = module.get<UsersService>(UsersService);
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────
   // CRUD TESTS
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────
 
   describe('create', () => {
     const createDto = {
