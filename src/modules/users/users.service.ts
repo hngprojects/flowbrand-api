@@ -1,11 +1,16 @@
 import {
   ConflictException,
+  Inject,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'node:crypto';
+import * as path from 'node:path';
+import { fromBuffer as detectFileTypeFromBuffer } from 'file-type';
 import { QueryFailedError } from 'typeorm';
 import { UserModelAction } from './actions/user.action';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -14,22 +19,40 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { UserRole } from './enums/user-role.enum';
 import { UserStateService } from './user-state.service';
-import { UserStateResponse } from './interfaces/user-state.interface';
+import type { UserStateResponse as UserDashboardStateResponse } from './interfaces/user-state.interface';
 import * as SYS_MSG from '../../constants/system.messages';
 import { IUserProfile } from './interfaces/user-profile.interface';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { ALLOWED_SSA_COUNTRIES } from './enums/allowed-ssa-countries.enum';
+import {
+  ALLOWED_AVATAR_MIME_TYPES,
+  AVATAR_SIGNED_URL_EXPIRY_SECONDS,
+  AVATAR_STORAGE_PREFIX,
+  MAX_AVATAR_UPLOAD_BYTES,
+} from './constants/avatar.constants';
+import { AvatarFileExtension, AvatarMimeType } from './enums/avatar-mime-type.enum';
+import type { IUserAvatarResponse } from './interfaces/user-avatar.interface';
+import { UPLOAD_OBJECT_STORAGE, type ObjectStorage } from '../upload/upload.types';
 
 const BCRYPT_ROUNDS = 10;
 const NO_TRANSACTION = {
   transactionOptions: { useTransaction: false as const },
 };
+const AVATAR_FILE_EXTENSION_BY_MIME: Record<AvatarMimeType, AvatarFileExtension> = {
+  [AvatarMimeType.JPEG]: AvatarFileExtension.JPG,
+  [AvatarMimeType.PNG]: AvatarFileExtension.PNG,
+  [AvatarMimeType.WEBP]: AvatarFileExtension.WEBP,
+};
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
-    private readonly userModelAction:UserModelAction,
+    private readonly userModelAction: UserModelAction,
     private readonly userStateService: UserStateService,
+    @Inject(UPLOAD_OBJECT_STORAGE)
+    private readonly objectStorage: ObjectStorage,
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
@@ -201,7 +224,7 @@ export class UsersService {
     });
   }
 
-  async getUserState(userId: string): Promise<UserStateResponse> {
+  async getUserState(userId: string): Promise<UserDashboardStateResponse> {
     return this.userStateService.getUserState(userId);
   }
 
@@ -222,6 +245,119 @@ export class UsersService {
   async getProfile(userId: string): Promise<IUserProfile> {
     const user = await this.findById(userId);
     return this.toProfileResponse(user);
+  }
+
+  private isStoredAvatarPath(avatarUrl: string | null): avatarUrl is string {
+    return typeof avatarUrl === 'string' && avatarUrl.startsWith(`${AVATAR_STORAGE_PREFIX}/`);
+  }
+
+  private buildAvatarStoragePath(userId: string, fileExtension: AvatarFileExtension): string {
+    return path.posix.join(AVATAR_STORAGE_PREFIX, userId, `${randomUUID()}.${fileExtension}`);
+  }
+
+  private async resolveAvatarUrl(storagePath: string): Promise<string> {
+    try {
+      return await this.objectStorage.createPresignedGetObjectUrl(
+        storagePath,
+        AVATAR_SIGNED_URL_EXPIRY_SECONDS,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to create avatar signed URL for ${storagePath}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new InternalServerErrorException(SYS_MSG.PROFILE_AVATAR_UPLOAD_FAILED);
+    }
+  }
+
+  async uploadAvatar(userId: string, file: Express.Multer.File | undefined): Promise<IUserAvatarResponse> {
+    if (!file?.buffer) {
+      throw new UnprocessableEntityException(SYS_MSG.PROFILE_AVATAR_FILE_REQUIRED);
+    }
+
+    if (file.size > MAX_AVATAR_UPLOAD_BYTES) {
+      throw new UnprocessableEntityException(SYS_MSG.PROFILE_AVATAR_UPLOAD_TOO_LARGE);
+    }
+
+    const detectedFileType = await detectFileTypeFromBuffer(file.buffer);
+    if (!detectedFileType) {
+      throw new UnprocessableEntityException(SYS_MSG.PROFILE_AVATAR_UPLOAD_INVALID_TYPE);
+    }
+
+    const detectedMimeType = detectedFileType.mime as AvatarMimeType;
+    if (!ALLOWED_AVATAR_MIME_TYPES.includes(detectedMimeType)) {
+      throw new UnprocessableEntityException(SYS_MSG.PROFILE_AVATAR_UPLOAD_INVALID_TYPE);
+    }
+
+    const avatarFileExtension = AVATAR_FILE_EXTENSION_BY_MIME[detectedMimeType];
+    const storagePath = this.buildAvatarStoragePath(userId, avatarFileExtension);
+
+    const user = await this.findById(userId);
+    const previousAvatarPath = this.isStoredAvatarPath(user.avatar_url) ? user.avatar_url : null;
+    let objectWritten = false;
+
+    try {
+      if (previousAvatarPath) {
+        await this.objectStorage.deleteObject(previousAvatarPath);
+      }
+
+      await this.objectStorage.putObject({
+        storagePath,
+        body: file.buffer,
+        contentType: detectedMimeType,
+        contentLength: file.size,
+      });
+      objectWritten = true;
+
+      const avatarUrl = await this.resolveAvatarUrl(storagePath);
+
+      const updatedUser = await this.userModelAction.updateAvatarUrl(userId, storagePath);
+      if (!updatedUser) {
+        throw new InternalServerErrorException(SYS_MSG.PROFILE_AVATAR_UPLOAD_FAILED);
+      }
+
+      return { avatarUrl };
+    } catch (error) {
+      if (objectWritten) {
+        try {
+          await this.objectStorage.deleteObject(storagePath);
+        } catch (cleanupError) {
+          this.logger.error(
+            `Failed to clean up uploaded avatar ${storagePath}`,
+            cleanupError instanceof Error ? cleanupError.stack : undefined,
+          );
+        }
+      }
+
+      if (
+        error instanceof UnprocessableEntityException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException(SYS_MSG.PROFILE_AVATAR_UPLOAD_FAILED);
+    }
+  }
+
+  async deleteAvatar(userId: string): Promise<IUserAvatarResponse> {
+    const user = await this.findById(userId);
+    const currentAvatarPath = this.isStoredAvatarPath(user.avatar_url) ? user.avatar_url : null;
+
+    if (!currentAvatarPath && user.avatar_url === null) {
+      return { avatarUrl: null };
+    }
+
+    if (currentAvatarPath) {
+      await this.objectStorage.deleteObject(currentAvatarPath);
+    }
+
+    const updatedUser = await this.userModelAction.updateAvatarUrl(userId, null);
+    if (!updatedUser) {
+      throw new InternalServerErrorException(SYS_MSG.PROFILE_AVATAR_DELETE_FAILED);
+    }
+
+    return { avatarUrl: null };
   }
 
   async updateProfile(
@@ -274,4 +410,5 @@ export class UsersService {
 
     return this.toProfileResponse(updated);
   }
+
 }

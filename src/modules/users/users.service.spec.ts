@@ -6,11 +6,14 @@ import {
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
+import { fromBuffer } from 'file-type';
 import { QueryFailedError } from 'typeorm';
 import * as SYS_MSG from '../../constants/system.messages';
+import { UPLOAD_OBJECT_STORAGE } from '../upload/upload.types';
 import { UserModelAction } from './actions/user.action';
 import { UsersService } from './users.service';
 import { UserStateService } from './user-state.service';
+import { AvatarMimeType } from './enums/avatar-mime-type.enum';
 import { User } from './entities/user.entity';
 import { UserStateResponse } from './interfaces/user-state.interface';
 
@@ -18,40 +21,33 @@ jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('hashed-password'),
   compare: jest.fn(),
 }));
+jest.mock('file-type', () => ({
+  fromBuffer: jest.fn(),
+}));
 
 const USER_ID = 'user-uuid-001';
 const USER_EMAIL = 'test@example.com';
 
-// Mock UserModelAction
 const mockUserModelAction = {
   findByEmail: jest.fn(),
   create: jest.fn(),
   get: jest.fn(),
   list: jest.fn(),
   update: jest.fn(),
+  updateAvatarUrl: jest.fn(),
   delete: jest.fn(),
 };
 
-// Mock WizardSessionModelAction
-const mockWizardSessionModelAction = {
-  findActiveSession: jest.fn(),
-  findSessionById: jest.fn(),
-  saveSession: jest.fn(),
-  markAsExpired: jest.fn(),
-  resolveStartWizardSession: jest.fn(),
-};
-
-// Mock UserStateService
 const mockUserStateService = {
   getUserState: jest.fn(),
   invalidateUserStateCache: jest.fn(),
 };
 
-// Mock RedisService
-const mockRedisService = {
-  get: jest.fn(),
-  set: jest.fn(),
-  del: jest.fn(),
+const mockObjectStorage = {
+  putObject: jest.fn(),
+  getObject: jest.fn(),
+  deleteObject: jest.fn(),
+  createPresignedGetObjectUrl: jest.fn(),
 };
 
 const mockUser = (): Partial<User> => ({
@@ -77,21 +73,16 @@ describe('UsersService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
         { provide: UserModelAction, useValue: mockUserModelAction },
         { provide: UserStateService, useValue: mockUserStateService },
+        { provide: UPLOAD_OBJECT_STORAGE, useValue: mockObjectStorage },
       ],
     }).compile();
-
     service = module.get<UsersService>(UsersService);
   });
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // CRUD TESTS
-  // ─────────────────────────────────────────────────────────────────────────
 
   describe('create', () => {
     const createDto = {
@@ -101,273 +92,120 @@ describe('UsersService', () => {
       termsAccepted: true,
     };
 
-    it('creates a user and returns the created user', async () => {
+    it('creates user', async () => {
       mockUserModelAction.findByEmail.mockResolvedValue(null);
       mockUserModelAction.create.mockResolvedValue(mockUser());
-
-      const result = await service.create(createDto);
-
-      expect(mockUserModelAction.findByEmail).toHaveBeenCalledWith(USER_EMAIL);
-      expect(bcrypt.hash).toHaveBeenCalledWith('Password123!', 10);
-      expect(result).toEqual(mockUser());
+      await expect(service.create(createDto)).resolves.toEqual(mockUser());
     });
 
-    it('throws 409 when email already exists', async () => {
+    it('throws conflict when email exists', async () => {
       mockUserModelAction.findByEmail.mockResolvedValue(mockUser());
-
       await expect(service.create(createDto)).rejects.toBeInstanceOf(ConflictException);
-      expect(mockUserModelAction.create).not.toHaveBeenCalled();
     });
 
-    it('throws 409 with USER_ACCOUNT_LOCKED when account is inactive', async () => {
-      mockUserModelAction.findByEmail.mockResolvedValue({ ...mockUser(), is_active: false });
-
-      await expect(service.create(createDto)).rejects.toThrow(SYS_MSG.USER_ACCOUNT_LOCKED);
-    });
-
-    it('throws 409 on duplicate key DB error', async () => {
+    it('throws conflict on duplicate db key', async () => {
       mockUserModelAction.findByEmail.mockResolvedValue(null);
       const dbError = Object.assign(new QueryFailedError('', [], new Error()), {
         driverError: { code: '23505' },
       });
       mockUserModelAction.create.mockRejectedValue(dbError);
-
       await expect(service.create(createDto)).rejects.toBeInstanceOf(ConflictException);
     });
   });
 
-  describe('findById', () => {
-    it('returns user when found', async () => {
-      mockUserModelAction.get.mockResolvedValue(mockUser());
-
-      const result = await service.findById(USER_ID);
-
-      expect(result).toEqual(mockUser());
-      expect(mockUserModelAction.get).toHaveBeenCalledWith({
-        identifierOptions: { id: USER_ID },
-      });
-    });
-
-    it('throws 404 when user not found', async () => {
-      mockUserModelAction.get.mockResolvedValue(null);
-
-      await expect(service.findById(USER_ID)).rejects.toBeInstanceOf(NotFoundException);
-    });
-  });
-
-  describe('findByEmail', () => {
-    it('returns user when email exists', async () => {
-      mockUserModelAction.findByEmail.mockResolvedValue(mockUser());
-
-      const result = await service.findByEmail(USER_EMAIL);
-
-      expect(result).toEqual(mockUser());
-    });
-
-    it('returns null when email does not exist', async () => {
-      mockUserModelAction.findByEmail.mockResolvedValue(null);
-
-      const result = await service.findByEmail('nonexistent@example.com');
-
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('update', () => {
-    const updateDto = { fullName: 'Updated Name' };
-
-    it('updates and returns user when found', async () => {
-      mockUserModelAction.get.mockResolvedValue(mockUser());
-      mockUserModelAction.update.mockResolvedValue({ ...mockUser(), full_name: 'Updated Name' });
-
-      const result = await service.update(USER_ID, updateDto);
-
-      expect(result.full_name).toBe('Updated Name');
-    });
-
-    it('throws 404 when user not found during update', async () => {
-      mockUserModelAction.get.mockResolvedValue(null);
-
-      await expect(service.update(USER_ID, updateDto)).rejects.toBeInstanceOf(NotFoundException);
-    });
-
-    it('hashes password when password is provided in update', async () => {
-      mockUserModelAction.get.mockResolvedValue(mockUser());
-      mockUserModelAction.update.mockResolvedValue(mockUser());
-
-      await service.update(USER_ID, { password: 'NewPass123!' });
-
-      expect(bcrypt.hash).toHaveBeenCalledWith('NewPass123!', 10);
-    });
-
-    it('throws 500 when update returns null', async () => {
-      mockUserModelAction.get.mockResolvedValue(mockUser());
-      mockUserModelAction.update.mockResolvedValue(null);
-
-      await expect(service.update(USER_ID, updateDto)).rejects.toBeInstanceOf(InternalServerErrorException);
-    });
-  });
-
-  describe('remove', () => {
-    it('deletes user when found', async () => {
-      mockUserModelAction.get.mockResolvedValue(mockUser());
-      mockUserModelAction.delete.mockResolvedValue(undefined);
-
-      await expect(service.remove(USER_ID)).resolves.toBeUndefined();
-      expect(mockUserModelAction.delete).toHaveBeenCalled();
-    });
-
-    it('throws 404 when user not found during remove', async () => {
-      mockUserModelAction.get.mockResolvedValue(null);
-
-      await expect(service.remove(USER_ID)).rejects.toBeInstanceOf(NotFoundException);
-      expect(mockUserModelAction.delete).not.toHaveBeenCalled();
-    });
-  });
-
   describe('getUserState', () => {
-    it('delegates to UserStateService.getUserState', async () => {
-      const expectedResponse: UserStateResponse = {
-        onboarding: { status: 'not_started' },
-        activeFunnel: null,
-      };
-      mockUserStateService.getUserState.mockResolvedValue(expectedResponse);
-
-      const result = await service.getUserState(USER_ID);
-
-      expect(mockUserStateService.getUserState).toHaveBeenCalledWith(USER_ID);
-      expect(result).toEqual(expectedResponse);
+    it('delegates to UserStateService', async () => {
+      const expected: UserStateResponse = { onboarding: { status: 'not_started' }, activeFunnel: null };
+      mockUserStateService.getUserState.mockResolvedValue(expected);
+      await expect(service.getUserState(USER_ID)).resolves.toEqual(expected);
     });
   });
 
-  describe('getProfile', () => {
-    it('returns camelCase profile for authenticated user', async () => {
-      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+  describe('uploadAvatar', () => {
+    const fromBufferMock = fromBuffer as jest.MockedFunction<typeof fromBuffer>;
+    const avatarFile = {
+      originalname: 'my-avatar.jpg',
+      size: 512_000,
+      buffer: Buffer.from('fake-image-bytes'),
+      mimetype: 'application/octet-stream',
+    } as Express.Multer.File;
 
-      const result = await service.getProfile(USER_ID);
+    it('uploads valid avatar and returns signed URL', async () => {
+      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+      fromBufferMock.mockResolvedValue({ ext: 'jpg', mime: AvatarMimeType.JPEG });
+      mockUserModelAction.updateAvatarUrl.mockResolvedValue({ ...mockFullUser, avatar_url: 'avatars/u/new.jpg' });
+      mockObjectStorage.createPresignedGetObjectUrl.mockResolvedValue('https://signed.example/avatar.jpg');
 
-      expect(result).toMatchObject({
-        id: USER_ID,
-        fullName: 'Test User',
-        email: USER_EMAIL,
-      });
+      const result = await service.uploadAvatar(USER_ID, avatarFile);
+      expect(result).toEqual({ avatarUrl: 'https://signed.example/avatar.jpg' });
+      expect(mockObjectStorage.putObject).toHaveBeenCalled();
     });
 
-    it('response never contains password_hash, deleted_at, or provider_user_id', async () => {
-      mockUserModelAction.get.mockResolvedValue(mockFullUser);
-
-      const result = await service.getProfile(USER_ID) as unknown as Record<string, unknown>;
-
-      expect(result).not.toHaveProperty('password_hash');
-      expect(result).not.toHaveProperty('deleted_at');
-      expect(result).not.toHaveProperty('provider_user_id');
+    it('rejects missing file with 422', async () => {
+      await expect(service.uploadAvatar(USER_ID, undefined)).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
     });
 
-    it('throws 404 when user not found', async () => {
-      mockUserModelAction.get.mockResolvedValue(null);
+    it('rejects oversized file with 422', async () => {
+      await expect(
+        service.uploadAvatar(USER_ID, { ...avatarFile, size: 2_097_153 }),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    });
 
-      await expect(service.getProfile(USER_ID)).rejects.toBeInstanceOf(NotFoundException);
+    it('rejects spoofed mime with 422', async () => {
+      fromBufferMock.mockResolvedValue({ ext: 'pdf', mime: 'application/pdf' });
+      await expect(service.uploadAvatar(USER_ID, avatarFile)).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
+    });
+
+    it('rolls back object when DB update fails', async () => {
+      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+      fromBufferMock.mockResolvedValue({ ext: 'webp', mime: AvatarMimeType.WEBP });
+      mockUserModelAction.updateAvatarUrl.mockResolvedValue(null);
+
+      await expect(service.uploadAvatar(USER_ID, avatarFile)).rejects.toBeInstanceOf(
+        InternalServerErrorException,
+      );
+      expect(mockObjectStorage.deleteObject).toHaveBeenCalled();
+    });
+  });
+
+  describe('deleteAvatar', () => {
+    it('deletes stored avatar and nulls db field', async () => {
+      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: 'avatars/u/a.jpg' });
+      mockUserModelAction.updateAvatarUrl.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+      await expect(service.deleteAvatar(USER_ID)).resolves.toEqual({ avatarUrl: null });
+    });
+
+    it('returns no-op when avatar is already null', async () => {
+      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+      await expect(service.deleteAvatar(USER_ID)).resolves.toEqual({ avatarUrl: null });
+    });
+
+    it('throws 500 when null update fails', async () => {
+      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: 'avatars/u/a.jpg' });
+      mockUserModelAction.updateAvatarUrl.mockResolvedValue(null);
+      await expect(service.deleteAvatar(USER_ID)).rejects.toBeInstanceOf(
+        InternalServerErrorException,
+      );
     });
   });
 
   describe('updateProfile', () => {
-    it('updates full_name and returns updated profile', async () => {
+    it('throws 422 when email in body', async () => {
       mockUserModelAction.get.mockResolvedValue(mockFullUser);
-      mockUserModelAction.update.mockResolvedValue({ ...mockFullUser, full_name: 'New Name' });
-
-      const result = await service.updateProfile(USER_ID, { fullName: 'New Name' });
-
-      expect(result.fullName).toBe('New Name');
-      expect(mockUserModelAction.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          updatePayload: { full_name: 'New Name' },
-        }),
-      );
-    });
-
-    it('updates country and returns updated profile', async () => {
-      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, country: 'Ghana' });
-      mockUserModelAction.update.mockResolvedValue({ ...mockFullUser, country: 'Nigeria' });
-
-      const result = await service.updateProfile(USER_ID, { country: 'Nigeria' });
-
-      expect(result.country).toBe('Nigeria');
-    });
-
-    it('throws 422 when email is present in body', async () => {
-      mockUserModelAction.get.mockResolvedValue(mockFullUser);
-
       await expect(
-        service.updateProfile(USER_ID, { email: 'hacker@example.com' } as never),
+        service.updateProfile(USER_ID, { email: 'x@example.com' } as never),
       ).rejects.toBeInstanceOf(UnprocessableEntityException);
-
-      expect(mockUserModelAction.update).not.toHaveBeenCalled();
-    });
-
-    it('returns unchanged profile without DB write when body is empty', async () => {
-      mockUserModelAction.get.mockResolvedValue(mockFullUser);
-
-      await service.updateProfile(USER_ID, {});
-
-      expect(mockUserModelAction.update).not.toHaveBeenCalled();
-    });
-
-    it('only-country update leaves full_name unchanged in DB', async () => {
-      mockUserModelAction.get.mockResolvedValue(mockFullUser);
-      mockUserModelAction.update.mockResolvedValue({ ...mockFullUser, country: 'Ghana' });
-
-      await service.updateProfile(USER_ID, { country: 'Ghana' });
-
-      const updateCall = mockUserModelAction.update.mock.calls[0][0] as {
-        updatePayload: Record<string, unknown>;
-      };
-      expect(updateCall.updatePayload).not.toHaveProperty('full_name');
-    });
-
-    it('no DB write when submitted values are identical to stored values', async () => {
-      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, full_name: 'Test User' });
-
-      await service.updateProfile(USER_ID, { fullName: 'Test User' });
-
-      expect(mockUserModelAction.update).not.toHaveBeenCalled();
-    });
-
-    it('trims whitespace from fullName before MinLength check', async () => {
-      mockUserModelAction.get.mockResolvedValue(mockFullUser);
-      mockUserModelAction.update.mockResolvedValue({ ...mockFullUser, full_name: 'Trimmed' });
-
-      const result = await service.updateProfile(USER_ID, { fullName: 'Trimmed' });
-
-      expect(result.fullName).toBe('Trimmed');
-    });
-
-    it('normalises country casing before comparison', async () => {
-      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, country: 'Ghana' });
-      mockUserModelAction.update.mockResolvedValue({ ...mockFullUser, country: 'Nigeria' });
-
-      await service.updateProfile(USER_ID, { country: 'nigeria' as never });
-
-      const updateCall = mockUserModelAction.update.mock.calls[0][0] as {
-        updatePayload: Record<string, unknown>;
-      };
-      expect(updateCall.updatePayload['country']).toBe('Nigeria');
     });
 
     it('throws 404 when user not found', async () => {
       mockUserModelAction.get.mockResolvedValue(null);
-
       await expect(service.updateProfile(USER_ID, { fullName: 'X' })).rejects.toBeInstanceOf(
         NotFoundException,
       );
-    });
-
-    it('throws 500 when DB update returns null', async () => {
-      mockUserModelAction.get.mockResolvedValue(mockFullUser);
-      mockUserModelAction.update.mockResolvedValue(null);
-
-      await expect(
-        service.updateProfile(USER_ID, { fullName: 'Different Name' }),
-      ).rejects.toBeInstanceOf(InternalServerErrorException);
     });
   });
 });

@@ -20,4 +20,12 @@ export class UserModelAction extends AbstractModelAction<User> {
   async findById(id: string): Promise<User | null> {
     return this.get({ identifierOptions: { id } });
   }
+
+  async updateAvatarUrl(userId: string, avatarUrl: string | null): Promise<User | null> {
+    return this.update({
+      transactionOptions: { useTransaction: false },
+      identifierOptions: { id: userId },
+      updatePayload: { avatar_url: avatarUrl },
+    });
+  }
 }
