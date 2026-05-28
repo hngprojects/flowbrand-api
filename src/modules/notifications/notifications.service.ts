@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { NotificationModelAction } from './actions/notification.action';
 import { Notification } from './entities/notification.entity';
 
+const TYPE_MAX = 50;
+const TITLE_MAX = 120;
 const METADATA_STRING_MAX = 500;
 
 @Injectable()
@@ -17,7 +19,7 @@ export class NotificationsService {
   ): Promise<Notification> {
     const sanitisedMetadata = this.truncateMetadata(metadata);
     return this.notificationAction.create({
-      createPayload: { user_id: userId, type, title, body, metadata: sanitisedMetadata },
+      createPayload: { user_id: userId, type: type.slice(0, TYPE_MAX), title: title.slice(0, TITLE_MAX), body, metadata: sanitisedMetadata },
       transactionOptions: { useTransaction: false },
     });
   }
