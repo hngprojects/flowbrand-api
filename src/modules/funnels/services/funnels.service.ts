@@ -7,6 +7,8 @@ import { APP_EVENTS } from '../../../common/constants/app-events';
 import { StageCompletedEvent } from '../../../common/events/stage-completed.event';
 import { StageUnlockedEvent } from '../../../common/events/stage-unlocked.event';
 import { FeedbackSubmittedEvent } from '../../../common/events/feedback-submitted.event';
+import { TaskCompletedEvent } from '../../../common/events/task-completed.event';
+import { TaskReopenedEvent } from '../../../common/events/task-reopened.event';
 import { JOBS, QUEUES } from '../../../common/constants/queue.constants';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { RedisService } from '../../redis/redis.service';
@@ -472,6 +474,13 @@ export class FunnelsService {
 
     task.status = status;
     const saved = await this.taskAction.saveTask(task);
+
+    if (status === 'complete') {
+      this.eventEmitter.emit(APP_EVENTS.TASK_COMPLETED, new TaskCompletedEvent(userId, funnelId, stageId, taskId, saved.name));
+    } else {
+      this.eventEmitter.emit(APP_EVENTS.TASK_REOPENED, new TaskReopenedEvent(userId, funnelId, stageId, taskId, saved.name));
+    }
+
     return this.buildTaskUpdateResult(saved);
   }
 
