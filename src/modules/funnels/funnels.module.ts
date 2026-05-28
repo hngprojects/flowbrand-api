@@ -30,6 +30,11 @@ import { StageFeedbackModelAction } from './actions/stage-feedback.action';
     StageTaskModelAction,
     StageFeedbackModelAction,
   ],
-  exports: [FunnelsService, FunnelModelAction],
+  exports: [
+    FunnelsService,
+    FunnelModelAction,
+    FunnelStageModelAction,
+    StageTaskModelAction,
+  ],
 })
 export class FunnelsModule {}
