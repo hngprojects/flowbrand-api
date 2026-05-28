@@ -12,7 +12,9 @@ import {
   GetStageDetailDecorators,
   GetStagesSummaryDecorators,
   ListFunnelsDecorators,
+  SubmitFeedbackDocs,
 } from '../docs/funnels-swagger.doc';
+import { SubmitStageFeedbackDto } from '../dto/submit-stage-feedback.dto';
 
 @FunnelControllerDecorators()
 @Controller('funnels')
@@ -106,5 +108,16 @@ export class FunnelsController {
         ...(result.error ? { error: result.error } : {}),
       },
     };
+  }
+
+  @Post(':funnelId/stages/:stageId/feedback')
+  @SubmitFeedbackDocs()
+  async submitFeedback(
+    @CurrentUser('userId') userId: string,
+    @Param('funnelId', ParseUUIDPipe) funnelId: string,
+    @Param('stageId', ParseUUIDPipe) stageId: string,
+    @Body() dto: SubmitStageFeedbackDto,
+  ) {
+    return this.funnelsService.submitFeedback(userId, funnelId, stageId, dto);
   }
 }

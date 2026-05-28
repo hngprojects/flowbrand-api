@@ -13,6 +13,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
   ApiUnprocessableEntityResponse,
+  ApiCreatedResponse,
 } from '@nestjs/swagger';
 import * as SYS_MSG from '../../../constants/system.messages';
 
@@ -363,5 +364,44 @@ export function CompleteStageDecorators() {
       description: 'Funnel is not active, the stage has no tasks, or one or more tasks are still pending',
       schema: { example: stagePendingTasksExample('/api/funnels/{id}/stages/{stageId}/complete') },
     }),
+  );
+}
+
+export const feedbackSuccessExample = {
+  success: true,
+  statusCode: HttpStatus.CREATED,
+  message: SYS_MSG.FEEDBACK_SUBMITTED,
+  data: {
+    feedbackId: '550e8400-e29b-41d4-a716-446655440000',
+    stageId: '550e8400-e29b-41d4-a716-446655440010',
+    comment: 'This stage was really useful.',
+    submittedAt: '2026-05-26T10:00:00.000Z',
+  },
+};
+
+export const feedbackConflictExample = {
+  success: false,
+  statusCode: HttpStatus.CONFLICT,
+  error: 'ConflictException',
+  message: SYS_MSG.FEEDBACK_ALREADY_SUBMITTED,
+  timestamp: '2026-05-26T10:00:00.000Z',
+};
+
+export const feedbackNotCompleteExample = {
+  success: false,
+  statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+  error: 'UnprocessableEntityException',
+  message: SYS_MSG.FEEDBACK_STAGE_NOT_COMPLETE,
+  timestamp: '2026-05-26T10:00:00.000Z',
+};
+
+export function SubmitFeedbackDocs() {
+  return applyDecorators(
+    ApiOperation({ summary: 'Submit feedback for a completed stage' }),
+    ApiCreatedResponse({ description: 'Feedback successfully submitted', schema: { example: feedbackSuccessExample } }),
+    ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token', schema: { example: unauthorizedExample } }),
+    ApiNotFoundResponse({ description: 'Funnel or stage not found', schema: { example: notFoundExample('/api/funnels/{funnelId}/stages/{stageId}/feedback') } }),
+    ApiConflictResponse({ description: 'Feedback already submitted for this stage', schema: { example: feedbackConflictExample } }),
+    ApiUnprocessableEntityResponse({ description: 'Stage is not complete', schema: { example: feedbackNotCompleteExample } }),
   );
 }
