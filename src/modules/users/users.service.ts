@@ -315,7 +315,7 @@ export class UsersService {
         is_active: false,
       });
 
-      await this.userSessionModelAction.revokeAllUserSessions(userId, queryRunner.manager);
+      const revokedSessionIds = await this.userSessionModelAction.revokeAllUserSessions(userId, queryRunner.manager);
 
       if (user.auth_provider === 'google') {
         await queryRunner.manager.update(User, userId, { provider_user_id: null });
@@ -323,6 +323,10 @@ export class UsersService {
 
       await queryRunner.commitTransaction();
       committed = true;
+
+      if (revokedSessionIds.length > 0) {
+        await this.userSessionModelAction.deleteSessionRedisKeys(userId, revokedSessionIds)
+      }
 
       this.logger.log('account.deleted', { userId });
 

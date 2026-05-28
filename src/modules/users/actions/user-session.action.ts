@@ -3,12 +3,14 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, EntityManager } from 'typeorm';
 import { UserSession } from './../entities/user-session.entity';
+import { RedisService } from '../../redis/redis.service';
 
 @Injectable()
 export class UserSessionModelAction extends AbstractModelAction<UserSession> {
   constructor(
     @InjectRepository(UserSession)
     repository: Repository<UserSession>,
+    private readonly redisService: RedisService,
   ) {
     super(repository, UserSession);
   }
@@ -43,19 +45,33 @@ export class UserSessionModelAction extends AbstractModelAction<UserSession> {
     return (await this.create({ createPayload, transactionOptions: { useTransaction: false } }));
   }
 
-  async revokeAllUserSessions(userId: string, manager?: EntityManager): Promise<void> {
+  async revokeAllUserSessions(userId: string, manager?: EntityManager): Promise<string[]> {
     const repo = manager ? manager.getRepository(UserSession) : this.repository;
+
+    const activeSessions = await repo.find({
+      where: { user_id: userId, is_revoked: false },
+      select: ['id'],
+    });
+
+    const sessionIds = activeSessions.map(s => s.id);
+
+    if (sessionIds.length === 0) {
+      return [];
+    }
     
     await repo.update(
       { user_id: userId, is_revoked: false },
       { is_revoked: true, revoked_at: new Date() },
     );
+
+    return sessionIds;
   }
 
-  async hasActiveSessions(userId: string): Promise<boolean> {
-    const count = await this.repository.count({
-      where: { user_id: userId, is_revoked: false },
-    });
-    return count > 0;
+  async deleteSessionRedisKeys(userId: string, sessionIds: string[]): Promise<void> {
+    for (const sessionId of sessionIds) {
+      const redisKey = `sess:${userId}:${sessionId}`;
+      await this.redisService.del(redisKey);
+    }
+    
   }
 }
