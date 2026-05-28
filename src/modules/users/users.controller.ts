@@ -16,7 +16,8 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator'; 
+import { GetUserStateDocs } from './docs/users-swagger.doc';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { GetProfileDocs, UpdateProfileDocs } from './docs/users-swagger.doc';
@@ -84,5 +85,11 @@ export class UsersController {
   @ApiOperation({ summary: 'Delete a user' })
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.remove(id);
+  }
+
+  @Get('me/state')
+  @GetUserStateDocs()
+  async getUserState(@CurrentUser('userId') userId: string) {
+    return this.usersService.getUserState(userId)
   }
 }
