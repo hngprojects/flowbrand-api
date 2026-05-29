@@ -18,6 +18,7 @@ export class DocumentTextExtractorService {
   private readonly logger = new Logger(DocumentTextExtractorService.name);
 
   async extract(buffer: Buffer, fileType: UploadFileType): Promise<string> {
+    const start = Date.now();
     let text: string;
 
     switch (fileType) {
@@ -42,6 +43,13 @@ export class DocumentTextExtractorService {
           message: SYS_MSG.FUNNEL_UPLOAD_UNSUPPORTED_FILE_TYPE,
         });
     }
+
+    this.logger.log({
+      event: 'extraction_format_complete',
+      format: fileType,
+      fileSizeBytes: buffer.byteLength,
+      durationMs: Date.now() - start,
+    });
 
     const normalized = text.replace(/\s+/g, ' ').trim();
     if (!normalized) {
