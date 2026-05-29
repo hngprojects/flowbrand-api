@@ -10,6 +10,7 @@ export const AUTH_LOGIN_SUCCESSFUL = 'Login successful';
 export const AUTH_LOGOUT_SUCCESSFUL = 'Logout successful';
 export const AUTH_TOKEN_REFRESHED = 'Token refreshed successfully';
 export const AUTH_INVALID_CREDENTIALS = 'Invalid email or password';
+export const AUTH_INVALID_TOKEN = 'Invalid or expired token';
 export const AUTH_INVALID_REFRESH_TOKEN = 'Invalid or expired refresh token';
 export const AUTH_UNAUTHENTICATED_MESSAGE = 'Unauthenticated';
 export const AUTH_TERMS_REQUIRED = 'You must accept the terms and conditions to register';
@@ -128,6 +129,8 @@ export const STAGE_COMPLETION_REQUIRES_ACTIVE_FUNNEL =
 export const STAGE_COMPLETION_CONCURRENT_UPDATE =
   'Stage completion failed due to a concurrent update. Please retry.';
 export const FUNNEL_UNAUTHORIZED_ACCESS = 'You do not have permission to access this funnel';
+export const FUNNEL_TASK_NOT_FOUND = 'Funnel task not found or not accessible.';
+export const TASK_STATUS_UPDATED_SUCCESSFULLY = 'Task updated successfully';
 
 // Password Reset Messages
 export const PASSWORD_RESET_OTP_SENT = 'If your email is registered, you will receive a password reset code.';
@@ -139,6 +142,15 @@ export const PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED = 'Too many verification at
 export const PASSWORD_RESET_OTP_VERIFIED = 'OTP verified. Use the reset token to set your new password.';
 export const PASSWORD_RESET_INVALID_TOKEN = 'Invalid or expired reset token.';
 
+//Password Change Messages
+export const PASSWORD_CHANGE_SUCCESSFUL = 'Password changed successfully';
+export const INCORRECT_OLD_PASSWORD = 'The old password you entered is incorrect.';
+export const PASSWORD_CHANGE_NOT_SUPPORTED = 'Password change is not supported for accounts registered via Google OAuth';
+export const PASSWORD_CHANGE_NOT_SUCCESSFUL = 'New password cannot be the same as the old password';
+export const INCORRECT_CONFIRM_PASSWORD = 'The value of the confirm password does not match the new password';
+export const PASSWORD_CHANGE_UNAVAILABLE = 'Password change is not available for this account';
+export const PASSWORD_TOO_WEAK = 'Your new password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+
 // Waitlist
 export const WAITLIST_JOINED_SUCCESSFULLY = 'Successfully joined the waitlist';
 export const WAITLIST_ALREADY_JOINED = 'You are already on the waitlist';
@@ -147,6 +159,15 @@ export const WAITLIST_ALREADY_JOINED = 'You are already on the waitlist';
 export const CONTACT_MESSAGE_SENT_SUCCESSFULLY = 'Message sent successfully';
 export const CONTACT_CREATED = 'Contact message submitted successfully';
 export const CONTACT_SPAM_DETECTED = 'Submission contains prohibited content';
+
+// Notifications
+export const NOTIFICATIONS_RETRIEVED_SUCCESSFULLY = 'Notifications retrieved successfully';
+export const NOTIFICATION_UNREAD_COUNT_RETRIEVED = 'Notification unread count retrieved successfully';
+export const NOTIFICATION_MARKED_AS_READ = 'Notification marked as read';
+export const NOTIFICATIONS_MARKED_AS_READ = 'Notifications marked as read';
+export const NOTIFICATIONS_MARKED_AS_UNREAD = 'Notifications marked as unread';
+export const NOTIFICATION_DELETED = 'Notification deleted.';
+export const NOTIFICATION_NOT_FOUND = 'Notification not found';
 
 // Spam Detection
 export const SPAM_PROHIBITED_CONTENT = 'Submission contains prohibited content';
@@ -207,3 +228,11 @@ export const PROFILE_AVATAR_UPLOAD_INVALID_TYPE =
 export const PROFILE_AVATAR_UPLOAD_TOO_LARGE = 'Avatar file size must be 2MB or less';
 export const PROFILE_AVATAR_UPLOAD_FAILED = 'Failed to upload profile avatar';
 export const PROFILE_AVATAR_DELETE_FAILED = 'Failed to remove profile avatar';
+
+// Account Deletion
+export const ACCOUNT_DELETED_SUCCESSFULLY = 'Your account has been deleted. You will be signed out.';
+export const ACCOUNT_ALREADY_DELETED = 'Account already deleted';
+export const ACCOUNT_DELETION_CONFIRMATION_REQUIRED = 'You must type DELETE to confirm account deletion';
+export const ACCOUNT_DELETION_FAILED = 'Failed to delete account';
+export const ACCOUNT_DELETION_SCHEDULED = 'Account deletion scheduled for 30 days from now';
+export const ACCOUNT_EXISTS_WITH_RETENTION = 'An account with this email exists. If you recently deleted your account, please wait 30 days.';

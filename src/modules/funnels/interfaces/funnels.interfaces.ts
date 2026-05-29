@@ -46,3 +46,12 @@ export interface SubmitFeedbackResponse {
     submittedAt: string;
   };
 }
+
+export interface TaskUpdateResult {
+  taskId: string;
+  name: string;
+  status: 'pending' | 'complete';
+  isComplete: boolean;
+  completedAt: string | null;
+  position: number;
+}
