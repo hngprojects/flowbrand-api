@@ -8,13 +8,8 @@ import {
   Param,
   ParseUUIDPipe,
   Patch,
-  Post,
-  Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CreateUserDto } from './dto/create-user.dto';
-import { PaginationDto } from './dto/pagination.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto'
 import { UsersService } from './users.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -29,18 +24,6 @@ import * as SYS_MSG from '../../constants/system.messages';
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
-
-  @Post()
-  @ApiOperation({ summary: 'Create a user' })
-  create(@Body() dto: CreateUserDto) {
-    return this.usersService.create(dto);
-  }
-
-  @Get()
-  @ApiOperation({ summary: 'List users (paginated)' })
-  findAll(@Query() pagination: PaginationDto) {
-    return this.usersService.findAll(pagination);
-  }
 
   @Get('me')
   @HttpCode(HttpStatus.OK)
@@ -105,12 +88,6 @@ export class UsersController {
       message: SYS_MSG.PASSWORD_CHANGE_SUCCESSFUL,
       data: null,
     }
-  }
-
-  @Patch(':id')
-  @ApiOperation({ summary: 'Update a user' })
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateUserDto) {
-    return this.usersService.update(id, dto);
   }
 
   @Delete(':id')
