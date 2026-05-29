@@ -23,7 +23,7 @@ import { LlmService } from '../interfaces/llm.service.interface';
 
 const ALLOWED_STAGE_KEYS = new Set(['position', 'channel', 'explanation', 'actionPrompt', 'tasks']);
 const MAX_FIELD_LENGTH = 2000;
-const LLM_TIMEOUT_MS = 60_000;
+const LLM_TIMEOUT_MS = 45_000;
 const EXPECTED_STAGE_COUNT = 4;
 
 @Processor(QUEUES.FUNNEL_GENERATION)
