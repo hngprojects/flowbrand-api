@@ -54,8 +54,10 @@ export class ExtractionProcessor {
     let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 
     try {
+      this.logger.log({ message: 'extraction_download_start', uploadId, storagePath });
       const buffer = await this.objectStorage.getObject(storagePath);
 
+      this.logger.log({ message: 'extraction_parse_start', uploadId, fileType, bytes: buffer.length });
       const extractionTimeout = new Promise<never>((_, reject) => {
         timeoutHandle = setTimeout(
           () => reject(new Error(`Extraction timed out after ${ExtractionProcessor.EXTRACTION_TIMEOUT_MS / 1000}s`)),
