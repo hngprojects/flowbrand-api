@@ -71,11 +71,16 @@ export class UsersController {
 
   @Delete('me')
   @DeleteAccountDocs()
+  @HttpCode(HttpStatus.OK)
   async deleteAccount(
     @CurrentUser('userId') userId: string,
     @Body() dto: DeleteAccountDto,
   ) {
-    return this.usersService.deleteAccount(userId, dto.confirmation);
+    await this.usersService.deleteAccount(userId, dto.confirmation);
+    return  {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.ACCOUNT_DELETED_SUCCESSFULLY,
+    };
   }
 
   @Get('me/state')

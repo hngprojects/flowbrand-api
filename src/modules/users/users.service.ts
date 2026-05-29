@@ -373,7 +373,7 @@ export class UsersService {
     return this.toProfileResponse(updated);
   }
 
-  async deleteAccount(userId: string, confirmation: string): Promise<{ message: string }> {
+  async deleteAccount(userId: string, confirmation: string): Promise<void> {
     if (confirmation !== 'DELETE') {
       throw new UnprocessableEntityException(SYS_MSG.ACCOUNT_DELETION_CONFIRMATION_REQUIRED);
     }
@@ -397,19 +397,22 @@ export class UsersService {
       const now = new Date();
       const thirtyDaysLater = 30 * 24 * 60 * 60 * 1000;
 
-      await queryRunner.manager.update(User, userId, {
+      // Single UPDATE with conditional fields
+      const updatePayload: Partial<User> = {
         deleted_at: now,
         is_active: false,
-      });
+      };
+      
+      if (user.auth_provider === 'google') {
+        updatePayload.provider_user_id = null;
+      }
+
+      await queryRunner.manager.update(User, userId, updatePayload);
 
       const revokedSessionIds = await this.userSessionModelAction.revokeAllUserSessionsInDb(
         userId,
         queryRunner.manager,
       );
-
-      if (user.auth_provider === 'google') {
-        await queryRunner.manager.update(User, userId, { provider_user_id: null });
-      }
 
       await queryRunner.commitTransaction();
       committed = true;
@@ -426,7 +429,6 @@ export class UsersService {
         { delay: thirtyDaysLater },
       );
 
-      return { message: SYS_MSG.ACCOUNT_DELETED_SUCCESSFULLY };
     } catch (error) {
       if (!committed) {
         await queryRunner.rollbackTransaction();
@@ -437,7 +439,7 @@ export class UsersService {
 
       if (committed) {
         this.pinoLogger.warn('Account deleted but queue failed', { userId, error: errorMessage });
-        return { message: SYS_MSG.ACCOUNT_DELETED_SUCCESSFULLY };
+        return;
       }
 
       throw new InternalServerErrorException(SYS_MSG.ACCOUNT_DELETION_FAILED);

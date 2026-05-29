@@ -740,9 +740,7 @@ describe('UsersService', () => {
       it('should soft delete account, revoke sessions, and schedule hard delete job', async () => {
         mockUserModelAction.findById.mockResolvedValue(mockLocalUser);
 
-        const result = await service.deleteAccount(USER_ID, 'DELETE');
-
-        expect(result.message).toBe(SYS_MSG.ACCOUNT_DELETED_SUCCESSFULLY);
+        await expect(service.deleteAccount(USER_ID, 'DELETE')).resolves.toBeUndefined();
         expect(mockUserModelAction.findById).toHaveBeenCalledWith(USER_ID);
         expect(mockQueryRunner.manager.update).toHaveBeenCalledWith(
           User,
