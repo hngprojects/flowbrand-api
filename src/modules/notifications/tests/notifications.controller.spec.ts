@@ -50,7 +50,7 @@ describe('NotificationsController', () => {
       has_next: false,
     });
 
-    const response = await request(app.getHttpServer()).get('/v1/notifications');
+    const response = await request(app.getHttpServer()).get('/notifications');
 
     expect(response.status).toBe(200);
     expect(response.body.data.total_count).toBe(0);
@@ -58,7 +58,7 @@ describe('NotificationsController', () => {
   });
 
   it('EC-04/SEC-02: rejects invalid UUIDs before invoking the service', async () => {
-    const response = await request(app.getHttpServer()).patch('/v1/notifications/not-a-uuid/read');
+    const response = await request(app.getHttpServer()).patch('/notifications/not-a-uuid/read');
 
     expect(response.status).toBe(400);
     expect(notificationsServiceMock.markRead).not.toHaveBeenCalled();

@@ -14,7 +14,7 @@ export class ListNotificationsQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(1000)
+  @Max(50)
   page?: number = 1;
 
   @ApiPropertyOptional({ default: 20, minimum: 1, maximum: 50 })

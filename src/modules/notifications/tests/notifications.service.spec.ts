@@ -168,7 +168,6 @@ describe('NotificationsService', () => {
 
   describe('deleteNotification', () => {
     it('AC-11: deletes owned notifications', async () => {
-      mockNotificationAction.findOwnedById.mockResolvedValue({ id: 'notif-1' } as Notification);
       mockNotificationAction.deleteOwnedById.mockResolvedValue(1);
 
       await expect(service.deleteNotification('user-1', 'notif-1')).resolves.toBeUndefined();
@@ -176,7 +175,7 @@ describe('NotificationsService', () => {
     });
 
     it('AC-12: throws when the notification does not exist', async () => {
-      mockNotificationAction.findOwnedById.mockResolvedValue(null);
+      mockNotificationAction.deleteOwnedById.mockResolvedValue(0);
 
       await expect(service.deleteNotification('user-1', 'notif-404')).rejects.toBeInstanceOf(NotFoundException);
     });
