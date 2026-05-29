@@ -8,6 +8,7 @@ import {
   Param,
   ParseUUIDPipe,
   Patch,
+  ValidationPipe,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UsersService } from './users.service';
@@ -16,8 +17,15 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { GetUserStateDocs } from './docs/users-swagger.doc';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
-import { GetProfileDocs, UpdateProfileDocs, ChangePasswordDocs } from './docs/users-swagger.doc';
+import {
+  ChangePasswordDocs,
+  GetNotificationPreferencesDocs,
+  GetProfileDocs,
+  UpdateNotificationPreferencesDocs,
+  UpdateProfileDocs,
+} from './docs/users-swagger.doc';
 import * as SYS_MSG from '../../constants/system.messages';
+import { UpdateNotificationPreferencesDto } from '../notifications/dto/update-notification-preferences.dto';
 
 @ApiTags('users')
 @ApiBearerAuth('JWT')
@@ -40,10 +48,7 @@ export class UsersController {
   @Patch('me')
   @HttpCode(HttpStatus.OK)
   @UpdateProfileDocs()
-  async updateProfile(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: UpdateUserProfileDto,
-  ) {
+  async updateProfile(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateUserProfileDto) {
     const data = await this.usersService.updateProfile(user.userId, dto);
     return {
       statusCode: HttpStatus.OK,
@@ -51,7 +56,6 @@ export class UsersController {
       data,
     };
   }
-
 
   @Patch('me/password')
   @ChangePasswordDocs()
@@ -62,7 +66,44 @@ export class UsersController {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.PASSWORD_CHANGE_SUCCESSFUL,
       data: null,
-    }
+    };
+  }
+
+  @Get('me/notification-preferences')
+  @HttpCode(HttpStatus.OK)
+  @GetNotificationPreferencesDocs()
+  async getNotificationPreferences(@CurrentUser('userId') userId: string) {
+    const data = await this.usersService.getNotificationPreferences(userId);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.NOTIFICATION_PREFERENCES_RETRIEVED_SUCCESSFULLY,
+      data,
+    };
+  }
+
+  @Patch('me/notification-preferences')
+  @HttpCode(HttpStatus.OK)
+  @UpdateNotificationPreferencesDocs()
+  async updateNotificationPreferences(
+    @CurrentUser('userId') userId: string,
+    @Body(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: false,
+        transform: true,
+        transformOptions: { enableImplicitConversion: false },
+        expectedType: UpdateNotificationPreferencesDto,
+      }),
+    )
+    rawDto: Record<string, unknown>,
+  ) {
+    const dto = rawDto as UpdateNotificationPreferencesDto;
+    const data = await this.usersService.updateNotificationPreferences(userId, dto);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.NOTIFICATION_PREFERENCES_UPDATED_SUCCESSFULLY,
+      data,
+    };
   }
 
   @Delete(':id')
@@ -75,6 +116,6 @@ export class UsersController {
   @Get('me/state')
   @GetUserStateDocs()
   async getUserState(@CurrentUser('userId') userId: string) {
-    return this.usersService.getUserState(userId)
+    return this.usersService.getUserState(userId);
   }
 }
