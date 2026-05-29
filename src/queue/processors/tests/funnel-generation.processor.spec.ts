@@ -1,6 +1,9 @@
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import type { Job } from 'bull';
+import { APP_EVENTS } from '../../../common/constants/app-events';
+import { FunnelFailedEvent, FunnelGeneratedEvent } from '../../../common/events';
 import { FunnelModelAction } from '../../../modules/funnels/actions/funnel.action';
 import { FunnelStatus } from '../../../modules/funnels/enums/funnel-status.enum';
 import type { BusinessContext, GenerateFunnelJobPayload } from '../../../modules/funnels/interfaces/generate-funnel-job.interface';
@@ -42,6 +45,8 @@ const mockLlmService = {
 const mockTemplateService = {
   getTemplate: jest.fn(),
 };
+
+const mockEventEmitter = { emit: jest.fn() };
 
 // Helpers 
 
@@ -87,6 +92,7 @@ describe('FunnelGenerationProcessor', () => {
     mockFunnelAction.get.mockResolvedValue({
       id: 'funnel-uuid',
       status: FunnelStatus.GENERATING,
+      business_name: 'Test Bakery',
       business_context: businessContext,
     });
 
@@ -105,6 +111,7 @@ describe('FunnelGenerationProcessor', () => {
         { provide: LlmService, useValue: mockLlmService },
         { provide: FunnelTemplateService, useValue: mockTemplateService },
         { provide: getDataSourceToken(), useValue: mockDataSource },
+        { provide: EventEmitter2, useValue: mockEventEmitter },
       ],
     }).compile();
 
@@ -314,7 +321,85 @@ describe('FunnelGenerationProcessor', () => {
     });
   });
 
-  // Hook logging 
+  // Event emission
+
+  describe('Event emission — FUNNEL_GENERATED', () => {
+    it('AC-04: emits FUNNEL_GENERATED after successful DB commit', async () => {
+      mockLlmService.generateWithGemini.mockResolvedValue(makeValidStageData());
+
+      await processor.handleGenerateFunnel(makeJob());
+
+      expect(mockEventEmitter.emit).toHaveBeenCalledTimes(1);
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        APP_EVENTS.FUNNEL_GENERATED,
+        expect.objectContaining({ userId: 'user-uuid', funnelId: 'funnel-uuid' }),
+      );
+    });
+
+    it('AC-05: emitted payload is a FunnelGeneratedEvent instance with correct fields', async () => {
+      mockLlmService.generateWithGemini.mockResolvedValue(makeValidStageData());
+
+      await processor.handleGenerateFunnel(makeJob());
+
+      const [, payload] = (mockEventEmitter.emit as jest.Mock).mock.calls[0];
+      expect(payload).toBeInstanceOf(FunnelGeneratedEvent);
+      expect(payload.businessName).toBe('Test Bakery');
+    });
+
+    it('AC-08: does NOT emit FUNNEL_GENERATED when writeFunnelData throws', async () => {
+      mockLlmService.generateWithGemini.mockResolvedValue(makeValidStageData());
+      mockQueryRunner.manager.update.mockRejectedValueOnce(new Error('DB write failed'));
+
+      await expect(processor.handleGenerateFunnel(makeJob())).rejects.toThrow('DB write failed');
+
+      expect(mockEventEmitter.emit).not.toHaveBeenCalledWith(APP_EVENTS.FUNNEL_GENERATED, expect.anything());
+    });
+
+    it('AC-09: a throwing FUNNEL_GENERATED listener does not fail the job or mark funnel FAILED', async () => {
+      mockLlmService.generateWithGemini.mockResolvedValue(makeValidStageData());
+      mockEventEmitter.emit.mockImplementationOnce((eventName: string) => {
+        if (eventName === APP_EVENTS.FUNNEL_GENERATED) throw new Error('listener crashed');
+      });
+
+      await expect(processor.handleGenerateFunnel(makeJob())).resolves.toBeUndefined();
+      expect(mockFunnelAction.update).not.toHaveBeenCalledWith(
+        expect.objectContaining({ updatePayload: { status: FunnelStatus.FAILED } }),
+      );
+    });
+  });
+
+  describe('Event emission — FUNNEL_FAILED', () => {
+    it('emits FUNNEL_FAILED in onFailed when no retries remain', async () => {
+      // Bull increments attemptsMade before firing onFailed, so the final attempt has attemptsMade === maxAttempts
+      const job = makeJob({ attemptsMade: 3, opts: { attempts: 3 } });
+
+      await processor.onFailed(job, new Error('LLM down'));
+
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        APP_EVENTS.FUNNEL_FAILED,
+        expect.objectContaining({ userId: 'user-uuid', funnelId: 'funnel-uuid' }),
+      );
+    });
+
+    it('emitted FUNNEL_FAILED payload is a FunnelFailedEvent instance', async () => {
+      const job = makeJob({ attemptsMade: 3, opts: { attempts: 3 } });
+
+      await processor.onFailed(job, new Error('LLM down'));
+
+      const [, payload] = (mockEventEmitter.emit as jest.Mock).mock.calls[0];
+      expect(payload).toBeInstanceOf(FunnelFailedEvent);
+    });
+
+    it('does NOT emit FUNNEL_FAILED in onFailed when retries remain', async () => {
+      const job = makeJob({ attemptsMade: 1, opts: { attempts: 3 } });
+
+      await processor.onFailed(job, new Error('LLM down'));
+
+      expect(mockEventEmitter.emit).not.toHaveBeenCalledWith(APP_EVENTS.FUNNEL_FAILED, expect.anything());
+    });
+  });
+
+  // Hook logging
 
   describe('Hook logging', () => {
     it('FR-11: onCompleted logs duration', () => {

@@ -2,14 +2,19 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
-  UnprocessableEntityException,
   UnauthorizedException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { QueryFailedError, DataSource } from 'typeorm';
 import { InjectQueue } from '@nestjs/bull';
 import type { Queue } from 'bull';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { APP_EVENTS } from '../../common/constants/app-events';
+import { ProfileUpdatedEvent, AccountDeletedEvent } from '../../common/events';
+import { emitSafely } from '../../common/events/emit-safely';
 import { UserModelAction } from './actions/user.action';
 import { UserSessionModelAction } from './actions/user-session.action';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -37,12 +42,15 @@ const NO_TRANSACTION = {
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     private readonly userModelAction: UserModelAction,
     private readonly userSessionModelAction: UserSessionModelAction,
     private readonly authMetaModelAction: AuthMetadataModelAction,
     private readonly redisService: RedisService,
     private readonly userStateService: UserStateService,
+    private readonly eventEmitter: EventEmitter2,
     private readonly pinoLogger: PinoLoggerService,
     @InjectQueue(ACCOUNT_DELETION_QUEUE)
     private readonly accountDeletionQueue: Queue,
@@ -204,6 +212,7 @@ export class UsersService {
       ...NO_TRANSACTION,
       identifierOptions: { id },
     });
+    emitSafely(this.eventEmitter, this.logger, APP_EVENTS.ACCOUNT_DELETED, new AccountDeletedEvent(id));
   }
 
   private async revokeAllUserSessions(userId: string): Promise<void> {
@@ -228,7 +237,11 @@ export class UsersService {
       }),
     );
 
-    this.pinoLogger.debug('Revoked sessions for user', { userId, sessionCount: activeSessions.length });
+    this.logger.debug({
+      message: `Revoked ${activeSessions.length} sessions for user`,
+      userId,
+      sessionCount: activeSessions.length,
+    });
   }
 
   async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
@@ -328,14 +341,17 @@ export class UsersService {
       }
     }
 
+    const changedFields: Array<'full_name' | 'country'> = [];
     const updatePayload: Partial<User> = {};
 
     if (dto.fullName !== undefined && dto.fullName !== user.full_name) {
       updatePayload.full_name = dto.fullName;
+      changedFields.push('full_name');
     }
 
     if (normalisedCountry !== undefined && normalisedCountry !== user.country) {
       updatePayload.country = normalisedCountry;
+      changedFields.push('country');
     }
 
     if (Object.keys(updatePayload).length === 0) {
@@ -351,6 +367,8 @@ export class UsersService {
     if (!updated) {
       throw new InternalServerErrorException(SYS_MSG.PROFILE_UPDATE_FAILED);
     }
+
+    emitSafely(this.eventEmitter, this.logger, APP_EVENTS.PROFILE_UPDATED, new ProfileUpdatedEvent(userId, changedFields));
 
     return this.toProfileResponse(updated);
   }
