@@ -75,6 +75,7 @@ export class UsersController {
   @Get('me/state')
   @GetUserStateDocs()
   async getUserState(@CurrentUser('userId') userId: string) {
-    return this.usersService.getUserState(userId)
+    const data = await this.usersService.getUserState(userId);
+    return { statusCode: HttpStatus.OK, message: SYS_MSG.USER_STATE_RETRIEVED, data };
   }
 }
