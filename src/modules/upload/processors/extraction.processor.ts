@@ -51,10 +51,11 @@ export class ExtractionProcessor {
       return;
     }
 
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
     try {
       const buffer = await this.objectStorage.getObject(storagePath);
 
-      let timeoutHandle: ReturnType<typeof setTimeout>;
       const extractionTimeout = new Promise<never>((_, reject) => {
         timeoutHandle = setTimeout(
           () => reject(new Error(`Extraction timed out after ${ExtractionProcessor.EXTRACTION_TIMEOUT_MS / 1000}s`)),
@@ -67,7 +68,7 @@ export class ExtractionProcessor {
         this.documentTextExtractor.extract(buffer, fileType),
         extractionTimeout,
       ]);
-      clearTimeout(timeoutHandle!);
+      clearTimeout(timeoutHandle);
 
       row.parsed_text = parsedText;
       row.status = UploadDocumentStatus.READY;
@@ -77,13 +78,10 @@ export class ExtractionProcessor {
 
       this.logger.log({ message: 'extraction_complete', uploadId });
     } catch (error) {
+      clearTimeout(timeoutHandle);
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error({ message: 'extraction_failed', uploadId, error: errorMessage });
-
-      row.status = UploadDocumentStatus.FAILED;
-      row.percent_complete = 0;
-      row.failure_reason = errorMessage.substring(0, 200);
-      await this.uploadedDocumentAction.saveDocument(row);
+      this.logger.error({ message: 'extraction_failed', uploadId, attemptsMade: job.attemptsMade, error: errorMessage });
+      throw error;
     }
   }
 
@@ -94,17 +92,27 @@ export class ExtractionProcessor {
 
   @OnQueueFailed()
   async onFailed(job: Job<ExtractionJobPayload>, error: Error): Promise<void> {
+    const maxAttempts = job.opts?.attempts ?? 1;
+    const isFinalAttempt = job.attemptsMade >= maxAttempts;
+
     this.logger.error({
       event: 'extraction_job_failed',
       jobId: job.id,
       uploadId: job.data.uploadId,
       attemptsMade: job.attemptsMade,
+      maxAttempts,
+      isFinalAttempt,
       error: error?.message,
     });
 
-    // Safety net: if the processor's own catch block never ran (e.g. Bull exceeded
-    // maxAttempts, the lock expired, or the process was killed mid-job), ensure the
-    // row never stays stuck at PARSING. READY is terminal — never overwrite it.
+    // Only write FAILED on the last attempt. On intermediate failures Bull will
+    // requeue the job — writing FAILED here would trip the idempotency guard and
+    // prevent the retry from running. On the final attempt, or when no retries are
+    // configured, this is the authoritative terminal write. READY is never overwritten.
+    if (!isFinalAttempt) {
+      return;
+    }
+
     try {
       const row = await this.uploadedDocumentAction.get({ identifierOptions: { id: job.data.uploadId } });
       if (row && row.status !== UploadDocumentStatus.READY) {
