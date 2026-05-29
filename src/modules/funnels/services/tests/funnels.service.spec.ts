@@ -346,19 +346,21 @@ describe('FunnelsService', () => {
   });
 
   describe('listForUser', () => {
-    it('listForUser caps per_page at 20 and returns summaries', async () => {
+    it('listForUser caps per_page at 20 and returns summaries with task counts', async () => {
       const sampleFunnel: any = {
         id: 'f1',
         business_name: 'B',
         creation_path: 'cp',
         status: 'active',
         created_at: new Date(),
-        stages: [{ position: 1, name: 'S1', status: 'active' }],
+        stages: [{ id: 's1', position: 1, name: 'S1', status: 'active' }],
       };
-      
+
       funnelAction.listForUserPaginated.mockResolvedValue([[sampleFunnel], 1]);
+      taskAction.getStageCounts.mockResolvedValue([{ stageId: 's1', total: 4, complete: 3 }]);
 
       const res = await service.listForUser('user-1', 1, 100);
+
       expect(res.funnels.length).toBe(1);
       expect(res.funnels[0]).toMatchObject({
         funnelId: 'f1',
@@ -368,7 +370,71 @@ describe('FunnelsService', () => {
       });
       expect(res.pagination.perPage).toBe(20);
       expect(res.pagination.hasNext).toBe(false);
-      expect(res.funnels[0].stages[0]).toEqual({ position: 1, name: 'S1', status: 'active' });
+      expect(res.funnels[0].stages[0]).toEqual({
+        position: 1,
+        name: 'S1',
+        status: 'active',
+        tasksTotal: 4,
+        tasksComplete: 3,
+      });
+      expect(taskAction.getStageCounts).toHaveBeenCalledWith(['s1']);
+    });
+
+    it('listForUser returns tasksTotal=0 and tasksComplete=0 for stages with no tasks', async () => {
+      const sampleFunnel: any = {
+        id: 'f2',
+        business_name: 'C',
+        creation_path: 'wizard',
+        status: 'generating',
+        created_at: new Date(),
+        stages: [{ id: 's2', position: 1, name: 'S1', status: 'active' }],
+      };
+
+      funnelAction.listForUserPaginated.mockResolvedValue([[sampleFunnel], 1]);
+      // getStageCounts returns no row for s2 (stage has no tasks yet)
+      taskAction.getStageCounts.mockResolvedValue([]);
+
+      const res = await service.listForUser('user-1', 1, 20);
+
+      expect(res.funnels[0].stages[0].tasksTotal).toBe(0);
+      expect(res.funnels[0].stages[0].tasksComplete).toBe(0);
+    });
+
+    it('listForUser batches all stage IDs across multiple funnels in a single getStageCounts call', async () => {
+      const funnelA: any = {
+        id: 'fA',
+        business_name: 'A',
+        creation_path: 'wizard',
+        status: 'active',
+        created_at: new Date(),
+        stages: [
+          { id: 'sA1', position: 1, name: 'S1', status: 'complete' },
+          { id: 'sA2', position: 2, name: 'S2', status: 'active' },
+        ],
+      };
+      const funnelB: any = {
+        id: 'fB',
+        business_name: 'B',
+        creation_path: 'wizard',
+        status: 'active',
+        created_at: new Date(),
+        stages: [{ id: 'sB1', position: 1, name: 'S1', status: 'active' }],
+      };
+
+      funnelAction.listForUserPaginated.mockResolvedValue([[funnelA, funnelB], 2]);
+      taskAction.getStageCounts.mockResolvedValue([
+        { stageId: 'sA1', total: 3, complete: 3 },
+        { stageId: 'sA2', total: 5, complete: 1 },
+        { stageId: 'sB1', total: 2, complete: 0 },
+      ]);
+
+      const res = await service.listForUser('user-1', 1, 20);
+
+      expect(taskAction.getStageCounts).toHaveBeenCalledTimes(1);
+      expect(taskAction.getStageCounts).toHaveBeenCalledWith(['sA1', 'sA2', 'sB1']);
+      expect(res.funnels[0].stages[0]).toMatchObject({ tasksTotal: 3, tasksComplete: 3 });
+      expect(res.funnels[0].stages[1]).toMatchObject({ tasksTotal: 5, tasksComplete: 1 });
+      expect(res.funnels[1].stages[0]).toMatchObject({ tasksTotal: 2, tasksComplete: 0 });
     });
   });
 

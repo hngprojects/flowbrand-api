@@ -76,13 +76,27 @@ export class FunnelsService {
     const { page: p, per_page: per } = this.normalizePagination(page, perPage);
     const [funnels, total] = await this.funnelAction.listForUserPaginated(userId, p, per);
 
+    const allStageIds = funnels.flatMap((f) => (f.stages ?? []).map((s) => s.id));
+    let countsMap = new Map<string, { total: number; complete: number }>();
+
+    if (allStageIds.length) {
+      const rawCounts = await this.taskAction.getStageCounts(allStageIds);
+      countsMap = this.mapStageCounts(rawCounts);
+    }
+
     const mapped = funnels.map((f) => ({
       funnelId: f.id,
       businessName: f.business_name,
       creationPath: f.creation_path,
       status: f.status,
       createdAt: f.created_at,
-      stages: (f.stages ?? []).map((s) => ({ position: s.position, name: s.name, status: s.status })),
+      stages: (f.stages ?? []).map((s) => ({
+        position: s.position,
+        name: s.name,
+        status: s.status,
+        tasksTotal: countsMap.get(s.id)?.total ?? 0,
+        tasksComplete: countsMap.get(s.id)?.complete ?? 0,
+      })),
     }));
 
     return {
