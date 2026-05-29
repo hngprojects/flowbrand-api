@@ -10,6 +10,7 @@ export const AUTH_LOGIN_SUCCESSFUL = 'Login successful';
 export const AUTH_LOGOUT_SUCCESSFUL = 'Logout successful';
 export const AUTH_TOKEN_REFRESHED = 'Token refreshed successfully';
 export const AUTH_INVALID_CREDENTIALS = 'Invalid email or password';
+export const AUTH_INVALID_TOKEN = 'Invalid or expired token';
 export const AUTH_INVALID_REFRESH_TOKEN = 'Invalid or expired refresh token';
 export const AUTH_UNAUTHENTICATED_MESSAGE = 'Unauthenticated';
 export const AUTH_TERMS_REQUIRED = 'You must accept the terms and conditions to register';
@@ -68,6 +69,8 @@ export const FUNNEL_UPLOAD_PARSE_FAILED = 'Could not extract text from the uploa
 export const FUNNEL_UPLOAD_UNSUPPORTED_FILE_TYPE = 'Unsupported file type for text extraction';
 export const FUNNEL_UPLOAD_NO_EXTRACTABLE_TEXT = 'No extractable text found in document';
 export const FUNNEL_UPLOAD_NO_SLIDES = 'No slides found in presentation';
+export const FUNNEL_UPLOAD_PPTX_TOO_LARGE = 'PPTX file exceeds the maximum allowed size for extraction';
+export const FUNNEL_UPLOAD_PPTX_TOO_MANY_SLIDES = 'PPTX file exceeds the maximum allowed slide count for extraction';
 export const FUNNEL_UPLOAD_PROGRESS_RETRIEVED = 'Funnel upload progress retrieved successfully';
 
 export const AI_GENERATION_FAILED = 'AI generation failed';
@@ -141,6 +144,15 @@ export const PASSWORD_RESET_VERIFY_ATTEMPTS_EXCEEDED = 'Too many verification at
 export const PASSWORD_RESET_OTP_VERIFIED = 'OTP verified. Use the reset token to set your new password.';
 export const PASSWORD_RESET_INVALID_TOKEN = 'Invalid or expired reset token.';
 
+//Password Change Messages
+export const PASSWORD_CHANGE_SUCCESSFUL = 'Password changed successfully';
+export const INCORRECT_OLD_PASSWORD = 'The old password you entered is incorrect.';
+export const PASSWORD_CHANGE_NOT_SUPPORTED = 'Password change is not supported for accounts registered via Google OAuth';
+export const PASSWORD_CHANGE_NOT_SUCCESSFUL = 'New password cannot be the same as the old password';
+export const INCORRECT_CONFIRM_PASSWORD = 'The value of the confirm password does not match the new password';
+export const PASSWORD_CHANGE_UNAVAILABLE = 'Password change is not available for this account';
+export const PASSWORD_TOO_WEAK = 'Your new password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+
 // Waitlist
 export const WAITLIST_JOINED_SUCCESSFULLY = 'Successfully joined the waitlist';
 export const WAITLIST_ALREADY_JOINED = 'You are already on the waitlist';
@@ -149,6 +161,15 @@ export const WAITLIST_ALREADY_JOINED = 'You are already on the waitlist';
 export const CONTACT_MESSAGE_SENT_SUCCESSFULLY = 'Message sent successfully';
 export const CONTACT_CREATED = 'Contact message submitted successfully';
 export const CONTACT_SPAM_DETECTED = 'Submission contains prohibited content';
+
+// Notifications
+export const NOTIFICATIONS_RETRIEVED_SUCCESSFULLY = 'Notifications retrieved successfully';
+export const NOTIFICATION_UNREAD_COUNT_RETRIEVED = 'Notification unread count retrieved successfully';
+export const NOTIFICATION_MARKED_AS_READ = 'Notification marked as read';
+export const NOTIFICATIONS_MARKED_AS_READ = 'Notifications marked as read';
+export const NOTIFICATIONS_MARKED_AS_UNREAD = 'Notifications marked as unread';
+export const NOTIFICATION_DELETED = 'Notification deleted.';
+export const NOTIFICATION_NOT_FOUND = 'Notification not found';
 
 // Spam Detection
 export const SPAM_PROHIBITED_CONTENT = 'Submission contains prohibited content';
@@ -201,3 +222,11 @@ export const PROFILE_NOT_FOUND = 'Profile not found';
 export const PROFILE_EMAIL_CHANGE_FORBIDDEN =
   'Email cannot be changed here. Please contact support.';
 export const PROFILE_UPDATE_FAILED = 'Failed to update profile';
+
+// Account Deletion
+export const ACCOUNT_DELETED_SUCCESSFULLY = 'Your account has been deleted. You will be signed out.';
+export const ACCOUNT_ALREADY_DELETED = 'Account already deleted';
+export const ACCOUNT_DELETION_CONFIRMATION_REQUIRED = 'You must type DELETE to confirm account deletion';
+export const ACCOUNT_DELETION_FAILED = 'Failed to delete account';
+export const ACCOUNT_DELETION_SCHEDULED = 'Account deletion scheduled for 30 days from now';
+export const ACCOUNT_EXISTS_WITH_RETENTION = 'An account with this email exists. If you recently deleted your account, please wait 30 days.';

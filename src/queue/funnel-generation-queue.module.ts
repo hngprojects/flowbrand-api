@@ -20,9 +20,9 @@ import { LlmModule } from '../modules/llm/llm.module';
       name: QUEUES.FUNNEL_GENERATION,
       useFactory: (config: ConfigService) => ({
         settings: {
-          // LLM calls can take up to 60 s — extend lock so Bull doesn't
-          // mark the job stalled before the app-level timeout fires.
-          lockDuration: 120_000,
+          // Two sequential LLM calls at 45 s each = 90 s worst case.
+          // 300 s is 3× that — keeps production tail latencies well inside the lock.
+          lockDuration: 300_000,
         },
         defaultJobOptions: {
           attempts: config.get<number>('QUEUE_MAX_ATTEMPTS') ?? 3,

@@ -8,7 +8,10 @@ Your participation helps keep the platform smarter, more reliable, and more impa
 
 ### 1. Clone the repository
 
-This project uses a shared-repo workflow. If you have write access to `hngprojects/flowbrand-api`, clone the repo directly and branch off `dev`. External contributors without write access can fork instead and open a cross-fork PR.
+This project uses a shared-repo workflow. If you have write access to
+`hngprojects/flowbrand-api`, clone the repo directly and branch off `dev`.
+External contributors without write access can fork the repository, work in
+their fork, and open a pull request back to `dev`.
 
 ```sh
 git clone https://github.com/hngprojects/flowbrand-api.git
@@ -34,7 +37,9 @@ pnpm install
 cp .env.example .env
 ```
 
-Fill in your database credentials and at least 32-character JWT secrets. The app validates env at boot via `@t3-oss/env-core` + Zod and fails fast on missing or invalid values.
+Fill in your database credentials and at least 32-character JWT secrets.
+The app validates env at boot via `@t3-oss/env-core` + Zod and fails fast on
+missing or invalid values.
 
 ### 5. Create the database and run migrations
 
@@ -188,7 +193,8 @@ async register(
 
 ### 5. Use the Repository Pattern via `@hng-sdk/orm`
 
-Services must not depend on TypeORM `Repository<T>` directly. Each entity gets a `*ModelAction` class that extends `AbstractModelAction<T>`:
+Services must not depend on TypeORM `Repository<T>` directly. Each entity gets
+a `*ModelAction` class that extends `AbstractModelAction<T>`:
 
 ```ts
 @Injectable()
@@ -209,7 +215,10 @@ All controllers go through `TransformInterceptor`, which produces the consistent
 { "success": true, "statusCode": 200, "message": "...", "data": <payload> }
 ```
 
-**Never call `res.json()` directly** unless the endpoint performs a `res.redirect()`. Never include `success: true` in what you return — the interceptor adds it, and if you include it manually it leads to `body.data.success` nesting.
+**Never call `res.json()` directly** unless the endpoint performs a
+`res.redirect()`. Never include `success: true` in what you return - the
+interceptor adds it, and if you include it manually it leads to duplicate
+envelopes and broken client expectations.
 
 #### Shape A — Structured with data ✅ (most endpoints)
 
@@ -251,12 +260,21 @@ return { paginationMeta: { ... }, payload: [...] };
 
 #### Rules and gotchas
 
-- **Shape A/B requires BOTH `statusCode` AND `message`.** Without `message`, the interceptor treats the whole object as Shape C data, causing `body.data.statusCode` instead of `body.statusCode`.
-- **Use `@Res({ passthrough: true })`** only when you must call `res.cookie()`, `res.clearCookie()`, or `res.status()` (dynamic status). Then `return` the structured object and the interceptor still fires normally.
-- **Keep plain `@Res()`** (without passthrough) only for `res.redirect()` endpoints — these bypass the interceptor entirely.
-- **Keep `@HttpCode()` in sync** with the `statusCode` field you return. The JSON `statusCode` comes from your return value; the HTTP status header comes from `@HttpCode()` or `res.status()`. They must match. Use `@Res({ passthrough: true })` + `res.status()` when the status is dynamic (e.g. 200 vs 201 vs 202 depending on a service result).
+- **Shape A/B requires BOTH `statusCode` AND `message`.** Without `message`,
+  the interceptor treats the whole object as Shape C data, causing
+  `body.data.statusCode` instead of `body.statusCode`.
+- **Use `@Res({ passthrough: true })`** only when you must call
+  `res.cookie()`, `res.clearCookie()`, or `res.status()` (dynamic status).
+  Then `return` the structured object and the interceptor still formats the
+  response.
+- **Keep plain `@Res()`** (without passthrough) only for `res.redirect()`
+  endpoints - these bypass the interceptor entirely.
+- **Keep `@HttpCode()` in sync** with the `statusCode` field you return. The
+  JSON `statusCode` comes from your return value; the HTTP status header comes
+  from `@HttpCode()` or `res.status()`. They must stay aligned.
 
-**Dynamic-status pattern example** — when the service decides the status code (202 for a new job, 200 for an idempotent repeat):
+**Dynamic-status pattern example** - when the service decides the status code
+(202 for a new job, 200 for an idempotent repeat):
 
 ```ts
 @Post('generate')
@@ -279,7 +297,63 @@ async generate(
 // → HTTP 200  { "success": true, "statusCode": 200, "message": "...", "data": { ... } }
 ```
 
-### 7. Testing Proof Is Required in Every PR
+### 7. Domain Events — Emit Timing and Listener Safety
+
+This codebase uses `EventEmitter2` for in-process domain events. Three rules
+are mandatory for any code that emits or listens.
+
+#### Rule 1 — Emit AFTER the transaction commits, never inside it
+
+If a transaction rolls back after `emit()` fires, listeners have already acted on data that no longer exists.
+
+```ts
+// CORRECT — emit after commit
+await queryRunner.commitTransaction();
+this.eventEmitter.emit(APP_EVENTS.STAGE_COMPLETED, new StageCompletedEvent(...));
+
+// WRONG — transaction may roll back after this line
+await queryRunner.manager.save(stage);
+this.eventEmitter.emit(APP_EVENTS.STAGE_COMPLETED, new StageCompletedEvent(...));
+```
+
+#### Rule 2 — Listeners must wrap all logic in try/catch and never rethrow
+
+`EventEmitter2` is synchronous. An uncaught exception in a listener propagates
+directly to the service that called `emit()` and can kill a user-facing
+request. Activity logging, notifications, and analytics listeners should
+follow the same pattern.
+
+> **Fire-and-forget**: `emit()` returns before any `async` listener settles.
+> This means `ignoreErrors` only catches synchronous throws - async listener
+> rejections become unhandled promise rejections at runtime.
+
+```ts
+@OnEvent(APP_EVENTS.STAGE_COMPLETED)
+async handleStageCompleted(event: StageCompletedEvent): Promise<void> {
+  // emit() is fire-and-forget — this method runs after the caller has already returned.
+  // Any rejection here is an unhandled promise rejection if not caught below.
+  try {
+    await this.activityAction.create({ ... });
+  } catch (err) {
+    this.logger.error({ message: 'Activity write failed', error: (err as Error).message });
+    // Never rethrow here.
+  }
+}
+```
+
+#### Rule 3 — No PII in event payloads
+
+Event payloads can end up in activity logs and notification metadata. Do not
+include `email`, `password_hash`, `token_hash`, `refresh_token`, or
+`provider_user_id` in any event class. A `userId` UUID is sufficient for
+correlation and lookup.
+
+`business_name` is acceptable in event payloads (e.g. `FunnelGeneratedEvent`)
+because it serves a legitimate operational purpose - activity logs need it for
+display. Be aware that sole proprietors sometimes use personal names instead
+of formal business names, so keep any display logic flexible.
+
+### 8. Testing Proof Is Required in Every PR
 
 Every PR must include at least one of the following:
 
@@ -367,7 +441,8 @@ Every module keeps its Swagger decorators in a dedicated file:
 src/modules/<name>/docs/<name>-swagger.doc.ts
 ```
 
-Each endpoint gets its own decorator factory using `applyDecorators`. The controller imports and applies these, keeping the controller file clean.
+Each endpoint gets its own decorator factory using `applyDecorators`. The
+controller imports and applies these, keeping the controller file clean.
 
 ```ts
 // src/modules/auth/docs/auth-swagger.doc.ts
@@ -406,8 +481,10 @@ Rules:
 
 - One factory per endpoint, named after the operation (`LoginDocs`, `RegisterDocs`, etc.).
 - Always document every `ApiResponse` status the endpoint can return.
-- For endpoints that set HttpOnly cookies, note it in the `description`. Swagger cannot demonstrate cookies via "Try it out".
-- For OAuth redirect endpoints, add a `description` explaining they cannot be tested via Swagger and must be opened directly in a browser.
+- For endpoints that set HttpOnly cookies, note it in the `description`.
+  Swagger cannot demonstrate cookies via "Try it out".
+- For OAuth redirect endpoints, add a `description` explaining they cannot be
+  tested via Swagger and must be opened directly in a browser.
 
 ## Code Style
 
@@ -423,7 +500,9 @@ pnpm lint
 
 ### JSDoc on exported service methods
 
-Every public method on an exported service must have a one-line JSDoc comment. This is what populates IDE tooltips and makes the module's public API navigable without reading the implementation.
+Every public method on an exported service must have a one-line JSDoc
+comment. This is what populates IDE tooltips and makes the module's public API
+navigable without reading the implementation.
 
 ```ts
 /** Registers a new user, hashes their password, and dispatches a verification OTP. */
@@ -437,7 +516,9 @@ async login(dto: LoginDto): Promise<AuthResponse> {
 }
 ```
 
-You don't need `@param` or `@returns` tags if the types are already annotated. The one-liner is enough. Private methods and internal helpers don't require JSDoc.
+You don't need `@param` or `@returns` tags if the types are already annotated.
+The one-liner is enough. Private methods and internal helpers don't require
+JSDoc.
 
 ## Tests
 
@@ -470,7 +551,9 @@ If you add or change behavior, include or update tests.
 
 ## Submitting Pull Requests
 
-1. Make sure your branch is current with `dev` before opening a PR. Pull the latest `dev` into your branch (merge or rebase, per your preference) and resolve conflicts locally.
+1. Make sure your branch is current with `dev` before opening a PR. Pull the
+  latest `dev` into your branch (merge or rebase, per your preference) and
+  resolve conflicts locally.
 
 2. Run the local checks:
 
@@ -502,7 +585,8 @@ If you add or change behavior, include or update tests.
 
 ## Pull Request Title Rules
 
-PR titles must follow the same Conventional Commits format as commit messages. The title is the first thing a reviewer reads — get it right.
+PR titles must follow the same Conventional Commits format as commit messages.
+The title is the first thing a reviewer reads - get it right.
 
 ### Format
 
@@ -544,5 +628,7 @@ When filing an issue, include:
 
 ## Code of Conduct
 
-This project follows the [Contributor Covenant Code of Conduct](https://www.contributor-covenant.org/version/2/1/code_of_conduct/).
-All contributors are expected to uphold respectful, inclusive, and professional interactions.
+This project follows the [Contributor Covenant Code of Conduct](https://www.
+contributor-covenant.org/version/2/1/code_of_conduct/).
+All contributors are expected to uphold respectful, inclusive, and
+professional interactions.

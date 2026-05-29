@@ -1,29 +1,28 @@
-import {
-  OnQueueActive,
-  OnQueueCompleted,
-  OnQueueFailed,
-  OnQueueStalled,
-  Process,
-  Processor,
-} from '@nestjs/bull';
+import { OnQueueActive, OnQueueCompleted, OnQueueFailed, OnQueueStalled, Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Job } from 'bull';
 import { DataSource } from 'typeorm';
+import { APP_EVENTS } from '../../common/constants/app-events';
+import { emitSafely, FunnelFailedEvent, FunnelGeneratedEvent } from '../../common/events';
 import { JOBS, QUEUES } from '../../common/constants/queue.constants';
 import { FunnelModelAction } from '../../modules/funnels/actions/funnel.action';
 import { Funnel } from '../../modules/funnels/entities/funnel.entity';
 import { FunnelStage } from '../../modules/funnels/entities/funnel-stage.entity';
 import { StageTask } from '../../modules/funnels/entities/stage-task.entity';
 import { FunnelStatus } from '../../modules/funnels/enums/funnel-status.enum';
-import type { BusinessContext, GenerateFunnelJobPayload } from '../../modules/funnels/interfaces/generate-funnel-job.interface';
+import type {
+  BusinessContext,
+  GenerateFunnelJobPayload,
+} from '../../modules/funnels/interfaces/generate-funnel-job.interface';
 import type { LlmStageData } from '../../modules/funnels/interfaces/llm-stage-data.interface';
 import { FunnelTemplateService } from '../../modules/funnels/services/funnel-template.service';
 import { LlmService } from '../interfaces/llm.service.interface';
 
 const ALLOWED_STAGE_KEYS = new Set(['position', 'channel', 'explanation', 'actionPrompt', 'tasks']);
 const MAX_FIELD_LENGTH = 2000;
-const LLM_TIMEOUT_MS = 60_000;
+const LLM_TIMEOUT_MS = 45_000;
 const EXPECTED_STAGE_COUNT = 4;
 
 @Processor(QUEUES.FUNNEL_GENERATION)
@@ -35,6 +34,7 @@ export class FunnelGenerationProcessor {
     private readonly llmService: LlmService,
     private readonly templateService: FunnelTemplateService,
     @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   @Process(JOBS.GENERATE_FUNNEL)
@@ -64,35 +64,33 @@ export class FunnelGenerationProcessor {
 
     await job.progress(10);
 
-    try {
-      let stageData = await this.tryAiGeneration(businessContext);
+    let stageData = await this.tryAiGeneration(businessContext);
 
-      if (!stageData) {
-        this.logger.log({ message: 'AI failed — using template fallback', funnelId });
-        stageData = this.templateService.getTemplate(businessContext, userId);
-      }
-
-      this.validateStageData(stageData);
-
-      await job.progress(70);
-
-      await this.writeFunnelData(funnelId, stageData, job);
-
-      await job.progress(100);
-
-      this.logger.log({ message: 'Funnel generation complete', funnelId, jobId: job.id });
-    } catch (err) {
-      const maxAttempts = job.opts.attempts ?? 3;
-      const isLastAttempt = job.attemptsMade + 1 >= maxAttempts;
-      if (isLastAttempt) {
-        await this.funnelAction.update({
-          identifierOptions: { id: funnelId },
-          updatePayload: { status: FunnelStatus.FAILED },
-          transactionOptions: { useTransaction: false },
-        });
-      }
-      throw err;
+    if (!stageData) {
+      this.logger.log({ message: 'AI failed — using template fallback', funnelId });
+      stageData = this.templateService.getTemplate(businessContext, userId);
     }
+
+    try {
+      this.validateStageData(stageData);
+    } catch (validationErr) {
+      this.logger.warn({
+        event: 'funnel_stage_validation_failed',
+        funnelId,
+        jobId: job.id,
+        rule: (validationErr as Error).message,
+      });
+      throw validationErr;
+    }
+
+    await job.progress(70);
+
+    await this.writeFunnelData(funnelId, stageData, job);
+
+    await job.progress(100);
+
+    this.logger.log({ message: 'Funnel generation complete', funnelId, jobId: job.id });
+    emitSafely(this.eventEmitter, this.logger, APP_EVENTS.FUNNEL_GENERATED, new FunnelGeneratedEvent(userId, funnelId, funnel.business_name));
   }
 
   private async tryAiGeneration(ctx: BusinessContext): Promise<LlmStageData[] | null> {
@@ -265,21 +263,48 @@ export class FunnelGenerationProcessor {
     });
 
     if (!willRetry) {
+      try {
+        const funnel = await this.funnelAction.get({
+          identifierOptions: { id: job.data.funnelId },
+        });
+        if (funnel?.status === FunnelStatus.ACTIVE) {
+          this.logger.warn({
+            event: 'funnel_job_failed_skip',
+            funnelId: job.data.funnelId,
+            message: 'Funnel already ACTIVE — not overwriting',
+          });
+          return;
+        }
+        await this.funnelAction.update({
+          identifierOptions: { id: job.data.funnelId },
+          updatePayload: { status: FunnelStatus.FAILED },
+          transactionOptions: { useTransaction: false },
+        });
+      } catch (dbErr) {
+        this.logger.error({
+          event: 'funnel_failed_state_write_error',
+          funnelId: job.data.funnelId,
+          error: (dbErr as Error).message,
+          message: 'Could not mark funnel FAILED — manual reconciliation required',
+        });
+      }
       await this.funnelAction.update({
         identifierOptions: { id: job.data.funnelId },
         updatePayload: { status: FunnelStatus.FAILED },
         transactionOptions: { useTransaction: false },
       });
+      emitSafely(this.eventEmitter, this.logger, APP_EVENTS.FUNNEL_FAILED, new FunnelFailedEvent(job.data.userId, job.data.funnelId));
     }
   }
 
   @OnQueueStalled()
   onStalled(job: Job<GenerateFunnelJobPayload>): void {
     this.logger.warn({
-      event: 'job_stalled',
+      event: 'funnel_job_stalled',
       jobId: job.id,
       funnelId: job.data.funnelId,
-      message: 'Bull will auto re-queue',
+      attemptsMade: job.attemptsMade,
+      message: 'Bull will auto re-queue — state not modified here',
     });
   }
 }

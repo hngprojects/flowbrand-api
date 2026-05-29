@@ -1,23 +1,31 @@
 import { Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
 import JSZip from 'jszip';
 import mammoth from 'mammoth';
+import pLimit from 'p-limit';
 import { getData } from 'pdf-parse/worker';
 import { PDFParse } from 'pdf-parse';
 import * as SYS_MSG from '../../../constants/system.messages';
 import type { PptxZipLoader, UploadFileType } from '../upload.types';
-// 2. Set the worker globally to prevent dynamic path resolution hanging in Node.js
+// Set the worker globally to prevent dynamic path resolution hanging in Node.js
 PDFParse.setWorker(getData());
 const MAX_PARSED_TEXT_CHARS = 2_000_000;
 /** Minimum length for coarse OLE (.doc/.ppt) text to be treated as usable. */
 const OLE_MIN_TEXT_LENGTH = 40;
 /** Minimum ratio of letters for OLE extraction (filters GUID/style noise). */
 const OLE_MIN_LETTER_RATIO = 0.4;
+// 4× MAX_UPLOAD_BYTES — Multer already rejects files above 5 MiB at the HTTP layer,
+// so this gate is a safety net for any path that bypasses upload validation (e.g. direct
+// queue injection or future S3 triggers). Not expected to fire in the normal upload flow.
+const PPTX_MAX_SIZE_BYTES = 20 * 1024 * 1024;
+const PPTX_MAX_SLIDES = 200;
+const PPTX_SLIDE_CONCURRENCY = 6;
 const pptxZipLoader = JSZip as unknown as PptxZipLoader;
 @Injectable()
 export class DocumentTextExtractorService {
   private readonly logger = new Logger(DocumentTextExtractorService.name);
 
   async extract(buffer: Buffer, fileType: UploadFileType): Promise<string> {
+    const start = Date.now();
     let text: string;
 
     switch (fileType) {
@@ -42,6 +50,13 @@ export class DocumentTextExtractorService {
           message: SYS_MSG.FUNNEL_UPLOAD_UNSUPPORTED_FILE_TYPE,
         });
     }
+
+    this.logger.log({
+      event: 'extraction_format_complete',
+      format: fileType,
+      fileSizeBytes: buffer.byteLength,
+      durationMs: Date.now() - start,
+    });
 
     const normalized = text.replace(/\s+/g, ' ').trim();
     if (!normalized) {
@@ -80,6 +95,18 @@ export class DocumentTextExtractorService {
 
   /** PPTX is a ZIP of slide XML files; extract visible text from `<a:t>` nodes. */
   private async extractPptx(buffer: Buffer): Promise<string> {
+    if (buffer.byteLength > PPTX_MAX_SIZE_BYTES) {
+      this.logger.warn({
+        event: 'pptx_size_gate',
+        fileSizeBytes: buffer.byteLength,
+        limitBytes: PPTX_MAX_SIZE_BYTES,
+      });
+      throw new UnprocessableEntityException({
+        error: 'UnprocessableEntityException',
+        message: SYS_MSG.FUNNEL_UPLOAD_PPTX_TOO_LARGE,
+      });
+    }
+
     const zip = await pptxZipLoader.loadAsync(buffer);
     const slidePaths = Object.keys(zip.files)
       .filter((name) => /^ppt\/slides\/slide\d+\.xml$/i.test(name))
@@ -92,23 +119,34 @@ export class DocumentTextExtractorService {
       });
     }
 
-    const chunks: string[] = [];
-    for (const path of slidePaths) {
-      const entry = zip.files[path];
-      if (!entry) {
-        continue;
-      }
-      const xml = await entry.async('string');
-      const slideText = [...xml.matchAll(/<a:t[^>]*>([^<]*)<\/a:t>/g)]
-        .map((match) => match[1] ?? '')
-        .join(' ')
-        .trim();
-      if (slideText) {
-        chunks.push(slideText);
-      }
+    if (slidePaths.length > PPTX_MAX_SLIDES) {
+      this.logger.warn({
+        event: 'pptx_slide_count_gate',
+        slideCount: slidePaths.length,
+        limit: PPTX_MAX_SLIDES,
+      });
+      throw new UnprocessableEntityException({
+        error: 'UnprocessableEntityException',
+        message: SYS_MSG.FUNNEL_UPLOAD_PPTX_TOO_MANY_SLIDES,
+      });
     }
 
-    return chunks.join('\n\n');
+    const limit = pLimit(PPTX_SLIDE_CONCURRENCY);
+    const chunks = await Promise.all(
+      slidePaths.map((slidePath) =>
+        limit(async () => {
+          const entry = zip.files[slidePath];
+          if (!entry) return '';
+          const xml = await entry.async('string');
+          return [...xml.matchAll(/<a:t[^>]*>([^<]*)<\/a:t>/g)]
+            .map((match) => match[1] ?? '')
+            .join(' ')
+            .trim();
+        }),
+      ),
+    );
+
+    return chunks.filter(Boolean).join('\n\n');
   }
 
 
