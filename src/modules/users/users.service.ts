@@ -326,13 +326,17 @@ export class UsersService {
     return this.userStateService.getUserState(userId);
   }
 
-  private toProfileResponse(user: User): IUserProfile {
+  private async toProfileResponse(user: User): Promise<IUserProfile> {
+    const avatarUrl = this.isStoredAvatarPath(user.avatar_url)
+      ? await this.resolveAvatarUrl(user.avatar_url)
+      : user.avatar_url;
+
     return {
       id: user.id,
       fullName: user.full_name,
       email: user.email,
       country: user.country,
-      avatarUrl: user.avatar_url,
+      avatarUrl,
       authProvider: user.auth_provider,
       isVerified: user.is_verified,
       createdAt: user.created_at,
@@ -342,7 +346,7 @@ export class UsersService {
 
   async getProfile(userId: string): Promise<IUserProfile> {
     const user = await this.findById(userId);
-    return this.toProfileResponse(user);
+    return await this.toProfileResponse(user);
   }
 
   private isStoredAvatarPath(avatarUrl: string | null): avatarUrl is string {
@@ -395,10 +399,6 @@ export class UsersService {
     let objectWritten = false;
 
     try {
-      if (previousAvatarPath) {
-        await this.objectStorage.deleteObject(previousAvatarPath);
-      }
-
       await this.objectStorage.putObject({
         storagePath,
         body: file.buffer,
@@ -412,6 +412,17 @@ export class UsersService {
       const updatedUser = await this.userModelAction.updateAvatarUrl(userId, storagePath);
       if (!updatedUser) {
         throw new InternalServerErrorException(SYS_MSG.PROFILE_AVATAR_UPLOAD_FAILED);
+      }
+
+      if (previousAvatarPath) {
+        try {
+          await this.objectStorage.deleteObject(previousAvatarPath);
+        } catch (cleanupError) {
+          this.logger.error(
+            `Failed to remove previous avatar ${previousAvatarPath}`,
+            cleanupError instanceof Error ? cleanupError.stack : undefined,
+          );
+        }
       }
 
       return { avatarUrl };
@@ -492,7 +503,7 @@ export class UsersService {
     }
 
     if (Object.keys(updatePayload).length === 0) {
-      return this.toProfileResponse(user);
+      return await this.toProfileResponse(user);
     }
 
     const updated = await this.userModelAction.update({
@@ -507,7 +518,7 @@ export class UsersService {
 
     emitSafely(this.eventEmitter, this.logger, APP_EVENTS.PROFILE_UPDATED, new ProfileUpdatedEvent(userId, changedFields));
 
-    return this.toProfileResponse(updated);
+    return await this.toProfileResponse(updated);
   }
 
   async deleteAccount(userId: string, confirmation: string): Promise<void> {

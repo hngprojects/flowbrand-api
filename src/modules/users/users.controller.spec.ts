@@ -61,6 +61,16 @@ describe('UsersController — profile endpoints', () => {
         message: SYS_MSG.PROFILE_RETRIEVED_SUCCESSFULLY,
         data: mockProfile,
       });
+      expect(mockUsersService.getProfile).toHaveBeenCalledWith(USER_ID);
+    });
+
+    it('delegates to service and does not expose raw entity fields', async () => {
+      mockUsersService.getProfile.mockResolvedValue(mockProfile);
+
+      const result = await controller.getProfile(mockAuthUser);
+
+      expect(result.data).not.toHaveProperty('password_hash');
+      expect(result.data).not.toHaveProperty('deleted_at');
     });
   });
 
@@ -77,6 +87,35 @@ describe('UsersController — profile endpoints', () => {
       expect(mockUsersService.updateProfile).toHaveBeenCalledWith(USER_ID, {
         fullName: 'Jane Updated',
       });
+    });
+
+    it('updates country and returns 200', async () => {
+      const updated = { ...mockProfile, country: 'Ghana' };
+      mockUsersService.updateProfile.mockResolvedValue(updated);
+
+      const result = await controller.updateProfile(mockAuthUser, { country: 'Ghana' });
+
+      expect(result.statusCode).toBe(HttpStatus.OK);
+      expect(mockUsersService.updateProfile).toHaveBeenCalledWith(USER_ID, {
+        country: 'Ghana',
+      });
+    });
+
+    it('empty body returns 200 with unchanged profile', async () => {
+      mockUsersService.updateProfile.mockResolvedValue(mockProfile);
+
+      const result = await controller.updateProfile(mockAuthUser, {});
+
+      expect(result.statusCode).toBe(HttpStatus.OK);
+      expect(mockUsersService.updateProfile).toHaveBeenCalledWith(USER_ID, {});
+    });
+
+    it('passes userId from JWT, never from path/body', async () => {
+      mockUsersService.updateProfile.mockResolvedValue(mockProfile);
+
+      await controller.updateProfile(mockAuthUser, {});
+
+      expect(mockUsersService.updateProfile.mock.calls[0][0]).toBe(USER_ID);
     });
   });
 

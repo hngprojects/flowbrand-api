@@ -163,7 +163,7 @@ export function UploadAvatarDocs() {
         'MIME type is validated from file buffer using file signature detection, not extension/header. ' +
         'Allowed formats: JPEG, PNG, WebP. Maximum size: 2MB. ' +
         'Stored path is generated server-side as `avatars/{userId}/{uuid}.{ext}`. ' +
-        'When a previous stored avatar exists, it is deleted before replacing.',
+        'When a previous stored avatar exists, it is deleted after successful replacement.',
     }),
     ApiConsumes('multipart/form-data'),
     ApiBody({ type: UploadAvatarDto }),

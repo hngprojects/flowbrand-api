@@ -584,7 +584,7 @@ describe('UsersService', () => {
       expect(result).toEqual({ avatarUrl: 'https://signed.example/avatar.jpg' });
     });
 
-    it('deletes previous stored avatar before uploading a new one', async () => {
+    it('deletes previous stored avatar after successful DB update', async () => {
       mockUserModelAction.get.mockResolvedValue({
         ...mockFullUser,
         avatar_url: `avatars/${USER_ID}/old.jpg`,
@@ -601,6 +601,9 @@ describe('UsersService', () => {
 
       expect(mockObjectStorage.deleteObject).toHaveBeenCalledTimes(1);
       expect(mockObjectStorage.deleteObject).toHaveBeenCalledWith(`avatars/${USER_ID}/old.jpg`);
+      expect(mockObjectStorage.deleteObject.mock.invocationCallOrder[0]).toBeGreaterThan(
+        mockUserModelAction.updateAvatarUrl.mock.invocationCallOrder[0],
+      );
     });
 
     it('rejects when avatar file is missing', async () => {
@@ -856,6 +859,36 @@ describe('UsersService', () => {
         fullName: 'Test User',
         email: USER_EMAIL,
       });
+    });
+
+    it('regenerates signed avatar URL when stored path exists', async () => {
+      mockUserModelAction.get.mockResolvedValue({
+        ...mockFullUser,
+        avatar_url: `avatars/${USER_ID}/profile.png`,
+      });
+      mockObjectStorage.createPresignedGetObjectUrl.mockResolvedValue(
+        'https://signed.example/avatar/profile.png',
+      );
+
+      const result = await service.getProfile(USER_ID);
+
+      expect(mockObjectStorage.createPresignedGetObjectUrl).toHaveBeenCalledWith(
+        `avatars/${USER_ID}/profile.png`,
+        900,
+      );
+      expect(result.avatarUrl).toBe('https://signed.example/avatar/profile.png');
+    });
+
+    it('keeps external avatar URL unchanged on profile read', async () => {
+      mockUserModelAction.get.mockResolvedValue({
+        ...mockFullUser,
+        avatar_url: 'https://cdn.example.com/avatar.png',
+      });
+
+      const result = await service.getProfile(USER_ID);
+
+      expect(mockObjectStorage.createPresignedGetObjectUrl).not.toHaveBeenCalled();
+      expect(result.avatarUrl).toBe('https://cdn.example.com/avatar.png');
     });
 
     it('response never contains password_hash, deleted_at, or provider_user_id', async () => {
