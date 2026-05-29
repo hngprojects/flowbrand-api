@@ -3,7 +3,6 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository, QueryDeepPartialEntity, In } from 'typeorm';
 import { Funnel } from '../entities/funnel.entity';
-import { FunnelStatus } from '../enums/funnel-status.enum';
 import { FunnelStage } from '../entities/funnel-stage.entity';
 import { StageTask } from '../entities/stage-task.entity';
 import { StageStatus } from '../enums/stage-status.enum';
@@ -38,7 +37,11 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
     funnelId: string,
     newValues: QueryDeepPartialEntity<FunnelStage>,
   ): Promise<number> {
-    const res = await manager.update(FunnelStage, { id: stageId, funnel_id: funnelId, status: StageStatus.ACTIVE }, newValues);
+    const res = await manager.update(
+      FunnelStage,
+      { id: stageId, funnel_id: funnelId, status: StageStatus.ACTIVE },
+      newValues,
+    );
     return res.affected ?? 0;
   }
 
@@ -70,19 +73,14 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
     });
   }
 
-  async findGeneratingForUser(userId: string): Promise<Funnel | null> {
-    return this.funnelRepository.findOne({
-      where: { user_id: userId, status: FunnelStatus.GENERATING },
-    });
-  }
-
   async findOwnedById(funnelId: string, userId: string, manager?: EntityManager): Promise<Funnel | null> {
     const repo = manager ? manager.getRepository(Funnel) : this.funnelRepository;
     return repo.findOne({ where: { id: funnelId, user_id: userId } });
   }
 
   async listForUserPaginated(userId: string, page: number, perPage: number): Promise<[Funnel[], number]> {
-    return this.funnelRepository.createQueryBuilder('f')
+    return this.funnelRepository
+      .createQueryBuilder('f')
       .where('f.user_id = :userId', { userId })
       .orderBy('f.created_at', 'DESC')
       .skip((page - 1) * perPage)
