@@ -8,6 +8,7 @@ import { NotificationPreferenceModelAction } from './actions/notification-prefer
 import { NotificationsService } from './notifications.service';
 
 @Module({
+  controllers: [NotificationsController],
   imports: [TypeOrmModule.forFeature([Notification, NotificationPreference])],
   providers: [NotificationModelAction, NotificationPreferenceModelAction, NotificationsService],
   exports: [NotificationModelAction, NotificationPreferenceModelAction, NotificationsService],
