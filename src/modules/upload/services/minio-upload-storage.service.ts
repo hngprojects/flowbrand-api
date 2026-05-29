@@ -5,9 +5,9 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import * as Minio from 'minio';
+import { env } from '../../../config/env';
 import {
   UPLOAD_STORAGE_DEFAULT_REGION,
-  UPLOAD_STORAGE_ENV,
 } from '../constants/upload.constants';
 import type {
   MinioClientConfig,
@@ -44,7 +44,7 @@ export class MinioUploadStorageService implements ObjectStorage, OnModuleInit {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
 
-      if (process.env.NODE_ENV === 'production') {
+      if (env.NODE_ENV === 'production') {
         throw new InternalServerErrorException(
           `Upload object storage is unavailable: ${detail}`,
         );
@@ -90,24 +90,28 @@ export class MinioUploadStorageService implements ObjectStorage, OnModuleInit {
     await client.removeObject(bucket, storagePath);
   }
 
+  async createPresignedGetObjectUrl(storagePath: string, expirySeconds: number): Promise<string> {
+    const { client, bucket } = this.resolveClient();
+    return client.presignedGetObject(bucket, storagePath, expirySeconds);
+  }
+
   private resolveClient(): MinioClientConfig {
     if (this.config) {
       return this.config;
     }
 
-    const endpoint = process.env[UPLOAD_STORAGE_ENV.endpoint];
-    const accessKey = process.env[UPLOAD_STORAGE_ENV.accessKey];
-    const secretKey = process.env[UPLOAD_STORAGE_ENV.secretKey];
-    const bucket = process.env[UPLOAD_STORAGE_ENV.bucket];
-    const region =
-      process.env[UPLOAD_STORAGE_ENV.region] ?? UPLOAD_STORAGE_DEFAULT_REGION;
+    const endpoint = env.UPLOAD_STORAGE_ENDPOINT;
+    const accessKey = env.UPLOAD_STORAGE_ACCESS_KEY;
+    const secretKey = env.UPLOAD_STORAGE_SECRET_KEY;
+    const bucket = env.UPLOAD_STORAGE_BUCKET;
+    const region = env.UPLOAD_STORAGE_REGION || UPLOAD_STORAGE_DEFAULT_REGION;
 
     if (!endpoint || !accessKey || !secretKey || !bucket) {
       const missing = [
-        !endpoint && UPLOAD_STORAGE_ENV.endpoint,
-        !accessKey && UPLOAD_STORAGE_ENV.accessKey,
-        !secretKey && UPLOAD_STORAGE_ENV.secretKey,
-        !bucket && UPLOAD_STORAGE_ENV.bucket,
+        !endpoint && 'UPLOAD_STORAGE_ENDPOINT',
+        !accessKey && 'UPLOAD_STORAGE_ACCESS_KEY',
+        !secretKey && 'UPLOAD_STORAGE_SECRET_KEY',
+        !bucket && 'UPLOAD_STORAGE_BUCKET',
       ].filter(Boolean);
 
       throw new InternalServerErrorException(

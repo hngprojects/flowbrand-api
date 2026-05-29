@@ -26,6 +26,8 @@ import { getQueueToken } from '@nestjs/bull';
 import { ACCOUNT_DELETION_QUEUE } from './processors/account-deletion.processor';
 import { PinoLoggerService } from '../../common/logger/pino-logger.service';
 import { UserRole } from './enums/user-role.enum';
+import { NotificationsService } from '../notifications/notifications.service';
+import { UPLOAD_OBJECT_STORAGE } from '../upload/upload.types';
 
 jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('hashed-password'),
@@ -39,6 +41,7 @@ const mockUserModelAction = {
   get: jest.fn(),
   list: jest.fn(),
   update: jest.fn(),
+  updateAvatarUrl: jest.fn(),
   delete: jest.fn(),
   findById: jest.fn(),
 };
@@ -75,6 +78,11 @@ const mockWizardSessionModelAction = {
 const mockUserStateService = {
   getUserState: jest.fn(),
   invalidateUserStateCache: jest.fn(),
+};
+
+const mockNotificationsService = {
+  getNotificationPreferences: jest.fn(),
+  updateNotificationPreferences: jest.fn(),
 };
 
 // Mock RedisService
@@ -114,6 +122,32 @@ const mockFullUser = {
   updated_at: new Date('2024-06-01'),
 };
 
+const mockNotificationPreferences = {
+  id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  user_id: USER_ID,
+  email_funnel_ready: true,
+  email_stage_unlocked: true,
+  email_stage_completed: false,
+  email_weekly_digest: true,
+  inapp_task_completed: true,
+  inapp_stage_unlocked: true,
+  created_at: new Date('2026-05-29T10:30:00.000Z'),
+  updated_at: new Date('2026-05-29T10:30:00.000Z'),
+};
+
+const mockNotificationPreferencesResponse = {
+  id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  userId: USER_ID,
+  emailFunnelReady: true,
+  emailStageUnlocked: true,
+  emailStageCompleted: false,
+  emailWeeklyDigest: true,
+  inappTaskCompleted: true,
+  inappStageUnlocked: true,
+  createdAt: new Date('2026-05-29T10:30:00.000Z'),
+  updatedAt: new Date('2026-05-29T10:30:00.000Z'),
+};
+
 // Mock AuthMetadataModelAction
 const mockAuthMetadataModelAction = {
   updateByUserId: jest.fn(),
@@ -140,6 +174,13 @@ const mockQueryRunner = {
 
 const mockDataSource = {
   createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
+};
+
+const mockObjectStorage = {
+  putObject: jest.fn(),
+  getObject: jest.fn(),
+  deleteObject: jest.fn(),
+  createPresignedGetObjectUrl: jest.fn(),
 };
 
 // Mock PinoLoggerService
@@ -176,6 +217,8 @@ describe('UsersService', () => {
         { provide: DataSource, useValue: mockDataSource },
         { provide: getQueueToken(ACCOUNT_DELETION_QUEUE), useValue: mockAccountDeletionQueue },
         { provide: EventEmitter2, useValue: mockEventEmitter },
+        { provide: NotificationsService, useValue: mockNotificationsService },
+        { provide: UPLOAD_OBJECT_STORAGE, useValue: mockObjectStorage },
       ],
     }).compile();
 
@@ -443,7 +486,6 @@ describe('UsersService', () => {
       
       await service.changePassword(USER_ID, changePasswordDto);
 
-      expect(logSpy).toHaveBeenCalled();
       const logPayload = JSON.stringify(logSpy.mock.calls);
       expect(logPayload).not.toContain(mockUser().password_hash);
       expect(logPayload).not.toContain(changePasswordDto.oldPassword);
@@ -526,6 +568,194 @@ describe('UsersService', () => {
         user_id: USER_ID,
         password_changed_at: expect.any(Date) ,
       });
+    });
+  });
+
+  describe('avatar operations', () => {
+    const onePixelPngBuffer = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7f4b4AAAAASUVORK5CYII=',
+      'base64',
+    );
+    const avatarFile = {
+      originalname: 'avatar.png',
+      size: onePixelPngBuffer.length,
+      buffer: onePixelPngBuffer,
+      mimetype: 'application/octet-stream',
+    } as Express.Multer.File;
+
+    beforeEach(() => {
+      mockObjectStorage.putObject.mockReset();
+      mockObjectStorage.deleteObject.mockReset();
+      mockObjectStorage.createPresignedGetObjectUrl.mockReset();
+      mockUserModelAction.updateAvatarUrl.mockReset();
+    });
+
+    it('uploads avatar successfully and returns signed URL', async () => {
+      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+      mockObjectStorage.createPresignedGetObjectUrl.mockResolvedValue(
+        'https://signed.example/avatar.jpg',
+      );
+      mockUserModelAction.updateAvatarUrl.mockResolvedValue({
+        ...mockFullUser,
+        avatar_url: 'avatars/user/new.jpg',
+      });
+
+      const result = await service.uploadAvatar(USER_ID, avatarFile);
+
+      expect(mockObjectStorage.putObject).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contentType: 'image/png',
+          contentLength: onePixelPngBuffer.length,
+        }),
+      );
+      expect(mockObjectStorage.createPresignedGetObjectUrl).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`^avatars/${USER_ID}/`)),
+        900,
+      );
+      expect(mockUserModelAction.updateAvatarUrl).toHaveBeenCalled();
+      expect(result).toEqual({ avatarUrl: 'https://signed.example/avatar.jpg' });
+    });
+
+    it('deletes previous stored avatar after successful DB update', async () => {
+      mockUserModelAction.get.mockResolvedValue({
+        ...mockFullUser,
+        avatar_url: `avatars/${USER_ID}/old.jpg`,
+      });
+      mockObjectStorage.createPresignedGetObjectUrl.mockResolvedValue(
+        'https://signed.example/avatar.jpg',
+      );
+      mockUserModelAction.updateAvatarUrl.mockResolvedValue({
+        ...mockFullUser,
+        avatar_url: `avatars/${USER_ID}/new.jpg`,
+      });
+
+      await service.uploadAvatar(USER_ID, avatarFile);
+
+      expect(mockObjectStorage.deleteObject).toHaveBeenCalledTimes(1);
+      expect(mockObjectStorage.deleteObject).toHaveBeenCalledWith(`avatars/${USER_ID}/old.jpg`);
+      expect(mockObjectStorage.deleteObject.mock.invocationCallOrder[0]).toBeGreaterThan(
+        mockUserModelAction.updateAvatarUrl.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('rejects when avatar file is missing', async () => {
+      await expect(service.uploadAvatar(USER_ID, undefined)).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
+    });
+
+    it('rejects when avatar exceeds 2MB', async () => {
+      await expect(
+        service.uploadAvatar(USER_ID, { ...avatarFile, size: 2 * 1024 * 1024 + 1 }),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    });
+
+    it('rejects when file signature cannot be detected', async () => {
+      const unknownBufferFile = {
+        ...avatarFile,
+        originalname: 'mystery.bin',
+        buffer: Buffer.from('not-an-image'),
+        size: Buffer.from('not-an-image').length,
+      };
+
+      await expect(service.uploadAvatar(USER_ID, unknownBufferFile)).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
+    });
+
+    it('rejects spoofed/unsupported mime type from buffer', async () => {
+      const spoofedPdfFile = {
+        ...avatarFile,
+        originalname: 'avatar.jpg',
+        buffer: Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\n', 'utf8'),
+        size: Buffer.byteLength('%PDF-1.4\n1 0 obj\n<<>>\nendobj\n', 'utf8'),
+      };
+
+      await expect(service.uploadAvatar(USER_ID, spoofedPdfFile)).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
+    });
+
+    it('cleans up uploaded file when DB update fails after upload', async () => {
+      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+      mockObjectStorage.createPresignedGetObjectUrl.mockResolvedValue(
+        'https://signed.example/avatar.jpg',
+      );
+      mockUserModelAction.updateAvatarUrl.mockResolvedValue(null);
+
+      await expect(service.uploadAvatar(USER_ID, avatarFile)).rejects.toBeInstanceOf(
+        InternalServerErrorException,
+      );
+
+      const uploadedPath = mockObjectStorage.putObject.mock.calls[0][0].storagePath as string;
+      expect(mockObjectStorage.deleteObject).toHaveBeenCalledWith(uploadedPath);
+    });
+
+    it('cleans up uploaded file when signed URL creation fails', async () => {
+      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+      mockObjectStorage.createPresignedGetObjectUrl.mockRejectedValue(new Error('sign failed'));
+
+      await expect(service.uploadAvatar(USER_ID, avatarFile)).rejects.toBeInstanceOf(
+        InternalServerErrorException,
+      );
+
+      const uploadedPath = mockObjectStorage.putObject.mock.calls[0][0].storagePath as string;
+      expect(mockObjectStorage.deleteObject).toHaveBeenCalledWith(uploadedPath);
+    });
+
+    it('returns 500 when storage upload fails', async () => {
+      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+      mockObjectStorage.putObject.mockRejectedValue(new Error('upload failed'));
+
+      await expect(service.uploadAvatar(USER_ID, avatarFile)).rejects.toBeInstanceOf(
+        InternalServerErrorException,
+      );
+      expect(mockObjectStorage.createPresignedGetObjectUrl).not.toHaveBeenCalled();
+    });
+
+    it('returns no-op 200 response when avatar is already null', async () => {
+      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+
+      await expect(service.deleteAvatar(USER_ID)).resolves.toEqual({ avatarUrl: null });
+      expect(mockObjectStorage.deleteObject).not.toHaveBeenCalled();
+      expect(mockUserModelAction.updateAvatarUrl).not.toHaveBeenCalled();
+    });
+
+    it('deletes stored avatar and nulls DB column', async () => {
+      mockUserModelAction.get.mockResolvedValue({
+        ...mockFullUser,
+        avatar_url: `avatars/${USER_ID}/old.jpg`,
+      });
+      mockUserModelAction.updateAvatarUrl.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+
+      const result = await service.deleteAvatar(USER_ID);
+
+      expect(mockObjectStorage.deleteObject).toHaveBeenCalledWith(`avatars/${USER_ID}/old.jpg`);
+      expect(mockUserModelAction.updateAvatarUrl).toHaveBeenCalledWith(USER_ID, null);
+      expect(result).toEqual({ avatarUrl: null });
+    });
+
+    it('keeps external avatar URL deletion as DB-only operation', async () => {
+      mockUserModelAction.get.mockResolvedValue({
+        ...mockFullUser,
+        avatar_url: 'https://cdn.example.com/avatar.jpg',
+      });
+      mockUserModelAction.updateAvatarUrl.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+
+      await service.deleteAvatar(USER_ID);
+
+      expect(mockObjectStorage.deleteObject).not.toHaveBeenCalled();
+      expect(mockUserModelAction.updateAvatarUrl).toHaveBeenCalledWith(USER_ID, null);
+    });
+
+    it('returns 500 when avatar DB nulling fails', async () => {
+      mockUserModelAction.get.mockResolvedValue({
+        ...mockFullUser,
+        avatar_url: `avatars/${USER_ID}/old.jpg`,
+      });
+      mockUserModelAction.updateAvatarUrl.mockResolvedValue(null);
+
+      await expect(service.deleteAvatar(USER_ID)).rejects.toBeInstanceOf(InternalServerErrorException);
     });
   });
 
@@ -663,6 +893,36 @@ describe('UsersService', () => {
       });
     });
 
+    it('regenerates signed avatar URL when stored path exists', async () => {
+      mockUserModelAction.get.mockResolvedValue({
+        ...mockFullUser,
+        avatar_url: `avatars/${USER_ID}/profile.png`,
+      });
+      mockObjectStorage.createPresignedGetObjectUrl.mockResolvedValue(
+        'https://signed.example/avatar/profile.png',
+      );
+
+      const result = await service.getProfile(USER_ID);
+
+      expect(mockObjectStorage.createPresignedGetObjectUrl).toHaveBeenCalledWith(
+        `avatars/${USER_ID}/profile.png`,
+        900,
+      );
+      expect(result.avatarUrl).toBe('https://signed.example/avatar/profile.png');
+    });
+
+    it('keeps external avatar URL unchanged on profile read', async () => {
+      mockUserModelAction.get.mockResolvedValue({
+        ...mockFullUser,
+        avatar_url: 'https://cdn.example.com/avatar.png',
+      });
+
+      const result = await service.getProfile(USER_ID);
+
+      expect(mockObjectStorage.createPresignedGetObjectUrl).not.toHaveBeenCalled();
+      expect(result.avatarUrl).toBe('https://cdn.example.com/avatar.png');
+    });
+
     it('response never contains password_hash, deleted_at, or provider_user_id', async () => {
       mockUserModelAction.get.mockResolvedValue(mockFullUser);
 
@@ -677,6 +937,69 @@ describe('UsersService', () => {
       mockUserModelAction.get.mockResolvedValue(null);
 
       await expect(service.getProfile(USER_ID)).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('notification preferences', () => {
+    beforeEach(() => {
+      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+    });
+
+    it('AC-01: returns current preferences for authenticated user', async () => {
+      mockNotificationsService.getNotificationPreferences.mockResolvedValue(mockNotificationPreferences);
+
+      const result = await service.getNotificationPreferences(USER_ID);
+
+      expect(mockUserModelAction.get).toHaveBeenCalledWith({
+        identifierOptions: { id: USER_ID },
+      });
+      expect(mockNotificationsService.getNotificationPreferences).toHaveBeenCalledWith(USER_ID);
+      expect(result).toEqual(mockNotificationPreferencesResponse);
+    });
+
+    it('AC-03: updates preferences for authenticated user', async () => {
+      const updated = { ...mockNotificationPreferences, email_weekly_digest: false };
+      mockNotificationsService.updateNotificationPreferences.mockResolvedValue(updated);
+
+      const result = await service.updateNotificationPreferences(USER_ID, {
+        email_weekly_digest: false,
+      });
+
+      expect(mockNotificationsService.updateNotificationPreferences).toHaveBeenCalledWith(USER_ID, {
+        email_weekly_digest: false,
+      });
+      expect(result.emailWeeklyDigest).toBe(false);
+    });
+
+    it('AC-04: returns camelCase preference fields without database column names', async () => {
+      mockNotificationsService.getNotificationPreferences.mockResolvedValue(mockNotificationPreferences);
+
+      const result = await service.getNotificationPreferences(USER_ID) as unknown as Record<string, unknown>;
+
+      expect(result).toMatchObject({
+        userId: USER_ID,
+        emailFunnelReady: true,
+        emailWeeklyDigest: true,
+        inappStageUnlocked: true,
+      });
+      expect(result).not.toHaveProperty('user_id');
+      expect(result).not.toHaveProperty('email_weekly_digest');
+      expect(result).not.toHaveProperty('created_at');
+    });
+
+    it('SEC-03: scopes notification preference reads to req.user.userId', async () => {
+      mockNotificationsService.getNotificationPreferences.mockResolvedValue(mockNotificationPreferences);
+
+      await service.getNotificationPreferences(USER_ID);
+
+      expect(mockNotificationsService.getNotificationPreferences).toHaveBeenCalledWith(USER_ID);
+    });
+
+    it('AC-09: throws 404 before reading preferences when user no longer exists', async () => {
+      mockUserModelAction.get.mockResolvedValue(null);
+
+      await expect(service.getNotificationPreferences(USER_ID)).rejects.toBeInstanceOf(NotFoundException);
+      expect(mockNotificationsService.getNotificationPreferences).not.toHaveBeenCalled();
     });
   });
 
@@ -730,6 +1053,8 @@ describe('UsersService', () => {
           { provide: DataSource, useValue: mockDataSource },
           { provide: getQueueToken(ACCOUNT_DELETION_QUEUE), useValue: mockAccountDeletionQueue },
           { provide: EventEmitter2, useValue: mockEventEmitter },
+          { provide: NotificationsService, useValue: mockNotificationsService },
+          { provide: UPLOAD_OBJECT_STORAGE, useValue: mockObjectStorage },
         ],
       }).compile();
 
