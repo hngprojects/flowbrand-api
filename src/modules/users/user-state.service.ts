@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { UserModelAction } from './actions/user.action';
 import { WizardSessionModelAction } from '../onboarding/actions/wizard-session.action';
 import { FunnelModelAction } from '../funnels/actions/funnel.action';
@@ -11,13 +8,13 @@ import { WizardStatus } from '../onboarding/enums/wizzard-status.enum';
 import { FunnelStatus } from '../funnels/enums/funnel-status.enum';
 import { StageStatus } from '../funnels/enums/stage-status.enum';
 import { RedisService } from './../redis/redis.service';
-import {
-  UserStateResponse,
-  OnboardingState,
-  ActiveFunnel,
-  CurrentStage,
-} from './interfaces/user-state.interface';
+import { UserStateResponse, OnboardingState, ActiveFunnel, CurrentStage } from './interfaces/user-state.interface';
 import * as SYS_MSG from '../../constants/system.messages';
+
+const FUNNEL_STATUS_PRIORITY: Partial<Record<FunnelStatus, number>> = {
+  [FunnelStatus.ACTIVE]: 1,
+  [FunnelStatus.GENERATING]: 2,
+};
 
 @Injectable()
 export class UserStateService {
@@ -42,30 +39,29 @@ export class UserStateService {
       }
     }
 
-    const user = await this.userModelAction.findById(userId)
+    const user = await this.userModelAction.findById(userId);
     if (!user) {
       throw new NotFoundException(SYS_MSG.USER_NOT_FOUND_BY_TOKEN);
     }
 
-
     const onboarding = await this.getOnboardingState(userId);
     const activeFunnel = await this.getActiveFunnelState(userId);
-    
+
     const response: UserStateResponse = {
-        onboarding,
-        activeFunnel,
+      onboarding,
+      activeFunnel,
     };
 
     await this.redisService.set(cacheKey, JSON.stringify(response), 20);
-    
+
     return response;
   }
 
   private async getOnboardingState(userId: string): Promise<OnboardingState> {
-    const session = await this.wizardSessionModelAction.findActiveSession(userId)
+    const session = await this.wizardSessionModelAction.findActiveSession(userId);
 
     if (!session) {
-      return { status: 'not_started' }
+      return { status: 'not_started' };
     }
 
     if (session.status === WizardStatus.COMPLETE) {
@@ -91,17 +87,22 @@ export class UserStateService {
 
   private async getActiveFunnelState(userId: string): Promise<ActiveFunnel | null> {
     const funnels = await this.funnelModelAction.findFunnelsByUserId(userId);
-    
-    const nonFailedFunnels = funnels.filter(f => f.status !== FunnelStatus.FAILED);
+
+    const nonFailedFunnels = funnels.filter((f) => f.status !== FunnelStatus.FAILED);
 
     if (nonFailedFunnels.length === 0) {
       return null;
     }
 
-    const activeFunnel = nonFailedFunnels.find(f => f.status === FunnelStatus.ACTIVE);
-    const generatingFunnel = nonFailedFunnels.find(f => f.status === FunnelStatus.GENERATING);
+    const selectedFunnel =
+      nonFailedFunnels
+        .filter((f) => FUNNEL_STATUS_PRIORITY[f.status] !== undefined)
+        .sort((a, b) => {
+          const priorityDiff = (FUNNEL_STATUS_PRIORITY[a.status] ?? 99) - (FUNNEL_STATUS_PRIORITY[b.status] ?? 99);
+          if (priorityDiff !== 0) return priorityDiff;
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        })[0] ?? null;
 
-    const selectedFunnel = activeFunnel ?? generatingFunnel;
     if (!selectedFunnel) {
       return null;
     }
@@ -118,14 +119,14 @@ export class UserStateService {
 
     const stages = await this.funnelStageModelAction.getStagesByFunnelId(selectedFunnel.id);
 
-    const activeStage = stages.find(s => s.status === StageStatus.ACTIVE);
+    const activeStage = stages.find((s) => s.status === StageStatus.ACTIVE);
 
     let currentStage: CurrentStage | null = null;
     if (activeStage) {
       const tasks = await this.stageTaskModelAction.findTasksByStageId(activeStage.id);
 
       const tasksTotal = tasks.length;
-      const tasksComplete = tasks.filter(task => task.is_complete).length;
+      const tasksComplete = tasks.filter((task) => task.is_complete).length;
 
       currentStage = {
         stageId: activeStage.id,

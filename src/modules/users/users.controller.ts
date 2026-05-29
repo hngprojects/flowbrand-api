@@ -23,7 +23,7 @@ import * as SYS_MSG from '../../constants/system.messages';
 @ApiBearerAuth('JWT')
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   @Get('me')
   @HttpCode(HttpStatus.OK)
@@ -60,7 +60,7 @@ export class UsersController {
     @Body() dto: DeleteAccountDto,
   ) {
     await this.usersService.deleteAccount(userId, dto.confirmation);
-    return  {
+    return {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.ACCOUNT_DELETED_SUCCESSFULLY,
     };
@@ -69,7 +69,8 @@ export class UsersController {
   @Get('me/state')
   @GetUserStateDocs()
   async getUserState(@CurrentUser('userId') userId: string) {
-    return this.usersService.getUserState(userId)
+    const data = await this.usersService.getUserState(userId);
+    return { statusCode: HttpStatus.OK, message: SYS_MSG.USER_STATE_RETRIEVED, data };
   }
 
   @Get(':id')
