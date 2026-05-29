@@ -42,10 +42,11 @@ const mockUserModelAction = {
 };
 
 const mockUserSessionModelAction = {
+  revokeAllUserSessionsInDb: jest.fn().mockResolvedValue([]),
+  deleteSessionRedisKeys: jest.fn().mockResolvedValue(undefined),
   findByUserId: jest.fn(),
-  updateById: jest.fn(),
-  revokeAllUserSessions: jest.fn(),
   findById: jest.fn(),
+  updateById: jest.fn(),
   deleteById: jest.fn(),
   createSession: jest.fn(),
 };
@@ -103,6 +104,13 @@ const mockFullUser = {
   updated_at: new Date('2024-06-01'),
 };
 
+// Mock AuthMetadataModelAction
+const mockAuthMetadataModelAction = {
+  updateByUserId: jest.fn(),
+  findByUserId: jest.fn(),
+  createForUser: jest.fn(),
+};
+
 // Mock Bull queue
 const mockAccountDeletionQueue = {
   add: jest.fn(),
@@ -140,6 +148,22 @@ const mockPinoLoggerService = {
 
 describe('UsersService', () => {
   let service: UsersService;
+
+  // Mock RedisService
+  const mockRedisService = {
+    get: jest.fn(),
+    set: jest.fn(),
+    del: jest.fn(),
+    getdel: jest.fn(),
+    setStrict: jest.fn(),
+    setNx: jest.fn(),
+    exists: jest.fn(),
+    incr: jest.fn(),
+    expire: jest.fn(),
+    rateLimit: jest.fn(),
+    delByPattern: jest.fn(),
+  };
+
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -403,6 +427,27 @@ describe('UsersService', () => {
       provider_user_id: null,
     };
 
+      // Mock AuthMetadataModelAction
+  const mockAuthMetadataModelAction = {
+    updateByUserId: jest.fn(),
+    findByUserId: jest.fn(),
+    createForUser: jest.fn(),
+  };
+
+  // Mock RedisService (add this)
+  const mockRedisService = {
+    get: jest.fn(),
+    set: jest.fn(),
+    del: jest.fn().mockResolvedValue(undefined),
+    setStrict: jest.fn(),
+    setNx: jest.fn(),
+    exists: jest.fn(),
+    incr: jest.fn(),
+    expire: jest.fn(),
+    rateLimit: jest.fn(),
+    delByPattern: jest.fn(),
+  };
+
     beforeEach(async () => {
       jest.clearAllMocks();
 
@@ -413,13 +458,16 @@ describe('UsersService', () => {
       mockQueryRunner.release.mockResolvedValue(undefined);
       mockQueryRunner.manager.update.mockResolvedValue({ affected: 1 });
       mockAccountDeletionQueue.add.mockResolvedValue({ id: 'job-123' });
-      mockUserSessionModelAction.revokeAllUserSessions.mockResolvedValue(undefined);
+      mockUserSessionModelAction.revokeAllUserSessionsInDb.mockResolvedValue([]);
+      mockUserSessionModelAction.deleteSessionRedisKeys = jest.fn().mockResolvedValue(undefined);
 
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           UsersService,
           { provide: UserModelAction, useValue: mockUserModelAction },
           { provide: UserSessionModelAction, useValue: mockUserSessionModelAction },
+          { provide: AuthMetadataModelAction, useValue: mockAuthMetadataModelAction },
+          { provide: RedisService, useValue: mockRedisService },
           { provide: UserStateService, useValue: mockUserStateService },
           { provide: PinoLoggerService, useValue: mockPinoLoggerService },
           { provide: DataSource, useValue: mockDataSource },
@@ -446,7 +494,7 @@ describe('UsersService', () => {
             is_active: false,
           }),
         );
-        expect(mockUserSessionModelAction.revokeAllUserSessions).toHaveBeenCalledWith(
+        expect(mockUserSessionModelAction.revokeAllUserSessionsInDb).toHaveBeenCalledWith(
           USER_ID,
           mockQueryRunner.manager,
         );
@@ -465,7 +513,7 @@ describe('UsersService', () => {
 
         await service.deleteAccount(USER_ID, 'DELETE');
 
-        expect(mockUserSessionModelAction.revokeAllUserSessions).toHaveBeenCalledWith(
+        expect(mockUserSessionModelAction.revokeAllUserSessionsInDb).toHaveBeenCalledWith(
           USER_ID,
           mockQueryRunner.manager,
         );
@@ -513,7 +561,7 @@ describe('UsersService', () => {
     describe('AC-09: transaction rollback on failure', () => {
       it('should rollback transaction when an error occurs', async () => {
         mockUserModelAction.findById.mockResolvedValue(mockLocalUser);
-        mockUserSessionModelAction.revokeAllUserSessions.mockRejectedValue(
+        mockUserSessionModelAction.revokeAllUserSessionsInDb.mockRejectedValue(
           new Error('Session revocation failed'),
         );
 
@@ -545,7 +593,7 @@ describe('UsersService', () => {
     });
 
     describe('EC-01: re-registration during retention window', () => {
-      it('should throw ConflictException when user exists with deleted_at not null', async () => {
+      it('should throw USER_ACCOUNT_LOCKED when user exists with deleted_at not null', async () => {
         const deletedUser = { ...mockLocalUser, is_active: false, deleted_at: new Date() };
         mockUserModelAction.findByEmail.mockResolvedValue(deletedUser);
 
@@ -556,9 +604,8 @@ describe('UsersService', () => {
           termsAccepted: true,
         };
 
-        await expect(service.create(createDto)).rejects.toThrow(
-          SYS_MSG.ACCOUNT_EXISTS_WITH_RETENTION
-        );
+        // Expect USER_ACCOUNT_LOCKED instead
+        await expect(service.create(createDto)).rejects.toThrow(SYS_MSG.USER_ACCOUNT_LOCKED);
         expect(mockUserModelAction.create).not.toHaveBeenCalled();
       });
     });
