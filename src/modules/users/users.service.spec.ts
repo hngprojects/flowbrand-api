@@ -7,9 +7,11 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as bcrypt from 'bcrypt';
 import { QueryFailedError } from 'typeorm';
 import * as SYS_MSG from '../../constants/system.messages';
+import { APP_EVENTS } from '../../common/constants/app-events';
 import { UserModelAction } from './actions/user.action';
 import { UsersService } from './users.service';
 import { UserSessionModelAction } from './actions/user-session.action';
@@ -96,9 +98,11 @@ const mockFullUser = {
 
 describe('UsersService', () => {
   let service: UsersService;
+  let mockEventEmitter: { emit: jest.Mock };
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockEventEmitter = { emit: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -109,15 +113,16 @@ describe('UsersService', () => {
         { provide: RedisService, useValue: mockRedisService },
 
         { provide: UserStateService, useValue: mockUserStateService },
+        { provide: EventEmitter2, useValue: mockEventEmitter },
       ],
     }).compile();
 
     service = module.get<UsersService>(UsersService);
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────
   // CRUD TESTS
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────
 
   describe('create', () => {
     const createDto = {
@@ -241,6 +246,10 @@ describe('UsersService', () => {
 
       await expect(service.remove(USER_ID)).resolves.toBeUndefined();
       expect(mockUserModelAction.delete).toHaveBeenCalled();
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        APP_EVENTS.ACCOUNT_DELETED,
+        expect.objectContaining({ userId: USER_ID }),
+      );
     });
 
     it('throws 404 when user not found during remove', async () => {
@@ -334,7 +343,7 @@ describe('UsersService', () => {
         ...changePasswordDto,
         confirmPassword: 'Mismatch123!',
       }).catch(e => e);
-      
+
       expect(error).toBeInstanceOf(UnprocessableEntityException);
       expect(mockUserModelAction.update).not.toHaveBeenCalled();
     });
@@ -439,8 +448,8 @@ describe('UsersService', () => {
         is_revoked: true,
         revoked_at: expect.any(Date),
       });
-      
-      expect(mockRedisService.del).toHaveBeenCalledTimes(4); 
+
+      expect(mockRedisService.del).toHaveBeenCalledTimes(4);
       expect(mockRedisService.del).not.toHaveBeenCalledWith(expect.stringContaining('session-1'));
     });
 
@@ -470,6 +479,10 @@ describe('UsersService', () => {
           updatePayload: { full_name: 'New Name' },
         }),
       );
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        APP_EVENTS.PROFILE_UPDATED,
+        expect.objectContaining({ userId: USER_ID, updatedFields: ['full_name'] }),
+      );
     });
 
     it('updates country and returns updated profile', async () => {
@@ -497,6 +510,7 @@ describe('UsersService', () => {
       await service.updateProfile(USER_ID, {});
 
       expect(mockUserModelAction.update).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
     });
 
     it('only-country update leaves full_name unchanged in DB', async () => {

@@ -2,10 +2,12 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bull';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test, TestingModule } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { QUEUES } from '../../../../common/constants/queue.constants';
+import { APP_EVENTS } from '../../../../common/constants/app-events';
 import * as SYS_MSG from '../../../../constants/system.messages';
 import { WizardSession } from '../../../onboarding/entities/wizzard-session.entity';
 import { RedisService } from '../../../redis/redis.service';
@@ -48,8 +50,10 @@ describe('FunnelsService - task status update', () => {
   let funnelAction: jest.Mocked<FunnelModelAction>;
   let stageAction: jest.Mocked<FunnelStageModelAction>;
   let taskAction: jest.Mocked<StageTaskModelAction>;
+  let mockEventEmitter: { emit: jest.Mock };
 
   beforeEach(async () => {
+    mockEventEmitter = { emit: jest.fn() };
     funnelAction = { findOwnedById: jest.fn() } as unknown as jest.Mocked<FunnelModelAction>;
     stageAction = { get: jest.fn() } as unknown as jest.Mocked<FunnelStageModelAction>;
     taskAction = {
@@ -73,6 +77,7 @@ describe('FunnelsService - task status update', () => {
         { provide: getRepositoryToken(WizardSession), useValue: {} },
         { provide: getRepositoryToken(UploadedDocument), useValue: {} },
         { provide: getRepositoryToken(StageFeedback), useValue: {} },
+        { provide: EventEmitter2, useValue: mockEventEmitter },
       ],
     }).compile();
 
@@ -97,6 +102,10 @@ describe('FunnelsService - task status update', () => {
       completedAt: completedAt.toISOString(),
       position: 1,
     });
+    expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+      APP_EVENTS.TASK_COMPLETED,
+      expect.objectContaining({ userId: USER_ID, funnelId: FUNNEL_ID, stageId: STAGE_ID, taskId: TASK_ID }),
+    );
   });
 
   it('AC-02: reopens a complete task to pending; clears completed_at via the saved entity', async () => {
@@ -113,6 +122,10 @@ describe('FunnelsService - task status update', () => {
     expect(result.status).toBe('pending');
     expect(result.isComplete).toBe(false);
     expect(result.completedAt).toBeNull();
+    expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+      APP_EVENTS.TASK_REOPENED,
+      expect.objectContaining({ userId: USER_ID, funnelId: FUNNEL_ID, stageId: STAGE_ID, taskId: TASK_ID }),
+    );
   });
 
   it('AC-03: task does not belong to the stage returns 404 without writing', async () => {
