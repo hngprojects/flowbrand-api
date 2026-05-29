@@ -1,8 +1,19 @@
 import { Processor, Process } from '@nestjs/bull';
 import type { Job } from 'bull';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import { PinoLoggerService } from '../../../common/logger/pino-logger.service';
+import { User } from '../entities/user.entity';
+import { UserSession } from '../entities/user-session.entity';
+import { UserRoleEntity } from '../entities/user-role.entity';
+import { WizardSession } from '../../onboarding/entities/wizzard-session.entity';
+import { UploadedDocument } from '../../upload/entities/uploaded-document.entity';
+import { Funnel } from '../../funnels/entities/funnel.entity';
+import { FunnelStage } from '../../funnels/entities/funnel-stage.entity';
+import { StageTask } from '../../funnels/entities/stage-task.entity';
+import { StageFeedback } from '../../funnels/entities/stage-feedback.entity';
+import { OtpToken } from '../../auth/entities/otp-token.entity';
+import { AuthMetadata } from '../../auth/entities/auth-metadata.entity';
 
 export interface AccountDeletionPayload {
   userId: string;
@@ -27,44 +38,56 @@ export class AccountDeletionProcessor {
 
     try {
       await this.dataSource.transaction(async (manager) => {
-        // Delete in correct order (bottom-up to avoid FK constraint errors)
+        // Resolve IDs needed for child deletions
+        const funnels = await manager.find(Funnel, {
+          where: { user_id: userId },
+          select: ['id'],
+        });
+        const funnelIds = funnels.map(f => f.id);
 
-        await manager.query(
-          `DELETE FROM stage_tasks WHERE stage_id IN (
-            SELECT id FROM funnel_stages WHERE funnel_id IN (
-              SELECT id FROM funnels WHERE user_id = $1
-            )
-          )`,
-          [userId],
-        );
+        const stageIds: string[] = [];
+        if (funnelIds.length > 0) {
+          const stages = await manager.find(FunnelStage, {
+            where: { funnel_id: In(funnelIds) },
+            select: ['id'],
+          });
+          stageIds.push(...stages.map(s => s.id));
+        }
 
-        await manager.query(`DELETE FROM stage_feedback WHERE user_id = $1`, [userId]);
+        // 1. stage_tasks (deepest child — must go first)
+        if (stageIds.length > 0) {
+          await manager.delete(StageTask, { stage_id: In(stageIds) });
+        }
 
-        await manager.query(
-          `DELETE FROM funnel_stages WHERE funnel_id IN (
-            SELECT id FROM funnels WHERE user_id = $1
-          )`,
-          [userId],
-        );
+        await manager.delete(StageFeedback, { user_id: userId });
 
-        await manager.query(`DELETE FROM funnels WHERE user_id = $1`, [userId]);
-        await manager.query(`DELETE FROM wizard_sessions WHERE user_id = $1`, [userId]);
-        await manager.query(`DELETE FROM uploaded_documents WHERE user_id = $1`, [userId]);
-        await manager.query(`DELETE FROM otp_tokens WHERE user_id = $1`, [userId]);
-        await manager.query(`DELETE FROM auth_metadata WHERE user_id = $1`, [userId]);
-        await manager.query(`DELETE FROM user_sessions WHERE user_id = $1`, [userId]);
-        await manager.query(`DELETE FROM user_roles WHERE user_id = $1`, [userId]);
-        await manager.query(`DELETE FROM users WHERE id = $1`, [userId]);
+        if (funnelIds.length > 0) {
+          await manager.delete(FunnelStage, { funnel_id: In(funnelIds) });
+        }
+
+        await manager.delete(Funnel, { user_id: userId });
+        await manager.delete(WizardSession, { user_id: userId });
+
+        // 6. uploaded_documents
+        await manager.delete(UploadedDocument, { user_id: userId });
+        await manager.delete(OtpToken, { user_id: userId });
+        await manager.delete(AuthMetadata, { user_id: userId });
+
+        // TODO: Delete notification_preferences here once entity exists
+        
+        await manager.delete(UserSession, { user_id: userId });
+        await manager.delete(UserRoleEntity, { user_id: userId });
+        await manager.delete(User, { id: userId });
       });
 
       this.logger.info('account.hard_delete.completed', { userId, email });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error('account.hard_delete.failed', { 
-        userId, 
-        email, 
+      this.logger.error('account.hard_delete.failed', {
+        userId,
+        email,
         error: errorMessage,
-        attempt: job.attemptsMade 
+        attempt: job.attemptsMade,
       });
       throw error;
     }
