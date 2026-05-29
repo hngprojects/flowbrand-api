@@ -168,6 +168,7 @@ export const NOTIFICATIONS_MARKED_AS_READ = 'Notifications marked as read';
 export const NOTIFICATIONS_MARKED_AS_UNREAD = 'Notifications marked as unread';
 export const NOTIFICATION_DELETED = 'Notification deleted.';
 export const NOTIFICATION_NOT_FOUND = 'Notification not found';
+export const NOTIFICATION_PREFERENCES_UPDATE_FAILED = 'Notification preferences changed during update. Please retry.';
 
 // Spam Detection
 export const SPAM_PROHIBITED_CONTENT = 'Submission contains prohibited content';

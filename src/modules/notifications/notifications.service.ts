@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { QueryFailedError } from 'typeorm';
 import * as SYS_MSG from '../../constants/system.messages';
 import { NotificationModelAction } from './actions/notification.action';
@@ -108,7 +108,12 @@ export class NotificationsService {
     }
 
     const recreated = await this.getNotificationPreferences(userId);
-    return (await this.preferenceAction.updateByUserId(userId, updatePayload)) ?? recreated;
+    const retried = await this.preferenceAction.updateByUserId(userId, updatePayload);
+    if(retried) {
+      return retried
+    }
+    
+    throw new ConflictException(SYS_MSG.NOTIFICATION_PREFERENCES_UPDATE_FAILED);
   }
 
   normalizePagination(page?: number, perPage?: number) {

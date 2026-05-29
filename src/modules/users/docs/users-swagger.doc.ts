@@ -389,6 +389,15 @@ export function ChangePasswordDocs() {
               message: SYS_MSG.INCORRECT_CONFIRM_PASSWORD,
             },
           },
+          sameAsOld: {
+            summary: 'New password is the same as the old password',
+            value: {
+              success: false,
+              statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+              error: 'UnprocessableEntityException',
+              message: SYS_MSG.PASSWORD_CHANGE_NOT_SUCCESSFUL,
+            }
+          },
           googleOAuth: {
             summary: 'Google OAuth account or new password same as old',
             value: {
@@ -404,7 +413,7 @@ export function ChangePasswordDocs() {
   );
 }
 
-export function GetNotificationPreferencesDocs(): ReturnType<typeof applyDecorators> {
+export function GetNotificationPreferencesDocs() {
   return applyDecorators(
     ApiBearerAuth('JWT'),
     ApiOperation({
@@ -427,6 +436,10 @@ export function GetNotificationPreferencesDocs(): ReturnType<typeof applyDecorat
     ApiUnauthorizedResponse({
       description: 'Missing or invalid JWT.',
       schema: { example: unauthorizedExample },
+    }),
+    ApiNotFoundResponse({
+      description: 'Authenticated user not found',
+      schema: { example: notFoundExample }, 
     }),
   );
 }
@@ -484,6 +497,10 @@ export function UpdateNotificationPreferencesDocs(): ReturnType<typeof applyDeco
     ApiUnauthorizedResponse({
       description: 'Missing or invalid JWT.',
       schema: { example: unauthorizedExample },
+    }),
+    ApiNotFoundResponse({
+      description: 'Authenticated user not found',
+      schema: { example: notFoundExample }, 
     }),
   );
 }
