@@ -12,6 +12,8 @@ const mockUsersService = {
   remove: jest.fn(),
   getProfile: jest.fn(),
   updateProfile: jest.fn(),
+  getNotificationPreferences: jest.fn(),
+  updateNotificationPreferences: jest.fn(),
 };
 
 const USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -33,6 +35,19 @@ const mockProfile = {
   isVerified: true,
   createdAt: new Date('2024-01-15'),
   updatedAt: new Date('2024-06-01'),
+};
+
+const mockNotificationPreferences = {
+  id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  user_id: USER_ID,
+  email_funnel_ready: true,
+  email_stage_unlocked: true,
+  email_stage_completed: false,
+  email_weekly_digest: true,
+  inapp_task_completed: true,
+  inapp_stage_unlocked: true,
+  created_at: new Date('2026-05-29T10:30:00.000Z'),
+  updated_at: new Date('2026-05-29T10:30:00.000Z'),
 };
 
 describe('UsersController — profile endpoints', () => {
@@ -67,10 +82,10 @@ describe('UsersController — profile endpoints', () => {
     it('delegates to service — response shape contains no raw entity', async () => {
       mockUsersService.getProfile.mockResolvedValue(mockProfile);
 
-      const result = await controller.getProfile(mockAuthUser) as unknown as {
+      const result = (await controller.getProfile(mockAuthUser)) as unknown as {
         data: Record<string, unknown>;
       };
-      
+
       expect(result.data).not.toHaveProperty('password_hash');
       expect(result.data).not.toHaveProperty('deleted_at');
     });
@@ -122,6 +137,48 @@ describe('UsersController — profile endpoints', () => {
 
       // First arg to updateProfile must be the JWT userId, not a path param
       expect(mockUsersService.updateProfile.mock.calls[0][0]).toBe(USER_ID);
+    });
+  });
+
+  describe('notification preferences endpoints', () => {
+    it('AC-01: GET returns current notification preferences', async () => {
+      mockUsersService.getNotificationPreferences.mockResolvedValue(mockNotificationPreferences);
+
+      const result = await controller.getNotificationPreferences(USER_ID);
+
+      expect(result).toEqual({
+        statusCode: HttpStatus.OK,
+        message: SYS_MSG.NOTIFICATION_PREFERENCES_RETRIEVED_SUCCESSFULLY,
+        data: mockNotificationPreferences,
+      });
+      expect(mockUsersService.getNotificationPreferences).toHaveBeenCalledWith(USER_ID);
+    });
+
+    it('AC-03: PATCH returns updated notification preferences', async () => {
+      const updated = { ...mockNotificationPreferences, email_weekly_digest: false };
+      mockUsersService.updateNotificationPreferences.mockResolvedValue(updated);
+
+      const result = await controller.updateNotificationPreferences(USER_ID, {
+        email_weekly_digest: false,
+      });
+
+      expect(result).toEqual({
+        statusCode: HttpStatus.OK,
+        message: SYS_MSG.NOTIFICATION_PREFERENCES_UPDATED_SUCCESSFULLY,
+        data: updated,
+      });
+      expect(mockUsersService.updateNotificationPreferences).toHaveBeenCalledWith(USER_ID, {
+        email_weekly_digest: false,
+      });
+    });
+
+    it('AC-05: PATCH empty body delegates to service and returns 200', async () => {
+      mockUsersService.updateNotificationPreferences.mockResolvedValue(mockNotificationPreferences);
+
+      const result = await controller.updateNotificationPreferences(USER_ID, {});
+
+      expect(result.statusCode).toBe(HttpStatus.OK);
+      expect(mockUsersService.updateNotificationPreferences).toHaveBeenCalledWith(USER_ID, {});
     });
   });
 });
