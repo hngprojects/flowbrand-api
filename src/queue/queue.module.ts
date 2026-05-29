@@ -25,7 +25,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
             return Math.min(times * 1000, 30_000) + jitter;
           },
         },
-        prefix: 'seil:bull',
+        prefix: `seil:bull:${config.get<string>('NODE_ENV') || 'development'}`,
       }),
     }),
   ],
