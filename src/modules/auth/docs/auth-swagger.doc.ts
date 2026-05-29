@@ -422,7 +422,9 @@ export function setupSwagger(app: INestApplication): void {
 
   SwaggerModule.setup('docs', app, document, {
     customJs: enableSwaggerMocks ? SWAGGER_OAUTH_REDIRECT_SCRIPT_PATH : undefined,
-    swaggerOptions: { persistAuthorization: true },
+    swaggerOptions: { persistAuthorization: true, 
+      tagsSorter: 'alpha',
+      operationsSorter: 'alpha' },
   });
 }
 export const VerifyOtpDocs = () =>

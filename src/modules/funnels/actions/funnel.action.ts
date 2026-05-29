@@ -9,6 +9,8 @@ import { StageStatus } from '../enums/stage-status.enum';
 import { WizardSession } from '../../onboarding/entities/wizzard-session.entity';
 import { WizardStatus } from '../../onboarding/enums/wizzard-status.enum';
 import { UploadedDocument } from '../../upload/entities/uploaded-document.entity';
+import { FunnelStatus } from '../../../modules/funnels/enums/funnel-status.enum';
+
 
 @Injectable()
 export class FunnelModelAction extends AbstractModelAction<Funnel> {
@@ -117,5 +119,25 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
     return this.manager.getRepository(UploadedDocument).find({
       where: { id: In(ids), user_id: userId },
     });
+  }
+
+    async findStuckFunnels(olderThanMs: number): Promise<{ id: string; user_id: string }[]> {
+    const threshold = new Date(Date.now() - olderThanMs);
+    return this.funnelRepository
+      .createQueryBuilder('f')
+      .select(['f.id', 'f.user_id'])
+      .where('f.status = :status', { status: FunnelStatus.GENERATING })
+      .andWhere('f.created_at < :threshold', { threshold })
+      .getMany();
+  }
+
+  async markFunnelsFailed(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    await this.funnelRepository
+      .createQueryBuilder()
+      .update(Funnel)
+      .set({ status: FunnelStatus.FAILED })
+      .whereInIds(ids)
+      .execute();
   }
 }

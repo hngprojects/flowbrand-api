@@ -33,6 +33,7 @@ import { LoggerModule } from './common/logger/logger.module';
 import { llmConfig } from './config/llm.config';
 import { AppController } from './app.controller';
 import { ScheduleModule } from '@nestjs/schedule';
+import { TasksModule } from './modules/tasks/tasks.module';
 
 function collectValidationErrors(errors: ValidationError[], parentPath = ''): string[] {
   return errors.flatMap((error) => {
@@ -87,6 +88,7 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
     ContactModule,
     NotificationsModule,
     ActivityModule,
+    TasksModule,
   ],
   controllers: [AppController],
   providers: [
