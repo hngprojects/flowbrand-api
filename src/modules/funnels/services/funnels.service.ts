@@ -198,9 +198,6 @@ export class FunnelsService {
       };
     }
 
-    const inflight = await this.funnelAction.findGeneratingForUser(userId);
-    if (inflight) throw new ConflictException(SYS_MSG.GENERATION_IN_PROGRESS);
-
     await this.checkRateLimit(userId);
     const { businessName, businessContext } = await this.validateSourceAndDeriveContext(userId, dto);
 

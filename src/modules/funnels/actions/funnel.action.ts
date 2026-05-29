@@ -70,12 +70,6 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
     });
   }
 
-  async findGeneratingForUser(userId: string): Promise<Funnel | null> {
-    return this.funnelRepository.findOne({
-      where: { user_id: userId, status: FunnelStatus.GENERATING },
-    });
-  }
-
   async findOwnedById(funnelId: string, userId: string, manager?: EntityManager): Promise<Funnel | null> {
     const repo = manager ? manager.getRepository(Funnel) : this.funnelRepository;
     return repo.findOne({ where: { id: funnelId, user_id: userId } });

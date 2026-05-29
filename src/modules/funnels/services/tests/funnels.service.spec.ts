@@ -82,7 +82,6 @@ describe('FunnelsService', () => {
     // Mock the Funnel action
     funnelAction = {
       findByIdempotency: jest.fn(),
-      findGeneratingForUser: jest.fn(),
       findOwnedById: jest.fn(),
       listForUserPaginated: jest.fn(),
       getLatestCompletedWizard: jest.fn(),
@@ -148,7 +147,6 @@ describe('FunnelsService', () => {
   describe('AC-01: happy path returns 202 generating', () => {
     it('AC-01: POST /funnels/generate with valid wizard returns 202 + funnel_id + status=generating', async () => {
       funnelAction.findByIdempotency.mockResolvedValue(null);
-      funnelAction.findGeneratingForUser.mockResolvedValue(null);
       funnelAction.getLatestCompletedWizard.mockResolvedValue(COMPLETE_WIZARD as WizardSession);
 
       const result = await service.createGeneration(USER_ID, BASE_DTO);
@@ -160,7 +158,6 @@ describe('FunnelsService', () => {
 
     it('AC-01: inserts funnel + 4 stages and dispatches the job before commit', async () => {
       funnelAction.findByIdempotency.mockResolvedValue(null);
-      funnelAction.findGeneratingForUser.mockResolvedValue(null);
       funnelAction.getLatestCompletedWizard.mockResolvedValue(COMPLETE_WIZARD as WizardSession);
 
       await service.createGeneration(USER_ID, BASE_DTO);
@@ -225,22 +222,31 @@ describe('FunnelsService', () => {
     });
   });
 
-  describe('AC-03: concurrent generation guard', () => {
-    it('AC-03: returns 409 GENERATION_IN_PROGRESS when another funnel is generating', async () => {
+  describe('EC-02: concurrent generation allowed (multi-funnel)', () => {
+    it('EC-02: creates a new funnel even when a generating funnel already exists for the user', async () => {
       funnelAction.findByIdempotency.mockResolvedValue(null);
-      funnelAction.findGeneratingForUser.mockResolvedValue({
-        id: 'other-fid',
-        status: FunnelStatus.GENERATING,
-      } as Funnel);
+      funnelAction.getLatestCompletedWizard.mockResolvedValue(COMPLETE_WIZARD as WizardSession);
 
-      await expect(service.createGeneration(USER_ID, BASE_DTO)).rejects.toThrow(ConflictException);
+      const result = await service.createGeneration(USER_ID, BASE_DTO);
+
+      expect(result.statusCode).toBe(HttpStatus.ACCEPTED);
+      expect(result.funnelId).toBe(FUNNEL_ID);
+      expect(queryRunner.startTransaction).toHaveBeenCalled();
+    });
+
+    it('EC-02: does not call findGeneratingForUser at all', async () => {
+      funnelAction.findByIdempotency.mockResolvedValue(null);
+      funnelAction.getLatestCompletedWizard.mockResolvedValue(COMPLETE_WIZARD as WizardSession);
+
+      await service.createGeneration(USER_ID, BASE_DTO);
+
+      expect((funnelAction as any).findGeneratingForUser).toBeUndefined();
     });
   });
 
   describe('AC-04: wizard source requires complete session', () => {
     it('AC-04: returns 422 ONBOARDING_INCOMPLETE when wizard session is not complete', async () => {
       funnelAction.findByIdempotency.mockResolvedValue(null);
-      funnelAction.findGeneratingForUser.mockResolvedValue(null);
       funnelAction.getLatestCompletedWizard.mockResolvedValue(null);
 
       await expect(service.createGeneration(USER_ID, BASE_DTO)).rejects.toThrow(
@@ -252,7 +258,6 @@ describe('FunnelsService', () => {
   describe('AC-05: document_upload source validation', () => {
     it('AC-05: returns 422 when any upload is not ready', async () => {
       funnelAction.findByIdempotency.mockResolvedValue(null);
-      funnelAction.findGeneratingForUser.mockResolvedValue(null);
       funnelAction.getUploadedDocuments.mockResolvedValue([
         { id: 'u1', user_id: USER_ID, status: UploadDocumentStatus.READY, file_name: 'a.pdf' } as any,
         { id: 'u2', user_id: USER_ID, status: UploadDocumentStatus.PARSING, file_name: 'b.pdf' } as any,
@@ -269,7 +274,6 @@ describe('FunnelsService', () => {
 
     it('EC-03 / SEC-04: returns 422 when any upload belongs to another user', async () => {
       funnelAction.findByIdempotency.mockResolvedValue(null);
-      funnelAction.findGeneratingForUser.mockResolvedValue(null);
       funnelAction.getUploadedDocuments.mockResolvedValue([]);
 
       await expect(
@@ -285,7 +289,6 @@ describe('FunnelsService', () => {
   describe('AC-09: rollback on queue dispatch failure', () => {
     it('AC-09: rolls back the transaction and returns 503 when queue.add throws', async () => {
       funnelAction.findByIdempotency.mockResolvedValue(null);
-      funnelAction.findGeneratingForUser.mockResolvedValue(null);
       funnelAction.getLatestCompletedWizard.mockResolvedValue(COMPLETE_WIZARD as WizardSession);
       queue.add.mockRejectedValueOnce(new Error('Redis is down'));
 
