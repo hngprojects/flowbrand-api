@@ -22,6 +22,7 @@ import { UserStateService } from './user-state.service';
 import { User } from './entities/user.entity';
 import { UserStateResponse } from './interfaces/user-state.interface';
 import { UserRole } from './enums/user-role.enum';
+import { NotificationsService } from '../notifications/notifications.service';
 
 jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('hashed-password'),
@@ -67,6 +68,11 @@ const mockUserStateService = {
   invalidateUserStateCache: jest.fn(),
 };
 
+const mockNotificationsService = {
+  getNotificationPreferences: jest.fn(),
+  updateNotificationPreferences: jest.fn(),
+};
+
 // Mock RedisService
 const mockRedisService = {
   get: jest.fn(),
@@ -96,6 +102,19 @@ const mockFullUser = {
   updated_at: new Date('2024-06-01'),
 };
 
+const mockNotificationPreferences = {
+  id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  user_id: USER_ID,
+  email_funnel_ready: true,
+  email_stage_unlocked: true,
+  email_stage_completed: false,
+  email_weekly_digest: true,
+  inapp_task_completed: true,
+  inapp_stage_unlocked: true,
+  created_at: new Date('2026-05-29T10:30:00.000Z'),
+  updated_at: new Date('2026-05-29T10:30:00.000Z'),
+};
+
 describe('UsersService', () => {
   let service: UsersService;
   let mockEventEmitter: { emit: jest.Mock };
@@ -114,6 +133,7 @@ describe('UsersService', () => {
 
         { provide: UserStateService, useValue: mockUserStateService },
         { provide: EventEmitter2, useValue: mockEventEmitter },
+        { provide: NotificationsService, useValue: mockNotificationsService },
       ],
     }).compile();
 
@@ -614,6 +634,53 @@ describe('UsersService', () => {
       mockUserModelAction.get.mockResolvedValue(null);
 
       await expect(service.getProfile(USER_ID)).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('notification preferences', () => {
+    beforeEach(() => {
+      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+    });
+
+    it('AC-01: returns current preferences for authenticated user', async () => {
+      mockNotificationsService.getNotificationPreferences.mockResolvedValue(mockNotificationPreferences);
+
+      const result = await service.getNotificationPreferences(USER_ID);
+
+      expect(mockUserModelAction.get).toHaveBeenCalledWith({
+        identifierOptions: { id: USER_ID },
+      });
+      expect(mockNotificationsService.getNotificationPreferences).toHaveBeenCalledWith(USER_ID);
+      expect(result).toBe(mockNotificationPreferences);
+    });
+
+    it('AC-03: updates preferences for authenticated user', async () => {
+      const updated = { ...mockNotificationPreferences, email_weekly_digest: false };
+      mockNotificationsService.updateNotificationPreferences.mockResolvedValue(updated);
+
+      const result = await service.updateNotificationPreferences(USER_ID, {
+        email_weekly_digest: false,
+      });
+
+      expect(mockNotificationsService.updateNotificationPreferences).toHaveBeenCalledWith(USER_ID, {
+        email_weekly_digest: false,
+      });
+      expect(result.email_weekly_digest).toBe(false);
+    });
+
+    it('SEC-03: scopes notification preference reads to req.user.userId', async () => {
+      mockNotificationsService.getNotificationPreferences.mockResolvedValue(mockNotificationPreferences);
+
+      await service.getNotificationPreferences(USER_ID);
+
+      expect(mockNotificationsService.getNotificationPreferences).toHaveBeenCalledWith(USER_ID);
+    });
+
+    it('AC-09: throws 404 before reading preferences when user no longer exists', async () => {
+      mockUserModelAction.get.mockResolvedValue(null);
+
+      await expect(service.getNotificationPreferences(USER_ID)).rejects.toBeInstanceOf(NotFoundException);
+      expect(mockNotificationsService.getNotificationPreferences).not.toHaveBeenCalled();
     });
   });
 });
