@@ -68,15 +68,20 @@ export class NotificationsService {
     userId: string,
     dto: UpdateNotificationPreferencesDto,
   ): Promise<NotificationPreference> {
-    const current = await this.getNotificationPreferences(userId);
     const updatePayload = this.toPreferenceUpdatePayload(dto);
 
     if (Object.keys(updatePayload).length === 0) {
-      return current;
+      return this.getNotificationPreferences(userId);
     }
 
+    await this.getNotificationPreferences(userId);
     const updated = await this.preferenceAction.updateByUserId(userId, updatePayload);
-    return updated ?? this.getNotificationPreferences(userId);
+    if (updated) {
+      return updated;
+    }
+
+    const recreated = await this.getNotificationPreferences(userId);
+    return (await this.preferenceAction.updateByUserId(userId, updatePayload)) ?? recreated;
   }
 
   private truncateMetadata(metadata: Record<string, unknown>): Record<string, unknown> {
