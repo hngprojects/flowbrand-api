@@ -30,6 +30,9 @@ import { IUserProfile } from './interfaces/user-profile.interface';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { ALLOWED_SSA_COUNTRIES } from './enums/allowed-ssa-countries.enum';
 import { redisKeys } from '../../constants/redis-keys';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationPreference } from '../notifications/entities/notification-preference.entity';
+import { UpdateNotificationPreferencesDto } from '../notifications/dto/update-notification-preferences.dto';
 
 const BCRYPT_ROUNDS = 10;
 const NO_TRANSACTION = {
@@ -47,6 +50,7 @@ export class UsersService {
     private readonly redisService: RedisService,
     private readonly userStateService: UserStateService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
@@ -77,8 +81,7 @@ export class UsersService {
     } catch (error) {
       if (
         error instanceof QueryFailedError &&
-        (error as { driverError?: { code?: string } }).driverError?.code ===
-          '23505'
+        (error as { driverError?: { code?: string } }).driverError?.code === '23505'
       ) {
         throw new ConflictException(SYS_MSG.USER_EMAIL_IN_USE);
       }
@@ -115,8 +118,7 @@ export class UsersService {
     } catch (error) {
       if (
         error instanceof QueryFailedError &&
-        (error as { driverError?: { code?: string } }).driverError?.code ===
-          '23505'
+        (error as { driverError?: { code?: string } }).driverError?.code === '23505'
       ) {
         throw new ConflictException(SYS_MSG.USER_EMAIL_IN_USE);
       }
@@ -163,9 +165,7 @@ export class UsersService {
       updatePayload: payload,
     });
     if (!updated) {
-      throw new InternalServerErrorException(
-        SYS_MSG.USER_UPDATE_FAILED,
-      );
+      throw new InternalServerErrorException(SYS_MSG.USER_UPDATE_FAILED);
     }
     return updated;
   }
@@ -191,9 +191,7 @@ export class UsersService {
     });
 
     if (!updated) {
-      throw new InternalServerErrorException(
-        SYS_MSG.USER_UPDATE_FAILED,
-      );
+      throw new InternalServerErrorException(SYS_MSG.USER_UPDATE_FAILED);
     }
     return updated;
   }
@@ -230,7 +228,7 @@ export class UsersService {
       return;
     }
 
-    const activeSessions = sessions.filter(s => !s.is_revoked);
+    const activeSessions = sessions.filter((s) => !s.is_revoked);
     await Promise.all(
       activeSessions.map(async (session) => {
         await this.userSessionModelAction.updateById(session.id, {
@@ -257,39 +255,38 @@ export class UsersService {
 
     if (!user.password_hash) {
       throw new UnprocessableEntityException({
-        message: user.auth_provider === 'google'
-          ? SYS_MSG.PASSWORD_CHANGE_NOT_SUPPORTED
-          : SYS_MSG.PASSWORD_CHANGE_UNAVAILABLE
-      })
+        message:
+          user.auth_provider === 'google' ? SYS_MSG.PASSWORD_CHANGE_NOT_SUPPORTED : SYS_MSG.PASSWORD_CHANGE_UNAVAILABLE,
+      });
     }
     const oldPassword = dto.oldPassword;
     const newPassword = dto.newPassword;
 
     const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password_hash);
 
-    if(!isOldPasswordValid) {
+    if (!isOldPasswordValid) {
       throw new UnauthorizedException({
-        message: SYS_MSG.INCORRECT_OLD_PASSWORD
-      })
+        message: SYS_MSG.INCORRECT_OLD_PASSWORD,
+      });
     }
 
-    if(newPassword === oldPassword) {
+    if (newPassword === oldPassword) {
       throw new UnprocessableEntityException({
-        message: SYS_MSG.PASSWORD_CHANGE_NOT_SUCCESSFUL
-      })
+        message: SYS_MSG.PASSWORD_CHANGE_NOT_SUCCESSFUL,
+      });
     }
 
     if (dto.newPassword !== dto.confirmPassword) {
       throw new UnprocessableEntityException(SYS_MSG.INCORRECT_CONFIRM_PASSWORD);
     }
 
-    const saveNewPassword = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
+    const saveNewPassword = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
 
     const updated = await this.userModelAction.update({
       ...NO_TRANSACTION,
       identifierOptions: { id: userId },
       updatePayload: { password_hash: saveNewPassword },
-    })
+    });
 
     if (!updated) {
       throw new InternalServerErrorException(SYS_MSG.USER_UPDATE_FAILED);
@@ -311,8 +308,8 @@ export class UsersService {
 
     this.logger.log({
       message: SYS_MSG.PASSWORD_CHANGE_SUCCESSFUL,
-      userId
-    })
+      userId,
+    });
   }
 
   async getUserState(userId: string): Promise<UserStateResponse> {
@@ -338,10 +335,22 @@ export class UsersService {
     return this.toProfileResponse(user);
   }
 
-  async updateProfile(
+  /** Returns the authenticated user's notification preferences, creating defaults when needed. */
+  async getNotificationPreferences(userId: string): Promise<NotificationPreference> {
+    await this.findById(userId);
+    return this.notificationsService.getNotificationPreferences(userId);
+  }
+
+  /** Partially updates the authenticated user's notification preferences. */
+  async updateNotificationPreferences(
     userId: string,
-    dto: UpdateUserProfileDto & { email?: unknown },
-  ): Promise<IUserProfile> {
+    dto: UpdateNotificationPreferencesDto,
+  ): Promise<NotificationPreference> {
+    await this.findById(userId);
+    return this.notificationsService.updateNotificationPreferences(userId, dto);
+  }
+
+  async updateProfile(userId: string, dto: UpdateUserProfileDto & { email?: unknown }): Promise<IUserProfile> {
     if ('email' in dto && dto.email !== undefined) {
       throw new UnprocessableEntityException(SYS_MSG.PROFILE_EMAIL_CHANGE_FORBIDDEN);
     }
@@ -350,9 +359,7 @@ export class UsersService {
 
     let normalisedCountry: string | undefined;
     if (dto.country !== undefined) {
-      normalisedCountry = ALLOWED_SSA_COUNTRIES.find(
-        (c) => c.toLowerCase() === dto.country!.toLowerCase(),
-      );
+      normalisedCountry = ALLOWED_SSA_COUNTRIES.find((c) => c.toLowerCase() === dto.country!.toLowerCase());
       // If IsIn() passed in the DTO, a match is guaranteed — this is a safety net
       if (!normalisedCountry) {
         throw new UnprocessableEntityException(SYS_MSG.VALIDATION_FAILED);
@@ -378,15 +385,20 @@ export class UsersService {
 
     const updated = await this.userModelAction.update({
       ...NO_TRANSACTION,
-      identifierOptions: { id: userId},
+      identifierOptions: { id: userId },
       updatePayload,
-    })
+    });
 
     if (!updated) {
       throw new InternalServerErrorException(SYS_MSG.PROFILE_UPDATE_FAILED);
     }
 
-    emitSafely(this.eventEmitter, this.logger, APP_EVENTS.PROFILE_UPDATED, new ProfileUpdatedEvent(userId, changedFields));
+    emitSafely(
+      this.eventEmitter,
+      this.logger,
+      APP_EVENTS.PROFILE_UPDATED,
+      new ProfileUpdatedEvent(userId, changedFields),
+    );
 
     return this.toProfileResponse(updated);
   }
