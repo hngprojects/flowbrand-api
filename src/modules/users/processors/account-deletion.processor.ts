@@ -39,9 +39,7 @@ export class AccountDeletionProcessor {
 
     try {
       await this.dataSource.transaction(async (manager) => {
-        // EC-03 (M4-BE-008): activity_events is the immutable audit log; the
-        // hard-delete job is its only deletion path. Remove it as the first
-        // step, before any other child rows.
+        // activity_events purged first (see PR description).
         await manager.delete(ActivityEvent, { user_id: userId });
 
         // Resolve IDs needed for child deletions
