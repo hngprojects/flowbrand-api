@@ -155,11 +155,7 @@ describe('UserStateService', () => {
 
       await service.getUserState(USER_ID);
 
-      expect(mockRedisService.set).toHaveBeenCalledWith(
-        `user-state:${USER_ID}`,
-        expect.any(String),
-        20
-      );
+      expect(mockRedisService.set).toHaveBeenCalledWith(`user-state:${USER_ID}`, expect.any(String), 20);
     });
 
     it('cache key is scoped to userId (SEC-04)', async () => {
@@ -200,7 +196,7 @@ describe('UserStateService', () => {
           status: WizardStatus.IN_PROGRESS,
           expires_at: new Date(Date.now() + 3_600_000),
           steps_completed: 2,
-        })
+        }),
       );
       mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([]);
 
@@ -224,7 +220,7 @@ describe('UserStateService', () => {
           status: WizardStatus.IN_PROGRESS,
           expires_at: new Date(Date.now() - 1_000), // expired
           steps_completed: 2,
-        })
+        }),
       );
       mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([]);
 
@@ -240,9 +236,7 @@ describe('UserStateService', () => {
   describe('onboarding complete', () => {
     it('returns status complete with no sessionId or stepsCompleted', async () => {
       mockUserModelAction.findById.mockResolvedValue(mockUser());
-      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(
-        mockSession({ status: WizardStatus.COMPLETE })
-      );
+      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(mockSession({ status: WizardStatus.COMPLETE }));
       mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([]);
 
       const result = await service.getUserState(USER_ID);
@@ -257,9 +251,7 @@ describe('UserStateService', () => {
   describe('AC-03 — no funnel yet', () => {
     it('returns activeFunnel null when user has no non-failed funnels', async () => {
       mockUserModelAction.findById.mockResolvedValue(mockUser());
-      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(
-        mockSession({ status: WizardStatus.COMPLETE })
-      );
+      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(mockSession({ status: WizardStatus.COMPLETE }));
       mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([]);
 
       const result = await service.getUserState(USER_ID);
@@ -273,12 +265,8 @@ describe('UserStateService', () => {
   describe('AC-06 — only failed funnels', () => {
     it('returns activeFunnel null when the only funnel has status failed', async () => {
       mockUserModelAction.findById.mockResolvedValue(mockUser());
-      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(
-        mockSession({ status: WizardStatus.COMPLETE })
-      );
-      mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([
-        mockFunnel({ status: FunnelStatus.FAILED }),
-      ]);
+      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(mockSession({ status: WizardStatus.COMPLETE }));
+      mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([mockFunnel({ status: FunnelStatus.FAILED })]);
 
       const result = await service.getUserState(USER_ID);
 
@@ -291,12 +279,8 @@ describe('UserStateService', () => {
   describe('AC-02 — funnel generating', () => {
     it('returns activeFunnel with status generating and currentStage null', async () => {
       mockUserModelAction.findById.mockResolvedValue(mockUser());
-      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(
-        mockSession({ status: WizardStatus.COMPLETE })
-      );
-      mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([
-        mockFunnel({ status: FunnelStatus.GENERATING }),
-      ]);
+      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(mockSession({ status: WizardStatus.COMPLETE }));
+      mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([mockFunnel({ status: FunnelStatus.GENERATING })]);
 
       const result = await service.getUserState(USER_ID);
 
@@ -311,9 +295,7 @@ describe('UserStateService', () => {
   describe('AC-01 — active funnel with current stage', () => {
     it('returns full stage data including task progress', async () => {
       mockUserModelAction.findById.mockResolvedValue(mockUser());
-      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(
-        mockSession({ status: WizardStatus.COMPLETE })
-      );
+      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(mockSession({ status: WizardStatus.COMPLETE }));
       mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([mockFunnel()]);
       mockFunnelStageModelAction.getStagesByFunnelId.mockResolvedValue([mockStage()]);
 
@@ -336,9 +318,7 @@ describe('UserStateService', () => {
   describe('AC-07 — all stages complete', () => {
     it('returns currentStage null when no stage has status ACTIVE', async () => {
       mockUserModelAction.findById.mockResolvedValue(mockUser());
-      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(
-        mockSession({ status: WizardStatus.COMPLETE })
-      );
+      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(mockSession({ status: WizardStatus.COMPLETE }));
       mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([mockFunnel()]);
       mockFunnelStageModelAction.getStagesByFunnelId.mockResolvedValue([]);
 
@@ -354,9 +334,7 @@ describe('UserStateService', () => {
   describe('EC-03 — active funnel but no stages generated', () => {
     it('returns currentStage null when funnel is active but has no stage rows', async () => {
       mockUserModelAction.findById.mockResolvedValue(mockUser());
-      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(
-        mockSession({ status: WizardStatus.COMPLETE })
-      );
+      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(mockSession({ status: WizardStatus.COMPLETE }));
       mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([mockFunnel()]);
       mockFunnelStageModelAction.getStagesByFunnelId.mockResolvedValue([]);
 
@@ -372,9 +350,7 @@ describe('UserStateService', () => {
   describe('EC-01 — active funnel wins over generating', () => {
     it('returns the active funnel even when a newer generating funnel exists', async () => {
       mockUserModelAction.findById.mockResolvedValue(mockUser());
-      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(
-        mockSession({ status: WizardStatus.COMPLETE })
-      );
+      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(mockSession({ status: WizardStatus.COMPLETE }));
       mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([
         mockFunnel({
           id: 'funnel-generating',
@@ -400,9 +376,7 @@ describe('UserStateService', () => {
 
     it('returns the active funnel even when it is listed after the generating funnel in the array', async () => {
       mockUserModelAction.findById.mockResolvedValue(mockUser());
-      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(
-        mockSession({ status: WizardStatus.COMPLETE })
-      );
+      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(mockSession({ status: WizardStatus.COMPLETE }));
       // active funnel listed last — sort must pick it regardless of array order
       mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([
         mockFunnel({ id: 'funnel-generating', status: FunnelStatus.GENERATING, created_at: new Date('2026-03-01') }),
@@ -422,9 +396,7 @@ describe('UserStateService', () => {
   describe('created_at DESC tiebreaker', () => {
     it('returns the most recently created active funnel when multiple active funnels exist', async () => {
       mockUserModelAction.findById.mockResolvedValue(mockUser());
-      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(
-        mockSession({ status: WizardStatus.COMPLETE })
-      );
+      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(mockSession({ status: WizardStatus.COMPLETE }));
       mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([
         mockFunnel({ id: 'funnel-old-active', status: FunnelStatus.ACTIVE, created_at: new Date('2026-01-01') }),
         mockFunnel({ id: 'funnel-new-active', status: FunnelStatus.ACTIVE, created_at: new Date('2026-04-01') }),
@@ -439,9 +411,7 @@ describe('UserStateService', () => {
 
     it('returns the most recently created generating funnel when no active funnels exist', async () => {
       mockUserModelAction.findById.mockResolvedValue(mockUser());
-      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(
-        mockSession({ status: WizardStatus.COMPLETE })
-      );
+      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(mockSession({ status: WizardStatus.COMPLETE }));
       mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([
         mockFunnel({ id: 'gen-old', status: FunnelStatus.GENERATING, created_at: new Date('2026-01-01') }),
         mockFunnel({ id: 'gen-new', status: FunnelStatus.GENERATING, created_at: new Date('2026-05-01') }),
@@ -459,9 +429,7 @@ describe('UserStateService', () => {
   describe('AC-10 — idempotency', () => {
     it('produces identical responses on repeated calls with no state mutations', async () => {
       mockUserModelAction.findById.mockResolvedValue(mockUser());
-      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(
-        mockSession({ status: WizardStatus.COMPLETE })
-      );
+      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(mockSession({ status: WizardStatus.COMPLETE }));
       mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([mockFunnel()]);
       mockFunnelStageModelAction.getStagesByFunnelId.mockResolvedValue([mockStage()]);
 
