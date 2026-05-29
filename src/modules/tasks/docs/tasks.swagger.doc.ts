@@ -1,10 +1,11 @@
 import { applyDecorators, HttpStatus } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags, ApiInternalServerErrorResponse, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags, ApiInternalServerErrorResponse, ApiUnauthorizedResponse, ApiBearerAuth } from '@nestjs/swagger';
 import * as SYS_MSG from '../../../constants/system.messages';
 
 export function TriggerReaperDocs() {
   return applyDecorators(
     ApiTags('Tasks'),
+    ApiBearerAuth('JWT'),
     ApiOperation({ 
       summary: 'Manually trigger the background reaper',
       description: 'Force-runs the background sweeping tasks without waiting for the next cron tick. ' +
