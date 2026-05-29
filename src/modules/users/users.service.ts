@@ -46,6 +46,10 @@ import { UPLOAD_OBJECT_STORAGE, type ObjectStorage } from '../upload/upload.type
 import { ACCOUNT_DELETION_QUEUE } from './processors/account-deletion.processor';
 import { PinoLoggerService } from '../../common/logger/pino-logger.service';
 import { redisKeys } from '../../constants/redis-keys';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationPreference } from '../notifications/entities/notification-preference.entity';
+import { UpdateNotificationPreferencesDto } from '../notifications/dto/update-notification-preferences.dto';
+import { NotificationPreferenceResponse } from '../notifications/interfaces/notification-preference.interface';
 
 const BCRYPT_ROUNDS = 10;
 const NO_TRANSACTION = {
@@ -73,6 +77,7 @@ export class UsersService {
     private readonly redisService: RedisService,
     private readonly userStateService: UserStateService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly notificationsService: NotificationsService,
     private readonly pinoLogger: PinoLoggerService,
     @InjectQueue(ACCOUNT_DELETION_QUEUE)
     private readonly accountDeletionQueue: Queue,
@@ -247,7 +252,7 @@ export class UsersService {
       return;
     }
 
-    const activeSessions = sessions.filter(s => !s.is_revoked);
+    const activeSessions = sessions.filter((s) => !s.is_revoked);
     await Promise.all(
       activeSessions.map(async (session) => {
         await this.userSessionModelAction.updateById(session.id, {
@@ -319,7 +324,10 @@ export class UsersService {
 
     await this.revokeAllUserSessions(userId);
 
-    this.pinoLogger.info('Password changed successfully', { userId });
+    this.logger.log({
+      message: SYS_MSG.PASSWORD_CHANGE_SUCCESSFUL,
+      userId,
+    });
   }
 
   async getUserState(userId: string): Promise<UserDashboardStateResponse> {
@@ -341,6 +349,23 @@ export class UsersService {
       isVerified: user.is_verified,
       createdAt: user.created_at,
       updatedAt: user.updated_at,
+    };
+  }
+
+  private toNotificationPreferenceResponse(
+    preference: NotificationPreference,
+  ): NotificationPreferenceResponse {
+    return {
+      id: preference.id,
+      userId: preference.user_id,
+      emailFunnelReady: preference.email_funnel_ready,
+      emailStageUnlocked: preference.email_stage_unlocked,
+      emailStageCompleted: preference.email_stage_completed,
+      emailWeeklyDigest: preference.email_weekly_digest,
+      inappTaskCompleted: preference.inapp_task_completed,
+      inappStageUnlocked: preference.inapp_stage_unlocked,
+      createdAt: preference.created_at,
+      updatedAt: preference.updated_at,
     };
   }
 
@@ -469,10 +494,24 @@ export class UsersService {
     return { avatarUrl: null };
   }
 
-  async updateProfile(
+  /** Returns the authenticated user's notification preferences, creating defaults when needed. */
+  async getNotificationPreferences(userId: string): Promise<NotificationPreferenceResponse> {
+    await this.findById(userId);
+    const preference = await this.notificationsService.getNotificationPreferences(userId);
+    return this.toNotificationPreferenceResponse(preference);
+  }
+
+  /** Partially updates the authenticated user's notification preferences. */
+  async updateNotificationPreferences(
     userId: string,
-    dto: UpdateUserProfileDto & { email?: unknown },
-  ): Promise<IUserProfile> {
+    dto: UpdateNotificationPreferencesDto,
+  ): Promise<NotificationPreferenceResponse> {
+    await this.findById(userId);
+    const preference = await this.notificationsService.updateNotificationPreferences(userId, dto);
+    return this.toNotificationPreferenceResponse(preference);
+  }
+
+  async updateProfile(userId: string, dto: UpdateUserProfileDto & { email?: unknown }): Promise<IUserProfile> {
     if ('email' in dto && dto.email !== undefined) {
       throw new UnprocessableEntityException(SYS_MSG.PROFILE_EMAIL_CHANGE_FORBIDDEN);
     }
@@ -484,6 +523,7 @@ export class UsersService {
       normalisedCountry = ALLOWED_SSA_COUNTRIES.find(
         (c) => c.toLowerCase() === dto.country!.toLowerCase(),
       );
+      // If IsIn() passed in the DTO, a match is guaranteed — this is a safety net
       if (!normalisedCountry) {
         throw new UnprocessableEntityException(SYS_MSG.VALIDATION_FAILED);
       }
@@ -516,7 +556,12 @@ export class UsersService {
       throw new InternalServerErrorException(SYS_MSG.PROFILE_UPDATE_FAILED);
     }
 
-    emitSafely(this.eventEmitter, this.logger, APP_EVENTS.PROFILE_UPDATED, new ProfileUpdatedEvent(userId, changedFields));
+    emitSafely(
+      this.eventEmitter,
+      this.logger,
+      APP_EVENTS.PROFILE_UPDATED,
+      new ProfileUpdatedEvent(userId, changedFields),
+    );
 
     return await this.toProfileResponse(updated);
   }

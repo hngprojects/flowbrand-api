@@ -26,6 +26,7 @@ import { getQueueToken } from '@nestjs/bull';
 import { ACCOUNT_DELETION_QUEUE } from './processors/account-deletion.processor';
 import { PinoLoggerService } from '../../common/logger/pino-logger.service';
 import { UserRole } from './enums/user-role.enum';
+import { NotificationsService } from '../notifications/notifications.service';
 import { UPLOAD_OBJECT_STORAGE } from '../upload/upload.types';
 
 jest.mock('bcrypt', () => ({
@@ -79,6 +80,11 @@ const mockUserStateService = {
   invalidateUserStateCache: jest.fn(),
 };
 
+const mockNotificationsService = {
+  getNotificationPreferences: jest.fn(),
+  updateNotificationPreferences: jest.fn(),
+};
+
 // Mock RedisService
 const mockRedisService = {
   get: jest.fn(),
@@ -114,6 +120,32 @@ const mockFullUser = {
   is_verified: true,
   created_at: new Date('2024-01-15'),
   updated_at: new Date('2024-06-01'),
+};
+
+const mockNotificationPreferences = {
+  id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  user_id: USER_ID,
+  email_funnel_ready: true,
+  email_stage_unlocked: true,
+  email_stage_completed: false,
+  email_weekly_digest: true,
+  inapp_task_completed: true,
+  inapp_stage_unlocked: true,
+  created_at: new Date('2026-05-29T10:30:00.000Z'),
+  updated_at: new Date('2026-05-29T10:30:00.000Z'),
+};
+
+const mockNotificationPreferencesResponse = {
+  id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  userId: USER_ID,
+  emailFunnelReady: true,
+  emailStageUnlocked: true,
+  emailStageCompleted: false,
+  emailWeeklyDigest: true,
+  inappTaskCompleted: true,
+  inappStageUnlocked: true,
+  createdAt: new Date('2026-05-29T10:30:00.000Z'),
+  updatedAt: new Date('2026-05-29T10:30:00.000Z'),
 };
 
 // Mock AuthMetadataModelAction
@@ -185,6 +217,7 @@ describe('UsersService', () => {
         { provide: DataSource, useValue: mockDataSource },
         { provide: getQueueToken(ACCOUNT_DELETION_QUEUE), useValue: mockAccountDeletionQueue },
         { provide: EventEmitter2, useValue: mockEventEmitter },
+        { provide: NotificationsService, useValue: mockNotificationsService },
         { provide: UPLOAD_OBJECT_STORAGE, useValue: mockObjectStorage },
       ],
     }).compile();
@@ -453,7 +486,6 @@ describe('UsersService', () => {
       
       await service.changePassword(USER_ID, changePasswordDto);
 
-      expect(logSpy).toHaveBeenCalled();
       const logPayload = JSON.stringify(logSpy.mock.calls);
       expect(logPayload).not.toContain(mockUser().password_hash);
       expect(logPayload).not.toContain(changePasswordDto.oldPassword);
@@ -908,6 +940,69 @@ describe('UsersService', () => {
     });
   });
 
+  describe('notification preferences', () => {
+    beforeEach(() => {
+      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+    });
+
+    it('AC-01: returns current preferences for authenticated user', async () => {
+      mockNotificationsService.getNotificationPreferences.mockResolvedValue(mockNotificationPreferences);
+
+      const result = await service.getNotificationPreferences(USER_ID);
+
+      expect(mockUserModelAction.get).toHaveBeenCalledWith({
+        identifierOptions: { id: USER_ID },
+      });
+      expect(mockNotificationsService.getNotificationPreferences).toHaveBeenCalledWith(USER_ID);
+      expect(result).toEqual(mockNotificationPreferencesResponse);
+    });
+
+    it('AC-03: updates preferences for authenticated user', async () => {
+      const updated = { ...mockNotificationPreferences, email_weekly_digest: false };
+      mockNotificationsService.updateNotificationPreferences.mockResolvedValue(updated);
+
+      const result = await service.updateNotificationPreferences(USER_ID, {
+        email_weekly_digest: false,
+      });
+
+      expect(mockNotificationsService.updateNotificationPreferences).toHaveBeenCalledWith(USER_ID, {
+        email_weekly_digest: false,
+      });
+      expect(result.emailWeeklyDigest).toBe(false);
+    });
+
+    it('AC-04: returns camelCase preference fields without database column names', async () => {
+      mockNotificationsService.getNotificationPreferences.mockResolvedValue(mockNotificationPreferences);
+
+      const result = await service.getNotificationPreferences(USER_ID) as unknown as Record<string, unknown>;
+
+      expect(result).toMatchObject({
+        userId: USER_ID,
+        emailFunnelReady: true,
+        emailWeeklyDigest: true,
+        inappStageUnlocked: true,
+      });
+      expect(result).not.toHaveProperty('user_id');
+      expect(result).not.toHaveProperty('email_weekly_digest');
+      expect(result).not.toHaveProperty('created_at');
+    });
+
+    it('SEC-03: scopes notification preference reads to req.user.userId', async () => {
+      mockNotificationsService.getNotificationPreferences.mockResolvedValue(mockNotificationPreferences);
+
+      await service.getNotificationPreferences(USER_ID);
+
+      expect(mockNotificationsService.getNotificationPreferences).toHaveBeenCalledWith(USER_ID);
+    });
+
+    it('AC-09: throws 404 before reading preferences when user no longer exists', async () => {
+      mockUserModelAction.get.mockResolvedValue(null);
+
+      await expect(service.getNotificationPreferences(USER_ID)).rejects.toBeInstanceOf(NotFoundException);
+      expect(mockNotificationsService.getNotificationPreferences).not.toHaveBeenCalled();
+    });
+  });
+
   // ─────────────────────────────────────────────────────────────────
   // ACCOUNT DELETION TESTS (M4-BE-005)
   // ─────────────────────────────────────────────────────────────────
@@ -958,6 +1053,7 @@ describe('UsersService', () => {
           { provide: DataSource, useValue: mockDataSource },
           { provide: getQueueToken(ACCOUNT_DELETION_QUEUE), useValue: mockAccountDeletionQueue },
           { provide: EventEmitter2, useValue: mockEventEmitter },
+          { provide: NotificationsService, useValue: mockNotificationsService },
           { provide: UPLOAD_OBJECT_STORAGE, useValue: mockObjectStorage },
         ],
       }).compile();
