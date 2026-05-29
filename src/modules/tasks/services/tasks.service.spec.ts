@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { TasksService } from '../services/tasks.service';
+import { TasksService } from './tasks.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { FunnelModelAction } from '../../funnels/actions/funnel.action';
 import { UploadedDocumentModelAction } from '../../upload/actions/uploaded-document.action';
@@ -39,22 +39,28 @@ describe('TasksService', () => {
     eventEmitter = module.get(EventEmitter2);
   });
 
-  it('should reap stuck funnels and emit events', async () => {
+  it('should reap stuck funnels, emit events, and return the correct count', async () => {
     funnelAction.findStuckFunnels.mockResolvedValue([{ id: 'f1', user_id: 'u1' }] as any);
     uploadAction.findStuckUploads.mockResolvedValue([]);
 
-    await service.runSweeps();
+    const result = await service.runSweeps();
 
     expect(funnelAction.markFunnelsFailed).toHaveBeenCalledWith(['f1']);
     expect(eventEmitter.emit).toHaveBeenCalledWith(APP_EVENTS.FUNNEL_FAILED, expect.anything());
+    
+    expect(result.funnelsReaped).toBe(1);
+    expect(result.uploadsReaped).toBe(0);
   });
 
-  it('should reap stuck uploads', async () => {
+  it('should reap stuck uploads and return the correct count', async () => {
     funnelAction.findStuckFunnels.mockResolvedValue([]);
     uploadAction.findStuckUploads.mockResolvedValue([{ id: 'u1', user_id: 'u1' }] as any);
 
-    await service.runSweeps();
+    const result = await service.runSweeps();
 
     expect(uploadAction.markUploadsFailed).toHaveBeenCalledWith(['u1'], expect.any(String));
+    
+    expect(result.funnelsReaped).toBe(0);
+    expect(result.uploadsReaped).toBe(1);
   });
 });

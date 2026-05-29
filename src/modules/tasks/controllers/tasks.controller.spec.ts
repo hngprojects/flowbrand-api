@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { TasksController } from '../controllers/tasks.controller';
+import { TasksController } from './tasks.controller';
 import { TasksService } from '../services/tasks.service';
 import { HttpStatus } from '@nestjs/common';
 import * as SYS_MSG from '../../../constants/system.messages';
@@ -14,7 +14,9 @@ describe('TasksController', () => {
       providers: [
         {
           provide: TasksService,
-          useValue: { runSweeps: jest.fn().mockResolvedValue(undefined) },
+          useValue: { 
+            runSweeps: jest.fn().mockResolvedValue({ funnelsReaped: 1, uploadsReaped: 0 }) 
+          },
         },
       ],
     }).compile();
@@ -23,12 +25,14 @@ describe('TasksController', () => {
     service = module.get<TasksService>(TasksService);
   });
 
-  it('should call runSweeps and return success response', async () => {
+  it('should call runSweeps and return success response with counts', async () => {
     const result = await controller.triggerReaper();
+    
     expect(service.runSweeps).toHaveBeenCalled();
     expect(result).toEqual({
       statusCode: HttpStatus.OK,
       message: SYS_MSG.REAPER_TRIGGERED_SUCCESSFULLY,
+      data: { funnelsReaped: 1, uploadsReaped: 0 },
     });
   });
 });

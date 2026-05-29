@@ -21,22 +21,26 @@ export class TasksService {
 
   @Cron(CronExpression.EVERY_MINUTE)
   async runSweeps() {
-    await Promise.allSettled([
+    const [funnels, uploads] = await Promise.allSettled([
       this.sweepStuckFunnels(),
       this.sweepStuckUploads(),
     ]);
+    return {
+      funnelsReaped: funnels.status === 'fulfilled' ? funnels.value : 0,
+      uploadsReaped: uploads.status === 'fulfilled' ? uploads.value : 0,
+    };
   }
 
-  private async sweepStuckFunnels() {
+  private async sweepStuckFunnels(): Promise<number> {
     try {
       const stuckFunnels = await this.funnelAction.findStuckFunnels(this.FUNNEL_STUCK_MS);
-      if (stuckFunnels.length === 0) return;
-
+      if (stuckFunnels.length === 0) {
+        return 0; 
+      }
       this.logger.warn(`Reaper found ${stuckFunnels.length} stuck funnels. Marking as FAILED.`);
       
       const ids = stuckFunnels.map((f) => f.id);
       await this.funnelAction.markFunnelsFailed(ids);
-
       for (const funnel of stuckFunnels) {
         emitSafely(
           this.eventEmitter,
@@ -45,22 +49,26 @@ export class TasksService {
           new FunnelFailedEvent(funnel.user_id, funnel.id)
         );
       }
+      return stuckFunnels.length;
     } catch (error) {
       this.logger.error('Funnel sweep failed', error instanceof Error ? error.stack : String(error));
+      return 0;
     }
   }
 
-  private async sweepStuckUploads() {
+   private async sweepStuckUploads(): Promise<number> {
     try {
       const stuckUploads = await this.uploadAction.findStuckUploads(this.UPLOAD_STUCK_MS);
-      if (stuckUploads.length === 0) return;
-
+      if (stuckUploads.length === 0) {
+        return 0;
+      }
       this.logger.warn(`Reaper found ${stuckUploads.length} stuck uploads. Marking as FAILED.`);
-
       const ids = stuckUploads.map((u) => u.id);
       await this.uploadAction.markUploadsFailed(ids, 'Processing timed out after 5 minutes (Reaper)');
+      return stuckUploads.length;
     } catch (error) {
       this.logger.error('Upload sweep failed', error instanceof Error ? error.stack : String(error));
+      return 0;
     }
   }
 }

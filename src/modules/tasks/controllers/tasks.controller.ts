@@ -7,14 +7,15 @@ import { TriggerReaperDocs } from '../docs/tasks.swagger.doc';
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
-  @Post('reaper/trigger')
+  @Post('trigger')
   @HttpCode(HttpStatus.OK)
   @TriggerReaperDocs()
   async triggerReaper() {
-    await this.tasksService.runSweeps();
+    const result = await this.tasksService.runSweeps();
     return {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.REAPER_TRIGGERED_SUCCESSFULLY,
+      data:result,
     };
   }
 }
