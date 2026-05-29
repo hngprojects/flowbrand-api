@@ -3,14 +3,12 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, EntityManager } from 'typeorm';
 import { UserSession } from './../entities/user-session.entity';
-import { RedisService } from '../../redis/redis.service';
 
 @Injectable()
 export class UserSessionModelAction extends AbstractModelAction<UserSession> {
   constructor(
     @InjectRepository(UserSession)
     repository: Repository<UserSession>,
-    private readonly redisService: RedisService,
   ) {
     super(repository, UserSession);
   }
@@ -65,13 +63,5 @@ export class UserSessionModelAction extends AbstractModelAction<UserSession> {
     );
 
     return sessionIds;
-  }
-
-  async deleteSessionRedisKeys(userId: string, sessionIds: string[]): Promise<void> {
-    for (const sessionId of sessionIds) {
-      const redisKey = `sess:${userId}:${sessionId}`;
-      await this.redisService.del(redisKey);
-    }
-    
   }
 }

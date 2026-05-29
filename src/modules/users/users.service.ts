@@ -415,7 +415,7 @@ export class UsersService {
       committed = true;
 
       if (revokedSessionIds.length > 0) {
-        await this.userSessionModelAction.deleteSessionRedisKeys(userId, revokedSessionIds);
+        await this.redisService.delByPattern(`sess:${userId}:*`);
       }
 
       this.pinoLogger.info('Account deleted', { userId });
