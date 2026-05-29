@@ -23,7 +23,7 @@ export const AUTH_EMAIL_UNVERIFIED = 'Please verify your email address to log in
 export const USER_EMAIL_IN_USE = 'Email already in use';
 export const USER_NOT_FOUND = (id: string) => `User ${id} not found`;
 export const USER_UPDATE_FAILED = 'Failed to update user';
-export const USER_UNAUTHORIZED = "User not authorized"
+export const USER_UNAUTHORIZED = 'User not authorized';
 
 // OAuth and external auth messages
 export const GOOGLE_ACCOUNT_NO_EMAIL = 'Google account has no email';
@@ -121,13 +121,10 @@ export const FUNNEL_STAGE_LOCKED_MESSAGE = (stageName: string, priorStageName: s
   `The ${stageName} stage is locked. Complete all tasks in ${priorStageName} and mark it complete to unlock.`;
 export const STAGE_COMPLETED_SUCCESSFULLY = 'Stage completed successfully';
 export const STAGE_ALREADY_COMPLETE = 'Stage already complete';
-export const STAGE_HAS_PENDING_TASKS = (count: number) =>
-  `Cannot complete stage: ${count} task(s) are still pending.`;
+export const STAGE_HAS_PENDING_TASKS = (count: number) => `Cannot complete stage: ${count} task(s) are still pending.`;
 export const STAGE_HAS_NO_TASKS = 'Stage has no tasks. Cannot be marked complete.';
-export const STAGE_COMPLETION_REQUIRES_ACTIVE_FUNNEL =
-  'Funnel must be active before a stage can be completed.';
-export const STAGE_COMPLETION_CONCURRENT_UPDATE =
-  'Stage completion failed due to a concurrent update. Please retry.';
+export const STAGE_COMPLETION_REQUIRES_ACTIVE_FUNNEL = 'Funnel must be active before a stage can be completed.';
+export const STAGE_COMPLETION_CONCURRENT_UPDATE = 'Stage completion failed due to a concurrent update. Please retry.';
 export const FUNNEL_UNAUTHORIZED_ACCESS = 'You do not have permission to access this funnel';
 export const FUNNEL_TASK_NOT_FOUND = 'Funnel task not found or not accessible.';
 export const TASK_STATUS_UPDATED_SUCCESSFULLY = 'Task updated successfully';
@@ -145,12 +142,13 @@ export const PASSWORD_RESET_INVALID_TOKEN = 'Invalid or expired reset token.';
 //Password Change Messages
 export const PASSWORD_CHANGE_SUCCESSFUL = 'Password changed successfully';
 export const INCORRECT_OLD_PASSWORD = 'The old password you entered is incorrect.';
-export const PASSWORD_CHANGE_NOT_SUPPORTED = 'Password change is not supported for accounts registered via Google OAuth';
+export const PASSWORD_CHANGE_NOT_SUPPORTED =
+  'Password change is not supported for accounts registered via Google OAuth';
 export const PASSWORD_CHANGE_NOT_SUCCESSFUL = 'New password cannot be the same as the old password';
 export const INCORRECT_CONFIRM_PASSWORD = 'The value of the confirm password does not match the new password';
 export const PASSWORD_CHANGE_UNAVAILABLE = 'Password change is not available for this account';
-export const PASSWORD_TOO_WEAK = 'Your new password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
-
+export const PASSWORD_TOO_WEAK =
+  'Your new password must contain at least one uppercase letter, one lowercase letter, one number, and one special character';
 // Waitlist
 export const WAITLIST_JOINED_SUCCESSFULLY = 'Successfully joined the waitlist';
 export const WAITLIST_ALREADY_JOINED = 'You are already on the waitlist';
@@ -208,6 +206,9 @@ export const USER_NOT_FOUND_BY_TOKEN = 'User associated with this token no longe
 export const PROFILE_RETRIEVED_SUCCESSFULLY = 'Profile retrieved successfully';
 export const PROFILE_UPDATED_SUCCESSFULLY = 'Profile updated successfully';
 export const PROFILE_NOT_FOUND = 'Profile not found';
-export const PROFILE_EMAIL_CHANGE_FORBIDDEN =
-  'Email cannot be changed here. Please contact support.';
+export const PROFILE_EMAIL_CHANGE_FORBIDDEN = 'Email cannot be changed here. Please contact support.';
 export const PROFILE_UPDATE_FAILED = 'Failed to update profile';
+
+// Notification Preferences
+export const NOTIFICATION_PREFERENCES_RETRIEVED_SUCCESSFULLY = 'Notification preferences retrieved successfully';
+export const NOTIFICATION_PREFERENCES_UPDATED_SUCCESSFULLY = 'Notification preferences updated successfully';
