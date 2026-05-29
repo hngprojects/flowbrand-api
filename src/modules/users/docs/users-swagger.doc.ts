@@ -44,15 +44,15 @@ const notFoundExample = {
 
 const notificationPreferencesExample = {
   id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-  user_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-  email_funnel_ready: true,
-  email_stage_unlocked: true,
-  email_stage_completed: false,
-  email_weekly_digest: true,
-  inapp_task_completed: true,
-  inapp_stage_unlocked: true,
-  created_at: '2026-05-29T10:30:00.000Z',
-  updated_at: '2026-05-29T10:30:00.000Z',
+  userId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  emailFunnelReady: true,
+  emailStageUnlocked: true,
+  emailStageCompleted: false,
+  emailWeeklyDigest: true,
+  inappTaskCompleted: true,
+  inappStageUnlocked: true,
+  createdAt: '2026-05-29T10:30:00.000Z',
+  updatedAt: '2026-05-29T10:30:00.000Z',
 };
 
 export function GetProfileDocs() {
@@ -453,7 +453,7 @@ export function UpdateNotificationPreferencesDocs(): ReturnType<typeof applyDeco
               message: SYS_MSG.NOTIFICATION_PREFERENCES_UPDATED_SUCCESSFULLY,
               data: {
                 ...notificationPreferencesExample,
-                email_weekly_digest: false,
+                emailWeeklyDigest: false,
               },
             },
           },

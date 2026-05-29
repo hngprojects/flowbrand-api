@@ -39,15 +39,15 @@ const mockProfile = {
 
 const mockNotificationPreferences = {
   id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-  user_id: USER_ID,
-  email_funnel_ready: true,
-  email_stage_unlocked: true,
-  email_stage_completed: false,
-  email_weekly_digest: true,
-  inapp_task_completed: true,
-  inapp_stage_unlocked: true,
-  created_at: new Date('2026-05-29T10:30:00.000Z'),
-  updated_at: new Date('2026-05-29T10:30:00.000Z'),
+  userId: USER_ID,
+  emailFunnelReady: true,
+  emailStageUnlocked: true,
+  emailStageCompleted: false,
+  emailWeeklyDigest: true,
+  inappTaskCompleted: true,
+  inappStageUnlocked: true,
+  createdAt: new Date('2026-05-29T10:30:00.000Z'),
+  updatedAt: new Date('2026-05-29T10:30:00.000Z'),
 };
 
 describe('UsersController — profile endpoints', () => {
@@ -155,7 +155,7 @@ describe('UsersController — profile endpoints', () => {
     });
 
     it('AC-03: PATCH returns updated notification preferences', async () => {
-      const updated = { ...mockNotificationPreferences, email_weekly_digest: false };
+      const updated = { ...mockNotificationPreferences, emailWeeklyDigest: false };
       mockUsersService.updateNotificationPreferences.mockResolvedValue(updated);
 
       const result = await controller.updateNotificationPreferences(USER_ID, {
