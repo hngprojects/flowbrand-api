@@ -8,12 +8,15 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { QueryFailedError } from 'typeorm';
+import { QueryFailedError, DataSource } from 'typeorm';
+import { InjectQueue } from '@nestjs/bull';
+import type { Queue } from 'bull';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { APP_EVENTS } from '../../common/constants/app-events';
 import { ProfileUpdatedEvent, AccountDeletedEvent } from '../../common/events';
 import { emitSafely } from '../../common/events/emit-safely';
 import { UserModelAction } from './actions/user.action';
+import { UserSessionModelAction } from './actions/user-session.action';
 import { CreateUserDto } from './dto/create-user.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -22,13 +25,14 @@ import { UserRole } from './enums/user-role.enum';
 import { UserStateService } from './user-state.service';
 import { UserStateResponse } from './interfaces/user-state.interface';
 import * as SYS_MSG from '../../constants/system.messages';
-import { UserSessionModelAction } from './actions/user-session.action';
 import { RedisService } from '../redis/redis.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { AuthMetadataModelAction } from '../auth/actions/auth-metadata.action';
 import { IUserProfile } from './interfaces/user-profile.interface';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { ALLOWED_SSA_COUNTRIES } from './enums/allowed-ssa-countries.enum';
+import { ACCOUNT_DELETION_QUEUE } from './processors/account-deletion.processor';
+import { PinoLoggerService } from '../../common/logger/pino-logger.service';
 import { redisKeys } from '../../constants/redis-keys';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationPreference } from '../notifications/entities/notification-preference.entity';
@@ -51,6 +55,10 @@ export class UsersService {
     private readonly userStateService: UserStateService,
     private readonly eventEmitter: EventEmitter2,
     private readonly notificationsService: NotificationsService,
+    private readonly pinoLogger: PinoLoggerService,
+    @InjectQueue(ACCOUNT_DELETION_QUEUE)
+    private readonly accountDeletionQueue: Queue,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
@@ -85,7 +93,6 @@ export class UsersService {
       ) {
         throw new ConflictException(SYS_MSG.USER_EMAIL_IN_USE);
       }
-
       throw error;
     }
   }
@@ -108,11 +115,7 @@ export class UsersService {
           auth_provider: 'google',
           provider_user_id: dto.providerUserId,
           avatar_url: dto.avatarUrl,
-          roles: [
-            {
-              role: UserRole.USER,
-            },
-          ],
+          roles: [{ role: UserRole.USER }],
         },
       });
     } catch (error) {
@@ -122,7 +125,6 @@ export class UsersService {
       ) {
         throw new ConflictException(SYS_MSG.USER_EMAIL_IN_USE);
       }
-
       throw error;
     }
   }
@@ -221,10 +223,7 @@ export class UsersService {
     const sessions = await this.userSessionModelAction.findByUserId(userId);
 
     if (!sessions || sessions.length === 0) {
-      this.logger.debug({
-        message: 'No active sessions found to revoke',
-        userId,
-      });
+      this.pinoLogger.debug('No active sessions found to revoke', { userId });
       return;
     }
 
@@ -249,38 +248,32 @@ export class UsersService {
     });
   }
 
-  /** Verifies the current password, updates the hash, and revokes all active sessions. */
   async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
     const user = await this.findById(userId);
 
     if (!user.password_hash) {
       throw new UnprocessableEntityException({
-        message:
-          user.auth_provider === 'google' ? SYS_MSG.PASSWORD_CHANGE_NOT_SUPPORTED : SYS_MSG.PASSWORD_CHANGE_UNAVAILABLE,
+        message: user.auth_provider === 'google'
+          ? SYS_MSG.PASSWORD_CHANGE_NOT_SUPPORTED
+          : SYS_MSG.PASSWORD_CHANGE_UNAVAILABLE,
       });
     }
-    const oldPassword = dto.oldPassword;
-    const newPassword = dto.newPassword;
 
-    const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password_hash);
+    const isOldPasswordValid = await bcrypt.compare(dto.oldPassword, user.password_hash);
 
     if (!isOldPasswordValid) {
-      throw new UnauthorizedException({
-        message: SYS_MSG.INCORRECT_OLD_PASSWORD,
-      });
+      throw new UnauthorizedException({ message: SYS_MSG.INCORRECT_OLD_PASSWORD });
     }
 
-    if (newPassword === oldPassword) {
-      throw new UnprocessableEntityException({
-        message: SYS_MSG.PASSWORD_CHANGE_NOT_SUCCESSFUL,
-      });
+    if (dto.newPassword === dto.oldPassword) {
+      throw new UnprocessableEntityException({ message: SYS_MSG.PASSWORD_CHANGE_NOT_SUCCESSFUL });
     }
 
     if (dto.newPassword !== dto.confirmPassword) {
       throw new UnprocessableEntityException(SYS_MSG.INCORRECT_CONFIRM_PASSWORD);
     }
 
-    const saveNewPassword = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    const saveNewPassword = await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS);
 
     const updated = await this.userModelAction.update({
       ...NO_TRANSACTION,
@@ -359,7 +352,9 @@ export class UsersService {
 
     let normalisedCountry: string | undefined;
     if (dto.country !== undefined) {
-      normalisedCountry = ALLOWED_SSA_COUNTRIES.find((c) => c.toLowerCase() === dto.country!.toLowerCase());
+      normalisedCountry = ALLOWED_SSA_COUNTRIES.find(
+        (c) => c.toLowerCase() === dto.country!.toLowerCase(),
+      );
       // If IsIn() passed in the DTO, a match is guaranteed — this is a safety net
       if (!normalisedCountry) {
         throw new UnprocessableEntityException(SYS_MSG.VALIDATION_FAILED);
@@ -379,7 +374,7 @@ export class UsersService {
       changedFields.push('country');
     }
 
-    if (changedFields.length === 0) {
+    if (Object.keys(updatePayload).length === 0) {
       return this.toProfileResponse(user);
     }
 
@@ -401,5 +396,80 @@ export class UsersService {
     );
 
     return this.toProfileResponse(updated);
+  }
+
+  async deleteAccount(userId: string, confirmation: string): Promise<void> {
+    if (confirmation !== 'DELETE') {
+      throw new UnprocessableEntityException(SYS_MSG.ACCOUNT_DELETION_CONFIRMATION_REQUIRED);
+    }
+
+    const user = await this.userModelAction.findById(userId);
+    if (!user) {
+      throw new NotFoundException(SYS_MSG.USER_NOT_FOUND(userId));
+    }
+
+    if (user.deleted_at !== null) {
+      throw new UnauthorizedException(SYS_MSG.ACCOUNT_ALREADY_DELETED);
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    let committed = false;
+
+    try {
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+
+      const now = new Date();
+      const thirtyDaysLater = 30 * 24 * 60 * 60 * 1000;
+
+      // Single UPDATE with conditional fields
+      const updatePayload: Partial<User> = {
+        deleted_at: now,
+        is_active: false,
+      };
+      
+      if (user.auth_provider === 'google') {
+        updatePayload.provider_user_id = null;
+      }
+
+      await queryRunner.manager.update(User, userId, updatePayload);
+
+      const revokedSessionIds = await this.userSessionModelAction.revokeAllUserSessionsInDb(
+        userId,
+        queryRunner.manager,
+      );
+
+      await queryRunner.commitTransaction();
+      committed = true;
+
+      if (revokedSessionIds.length > 0) {
+        await this.redisService.delByPattern(`sess:${userId}:*`);
+      }
+
+      this.pinoLogger.info('Account deleted', { userId });
+
+      await this.accountDeletionQueue.add(
+        'hard-delete',
+        { userId, email: user.email },
+        { delay: thirtyDaysLater },
+      );
+
+    } catch (error) {
+      if (!committed) {
+        await queryRunner.rollbackTransaction();
+      }
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.pinoLogger.error('Account deletion failed', { userId, error: errorMessage, committed });
+
+      if (committed) {
+        this.pinoLogger.warn('Account deleted but queue failed', { userId, error: errorMessage });
+        return;
+      }
+
+      throw new InternalServerErrorException(SYS_MSG.ACCOUNT_DELETION_FAILED);
+    } finally {
+      await queryRunner.release();
+    }
   }
 }

@@ -11,10 +11,9 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ChangePasswordDto } from './dto/change-password.dto'
 import { UsersService } from './users.service';
-import { ChangePasswordDto } from './dto/change-password.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { GetUserStateDocs } from './docs/users-swagger.doc';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import {
@@ -23,7 +22,10 @@ import {
   GetProfileDocs,
   UpdateNotificationPreferencesDocs,
   UpdateProfileDocs,
+  GetUserStateDocs,
+  DeleteAccountDocs,
 } from './docs/users-swagger.doc';
+import { DeleteAccountDto } from './dto/delete-account.dto';
 import * as SYS_MSG from '../../constants/system.messages';
 import { UpdateNotificationPreferencesDto } from '../notifications/dto/update-notification-preferences.dto';
 
@@ -55,6 +57,32 @@ export class UsersController {
       message: SYS_MSG.PROFILE_UPDATED_SUCCESSFULLY,
       data,
     };
+  }
+
+  @Delete('me')
+  @DeleteAccountDocs()
+  @HttpCode(HttpStatus.OK)
+  async deleteAccount(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: DeleteAccountDto,
+  ) {
+    await this.usersService.deleteAccount(userId, dto.confirmation);
+    return  {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.ACCOUNT_DELETED_SUCCESSFULLY,
+    };
+  }
+
+  @Get('me/state')
+  @GetUserStateDocs()
+  async getUserState(@CurrentUser('userId') userId: string) {
+    return this.usersService.getUserState(userId)
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a user by id' })
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
+    return this.usersService.findById(id);
   }
 
   @Patch('me/password')
@@ -111,11 +139,5 @@ export class UsersController {
   @ApiOperation({ summary: 'Delete a user' })
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.remove(id);
-  }
-
-  @Get('me/state')
-  @GetUserStateDocs()
-  async getUserState(@CurrentUser('userId') userId: string) {
-    return this.usersService.getUserState(userId);
   }
 }

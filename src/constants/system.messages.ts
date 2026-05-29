@@ -212,3 +212,11 @@ export const PROFILE_UPDATE_FAILED = 'Failed to update profile';
 // Notification Preferences
 export const NOTIFICATION_PREFERENCES_RETRIEVED_SUCCESSFULLY = 'Notification preferences retrieved successfully';
 export const NOTIFICATION_PREFERENCES_UPDATED_SUCCESSFULLY = 'Notification preferences updated successfully';
+
+// Account Deletion
+export const ACCOUNT_DELETED_SUCCESSFULLY = 'Your account has been deleted. You will be signed out.';
+export const ACCOUNT_ALREADY_DELETED = 'Account already deleted';
+export const ACCOUNT_DELETION_CONFIRMATION_REQUIRED = 'You must type DELETE to confirm account deletion';
+export const ACCOUNT_DELETION_FAILED = 'Failed to delete account';
+export const ACCOUNT_DELETION_SCHEDULED = 'Account deletion scheduled for 30 days from now';
+export const ACCOUNT_EXISTS_WITH_RETENTION = 'An account with this email exists. If you recently deleted your account, please wait 30 days.';
