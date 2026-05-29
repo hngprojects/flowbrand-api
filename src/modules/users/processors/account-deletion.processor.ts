@@ -14,6 +14,7 @@ import { StageTask } from '../../funnels/entities/stage-task.entity';
 import { StageFeedback } from '../../funnels/entities/stage-feedback.entity';
 import { OtpToken } from '../../auth/entities/otp-token.entity';
 import { AuthMetadata } from '../../auth/entities/auth-metadata.entity';
+import { ActivityEvent } from '../../activity/entities/activity-event.entity';
 
 export interface AccountDeletionPayload {
   userId: string;
@@ -38,6 +39,9 @@ export class AccountDeletionProcessor {
 
     try {
       await this.dataSource.transaction(async (manager) => {
+        // activity_events purged first (see PR description).
+        await manager.delete(ActivityEvent, { user_id: userId });
+
         // Resolve IDs needed for child deletions
         const funnels = await manager.find(Funnel, {
           where: { user_id: userId },

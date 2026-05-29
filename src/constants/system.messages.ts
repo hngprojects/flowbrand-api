@@ -69,6 +69,8 @@ export const FUNNEL_UPLOAD_PARSE_FAILED = 'Could not extract text from the uploa
 export const FUNNEL_UPLOAD_UNSUPPORTED_FILE_TYPE = 'Unsupported file type for text extraction';
 export const FUNNEL_UPLOAD_NO_EXTRACTABLE_TEXT = 'No extractable text found in document';
 export const FUNNEL_UPLOAD_NO_SLIDES = 'No slides found in presentation';
+export const FUNNEL_UPLOAD_PPTX_TOO_LARGE = 'PPTX file exceeds the maximum allowed size for extraction';
+export const FUNNEL_UPLOAD_PPTX_TOO_MANY_SLIDES = 'PPTX file exceeds the maximum allowed slide count for extraction';
 export const FUNNEL_UPLOAD_PROGRESS_RETRIEVED = 'Funnel upload progress retrieved successfully';
 
 export const AI_GENERATION_FAILED = 'AI generation failed';
@@ -157,6 +159,15 @@ export const WAITLIST_ALREADY_JOINED = 'You are already on the waitlist';
 export const CONTACT_MESSAGE_SENT_SUCCESSFULLY = 'Message sent successfully';
 export const CONTACT_CREATED = 'Contact message submitted successfully';
 export const CONTACT_SPAM_DETECTED = 'Submission contains prohibited content';
+
+// Notifications
+export const NOTIFICATIONS_RETRIEVED_SUCCESSFULLY = 'Notifications retrieved successfully';
+export const NOTIFICATION_UNREAD_COUNT_RETRIEVED = 'Notification unread count retrieved successfully';
+export const NOTIFICATION_MARKED_AS_READ = 'Notification marked as read';
+export const NOTIFICATIONS_MARKED_AS_READ = 'Notifications marked as read';
+export const NOTIFICATIONS_MARKED_AS_UNREAD = 'Notifications marked as unread';
+export const NOTIFICATION_DELETED = 'Notification deleted.';
+export const NOTIFICATION_NOT_FOUND = 'Notification not found';
 
 // Spam Detection
 export const SPAM_PROHIBITED_CONTENT = 'Submission contains prohibited content';

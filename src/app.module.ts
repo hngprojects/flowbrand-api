@@ -28,6 +28,7 @@ import { FunnelGenerationQueueModule } from './queue/funnel-generation-queue.mod
 import { WaitlistModule } from './modules/waitlist/waitlist.module';
 import { ContactModule } from './modules/contact/contact.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ActivityModule } from './modules/activity/activity.module';
 import { LoggerModule } from './common/logger/logger.module';
 import { llmConfig } from './config/llm.config';
 import { AppController } from './app.controller';
@@ -83,6 +84,7 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
     WaitlistModule,
     ContactModule,
     NotificationsModule,
+    ActivityModule,
   ],
   controllers: [AppController],
   providers: [
