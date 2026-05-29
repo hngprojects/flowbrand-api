@@ -287,10 +287,11 @@ export class FunnelGenerationProcessor {
   @OnQueueStalled()
   onStalled(job: Job<GenerateFunnelJobPayload>): void {
     this.logger.warn({
-      event: 'job_stalled',
+      event: 'funnel_job_stalled',
       jobId: job.id,
       funnelId: job.data.funnelId,
-      message: 'Bull will auto re-queue',
+      attemptsMade: job.attemptsMade,
+      message: 'Bull will auto re-queue — state not modified here',
     });
   }
 }
