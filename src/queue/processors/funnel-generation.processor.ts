@@ -256,11 +256,31 @@ export class FunnelGenerationProcessor {
     });
 
     if (!willRetry) {
-      await this.funnelAction.update({
-        identifierOptions: { id: job.data.funnelId },
-        updatePayload: { status: FunnelStatus.FAILED },
-        transactionOptions: { useTransaction: false },
-      });
+      try {
+        const funnel = await this.funnelAction.get({
+          identifierOptions: { id: job.data.funnelId },
+        });
+        if (funnel?.status === FunnelStatus.ACTIVE) {
+          this.logger.warn({
+            event: 'funnel_job_failed_skip',
+            funnelId: job.data.funnelId,
+            message: 'Funnel already ACTIVE — not overwriting',
+          });
+          return;
+        }
+        await this.funnelAction.update({
+          identifierOptions: { id: job.data.funnelId },
+          updatePayload: { status: FunnelStatus.FAILED },
+          transactionOptions: { useTransaction: false },
+        });
+      } catch (dbErr) {
+        this.logger.error({
+          event: 'funnel_failed_state_write_error',
+          funnelId: job.data.funnelId,
+          error: (dbErr as Error).message,
+          message: 'Could not mark funnel FAILED — manual reconciliation required',
+        });
+      }
     }
   }
 
