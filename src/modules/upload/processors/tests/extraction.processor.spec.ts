@@ -169,6 +169,48 @@ describe('ExtractionProcessor', () => {
     });
   });
 
+  describe('onFailed — DB reconciliation', () => {
+    function makeFailedJob(overrides: Partial<ExtractionJobPayload> = {}): Job<ExtractionJobPayload> {
+      return { ...makeJob(overrides), attemptsMade: 3 } as unknown as Job<ExtractionJobPayload>;
+    }
+
+    it('marks upload FAILED when status is PARSING', async () => {
+      mockDocumentAction.get.mockResolvedValue(makeRow({ status: UploadDocumentStatus.PARSING }));
+
+      await processor.onFailed(makeFailedJob(), new Error('Worker killed'));
+
+      expect(mockDocumentAction.saveDocument).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: UploadDocumentStatus.FAILED,
+          percent_complete: 0,
+          failure_reason: 'Worker killed',
+        }),
+      );
+    });
+
+    it('does not overwrite status when already READY', async () => {
+      mockDocumentAction.get.mockResolvedValue(makeRow({ status: UploadDocumentStatus.READY }));
+
+      await processor.onFailed(makeFailedJob(), new Error('Late failure'));
+
+      expect(mockDocumentAction.saveDocument).not.toHaveBeenCalled();
+    });
+
+    it('swallows DB errors so the handler never throws', async () => {
+      mockDocumentAction.get.mockRejectedValue(new Error('DB connection lost'));
+
+      await expect(processor.onFailed(makeFailedJob(), new Error('original error'))).resolves.toBeUndefined();
+    });
+
+    it('handles null upload row without throwing', async () => {
+      mockDocumentAction.get.mockResolvedValue(null);
+
+      await expect(processor.onFailed(makeFailedJob(), new Error('some error'))).resolves.toBeUndefined();
+
+      expect(mockDocumentAction.saveDocument).not.toHaveBeenCalled();
+    });
+  });
+
   describe('idempotency guard — already terminal', () => {
     it('skips extraction and does not write to storage or DB when status is READY', async () => {
       mockDocumentAction.get.mockResolvedValue(makeRow({ status: UploadDocumentStatus.READY }));

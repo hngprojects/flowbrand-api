@@ -1,4 +1,4 @@
-import { Process, Processor, OnQueueCompleted, OnQueueFailed } from '@nestjs/bull';
+import { Process, Processor, OnQueueCompleted, OnQueueFailed, OnQueueStalled } from '@nestjs/bull';
 import { Inject, Logger } from '@nestjs/common';
 import type { Job } from 'bull';
 import { env } from '../../../config/env'; // Import the environment config
@@ -75,12 +75,42 @@ export class ExtractionProcessor {
   }
 
   @OnQueueFailed()
-  onFailed(job: Job<ExtractionJobPayload>, error: Error): void {
+  async onFailed(job: Job<ExtractionJobPayload>, error: Error): Promise<void> {
     this.logger.error({
       event: 'extraction_job_failed',
       jobId: job.id,
       uploadId: job.data.uploadId,
-      error: error.message,
+      attemptsMade: job.attemptsMade,
+      error: error?.message,
+    });
+
+    // Safety net: if the processor's own catch block never ran (e.g. Bull exceeded
+    // maxAttempts, the lock expired, or the process was killed mid-job), ensure the
+    // row never stays stuck at PARSING. READY is terminal — never overwrite it.
+    try {
+      const row = await this.uploadedDocumentAction.get({ identifierOptions: { id: job.data.uploadId } });
+      if (row && row.status !== UploadDocumentStatus.READY) {
+        row.status = UploadDocumentStatus.FAILED;
+        row.percent_complete = 0;
+        row.failure_reason = (error?.message ?? 'Job failed').slice(0, 200);
+        await this.uploadedDocumentAction.saveDocument(row);
+      }
+    } catch (dbErr) {
+      this.logger.error({
+        event: 'extraction_failed_db_reconciliation_error',
+        uploadId: job.data.uploadId,
+        error: dbErr instanceof Error ? dbErr.message : String(dbErr),
+      });
+    }
+  }
+
+  @OnQueueStalled()
+  onStalled(job: Job<ExtractionJobPayload>): void {
+    this.logger.warn({
+      event: 'extraction_job_stalled',
+      jobId: job.id,
+      uploadId: job.data.uploadId,
+      attemptsMade: job.attemptsMade,
     });
   }
 }
