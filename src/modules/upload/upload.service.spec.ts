@@ -9,9 +9,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import * as fs from 'node:fs';
 import { QUEUES } from '../../common/constants/queue.constants';
 import * as SYS_MSG from '../../constants/system.messages';
-import { UploadedDocumentModelAction } from './actions/uploaded-document.action';
 import { MAX_UPLOAD_BYTES, UPLOAD_PROGRESS } from './constants/upload.constants';
 import { UploadedDocument } from './entities/uploaded-document.entity';
+import { UploadedDocumentModelAction } from './actions/uploaded-document.action';
 import { DocumentTextExtractorService } from './services/document-text-extractor.service';
 import { UploadService } from './upload.service';
 import {
@@ -59,6 +59,7 @@ const mockObjectStorage: jest.Mocked<ObjectStorage> = {
   putObject: jest.fn(),
   getObject: jest.fn(),
   deleteObject: jest.fn(),
+  createPresignedGetObjectUrl: jest.fn(),
 };
 
 function buildRow(

@@ -1,14 +1,15 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { FunnelsModule } from '../funnels/funnels.module';
+import { UploadModule } from '../upload/upload.module';
+import { RedisModule } from '../redis/redis.module';
+import { OnboardingModule } from '../onboarding/onboarding.module';
 import { UserModelAction } from './actions/user.action';
 import { UserSessionModelAction } from './actions/user-session.action';
 import { UserSession } from './entities/user-session.entity';
 import { User } from './entities/user.entity';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
-import { RedisModule } from '../redis/redis.module';
-import { OnboardingModule } from '../onboarding/onboarding.module';
-import { FunnelsModule } from '../funnels/funnels.module';
 import { UserStateService } from './user-state.service';
 import { BullModule } from '@nestjs/bull';
 import { ConfigService } from '@nestjs/config'
@@ -22,6 +23,7 @@ import { AuthMetadataModelAction } from '../auth/actions/auth-metadata.action';
     OnboardingModule,
     FunnelsModule,
     RedisModule,
+    UploadModule,
     BullModule.registerQueueAsync({
       name: ACCOUNT_DELETION_QUEUE,
       useFactory: (configService: ConfigService) => ({
@@ -45,9 +47,9 @@ import { AuthMetadataModelAction } from '../auth/actions/auth-metadata.action';
   ],
   controllers: [UsersController],
   providers: [
-    UserModelAction, 
-    UserSessionModelAction, 
-    UsersService, 
+    UserModelAction,
+    UserSessionModelAction,
+    UsersService,
     UserStateService,
     AccountDeletionProcessor,
     AuthMetadataModelAction,

@@ -222,6 +222,14 @@ export const PROFILE_NOT_FOUND = 'Profile not found';
 export const PROFILE_EMAIL_CHANGE_FORBIDDEN =
   'Email cannot be changed here. Please contact support.';
 export const PROFILE_UPDATE_FAILED = 'Failed to update profile';
+export const PROFILE_AVATAR_FILE_REQUIRED = 'Avatar file is required';
+export const PROFILE_AVATAR_UPLOADED_SUCCESSFULLY = 'Profile avatar uploaded successfully';
+export const PROFILE_AVATAR_REMOVED_SUCCESSFULLY = 'Profile avatar removed successfully';
+export const PROFILE_AVATAR_UPLOAD_INVALID_TYPE =
+  'Avatar must be a valid JPEG, PNG, or WebP image';
+export const PROFILE_AVATAR_UPLOAD_TOO_LARGE = 'Avatar file size must be 2MB or less';
+export const PROFILE_AVATAR_UPLOAD_FAILED = 'Failed to upload profile avatar';
+export const PROFILE_AVATAR_DELETE_FAILED = 'Failed to remove profile avatar';
 
 // Account Deletion
 export const ACCOUNT_DELETED_SUCCESSFULLY = 'Your account has been deleted. You will be signed out.';

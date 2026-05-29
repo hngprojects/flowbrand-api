@@ -26,6 +26,7 @@ import { getQueueToken } from '@nestjs/bull';
 import { ACCOUNT_DELETION_QUEUE } from './processors/account-deletion.processor';
 import { PinoLoggerService } from '../../common/logger/pino-logger.service';
 import { UserRole } from './enums/user-role.enum';
+import { UPLOAD_OBJECT_STORAGE } from '../upload/upload.types';
 
 jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('hashed-password'),
@@ -39,6 +40,7 @@ const mockUserModelAction = {
   get: jest.fn(),
   list: jest.fn(),
   update: jest.fn(),
+  updateAvatarUrl: jest.fn(),
   delete: jest.fn(),
   findById: jest.fn(),
 };
@@ -142,6 +144,13 @@ const mockDataSource = {
   createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
 };
 
+const mockObjectStorage = {
+  putObject: jest.fn(),
+  getObject: jest.fn(),
+  deleteObject: jest.fn(),
+  createPresignedGetObjectUrl: jest.fn(),
+};
+
 // Mock PinoLoggerService
 const mockPinoLoggerService = {
   info: jest.fn(),
@@ -176,6 +185,7 @@ describe('UsersService', () => {
         { provide: DataSource, useValue: mockDataSource },
         { provide: getQueueToken(ACCOUNT_DELETION_QUEUE), useValue: mockAccountDeletionQueue },
         { provide: EventEmitter2, useValue: mockEventEmitter },
+        { provide: UPLOAD_OBJECT_STORAGE, useValue: mockObjectStorage },
       ],
     }).compile();
 
@@ -529,6 +539,194 @@ describe('UsersService', () => {
     });
   });
 
+  describe('avatar operations', () => {
+    const onePixelPngBuffer = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7f4b4AAAAASUVORK5CYII=',
+      'base64',
+    );
+    const avatarFile = {
+      originalname: 'avatar.png',
+      size: onePixelPngBuffer.length,
+      buffer: onePixelPngBuffer,
+      mimetype: 'application/octet-stream',
+    } as Express.Multer.File;
+
+    beforeEach(() => {
+      mockObjectStorage.putObject.mockReset();
+      mockObjectStorage.deleteObject.mockReset();
+      mockObjectStorage.createPresignedGetObjectUrl.mockReset();
+      mockUserModelAction.updateAvatarUrl.mockReset();
+    });
+
+    it('uploads avatar successfully and returns signed URL', async () => {
+      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+      mockObjectStorage.createPresignedGetObjectUrl.mockResolvedValue(
+        'https://signed.example/avatar.jpg',
+      );
+      mockUserModelAction.updateAvatarUrl.mockResolvedValue({
+        ...mockFullUser,
+        avatar_url: 'avatars/user/new.jpg',
+      });
+
+      const result = await service.uploadAvatar(USER_ID, avatarFile);
+
+      expect(mockObjectStorage.putObject).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contentType: 'image/png',
+          contentLength: onePixelPngBuffer.length,
+        }),
+      );
+      expect(mockObjectStorage.createPresignedGetObjectUrl).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`^avatars/${USER_ID}/`)),
+        900,
+      );
+      expect(mockUserModelAction.updateAvatarUrl).toHaveBeenCalled();
+      expect(result).toEqual({ avatarUrl: 'https://signed.example/avatar.jpg' });
+    });
+
+    it('deletes previous stored avatar after successful DB update', async () => {
+      mockUserModelAction.get.mockResolvedValue({
+        ...mockFullUser,
+        avatar_url: `avatars/${USER_ID}/old.jpg`,
+      });
+      mockObjectStorage.createPresignedGetObjectUrl.mockResolvedValue(
+        'https://signed.example/avatar.jpg',
+      );
+      mockUserModelAction.updateAvatarUrl.mockResolvedValue({
+        ...mockFullUser,
+        avatar_url: `avatars/${USER_ID}/new.jpg`,
+      });
+
+      await service.uploadAvatar(USER_ID, avatarFile);
+
+      expect(mockObjectStorage.deleteObject).toHaveBeenCalledTimes(1);
+      expect(mockObjectStorage.deleteObject).toHaveBeenCalledWith(`avatars/${USER_ID}/old.jpg`);
+      expect(mockObjectStorage.deleteObject.mock.invocationCallOrder[0]).toBeGreaterThan(
+        mockUserModelAction.updateAvatarUrl.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('rejects when avatar file is missing', async () => {
+      await expect(service.uploadAvatar(USER_ID, undefined)).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
+    });
+
+    it('rejects when avatar exceeds 2MB', async () => {
+      await expect(
+        service.uploadAvatar(USER_ID, { ...avatarFile, size: 2 * 1024 * 1024 + 1 }),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    });
+
+    it('rejects when file signature cannot be detected', async () => {
+      const unknownBufferFile = {
+        ...avatarFile,
+        originalname: 'mystery.bin',
+        buffer: Buffer.from('not-an-image'),
+        size: Buffer.from('not-an-image').length,
+      };
+
+      await expect(service.uploadAvatar(USER_ID, unknownBufferFile)).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
+    });
+
+    it('rejects spoofed/unsupported mime type from buffer', async () => {
+      const spoofedPdfFile = {
+        ...avatarFile,
+        originalname: 'avatar.jpg',
+        buffer: Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\n', 'utf8'),
+        size: Buffer.byteLength('%PDF-1.4\n1 0 obj\n<<>>\nendobj\n', 'utf8'),
+      };
+
+      await expect(service.uploadAvatar(USER_ID, spoofedPdfFile)).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
+    });
+
+    it('cleans up uploaded file when DB update fails after upload', async () => {
+      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+      mockObjectStorage.createPresignedGetObjectUrl.mockResolvedValue(
+        'https://signed.example/avatar.jpg',
+      );
+      mockUserModelAction.updateAvatarUrl.mockResolvedValue(null);
+
+      await expect(service.uploadAvatar(USER_ID, avatarFile)).rejects.toBeInstanceOf(
+        InternalServerErrorException,
+      );
+
+      const uploadedPath = mockObjectStorage.putObject.mock.calls[0][0].storagePath as string;
+      expect(mockObjectStorage.deleteObject).toHaveBeenCalledWith(uploadedPath);
+    });
+
+    it('cleans up uploaded file when signed URL creation fails', async () => {
+      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+      mockObjectStorage.createPresignedGetObjectUrl.mockRejectedValue(new Error('sign failed'));
+
+      await expect(service.uploadAvatar(USER_ID, avatarFile)).rejects.toBeInstanceOf(
+        InternalServerErrorException,
+      );
+
+      const uploadedPath = mockObjectStorage.putObject.mock.calls[0][0].storagePath as string;
+      expect(mockObjectStorage.deleteObject).toHaveBeenCalledWith(uploadedPath);
+    });
+
+    it('returns 500 when storage upload fails', async () => {
+      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+      mockObjectStorage.putObject.mockRejectedValue(new Error('upload failed'));
+
+      await expect(service.uploadAvatar(USER_ID, avatarFile)).rejects.toBeInstanceOf(
+        InternalServerErrorException,
+      );
+      expect(mockObjectStorage.createPresignedGetObjectUrl).not.toHaveBeenCalled();
+    });
+
+    it('returns no-op 200 response when avatar is already null', async () => {
+      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+
+      await expect(service.deleteAvatar(USER_ID)).resolves.toEqual({ avatarUrl: null });
+      expect(mockObjectStorage.deleteObject).not.toHaveBeenCalled();
+      expect(mockUserModelAction.updateAvatarUrl).not.toHaveBeenCalled();
+    });
+
+    it('deletes stored avatar and nulls DB column', async () => {
+      mockUserModelAction.get.mockResolvedValue({
+        ...mockFullUser,
+        avatar_url: `avatars/${USER_ID}/old.jpg`,
+      });
+      mockUserModelAction.updateAvatarUrl.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+
+      const result = await service.deleteAvatar(USER_ID);
+
+      expect(mockObjectStorage.deleteObject).toHaveBeenCalledWith(`avatars/${USER_ID}/old.jpg`);
+      expect(mockUserModelAction.updateAvatarUrl).toHaveBeenCalledWith(USER_ID, null);
+      expect(result).toEqual({ avatarUrl: null });
+    });
+
+    it('keeps external avatar URL deletion as DB-only operation', async () => {
+      mockUserModelAction.get.mockResolvedValue({
+        ...mockFullUser,
+        avatar_url: 'https://cdn.example.com/avatar.jpg',
+      });
+      mockUserModelAction.updateAvatarUrl.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+
+      await service.deleteAvatar(USER_ID);
+
+      expect(mockObjectStorage.deleteObject).not.toHaveBeenCalled();
+      expect(mockUserModelAction.updateAvatarUrl).toHaveBeenCalledWith(USER_ID, null);
+    });
+
+    it('returns 500 when avatar DB nulling fails', async () => {
+      mockUserModelAction.get.mockResolvedValue({
+        ...mockFullUser,
+        avatar_url: `avatars/${USER_ID}/old.jpg`,
+      });
+      mockUserModelAction.updateAvatarUrl.mockResolvedValue(null);
+
+      await expect(service.deleteAvatar(USER_ID)).rejects.toBeInstanceOf(InternalServerErrorException);
+    });
+  });
+
   describe('updateProfile', () => {
     it('updates full_name and returns updated profile', async () => {
       mockUserModelAction.get.mockResolvedValue(mockFullUser);
@@ -663,6 +861,36 @@ describe('UsersService', () => {
       });
     });
 
+    it('regenerates signed avatar URL when stored path exists', async () => {
+      mockUserModelAction.get.mockResolvedValue({
+        ...mockFullUser,
+        avatar_url: `avatars/${USER_ID}/profile.png`,
+      });
+      mockObjectStorage.createPresignedGetObjectUrl.mockResolvedValue(
+        'https://signed.example/avatar/profile.png',
+      );
+
+      const result = await service.getProfile(USER_ID);
+
+      expect(mockObjectStorage.createPresignedGetObjectUrl).toHaveBeenCalledWith(
+        `avatars/${USER_ID}/profile.png`,
+        900,
+      );
+      expect(result.avatarUrl).toBe('https://signed.example/avatar/profile.png');
+    });
+
+    it('keeps external avatar URL unchanged on profile read', async () => {
+      mockUserModelAction.get.mockResolvedValue({
+        ...mockFullUser,
+        avatar_url: 'https://cdn.example.com/avatar.png',
+      });
+
+      const result = await service.getProfile(USER_ID);
+
+      expect(mockObjectStorage.createPresignedGetObjectUrl).not.toHaveBeenCalled();
+      expect(result.avatarUrl).toBe('https://cdn.example.com/avatar.png');
+    });
+
     it('response never contains password_hash, deleted_at, or provider_user_id', async () => {
       mockUserModelAction.get.mockResolvedValue(mockFullUser);
 
@@ -730,6 +958,7 @@ describe('UsersService', () => {
           { provide: DataSource, useValue: mockDataSource },
           { provide: getQueueToken(ACCOUNT_DELETION_QUEUE), useValue: mockAccountDeletionQueue },
           { provide: EventEmitter2, useValue: mockEventEmitter },
+          { provide: UPLOAD_OBJECT_STORAGE, useValue: mockObjectStorage },
         ],
       }).compile();
 
