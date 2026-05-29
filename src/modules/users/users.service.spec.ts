@@ -7,9 +7,11 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as bcrypt from 'bcrypt';
 import { QueryFailedError } from 'typeorm';
 import * as SYS_MSG from '../../constants/system.messages';
+import { APP_EVENTS } from '../../common/constants/app-events';
 import { UserModelAction } from './actions/user.action';
 import { UsersService } from './users.service';
 import { UserSessionModelAction } from './actions/user-session.action';
@@ -19,6 +21,10 @@ import { redisKeys } from '../../constants/redis-keys';
 import { UserStateService } from './user-state.service';
 import { User } from './entities/user.entity';
 import { UserStateResponse } from './interfaces/user-state.interface';
+import { DataSource } from 'typeorm';
+import { getQueueToken } from '@nestjs/bull';
+import { ACCOUNT_DELETION_QUEUE } from './processors/account-deletion.processor';
+import { PinoLoggerService } from '../../common/logger/pino-logger.service';
 import { UserRole } from './enums/user-role.enum';
 
 jest.mock('bcrypt', () => ({
@@ -34,11 +40,17 @@ const mockUserModelAction = {
   list: jest.fn(),
   update: jest.fn(),
   delete: jest.fn(),
+  findById: jest.fn(),
 };
 
 const mockUserSessionModelAction = {
+  revokeAllUserSessionsInDb: jest.fn().mockResolvedValue([]),
+  deleteSessionRedisKeys: jest.fn().mockResolvedValue(undefined),
   findByUserId: jest.fn(),
-  updateById: jest.fn()
+  findById: jest.fn(),
+  updateById: jest.fn(),
+  deleteById: jest.fn(),
+  createSession: jest.fn(),
 };
 
 const mockAuthMetaModelAction = {
@@ -47,9 +59,9 @@ const mockAuthMetaModelAction = {
   createForUser: jest.fn(),
 };
 
-
 const USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const USER_EMAIL = 'test@example.com';
+
 // Mock WizardSessionModelAction
 const mockWizardSessionModelAction = {
   findActiveSession: jest.fn(),
@@ -70,6 +82,14 @@ const mockRedisService = {
   get: jest.fn(),
   set: jest.fn(),
   del: jest.fn(),
+  getdel: jest.fn(),
+  setStrict: jest.fn(),
+  setNx: jest.fn(),
+  exists: jest.fn(),
+  incr: jest.fn(),
+  expire: jest.fn(),
+  rateLimit: jest.fn(),
+  delByPattern: jest.fn(),
 };
 
 const mockUser = (): Partial<User> => ({
@@ -94,11 +114,55 @@ const mockFullUser = {
   updated_at: new Date('2024-06-01'),
 };
 
+// Mock AuthMetadataModelAction
+const mockAuthMetadataModelAction = {
+  updateByUserId: jest.fn(),
+  findByUserId: jest.fn(),
+  createForUser: jest.fn(),
+};
+
+// Mock Bull queue
+const mockAccountDeletionQueue = {
+  add: jest.fn(),
+};
+
+// Mock DataSource
+const mockQueryRunner = {
+  connect: jest.fn(),
+  startTransaction: jest.fn(),
+  commitTransaction: jest.fn(),
+  rollbackTransaction: jest.fn(),
+  release: jest.fn(),
+  manager: {
+    update: jest.fn(),
+  },
+};
+
+const mockDataSource = {
+  createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
+};
+
+// Mock PinoLoggerService
+const mockPinoLoggerService = {
+  info: jest.fn(),
+  error: jest.fn(),
+  warn: jest.fn(),
+  debug: jest.fn(),
+  log: jest.fn(),
+  verbose: jest.fn(),
+  fatal: jest.fn(),
+  setContext: jest.fn(),
+  getLoggerLevel: jest.fn(),
+  runWithContext: jest.fn(),
+};
+
 describe('UsersService', () => {
   let service: UsersService;
+  let mockEventEmitter: { emit: jest.Mock };
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockEventEmitter = { emit: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -107,17 +171,20 @@ describe('UsersService', () => {
         { provide: UserSessionModelAction, useValue: mockUserSessionModelAction },
         { provide: AuthMetadataModelAction, useValue: mockAuthMetaModelAction },
         { provide: RedisService, useValue: mockRedisService },
-
         { provide: UserStateService, useValue: mockUserStateService },
+        { provide: PinoLoggerService, useValue: mockPinoLoggerService },
+        { provide: DataSource, useValue: mockDataSource },
+        { provide: getQueueToken(ACCOUNT_DELETION_QUEUE), useValue: mockAccountDeletionQueue },
+        { provide: EventEmitter2, useValue: mockEventEmitter },
       ],
     }).compile();
 
     service = module.get<UsersService>(UsersService);
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────
   // CRUD TESTS
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────
 
   describe('create', () => {
     const createDto = {
@@ -241,6 +308,10 @@ describe('UsersService', () => {
 
       await expect(service.remove(USER_ID)).resolves.toBeUndefined();
       expect(mockUserModelAction.delete).toHaveBeenCalled();
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        APP_EVENTS.ACCOUNT_DELETED,
+        expect.objectContaining({ userId: USER_ID }),
+      );
     });
 
     it('throws 404 when user not found during remove', async () => {
@@ -261,7 +332,7 @@ describe('UsersService', () => {
     beforeEach(() => {
       mockUserModelAction.get.mockResolvedValue(mockUser());
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-      mockUserModelAction.update.mockResolvedValue(mockUser);
+      mockUserModelAction.update.mockResolvedValue(mockUser());
       mockAuthMetaModelAction.updateByUserId.mockResolvedValue(undefined);
       mockAuthMetaModelAction.findByUserId.mockResolvedValue({ user_id: USER_ID });
       mockUserSessionModelAction.findByUserId.mockResolvedValue([]);
@@ -334,7 +405,7 @@ describe('UsersService', () => {
         ...changePasswordDto,
         confirmPassword: 'Mismatch123!',
       }).catch(e => e);
-      
+
       expect(error).toBeInstanceOf(UnprocessableEntityException);
       expect(mockUserModelAction.update).not.toHaveBeenCalled();
     });
@@ -368,7 +439,8 @@ describe('UsersService', () => {
     });
 
     it('SEC-02: logger does not include password hash in log payload', async () => {
-      const logSpy = jest.spyOn(service['logger'], 'log');
+      const logSpy = jest.spyOn(service['pinoLogger'], 'info');
+      
       await service.changePassword(USER_ID, changePasswordDto);
 
       expect(logSpy).toHaveBeenCalled();
@@ -439,8 +511,8 @@ describe('UsersService', () => {
         is_revoked: true,
         revoked_at: expect.any(Date),
       });
-      
-      expect(mockRedisService.del).toHaveBeenCalledTimes(4); 
+
+      expect(mockRedisService.del).toHaveBeenCalledTimes(4);
       expect(mockRedisService.del).not.toHaveBeenCalledWith(expect.stringContaining('session-1'));
     });
 
@@ -470,6 +542,10 @@ describe('UsersService', () => {
           updatePayload: { full_name: 'New Name' },
         }),
       );
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        APP_EVENTS.PROFILE_UPDATED,
+        expect.objectContaining({ userId: USER_ID, updatedFields: ['full_name'] }),
+      );
     });
 
     it('updates country and returns updated profile', async () => {
@@ -497,6 +573,7 @@ describe('UsersService', () => {
       await service.updateProfile(USER_ID, {});
 
       expect(mockUserModelAction.update).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
     });
 
     it('only-country update leaves full_name unchanged in DB', async () => {
@@ -600,6 +677,202 @@ describe('UsersService', () => {
       mockUserModelAction.get.mockResolvedValue(null);
 
       await expect(service.getProfile(USER_ID)).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // ACCOUNT DELETION TESTS (M4-BE-005)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  describe('UsersService - deleteAccount', () => {
+    const mockGoogleUser = {
+      id: USER_ID,
+      email: USER_EMAIL,
+      full_name: 'Test User',
+      is_active: true,
+      deleted_at: null,
+      auth_provider: 'google',
+      provider_user_id: 'google-123456',
+    };
+
+    const mockLocalUser = {
+      id: USER_ID,
+      email: USER_EMAIL,
+      full_name: 'Test User',
+      is_active: true,
+      deleted_at: null,
+      auth_provider: 'local',
+      provider_user_id: null,
+    };
+
+    beforeEach(async () => {
+      jest.clearAllMocks();
+
+      mockQueryRunner.connect.mockResolvedValue(undefined);
+      mockQueryRunner.startTransaction.mockResolvedValue(undefined);
+      mockQueryRunner.commitTransaction.mockResolvedValue(undefined);
+      mockQueryRunner.rollbackTransaction.mockResolvedValue(undefined);
+      mockQueryRunner.release.mockResolvedValue(undefined);
+      mockQueryRunner.manager.update.mockResolvedValue({ affected: 1 });
+      mockAccountDeletionQueue.add.mockResolvedValue({ id: 'job-123' });
+      mockUserSessionModelAction.revokeAllUserSessionsInDb.mockResolvedValue([]);
+      mockUserSessionModelAction.deleteSessionRedisKeys = jest.fn().mockResolvedValue(undefined);
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          UsersService,
+          { provide: UserModelAction, useValue: mockUserModelAction },
+          { provide: UserSessionModelAction, useValue: mockUserSessionModelAction },
+          { provide: AuthMetadataModelAction, useValue: mockAuthMetadataModelAction },
+          { provide: RedisService, useValue: mockRedisService },
+          { provide: UserStateService, useValue: mockUserStateService },
+          { provide: PinoLoggerService, useValue: mockPinoLoggerService },
+          { provide: DataSource, useValue: mockDataSource },
+          { provide: getQueueToken(ACCOUNT_DELETION_QUEUE), useValue: mockAccountDeletionQueue },
+          { provide: EventEmitter2, useValue: mockEventEmitter },
+        ],
+      }).compile();
+
+      service = module.get<UsersService>(UsersService);
+    });
+
+    describe('AC-01: valid account deletion', () => {
+      it('should soft delete account, revoke sessions, and schedule hard delete job', async () => {
+        mockUserModelAction.findById.mockResolvedValue(mockLocalUser);
+
+        await expect(service.deleteAccount(USER_ID, 'DELETE')).resolves.toBeUndefined();
+        expect(mockUserModelAction.findById).toHaveBeenCalledWith(USER_ID);
+        expect(mockQueryRunner.manager.update).toHaveBeenCalledWith(
+          User,
+          USER_ID,
+          expect.objectContaining({
+            deleted_at: expect.any(Date),
+            is_active: false,
+          }),
+        );
+        expect(mockUserSessionModelAction.revokeAllUserSessionsInDb).toHaveBeenCalledWith(
+          USER_ID,
+          mockQueryRunner.manager,
+        );
+        expect(mockAccountDeletionQueue.add).toHaveBeenCalledWith(
+          'hard-delete',
+          { userId: USER_ID, email: USER_EMAIL },
+          { delay: 30 * 24 * 60 * 60 * 1000 },
+        );
+        expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      });
+    });
+
+    describe('AC-02: session revocation', () => {
+      it('should call revokeAllUserSessionsInDb with correct parameters', async () => {
+        mockUserModelAction.findById.mockResolvedValue(mockLocalUser);
+
+        await service.deleteAccount(USER_ID, 'DELETE');
+
+        expect(mockUserSessionModelAction.revokeAllUserSessionsInDb).toHaveBeenCalledWith(
+          USER_ID,
+          mockQueryRunner.manager,
+        );
+      });
+    });
+
+    describe('AC-04: already deleted account', () => {
+      it('should throw UnauthorizedException when user already has deleted_at set', async () => {
+        const deletedUser = { ...mockLocalUser, deleted_at: new Date() };
+        mockUserModelAction.findById.mockResolvedValue(deletedUser);
+
+        await expect(service.deleteAccount(USER_ID, 'DELETE')).rejects.toThrow(
+          UnauthorizedException,
+        );
+        expect(mockQueryRunner.startTransaction).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('AC-06: invalid confirmation - lowercase', () => {
+      it('should throw UnprocessableEntityException when confirmation is lowercase', async () => {
+        await expect(service.deleteAccount(USER_ID, 'delete')).rejects.toThrow(
+          UnprocessableEntityException,
+        );
+        expect(mockUserModelAction.findById).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('AC-07: invalid confirmation - trailing space', () => {
+      it('should throw UnprocessableEntityException when confirmation has trailing space', async () => {
+        await expect(service.deleteAccount(USER_ID, 'DELETE ')).rejects.toThrow(
+          UnprocessableEntityException,
+        );
+        expect(mockUserModelAction.findById).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('AC-08: missing confirmation', () => {
+      it('should throw UnprocessableEntityException when confirmation is empty', async () => {
+        await expect(service.deleteAccount(USER_ID, '')).rejects.toThrow(
+          UnprocessableEntityException,
+        );
+      });
+    });
+
+    describe('AC-09: transaction rollback on failure', () => {
+      it('should rollback transaction when an error occurs', async () => {
+        mockUserModelAction.findById.mockResolvedValue(mockLocalUser);
+        mockUserSessionModelAction.revokeAllUserSessionsInDb.mockRejectedValue(
+          new Error('Session revocation failed'),
+        );
+
+        await expect(service.deleteAccount(USER_ID, 'DELETE')).rejects.toThrow(
+          InternalServerErrorException,
+        );
+
+        expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+        expect(mockQueryRunner.commitTransaction).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('AC-11: Google OAuth account deletion', () => {
+      it('should nullify provider_user_id for Google OAuth accounts', async () => {
+        mockUserModelAction.findById.mockResolvedValue(mockGoogleUser);
+
+        await service.deleteAccount(USER_ID, 'DELETE');
+
+        expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      });
+
+      it('should not nullify provider_user_id for non-Google accounts', async () => {
+        mockUserModelAction.findById.mockResolvedValue(mockLocalUser);
+
+        await service.deleteAccount(USER_ID, 'DELETE');
+
+        expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      });
+    });
+
+    describe('EC-01: re-registration during retention window', () => {
+      it('should throw USER_ACCOUNT_LOCKED when user exists with deleted_at not null', async () => {
+        const deletedUser = { ...mockLocalUser, is_active: false, deleted_at: new Date() };
+        mockUserModelAction.findByEmail.mockResolvedValue(deletedUser);
+
+        const createDto = {
+          email: USER_EMAIL,
+          password: 'Password123!',
+          fullName: 'New User',
+          termsAccepted: true,
+        };
+
+        await expect(service.create(createDto)).rejects.toThrow(SYS_MSG.USER_ACCOUNT_LOCKED);
+        expect(mockUserModelAction.create).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('user not found', () => {
+      it('should throw NotFoundException when user does not exist', async () => {
+        mockUserModelAction.findById.mockResolvedValue(null);
+
+        await expect(service.deleteAccount(USER_ID, 'DELETE')).rejects.toThrow(
+          NotFoundException,
+        );
+      });
     });
   });
 });
