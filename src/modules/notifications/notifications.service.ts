@@ -39,7 +39,7 @@ export class NotificationsService {
       if (jsonLen > METADATA_TOTAL_MAX) {
         finalMetadata = { _truncated: true };
       }
-    } catch (e) {
+    } catch {
       finalMetadata = { _truncated: true };
     }
 
