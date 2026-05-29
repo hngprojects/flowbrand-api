@@ -131,13 +131,14 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
       .getMany();
   }
 
-  async markFunnelsFailed(ids: string[]): Promise<void> {
+    async markFunnelsFailed(ids: string[]): Promise<void> {
     if (ids.length === 0) return;
     await this.funnelRepository
       .createQueryBuilder()
       .update(Funnel)
       .set({ status: FunnelStatus.FAILED })
       .whereInIds(ids)
+      .andWhere('status = :status', { status: FunnelStatus.GENERATING }) 
       .execute();
   }
 }

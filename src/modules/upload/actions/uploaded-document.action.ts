@@ -84,7 +84,7 @@ export class UploadedDocumentModelAction extends AbstractModelAction<UploadedDoc
       .getMany();
   }
 
-  async markUploadsFailed(ids: string[], failureReason: string): Promise<void> {
+    async markUploadsFailed(ids: string[], failureReason: string): Promise<void> {
     if (ids.length === 0) return;
     await this.uploadedDocumentRepository
       .createQueryBuilder()
@@ -95,6 +95,9 @@ export class UploadedDocumentModelAction extends AbstractModelAction<UploadedDoc
         failure_reason: failureReason
       })
       .whereInIds(ids)
+      .andWhere('status IN (:...statuses)', { 
+        statuses: [UploadDocumentStatus.PARSING, UploadDocumentStatus.UPLOADING] 
+      })
       .execute();
   }
 }
