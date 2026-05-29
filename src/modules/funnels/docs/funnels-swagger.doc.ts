@@ -35,7 +35,7 @@ export const funnelListExample = {
         creationPath: 'google-ads',
         status: 'active',
         createdAt: '2026-05-18T12:00:00.000Z',
-        stages: [{ position: 1, name: 'Discovery', status: 'complete' }],
+        stages: [{ position: 1, name: 'Discovery', status: 'complete', tasksTotal: 3, tasksComplete: 3 }],
       },
     ],
     pagination: {
@@ -227,17 +227,6 @@ export const CreateFunnelDocs = () =>
       },
     }),
     ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.', schema: { example: unauthorizedExample } }),
-    ApiConflictResponse({
-      description: 'Another funnel is already generating for this user.',
-      schema: {
-        example: {
-          success: false,
-          statusCode: HttpStatus.CONFLICT,
-          error: 'ConflictException',
-          message: SYS_MSG.GENERATION_IN_PROGRESS,
-        },
-      },
-    }),
     ApiUnprocessableEntityResponse({
       description:
         'Source validation failed: wizard session not complete; upload_ids omitted ' +
