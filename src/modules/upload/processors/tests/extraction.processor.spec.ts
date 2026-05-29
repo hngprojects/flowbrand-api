@@ -169,6 +169,31 @@ describe('ExtractionProcessor', () => {
     });
   });
 
+  describe('EC-05 — extraction timeout', () => {
+    it('EC-05: marks record FAILED when extraction exceeds the timeout', async () => {
+      jest.useFakeTimers();
+
+      mockExtractor.extract.mockImplementation(
+        () => new Promise<string>((resolve) => setTimeout(() => resolve('late text'), 999_999)),
+      );
+
+      const jobPromise = processor.handleExtraction(makeJob());
+      // advanceTimersByTimeAsync advances fake timers AND flushes resulting microtasks,
+      // so the Promise.race rejection propagates before we await the job promise.
+      await jest.advanceTimersByTimeAsync(270_001);
+      await jobPromise;
+
+      expect(mockDocumentAction.saveDocument).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: UploadDocumentStatus.FAILED,
+          failure_reason: expect.stringContaining('timed out'),
+        }),
+      );
+
+      jest.useRealTimers();
+    });
+  });
+
   describe('onFailed — DB reconciliation', () => {
     function makeFailedJob(overrides: Partial<ExtractionJobPayload> = {}): Job<ExtractionJobPayload> {
       return { ...makeJob(overrides), attemptsMade: 3 } as unknown as Job<ExtractionJobPayload>;
