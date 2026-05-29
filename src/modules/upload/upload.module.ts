@@ -10,6 +10,7 @@ import { UploadService } from './upload.service';
 import { UPLOAD_OBJECT_STORAGE } from './upload.types';
 import { DocumentTextExtractorService } from './services/document-text-extractor.service';
 import { MinioUploadStorageService } from './services/minio-upload-storage.service';
+import { UploadRecoveryService } from './services/upload-recovery.service';
 import { ExtractionProcessor } from './processors/extraction.processor';
 
 @Module({
@@ -36,6 +37,7 @@ import { ExtractionProcessor } from './processors/extraction.processor';
     UploadedDocumentModelAction,
     DocumentTextExtractorService,
     MinioUploadStorageService,
+    UploadRecoveryService,
     ExtractionProcessor,
     {
       provide: UPLOAD_OBJECT_STORAGE,

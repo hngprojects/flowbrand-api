@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UploadedDocument } from '../entities/uploaded-document.entity';
+import { UploadDocumentStatus } from '../upload.types';
 
 @Injectable()
 export class UploadedDocumentModelAction extends AbstractModelAction<UploadedDocument> {
@@ -39,6 +40,22 @@ export class UploadedDocumentModelAction extends AbstractModelAction<UploadedDoc
       },
       where: { id: uploadId, user_id: userId },
     });
+  }
+
+  async markStaleParsing(olderThanMs: number): Promise<number> {
+    const threshold = new Date(Date.now() - olderThanMs);
+    const result = await this.uploadedDocumentRepository
+      .createQueryBuilder()
+      .update(UploadedDocument)
+      .set({
+        status: UploadDocumentStatus.FAILED,
+        percent_complete: 0,
+        failure_reason: 'Server restarted during extraction',
+      })
+      .where('status = :status', { status: UploadDocumentStatus.PARSING })
+      .andWhere('updated_at < :threshold', { threshold })
+      .execute();
+    return result.affected ?? 0;
   }
 
   async deleteById(uploadId: string): Promise<void> {
