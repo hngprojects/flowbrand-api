@@ -439,7 +439,8 @@ describe('UsersService', () => {
     });
 
     it('SEC-02: logger does not include password hash in log payload', async () => {
-      const logSpy = jest.spyOn(service['logger'], 'log');
+      const logSpy = jest.spyOn(service['pinoLogger'], 'info');
+      
       await service.changePassword(USER_ID, changePasswordDto);
 
       expect(logSpy).toHaveBeenCalled();
