@@ -121,7 +121,11 @@ export const MarkNotificationReadDocs = () =>
           success: true,
           statusCode: HttpStatus.OK,
           message: SYS_MSG.NOTIFICATION_MARKED_AS_READ,
-          data: notificationItemExample,
+           data: {
+            ...notificationItemExample,
+            is_read: true,
+            read_at: '2026-05-29T10:00:00.000Z',
+         },
         },
       },
     }),

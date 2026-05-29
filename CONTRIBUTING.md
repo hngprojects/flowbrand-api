@@ -8,7 +8,7 @@ Your participation helps keep the platform smarter, more reliable, and more impa
 
 ### 1. Clone the repository
 
-This project uses a shared-repo workflow. If you have write access to `hngprojects/flowbrand-api`, clone the repo directly and branch off `dev`. External contributors without write access can fork ins
+This project uses a shared-repo workflow. If you have write access to `hngprojects/flowbrand-api`, clone the repo directly and branch off `dev`. External contributors without write access can fork the
 
 ```sh
 git clone https://github.com/hngprojects/flowbrand-api.git
@@ -301,7 +301,7 @@ this.eventEmitter.emit(APP_EVENTS.STAGE_COMPLETED, new StageCompletedEvent(...))
 
 `EventEmitter2` is synchronous. An uncaught exception in a listener propagates directly to the service that called `emit()` and can kill a user-facing request. Activity logging, notifications, and ana
 
-> **Fire-and-forget**: `emit()` returns before any `async` listener settles. This means `ignoreErrors` only catches synchronous throws — async listener rejections become unhandled promise rejections r
+> **Fire-and-forget**: `emit()` returns before any `async` listener settles. This means `ignoreErrors` only catches synchronous throws — async listener rejections become unhandled promise rejections a
 
 ```ts
 @OnEvent(APP_EVENTS.STAGE_COMPLETED)

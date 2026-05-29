@@ -32,6 +32,7 @@ export class NotificationModelAction extends AbstractModelAction<Notification> {
 
     return query
       .orderBy('notification.created_at', 'DESC')
+      .addOrderBy('notification.id', 'DESC')
       .skip((page - 1) * perPage)
       .take(perPage)
       .getManyAndCount();

@@ -125,12 +125,10 @@ export class NotificationsService {
   }
 
   async deleteNotification(userId: string, notificationId: string): Promise<void> {
-    const notification = await this.notificationAction.findOwnedById(notificationId, userId);
-    if (!notification) {
+     const deletedCount = await this.notificationAction.deleteOwnedById(notificationId, userId);
+    if (deletedCount === 0) {
       throw new NotFoundException(SYS_MSG.NOTIFICATION_NOT_FOUND);
     }
-
-    await this.notificationAction.deleteOwnedById(notificationId, userId);
   }
 
   private mapToFeedItem(n: Notification): NotificationFeedItem {
@@ -156,20 +154,24 @@ export class NotificationsService {
     );
   }
 
-  private sanitizeMetadataRecursive(value: unknown): unknown {
+  private sanitizeMetadataRecursive(value: unknown, seen = new WeakSet<object>()): unknown {
     if (typeof value === 'string') {
       return value.length > METADATA_STRING_MAX ? value.slice(0, METADATA_STRING_MAX) : value;
     }
 
     if (Array.isArray(value)) {
-      return value.map((v) => this.sanitizeMetadataRecursive(v));
+      return value.map((v) => this.sanitizeMetadataRecursive(v, seen));
     }
 
     if (value && typeof value === 'object') {
+      if (seen.has(value)) {
+        return '[Circular]';
+      }
+      seen.add(value);
       const obj = value as Record<string, unknown>;
       const out: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(obj)) {
-        out[k] = this.sanitizeMetadataRecursive(v);
+        out[k] = this.sanitizeMetadataRecursive(v, seen);
       }
       return out;
     }
