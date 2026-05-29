@@ -16,12 +16,14 @@ import { ConfigService } from '@nestjs/config'
 import { AccountDeletionProcessor, ACCOUNT_DELETION_QUEUE } from './processors/account-deletion.processor';
 import { AuthMetadata } from '../auth/entities/auth-metadata.entity';
 import { AuthMetadataModelAction } from '../auth/actions/auth-metadata.action';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, UserSession, AuthMetadata]),
     OnboardingModule,
     FunnelsModule,
+    NotificationsModule,
     RedisModule,
     UploadModule,
     BullModule.registerQueueAsync({

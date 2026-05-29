@@ -2,6 +2,7 @@ import { applyDecorators, HttpStatus } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiBadRequestResponse,
   ApiConsumes,
   ApiInternalServerErrorResponse,
   ApiNotFoundResponse,
@@ -18,6 +19,7 @@ import { UploadAvatarDto } from '../dto/upload-avatar.dto';
 import { UserAvatarResponseDto } from '../dto/user-avatar-response.dto';
 import { DeleteAccountDto } from '../dto/delete-account.dto';
 import { ChangePasswordDto } from '../dto/change-password.dto';
+import { UpdateNotificationPreferencesDto } from '../../notifications/dto/update-notification-preferences.dto';
 
 const profileDataExample = {
   id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -45,6 +47,18 @@ const notFoundExample = {
   message: SYS_MSG.PROFILE_NOT_FOUND,
 };
 
+const notificationPreferencesExample = {
+  id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  userId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  emailFunnelReady: true,
+  emailStageUnlocked: true,
+  emailStageCompleted: false,
+  emailWeeklyDigest: true,
+  inappTaskCompleted: true,
+  inappStageUnlocked: true,
+  createdAt: '2026-05-29T10:30:00.000Z',
+  updatedAt: '2026-05-29T10:30:00.000Z',
+};
 const avatarUploadedExample = {
   success: true,
   statusCode: HttpStatus.OK,
@@ -77,7 +91,7 @@ export function GetProfileDocs() {
   return applyDecorators(
     ApiBearerAuth('JWT'),
     ApiOperation({
-      summary: 'Get the authenticated user\'s profile',
+      summary: "Get the authenticated user's profile",
       description:
         'Returns the full profile for the currently authenticated user. ' +
         'Sensitive fields (password_hash, deleted_at, provider_user_id) are never included. ' +
@@ -109,7 +123,7 @@ export function UpdateProfileDocs() {
   return applyDecorators(
     ApiBearerAuth('JWT'),
     ApiOperation({
-      summary: 'Update the authenticated user\'s profile',
+      summary: "Update the authenticated user's profile",
       description:
         'Accepts a partial body. Only `fullName` and `country` may be changed. ' +
         '`fullName` is trimmed before validation — a whitespace-only string returns HTTP 422. ' +
@@ -131,8 +145,7 @@ export function UpdateProfileDocs() {
     }),
     ApiResponse({
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description:
-        'Validation failed — email in body / invalid country / empty fullName after trim',
+      description: 'Validation failed — email in body / invalid country / empty fullName after trim',
       schema: {
         example: {
           success: false,
@@ -458,48 +471,152 @@ export function ChangePasswordDocs() {
       description: 'Missing or invalid bearer token, or current password is incorrect.',
       schema: {
         examples: {
-            invalidToken: {
-                summary: 'Invalid token',
-                value: {
-                    success: false,
-                    statusCode: HttpStatus.UNAUTHORIZED,
-                    error: 'UnauthorizedException',
-                    message: SYS_MSG.AUTH_INVALID_TOKEN,
-                }
+          invalidToken: {
+            summary: 'Invalid token',
+            value: {
+              success: false,
+              statusCode: HttpStatus.UNAUTHORIZED,
+              error: 'UnauthorizedException',
+              message: SYS_MSG.AUTH_INVALID_TOKEN,
             },
-            incorrectPassword: {
-                summary: 'Current password is incorrect',
-                value: {
-                    success: false,
-                    statusCode: HttpStatus.UNAUTHORIZED,
-                    error: 'UnauthorizedException',
-                    message: SYS_MSG.INCORRECT_OLD_PASSWORD,
-                }
+          },
+          incorrectPassword: {
+            summary: 'Current password is incorrect',
+            value: {
+              success: false,
+              statusCode: HttpStatus.UNAUTHORIZED,
+              error: 'UnauthorizedException',
+              message: SYS_MSG.INCORRECT_OLD_PASSWORD,
+            },
+          },
+        },
+      },
+    }),
+    ApiUnprocessableEntityResponse({
+      description: 'Validation failed — confirm password mismatch, OAuth account, or new password equals old password.',
+      schema: {
+        examples: {
+          confirmMismatch: {
+            summary: 'New password and confirm password do not match',
+            value: {
+              success: false,
+              statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+              error: 'UnprocessableEntityException',
+              message: SYS_MSG.INCORRECT_CONFIRM_PASSWORD,
+            },
+          },
+          sameAsOld: {
+            summary: 'New password is the same as the old password',
+            value: {
+              success: false,
+              statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+              error: 'UnprocessableEntityException',
+              message: SYS_MSG.PASSWORD_CHANGE_NOT_SUCCESSFUL,
             }
+          },
+          googleOAuth: {
+            summary: 'Google OAuth account or new password same as old',
+            value: {
+              success: false,
+              statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+              error: 'UnprocessableEntityException',
+              message: SYS_MSG.PASSWORD_CHANGE_NOT_SUPPORTED,
+            },
+          },
         },
       },
     }),
-    ApiUnprocessableEntityResponse({
-      description: 'New password and confirm password do not match.',
+  );
+}
+
+export function GetNotificationPreferencesDocs() {
+  return applyDecorators(
+    ApiBearerAuth('JWT'),
+    ApiOperation({
+      summary: 'Get notification preferences',
+      description:
+        "Returns the authenticated user's notification preferences. " +
+        'If no preference record exists, default preferences are created and returned.',
+    }),
+    ApiOkResponse({
+      description: 'Notification preferences retrieved successfully.',
       schema: {
         example: {
-          success: false,
-          statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
-          error: 'UnprocessableEntityException',
-          message: SYS_MSG.INCORRECT_CONFIRM_PASSWORD,
+          success: true,
+          statusCode: HttpStatus.OK,
+          message: SYS_MSG.NOTIFICATION_PREFERENCES_RETRIEVED_SUCCESSFULLY,
+          data: notificationPreferencesExample,
         },
       },
     }),
-    ApiUnprocessableEntityResponse({
-      description: 'Google OAuth account or new password is the same as the old password.',
+    ApiUnauthorizedResponse({
+      description: 'Missing or invalid JWT.',
+      schema: { example: unauthorizedExample },
+    }),
+    ApiNotFoundResponse({
+      description: 'Authenticated user not found',
+      schema: { example: notFoundExample }, 
+    }),
+  );
+}
+
+export function UpdateNotificationPreferencesDocs(): ReturnType<typeof applyDecorators> {
+  return applyDecorators(
+    ApiBearerAuth('JWT'),
+    ApiOperation({
+      summary: 'Update notification preferences',
+      description:
+        "Partially updates the authenticated user's notification preferences. " +
+        'An empty body returns the current preferences without writing to the database.',
+    }),
+    ApiBody({ type: UpdateNotificationPreferencesDto }),
+    ApiOkResponse({
+      description: 'Notification preferences updated successfully.',
+      schema: {
+        examples: {
+          updated: {
+            summary: 'Preference updated',
+            value: {
+              success: true,
+              statusCode: HttpStatus.OK,
+              message: SYS_MSG.NOTIFICATION_PREFERENCES_UPDATED_SUCCESSFULLY,
+              data: {
+                ...notificationPreferencesExample,
+                emailWeeklyDigest: false,
+              },
+            },
+          },
+          unchanged: {
+            summary: 'Empty body or stripped fields',
+            value: {
+              success: true,
+              statusCode: HttpStatus.OK,
+              message: SYS_MSG.NOTIFICATION_PREFERENCES_UPDATED_SUCCESSFULLY,
+              data: notificationPreferencesExample,
+            },
+          },
+        },
+      },
+    }),
+    ApiBadRequestResponse({
+      description: 'Validation failed. Boolean strings such as "true" are rejected.',
       schema: {
         example: {
           success: false,
-          statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
-          error: 'UnprocessableEntityException',
-          message: SYS_MSG.PASSWORD_CHANGE_NOT_SUPPORTED,
+          statusCode: HttpStatus.BAD_REQUEST,
+          error: 'Bad Request',
+          message: SYS_MSG.VALIDATION_FAILED,
+          details: ['email_weekly_digest: email_weekly_digest must be a boolean value'],
         },
       },
+    }),
+    ApiUnauthorizedResponse({
+      description: 'Missing or invalid JWT.',
+      schema: { example: unauthorizedExample },
+    }),
+    ApiNotFoundResponse({
+      description: 'Authenticated user not found',
+      schema: { example: notFoundExample }, 
     }),
   );
 }
