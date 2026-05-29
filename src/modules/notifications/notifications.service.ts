@@ -106,12 +106,6 @@ export class NotificationsService {
     if (updated) {
       return updated;
     }
-
-    const recreated = await this.getNotificationPreferences(userId);
-    const retried = await this.preferenceAction.updateByUserId(userId, updatePayload);
-    if(retried) {
-      return retried
-    }
     
     throw new ConflictException(SYS_MSG.NOTIFICATION_PREFERENCES_UPDATE_FAILED);
   }
