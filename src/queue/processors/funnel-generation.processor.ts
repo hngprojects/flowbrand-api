@@ -1,11 +1,4 @@
-import {
-  OnQueueActive,
-  OnQueueCompleted,
-  OnQueueFailed,
-  OnQueueStalled,
-  Process,
-  Processor,
-} from '@nestjs/bull';
+import { OnQueueActive, OnQueueCompleted, OnQueueFailed, OnQueueStalled, Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Job } from 'bull';
@@ -16,7 +9,10 @@ import { Funnel } from '../../modules/funnels/entities/funnel.entity';
 import { FunnelStage } from '../../modules/funnels/entities/funnel-stage.entity';
 import { StageTask } from '../../modules/funnels/entities/stage-task.entity';
 import { FunnelStatus } from '../../modules/funnels/enums/funnel-status.enum';
-import type { BusinessContext, GenerateFunnelJobPayload } from '../../modules/funnels/interfaces/generate-funnel-job.interface';
+import type {
+  BusinessContext,
+  GenerateFunnelJobPayload,
+} from '../../modules/funnels/interfaces/generate-funnel-job.interface';
 import type { LlmStageData } from '../../modules/funnels/interfaces/llm-stage-data.interface';
 import { FunnelTemplateService } from '../../modules/funnels/services/funnel-template.service';
 import { LlmService } from '../interfaces/llm.service.interface';
@@ -64,36 +60,32 @@ export class FunnelGenerationProcessor {
 
     await job.progress(10);
 
-    try {
-      let stageData = await this.tryAiGeneration(businessContext);
+    let stageData = await this.tryAiGeneration(businessContext);
 
-      if (!stageData) {
-        this.logger.log({ message: 'AI failed — using template fallback', funnelId });
-        stageData = this.templateService.getTemplate(businessContext, userId);
-      }
-
-      try {
-        this.validateStageData(stageData);
-      } catch (validationErr) {
-        this.logger.warn({
-          event: 'funnel_stage_validation_failed',
-          funnelId,
-          jobId: job.id,
-          rule: (validationErr as Error).message,
-        });
-        throw validationErr;
-      }
-
-      await job.progress(70);
-
-      await this.writeFunnelData(funnelId, stageData, job);
-
-      await job.progress(100);
-
-      this.logger.log({ message: 'Funnel generation complete', funnelId, jobId: job.id });
-    } catch (err) {
-      throw err;
+    if (!stageData) {
+      this.logger.log({ message: 'AI failed — using template fallback', funnelId });
+      stageData = this.templateService.getTemplate(businessContext, userId);
     }
+
+    try {
+      this.validateStageData(stageData);
+    } catch (validationErr) {
+      this.logger.warn({
+        event: 'funnel_stage_validation_failed',
+        funnelId,
+        jobId: job.id,
+        rule: (validationErr as Error).message,
+      });
+      throw validationErr;
+    }
+
+    await job.progress(70);
+
+    await this.writeFunnelData(funnelId, stageData, job);
+
+    await job.progress(100);
+
+    this.logger.log({ message: 'Funnel generation complete', funnelId, jobId: job.id });
   }
 
   private async tryAiGeneration(ctx: BusinessContext): Promise<LlmStageData[] | null> {
