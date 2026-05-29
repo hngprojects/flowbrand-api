@@ -20,3 +20,16 @@ export const NOTIFICATION_PREFERENCE_FIELDS = [
   'inapp_task_completed',
   'inapp_stage_unlocked',
 ] as const;
+
+export interface NotificationPreferenceResponse {
+  id: string;
+  userId: string;
+  emailFunnelReady: boolean;
+  emailStageUnlocked: boolean;
+  emailStageCompleted: boolean;
+  emailWeeklyDigest: boolean;
+  inappTaskCompleted: boolean;
+  inappStageUnlocked: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}

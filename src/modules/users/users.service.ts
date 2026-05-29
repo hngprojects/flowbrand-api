@@ -37,6 +37,7 @@ import { redisKeys } from '../../constants/redis-keys';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationPreference } from '../notifications/entities/notification-preference.entity';
 import { UpdateNotificationPreferencesDto } from '../notifications/dto/update-notification-preferences.dto';
+import { NotificationPreferenceResponse } from '../notifications/interfaces/notification-preference.interface';
 
 const BCRYPT_ROUNDS = 10;
 const NO_TRANSACTION = {
@@ -323,24 +324,43 @@ export class UsersService {
     };
   }
 
+  private toNotificationPreferenceResponse(
+    preference: NotificationPreference,
+  ): NotificationPreferenceResponse {
+    return {
+      id: preference.id,
+      userId: preference.user_id,
+      emailFunnelReady: preference.email_funnel_ready,
+      emailStageUnlocked: preference.email_stage_unlocked,
+      emailStageCompleted: preference.email_stage_completed,
+      emailWeeklyDigest: preference.email_weekly_digest,
+      inappTaskCompleted: preference.inapp_task_completed,
+      inappStageUnlocked: preference.inapp_stage_unlocked,
+      createdAt: preference.created_at,
+      updatedAt: preference.updated_at,
+    };
+  }
+
   async getProfile(userId: string): Promise<IUserProfile> {
     const user = await this.findById(userId);
     return this.toProfileResponse(user);
   }
 
   /** Returns the authenticated user's notification preferences, creating defaults when needed. */
-  async getNotificationPreferences(userId: string): Promise<NotificationPreference> {
+  async getNotificationPreferences(userId: string): Promise<NotificationPreferenceResponse> {
     await this.findById(userId);
-    return this.notificationsService.getNotificationPreferences(userId);
+    const preference = await this.notificationsService.getNotificationPreferences(userId);
+    return this.toNotificationPreferenceResponse(preference);
   }
 
   /** Partially updates the authenticated user's notification preferences. */
   async updateNotificationPreferences(
     userId: string,
     dto: UpdateNotificationPreferencesDto,
-  ): Promise<NotificationPreference> {
+  ): Promise<NotificationPreferenceResponse> {
     await this.findById(userId);
-    return this.notificationsService.updateNotificationPreferences(userId, dto);
+    const preference = await this.notificationsService.updateNotificationPreferences(userId, dto);
+    return this.toNotificationPreferenceResponse(preference);
   }
 
   async updateProfile(userId: string, dto: UpdateUserProfileDto & { email?: unknown }): Promise<IUserProfile> {

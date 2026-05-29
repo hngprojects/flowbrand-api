@@ -133,6 +133,19 @@ const mockNotificationPreferences = {
   updated_at: new Date('2026-05-29T10:30:00.000Z'),
 };
 
+const mockNotificationPreferencesResponse = {
+  id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  userId: USER_ID,
+  emailFunnelReady: true,
+  emailStageUnlocked: true,
+  emailStageCompleted: false,
+  emailWeeklyDigest: true,
+  inappTaskCompleted: true,
+  inappStageUnlocked: true,
+  createdAt: new Date('2026-05-29T10:30:00.000Z'),
+  updatedAt: new Date('2026-05-29T10:30:00.000Z'),
+};
+
 // Mock AuthMetadataModelAction
 const mockAuthMetadataModelAction = {
   updateByUserId: jest.fn(),
@@ -714,7 +727,7 @@ describe('UsersService', () => {
         identifierOptions: { id: USER_ID },
       });
       expect(mockNotificationsService.getNotificationPreferences).toHaveBeenCalledWith(USER_ID);
-      expect(result).toBe(mockNotificationPreferences);
+      expect(result).toEqual(mockNotificationPreferencesResponse);
     });
 
     it('AC-03: updates preferences for authenticated user', async () => {
@@ -728,7 +741,23 @@ describe('UsersService', () => {
       expect(mockNotificationsService.updateNotificationPreferences).toHaveBeenCalledWith(USER_ID, {
         email_weekly_digest: false,
       });
-      expect(result.email_weekly_digest).toBe(false);
+      expect(result.emailWeeklyDigest).toBe(false);
+    });
+
+    it('AC-04: returns camelCase preference fields without database column names', async () => {
+      mockNotificationsService.getNotificationPreferences.mockResolvedValue(mockNotificationPreferences);
+
+      const result = await service.getNotificationPreferences(USER_ID) as unknown as Record<string, unknown>;
+
+      expect(result).toMatchObject({
+        userId: USER_ID,
+        emailFunnelReady: true,
+        emailWeeklyDigest: true,
+        inappStageUnlocked: true,
+      });
+      expect(result).not.toHaveProperty('user_id');
+      expect(result).not.toHaveProperty('email_weekly_digest');
+      expect(result).not.toHaveProperty('created_at');
     });
 
     it('SEC-03: scopes notification preference reads to req.user.userId', async () => {
@@ -797,6 +826,7 @@ describe('UsersService', () => {
           { provide: DataSource, useValue: mockDataSource },
           { provide: getQueueToken(ACCOUNT_DELETION_QUEUE), useValue: mockAccountDeletionQueue },
           { provide: EventEmitter2, useValue: mockEventEmitter },
+          { provide: NotificationsService, useValue: mockNotificationsService },
         ],
       }).compile();
 
