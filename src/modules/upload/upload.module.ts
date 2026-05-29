@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bull';
 import { QUEUES } from '../../common/constants/queue.constants';
 import { UploadedDocumentModelAction } from './actions/uploaded-document.action';
+import { EXTRACTION_LOCK_MS } from './constants/upload.constants';
 import { UploadedDocument } from './entities/uploaded-document.entity';
 import { UploadController } from './upload.controller';
 import { UploadService } from './upload.service';
@@ -16,10 +17,16 @@ import { ExtractionProcessor } from './processors/extraction.processor';
     TypeOrmModule.forFeature([UploadedDocument]),
     BullModule.registerQueue({
       name: QUEUES.DOCUMENT_EXTRACTION,
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5_000 },
+        removeOnComplete: true,
+        removeOnFail: false,
+      },
       settings: {
-        // Text extraction on large documents can exceed Bull's default 30 s lock.
-        // 120 s matches the upload file size limit (5 MiB at typical parse speeds).
-        lockDuration: 120_000,
+        lockDuration: EXTRACTION_LOCK_MS,
+        stalledInterval: 30_000,
+        maxStalledCount: 1,
       },
     }),
   ],
