@@ -40,6 +40,7 @@ const mockObjectStorage: jest.Mocked<ObjectStorage> = {
   putObject: jest.fn(),
   getObject: jest.fn(),
   deleteObject: jest.fn(),
+  createPresignedGetObjectUrl: jest.fn(),
 };
 
 function makeRow(overrides = {}) {

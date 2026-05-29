@@ -59,6 +59,7 @@ export interface ObjectStorage {
   putObject(params: StoragePutParams): Promise<void>;
   getObject(storagePath: string): Promise<Buffer>;
   deleteObject(storagePath: string): Promise<void>;
+  createPresignedGetObjectUrl(storagePath: string, expirySeconds: number): Promise<string>;
 }
 
 /** Nest injection token for `ObjectStorage`. */

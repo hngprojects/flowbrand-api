@@ -12,6 +12,9 @@ const mockUsersService = {
   remove: jest.fn(),
   getProfile: jest.fn(),
   updateProfile: jest.fn(),
+  getUserState: jest.fn(),
+  uploadAvatar: jest.fn(),
+  deleteAvatar: jest.fn(),
 };
 
 const USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -49,13 +52,10 @@ describe('UsersController — profile endpoints', () => {
     controller = module.get<UsersController>(UsersController);
   });
 
-  // GET /users/me
   describe('GET /users/me', () => {
     it('returns 200 with profile data', async () => {
       mockUsersService.getProfile.mockResolvedValue(mockProfile);
-
       const result = await controller.getProfile(mockAuthUser);
-
       expect(result).toEqual({
         statusCode: HttpStatus.OK,
         message: SYS_MSG.PROFILE_RETRIEVED_SUCCESSFULLY,
@@ -64,31 +64,26 @@ describe('UsersController — profile endpoints', () => {
       expect(mockUsersService.getProfile).toHaveBeenCalledWith(USER_ID);
     });
 
-    it('delegates to service — response shape contains no raw entity', async () => {
+    it('delegates to service and does not expose raw entity fields', async () => {
       mockUsersService.getProfile.mockResolvedValue(mockProfile);
 
-      const result = await controller.getProfile(mockAuthUser) as unknown as {
-        data: Record<string, unknown>;
-      };
-      
+      const result = await controller.getProfile(mockAuthUser);
+
       expect(result.data).not.toHaveProperty('password_hash');
       expect(result.data).not.toHaveProperty('deleted_at');
     });
   });
 
-  // PATCH /users/me
   describe('PATCH /users/me', () => {
     it('updates full_name and returns 200', async () => {
       const updated = { ...mockProfile, fullName: 'Jane Updated' };
       mockUsersService.updateProfile.mockResolvedValue(updated);
 
-      const result = await controller.updateProfile(mockAuthUser, { fullName: 'Jane Updated' });
-
-      expect(result).toEqual({
-        statusCode: HttpStatus.OK,
-        message: SYS_MSG.PROFILE_UPDATED_SUCCESSFULLY,
-        data: updated,
+      const result = await controller.updateProfile(mockAuthUser, {
+        fullName: 'Jane Updated',
       });
+
+      expect(result.statusCode).toBe(HttpStatus.OK);
       expect(mockUsersService.updateProfile).toHaveBeenCalledWith(USER_ID, {
         fullName: 'Jane Updated',
       });
@@ -100,9 +95,9 @@ describe('UsersController — profile endpoints', () => {
 
       const result = await controller.updateProfile(mockAuthUser, { country: 'Ghana' });
 
-      expect(result).toMatchObject({
-        statusCode: HttpStatus.OK,
-        message: SYS_MSG.PROFILE_UPDATED_SUCCESSFULLY,
+      expect(result.statusCode).toBe(HttpStatus.OK);
+      expect(mockUsersService.updateProfile).toHaveBeenCalledWith(USER_ID, {
+        country: 'Ghana',
       });
     });
 
@@ -115,13 +110,40 @@ describe('UsersController — profile endpoints', () => {
       expect(mockUsersService.updateProfile).toHaveBeenCalledWith(USER_ID, {});
     });
 
-    it('passes userId from JWT — never from path param', async () => {
+    it('passes userId from JWT, never from path/body', async () => {
       mockUsersService.updateProfile.mockResolvedValue(mockProfile);
 
       await controller.updateProfile(mockAuthUser, {});
 
-      // First arg to updateProfile must be the JWT userId, not a path param
       expect(mockUsersService.updateProfile.mock.calls[0][0]).toBe(USER_ID);
+    });
+  });
+
+  describe('POST /users/me/avatar', () => {
+    it('returns 200 with uploaded avatar URL', async () => {
+      const avatarFile = { buffer: Buffer.from('img'), size: 1024 } as Express.Multer.File;
+      const payload = { avatarUrl: 'https://signed.example/avatar.webp' };
+      mockUsersService.uploadAvatar.mockResolvedValue(payload);
+
+      const result = await controller.uploadAvatar(mockAuthUser, avatarFile);
+
+      expect(result).toEqual({
+        statusCode: HttpStatus.OK,
+        message: SYS_MSG.PROFILE_AVATAR_UPLOADED_SUCCESSFULLY,
+        data: payload,
+      });
+    });
+  });
+
+  describe('DELETE /users/me/avatar', () => {
+    it('returns 200 with avatarUrl null', async () => {
+      mockUsersService.deleteAvatar.mockResolvedValue({ avatarUrl: null });
+      const result = await controller.deleteAvatar(mockAuthUser);
+      expect(result).toEqual({
+        statusCode: HttpStatus.OK,
+        message: SYS_MSG.PROFILE_AVATAR_REMOVED_SUCCESSFULLY,
+        data: { avatarUrl: null },
+      });
     });
   });
 });

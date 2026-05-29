@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  Inject,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -8,6 +9,8 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'node:crypto';
+import * as path from 'node:path';
 import { QueryFailedError, DataSource } from 'typeorm';
 import { InjectQueue } from '@nestjs/bull';
 import type { Queue } from 'bull';
@@ -23,7 +26,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { UserRole } from './enums/user-role.enum';
 import { UserStateService } from './user-state.service';
-import { UserStateResponse } from './interfaces/user-state.interface';
+import type { UserStateResponse as UserDashboardStateResponse } from './interfaces/user-state.interface';
 import * as SYS_MSG from '../../constants/system.messages';
 import { RedisService } from '../redis/redis.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -31,6 +34,15 @@ import { AuthMetadataModelAction } from '../auth/actions/auth-metadata.action';
 import { IUserProfile } from './interfaces/user-profile.interface';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { ALLOWED_SSA_COUNTRIES } from './enums/allowed-ssa-countries.enum';
+import {
+  ALLOWED_AVATAR_MIME_TYPES,
+  AVATAR_SIGNED_URL_EXPIRY_SECONDS,
+  AVATAR_STORAGE_PREFIX,
+  MAX_AVATAR_UPLOAD_BYTES,
+} from './constants/avatar.constants';
+import { AvatarFileExtension, AvatarMimeType } from './enums/avatar-mime-type.enum';
+import type { IUserAvatarResponse } from './interfaces/user-avatar.interface';
+import { UPLOAD_OBJECT_STORAGE, type ObjectStorage } from '../upload/upload.types';
 import { ACCOUNT_DELETION_QUEUE } from './processors/account-deletion.processor';
 import { PinoLoggerService } from '../../common/logger/pino-logger.service';
 import { redisKeys } from '../../constants/redis-keys';
@@ -38,6 +50,16 @@ import { redisKeys } from '../../constants/redis-keys';
 const BCRYPT_ROUNDS = 10;
 const NO_TRANSACTION = {
   transactionOptions: { useTransaction: false as const },
+};
+const AVATAR_FILE_EXTENSION_BY_MIME: Record<AvatarMimeType, AvatarFileExtension> = {
+  [AvatarMimeType.JPEG]: AvatarFileExtension.JPG,
+  [AvatarMimeType.PNG]: AvatarFileExtension.PNG,
+  [AvatarMimeType.WEBP]: AvatarFileExtension.WEBP,
+};
+
+const detectFileTypeFromBuffer = async (buffer: Buffer) => {
+  const { fileTypeFromBuffer } = await import('file-type');
+  return fileTypeFromBuffer(buffer);
 };
 
 @Injectable()
@@ -55,6 +77,8 @@ export class UsersService {
     @InjectQueue(ACCOUNT_DELETION_QUEUE)
     private readonly accountDeletionQueue: Queue,
     private readonly dataSource: DataSource,
+    @Inject(UPLOAD_OBJECT_STORAGE)
+    private readonly objectStorage: ObjectStorage,
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
@@ -298,17 +322,21 @@ export class UsersService {
     this.pinoLogger.info('Password changed successfully', { userId });
   }
 
-  async getUserState(userId: string): Promise<UserStateResponse> {
+  async getUserState(userId: string): Promise<UserDashboardStateResponse> {
     return this.userStateService.getUserState(userId);
   }
 
-  private toProfileResponse(user: User): IUserProfile {
+  private async toProfileResponse(user: User): Promise<IUserProfile> {
+    const avatarUrl = this.isStoredAvatarPath(user.avatar_url)
+      ? await this.resolveAvatarUrl(user.avatar_url)
+      : user.avatar_url;
+
     return {
       id: user.id,
       fullName: user.full_name,
       email: user.email,
       country: user.country,
-      avatarUrl: user.avatar_url,
+      avatarUrl,
       authProvider: user.auth_provider,
       isVerified: user.is_verified,
       createdAt: user.created_at,
@@ -318,7 +346,127 @@ export class UsersService {
 
   async getProfile(userId: string): Promise<IUserProfile> {
     const user = await this.findById(userId);
-    return this.toProfileResponse(user);
+    return await this.toProfileResponse(user);
+  }
+
+  private isStoredAvatarPath(avatarUrl: string | null): avatarUrl is string {
+    return typeof avatarUrl === 'string' && avatarUrl.startsWith(`${AVATAR_STORAGE_PREFIX}/`);
+  }
+
+  private buildAvatarStoragePath(userId: string, fileExtension: AvatarFileExtension): string {
+    return path.posix.join(AVATAR_STORAGE_PREFIX, userId, `${randomUUID()}.${fileExtension}`);
+  }
+
+  private async resolveAvatarUrl(storagePath: string): Promise<string> {
+    try {
+      return await this.objectStorage.createPresignedGetObjectUrl(
+        storagePath,
+        AVATAR_SIGNED_URL_EXPIRY_SECONDS,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to create avatar signed URL for ${storagePath}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new InternalServerErrorException(SYS_MSG.PROFILE_AVATAR_UPLOAD_FAILED);
+    }
+  }
+
+  async uploadAvatar(userId: string, file: Express.Multer.File | undefined): Promise<IUserAvatarResponse> {
+    if (!file?.buffer) {
+      throw new UnprocessableEntityException(SYS_MSG.PROFILE_AVATAR_FILE_REQUIRED);
+    }
+
+    if (file.size > MAX_AVATAR_UPLOAD_BYTES) {
+      throw new UnprocessableEntityException(SYS_MSG.PROFILE_AVATAR_UPLOAD_TOO_LARGE);
+    }
+
+    const detectedFileType = await detectFileTypeFromBuffer(file.buffer);
+    if (!detectedFileType) {
+      throw new UnprocessableEntityException(SYS_MSG.PROFILE_AVATAR_UPLOAD_INVALID_TYPE);
+    }
+
+    const detectedMimeType = detectedFileType.mime as AvatarMimeType;
+    if (!ALLOWED_AVATAR_MIME_TYPES.includes(detectedMimeType)) {
+      throw new UnprocessableEntityException(SYS_MSG.PROFILE_AVATAR_UPLOAD_INVALID_TYPE);
+    }
+
+    const avatarFileExtension = AVATAR_FILE_EXTENSION_BY_MIME[detectedMimeType];
+    const storagePath = this.buildAvatarStoragePath(userId, avatarFileExtension);
+
+    const user = await this.findById(userId);
+    const previousAvatarPath = this.isStoredAvatarPath(user.avatar_url) ? user.avatar_url : null;
+    let objectWritten = false;
+
+    try {
+      await this.objectStorage.putObject({
+        storagePath,
+        body: file.buffer,
+        contentType: detectedMimeType,
+        contentLength: file.size,
+      });
+      objectWritten = true;
+
+      const avatarUrl = await this.resolveAvatarUrl(storagePath);
+
+      const updatedUser = await this.userModelAction.updateAvatarUrl(userId, storagePath);
+      if (!updatedUser) {
+        throw new InternalServerErrorException(SYS_MSG.PROFILE_AVATAR_UPLOAD_FAILED);
+      }
+
+      if (previousAvatarPath) {
+        try {
+          await this.objectStorage.deleteObject(previousAvatarPath);
+        } catch (cleanupError) {
+          this.logger.error(
+            `Failed to remove previous avatar ${previousAvatarPath}`,
+            cleanupError instanceof Error ? cleanupError.stack : undefined,
+          );
+        }
+      }
+
+      return { avatarUrl };
+    } catch (error) {
+      if (objectWritten) {
+        try {
+          await this.objectStorage.deleteObject(storagePath);
+        } catch (cleanupError) {
+          this.logger.error(
+            `Failed to clean up uploaded avatar ${storagePath}`,
+            cleanupError instanceof Error ? cleanupError.stack : undefined,
+          );
+        }
+      }
+
+      if (
+        error instanceof UnprocessableEntityException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException(SYS_MSG.PROFILE_AVATAR_UPLOAD_FAILED);
+    }
+  }
+
+  async deleteAvatar(userId: string): Promise<IUserAvatarResponse> {
+    const user = await this.findById(userId);
+    const currentAvatarPath = this.isStoredAvatarPath(user.avatar_url) ? user.avatar_url : null;
+
+    if (!currentAvatarPath && user.avatar_url === null) {
+      return { avatarUrl: null };
+    }
+
+    if (currentAvatarPath) {
+      await this.objectStorage.deleteObject(currentAvatarPath);
+    }
+
+    const updatedUser = await this.userModelAction.updateAvatarUrl(userId, null);
+    if (!updatedUser) {
+      throw new InternalServerErrorException(SYS_MSG.PROFILE_AVATAR_DELETE_FAILED);
+    }
+
+    return { avatarUrl: null };
   }
 
   async updateProfile(
@@ -355,7 +503,7 @@ export class UsersService {
     }
 
     if (Object.keys(updatePayload).length === 0) {
-      return this.toProfileResponse(user);
+      return await this.toProfileResponse(user);
     }
 
     const updated = await this.userModelAction.update({
@@ -370,7 +518,7 @@ export class UsersService {
 
     emitSafely(this.eventEmitter, this.logger, APP_EVENTS.PROFILE_UPDATED, new ProfileUpdatedEvent(userId, changedFields));
 
-    return this.toProfileResponse(updated);
+    return await this.toProfileResponse(updated);
   }
 
   async deleteAccount(userId: string, confirmation: string): Promise<void> {
