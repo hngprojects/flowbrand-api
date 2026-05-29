@@ -1,7 +1,10 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { UploadedDocumentModelAction } from '../actions/uploaded-document.action';
+import { EXTRACTION_LOCK_MS } from '../constants/upload.constants';
 
-const STALE_PARSING_THRESHOLD_MS = 15 * 60 * 1000;
+// Give a crashed job 3× the lock window before declaring it orphaned.
+// Stays in sync with EXTRACTION_LOCK_MS automatically if the lock is tuned.
+const STALE_PARSING_THRESHOLD_MS = EXTRACTION_LOCK_MS * 3;
 
 @Injectable()
 export class UploadRecoveryService implements OnApplicationBootstrap {

@@ -13,6 +13,9 @@ const MAX_PARSED_TEXT_CHARS = 2_000_000;
 const OLE_MIN_TEXT_LENGTH = 40;
 /** Minimum ratio of letters for OLE extraction (filters GUID/style noise). */
 const OLE_MIN_LETTER_RATIO = 0.4;
+// 4× MAX_UPLOAD_BYTES — Multer already rejects files above 5 MiB at the HTTP layer,
+// so this gate is a safety net for any path that bypasses upload validation (e.g. direct
+// queue injection or future S3 triggers). Not expected to fire in the normal upload flow.
 const PPTX_MAX_SIZE_BYTES = 20 * 1024 * 1024;
 const PPTX_MAX_SLIDES = 200;
 const PPTX_SLIDE_CONCURRENCY = 6;

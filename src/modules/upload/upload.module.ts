@@ -21,7 +21,10 @@ import { ExtractionProcessor } from './processors/extraction.processor';
       defaultJobOptions: {
         attempts: 3,
         backoff: { type: 'exponential', delay: 5_000 },
-        removeOnComplete: true,
+        // Keep completed jobs for 1 hour during the initial monitoring window
+        // so extraction_format_complete timings can be correlated with job IDs.
+        // Tighten to `true` once p95 baselines are established.
+        removeOnComplete: { age: 3600 },
         removeOnFail: false,
       },
       settings: {
