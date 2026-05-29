@@ -2,13 +2,17 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
-  NotFoundException,
   Logger,
-  UnprocessableEntityException,
+  NotFoundException,
   UnauthorizedException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { QueryFailedError } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { APP_EVENTS } from '../../common/constants/app-events';
+import { ProfileUpdatedEvent, AccountDeletedEvent } from '../../common/events';
+import { emitSafely } from '../../common/events/emit-safely';
 import { UserModelAction } from './actions/user.action';
 import { CreateUserDto } from './dto/create-user.dto';
 import { PaginationDto } from './dto/pagination.dto';
@@ -35,12 +39,14 @@ const NO_TRANSACTION = {
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
+
   constructor(
     private readonly userModelAction: UserModelAction,
     private readonly userSessionModelAction: UserSessionModelAction,
     private readonly authMetaModelAction: AuthMetadataModelAction,
     private readonly redisService: RedisService,
     private readonly userStateService: UserStateService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
@@ -146,7 +152,7 @@ export class UsersService {
     if (dto.fullName !== undefined) payload.full_name = dto.fullName;
     if (dto.email !== undefined) payload.email = dto.email;
     if (dto.termsAccepted !== undefined) payload.termsAccepted = dto.termsAccepted;
-  
+
     if (dto.password) {
       payload.password_hash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
     }
@@ -210,6 +216,7 @@ export class UsersService {
       ...NO_TRANSACTION,
       identifierOptions: { id },
     });
+    emitSafely(this.eventEmitter, this.logger, APP_EVENTS.ACCOUNT_DELETED, new AccountDeletedEvent(id));
   }
 
   private async revokeAllUserSessions(userId: string): Promise<void> {
@@ -241,7 +248,7 @@ export class UsersService {
       message: `Revoked ${activeSessions.length} sessions for user`,
       userId,
       sessionCount: activeSessions.length,
-    });    
+    });
   }
 
   /** Verifies the current password, updates the hash, and revokes all active sessions. */
@@ -250,7 +257,7 @@ export class UsersService {
 
     if (!user.password_hash) {
       throw new UnprocessableEntityException({
-        message: user.auth_provider === 'google' 
+        message: user.auth_provider === 'google'
           ? SYS_MSG.PASSWORD_CHANGE_NOT_SUPPORTED
           : SYS_MSG.PASSWORD_CHANGE_UNAVAILABLE
       })
@@ -299,7 +306,7 @@ export class UsersService {
         password_changed_at: new Date(),
       });
     }
-    
+
     await this.revokeAllUserSessions(userId);
 
     this.logger.log({
@@ -378,6 +385,8 @@ export class UsersService {
     if (!updated) {
       throw new InternalServerErrorException(SYS_MSG.PROFILE_UPDATE_FAILED);
     }
+
+    emitSafely(this.eventEmitter, this.logger, APP_EVENTS.PROFILE_UPDATED, new ProfileUpdatedEvent(userId, changedFields));
 
     return this.toProfileResponse(updated);
   }

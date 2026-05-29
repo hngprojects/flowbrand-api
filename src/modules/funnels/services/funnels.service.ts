@@ -2,6 +2,10 @@ import { Injectable, NotFoundException, ForbiddenException, ConflictException, S
 import { InjectQueue } from '@nestjs/bull';
 import type { Queue } from 'bull';
 import { DataSource } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { APP_EVENTS } from '../../../common/constants/app-events';
+import { StageCompletedEvent, StageUnlockedEvent, FeedbackSubmittedEvent, TaskCompletedEvent, TaskReopenedEvent } from '../../../common/events';
+import { emitSafely } from '../../../common/events/emit-safely';
 import { JOBS, QUEUES } from '../../../common/constants/queue.constants';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { RedisService } from '../../redis/redis.service';
@@ -39,6 +43,7 @@ export class FunnelsService {
     @InjectQueue(QUEUES.FUNNEL_GENERATION) private readonly queue: Queue<GenerateFunnelJobPayload>,
     private readonly dataSource: DataSource,
     private readonly feedbackAction: StageFeedbackModelAction,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   normalizePagination(page?: number, perPage?: number) {
@@ -335,6 +340,16 @@ export class FunnelsService {
 
       await queryRunner.commitTransaction();
 
+      emitSafely(this.eventEmitter, this.logger, APP_EVENTS.STAGE_COMPLETED,
+        new StageCompletedEvent(userId, funnelId, stageId, currentStage.position, currentStage.name, nextStage?.id ?? null, nextStage?.name ?? null),
+      );
+
+      if (nextStage) {
+        emitSafely(this.eventEmitter, this.logger, APP_EVENTS.STAGE_UNLOCKED,
+          new StageUnlockedEvent(userId, funnelId, nextStage.id, nextStage.position, nextStage.name),
+        );
+      }
+
       const unlockedStage = nextStage ? await this.funnelAction.findStageById(queryRunner.manager, nextStage.id, funnelId) : null;
       return {
         statusCode: HttpStatus.OK,
@@ -454,6 +469,13 @@ export class FunnelsService {
 
     task.status = status;
     const saved = await this.taskAction.saveTask(task);
+
+    if (status === 'complete') {
+      emitSafely(this.eventEmitter, this.logger, APP_EVENTS.TASK_COMPLETED, new TaskCompletedEvent(userId, funnelId, stageId, taskId, saved.name));
+    } else {
+      emitSafely(this.eventEmitter, this.logger, APP_EVENTS.TASK_REOPENED, new TaskReopenedEvent(userId, funnelId, stageId, taskId, saved.name));
+    }
+
     return this.buildTaskUpdateResult(saved);
   }
 
@@ -496,7 +518,11 @@ export class FunnelsService {
       }
       throw error;
     }
-   
+
+    emitSafely(this.eventEmitter, this.logger, APP_EVENTS.FEEDBACK_SUBMITTED,
+      new FeedbackSubmittedEvent(userId, funnelId, stageId, feedback.id),
+    );
+
     return {
       statusCode: HttpStatus.CREATED,
       message: SYS_MSG.FEEDBACK_SUBMITTED,

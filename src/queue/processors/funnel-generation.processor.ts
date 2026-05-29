@@ -1,8 +1,11 @@
 import { OnQueueActive, OnQueueCompleted, OnQueueFailed, OnQueueStalled, Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Job } from 'bull';
 import { DataSource } from 'typeorm';
+import { APP_EVENTS } from '../../common/constants/app-events';
+import { emitSafely, FunnelFailedEvent, FunnelGeneratedEvent } from '../../common/events';
 import { JOBS, QUEUES } from '../../common/constants/queue.constants';
 import { FunnelModelAction } from '../../modules/funnels/actions/funnel.action';
 import { Funnel } from '../../modules/funnels/entities/funnel.entity';
@@ -31,6 +34,7 @@ export class FunnelGenerationProcessor {
     private readonly llmService: LlmService,
     private readonly templateService: FunnelTemplateService,
     @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   @Process(JOBS.GENERATE_FUNNEL)
@@ -86,6 +90,7 @@ export class FunnelGenerationProcessor {
     await job.progress(100);
 
     this.logger.log({ message: 'Funnel generation complete', funnelId, jobId: job.id });
+    emitSafely(this.eventEmitter, this.logger, APP_EVENTS.FUNNEL_GENERATED, new FunnelGeneratedEvent(userId, funnelId, funnel.business_name));
   }
 
   private async tryAiGeneration(ctx: BusinessContext): Promise<LlmStageData[] | null> {
@@ -283,6 +288,12 @@ export class FunnelGenerationProcessor {
           message: 'Could not mark funnel FAILED — manual reconciliation required',
         });
       }
+      await this.funnelAction.update({
+        identifierOptions: { id: job.data.funnelId },
+        updatePayload: { status: FunnelStatus.FAILED },
+        transactionOptions: { useTransaction: false },
+      });
+      emitSafely(this.eventEmitter, this.logger, APP_EVENTS.FUNNEL_FAILED, new FunnelFailedEvent(job.data.userId, job.data.funnelId));
     }
   }
 
