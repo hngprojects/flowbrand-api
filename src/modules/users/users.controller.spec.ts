@@ -14,6 +14,9 @@ const mockUsersService = {
   updateProfile: jest.fn(),
   getNotificationPreferences: jest.fn(),
   updateNotificationPreferences: jest.fn(),
+  getUserState: jest.fn(),
+  uploadAvatar: jest.fn(),
+  deleteAvatar: jest.fn(),
 };
 
 const USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -119,6 +122,9 @@ describe('UsersController — profile endpoints', () => {
         statusCode: HttpStatus.OK,
         message: SYS_MSG.PROFILE_UPDATED_SUCCESSFULLY,
       });
+      expect(mockUsersService.updateProfile).toHaveBeenCalledWith(USER_ID, {
+        country: 'Ghana',
+      });
     });
 
     it('empty body returns 200 with unchanged profile', async () => {
@@ -181,4 +187,35 @@ describe('UsersController — profile endpoints', () => {
       expect(mockUsersService.updateNotificationPreferences).toHaveBeenCalledWith(USER_ID, {});
     });
   });
+
+  describe('POST /users/me/avatar', () => {
+    it('returns 200 with uploaded avatar URL', async () => {
+      const avatarFile = { buffer: Buffer.from('img'), size: 1024 } as Express.Multer.File;
+      const payload = { avatarUrl: 'https://signed.example/avatar.webp' };
+      mockUsersService.uploadAvatar.mockResolvedValue(payload);
+
+      const result = await controller.uploadAvatar(mockAuthUser, avatarFile);
+
+      expect(result).toEqual({
+        statusCode: HttpStatus.OK,
+        message: SYS_MSG.PROFILE_AVATAR_UPLOADED_SUCCESSFULLY,
+        data: payload,
+      });
+    });
+  });
+
+  describe('DELETE /users/me/avatar', () => {
+    it('returns 200 with avatarUrl null', async () => {
+      mockUsersService.deleteAvatar.mockResolvedValue({ avatarUrl: null });
+      const result = await controller.deleteAvatar(mockAuthUser);
+      expect(result).toEqual({
+        statusCode: HttpStatus.OK,
+        message: SYS_MSG.PROFILE_AVATAR_REMOVED_SUCCESSFULLY,
+        data: { avatarUrl: null },
+      });
+    });
+  });
 });
+
+
+

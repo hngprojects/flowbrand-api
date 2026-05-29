@@ -36,6 +36,12 @@ const envSchema = z.object({
 
   CONTACT_ADMIN_EMAIL: z.string().email().default('useseil@hng14.com'),
 
+  UPLOAD_STORAGE_ENDPOINT: z.string().default(''),
+  UPLOAD_STORAGE_ACCESS_KEY: z.string().default(''),
+  UPLOAD_STORAGE_SECRET_KEY: z.string().default(''),
+  UPLOAD_STORAGE_BUCKET: z.string().default(''),
+  UPLOAD_STORAGE_REGION: z.string().default(''),
+
   GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required'),
   GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
   GEMINI_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),

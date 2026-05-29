@@ -9,9 +9,14 @@ import {
   ParseUUIDPipe,
   Patch,
   ValidationPipe,
+  Post,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ChangePasswordDto } from './dto/change-password.dto'
+import { memoryStorage } from 'multer';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { UsersService } from './users.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
@@ -24,16 +29,24 @@ import {
   UpdateProfileDocs,
   GetUserStateDocs,
   DeleteAccountDocs,
+  RemoveAvatarDocs,
+  UploadAvatarDocs,
 } from './docs/users-swagger.doc';
+import { UpdateNotificationPreferencesDto } from '../notifications/dto/update-notification-preferences.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
 import * as SYS_MSG from '../../constants/system.messages';
-import { UpdateNotificationPreferencesDto } from '../notifications/dto/update-notification-preferences.dto';
+import { MAX_AVATAR_UPLOAD_BYTES } from './constants/avatar.constants';
+
+const avatarUploadInterceptor = FileInterceptor('avatar', {
+  storage: memoryStorage(),
+  limits: { fileSize: MAX_AVATAR_UPLOAD_BYTES, files: 1 },
+});
 
 @ApiTags('users')
 @ApiBearerAuth('JWT')
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) { }
+  constructor(private readonly usersService: UsersService) {}
 
   @Get('me')
   @HttpCode(HttpStatus.OK)
@@ -55,6 +68,34 @@ export class UsersController {
     return {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.PROFILE_UPDATED_SUCCESSFULLY,
+      data,
+    };
+  }
+
+  @Post('me/avatar')
+  @HttpCode(HttpStatus.OK)
+  @UploadAvatarDocs()
+  @UseInterceptors(avatarUploadInterceptor)
+  async uploadAvatar(
+    @CurrentUser() user: AuthenticatedUser,
+    @UploadedFile() avatar: Express.Multer.File | undefined,
+  ) {
+    const data = await this.usersService.uploadAvatar(user.userId, avatar);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.PROFILE_AVATAR_UPLOADED_SUCCESSFULLY,
+      data,
+    };
+  }
+
+  @Delete('me/avatar')
+  @HttpCode(HttpStatus.OK)
+  @RemoveAvatarDocs()
+  async deleteAvatar(@CurrentUser() user: AuthenticatedUser) {
+    const data = await this.usersService.deleteAvatar(user.userId);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.PROFILE_AVATAR_REMOVED_SUCCESSFULLY,
       data,
     };
   }

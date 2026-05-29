@@ -3,15 +3,20 @@ import {
   ApiBearerAuth,
   ApiBody,
   ApiBadRequestResponse,
+  ApiConsumes,
+  ApiInternalServerErrorResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiPayloadTooLargeResponse,
   ApiUnauthorizedResponse,
-  ApiResponse,
   ApiUnprocessableEntityResponse,
+  ApiResponse,
 } from '@nestjs/swagger';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { UpdateUserProfileDto } from '../dto/update-user-profile.dto';
+import { UploadAvatarDto } from '../dto/upload-avatar.dto';
+import { UserAvatarResponseDto } from '../dto/user-avatar-response.dto';
 import { DeleteAccountDto } from '../dto/delete-account.dto';
 import { ChangePasswordDto } from '../dto/change-password.dto';
 import { UpdateNotificationPreferencesDto } from '../../notifications/dto/update-notification-preferences.dto';
@@ -54,6 +59,33 @@ const notificationPreferencesExample = {
   createdAt: '2026-05-29T10:30:00.000Z',
   updatedAt: '2026-05-29T10:30:00.000Z',
 };
+const avatarUploadedExample = {
+  success: true,
+  statusCode: HttpStatus.OK,
+  message: SYS_MSG.PROFILE_AVATAR_UPLOADED_SUCCESSFULLY,
+  data: {
+    avatarUrl:
+      'https://storage.example.com/uploads/avatars/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/avatar.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256',
+  },
+};
+
+const avatarRemovedExample = {
+  success: true,
+  statusCode: HttpStatus.OK,
+  message: SYS_MSG.PROFILE_AVATAR_REMOVED_SUCCESSFULLY,
+  data: {
+    avatarUrl: null,
+  },
+};
+
+const avatarValidationErrorExample = {
+  success: false,
+  statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+  error: 'UnprocessableEntityException',
+  message: SYS_MSG.PROFILE_AVATAR_UPLOAD_INVALID_TYPE,
+};
+
+// ─── Profile Endpoints ─────────────────────────────────────────────────────
 
 export function GetProfileDocs() {
   return applyDecorators(
@@ -126,6 +158,90 @@ export function UpdateProfileDocs() {
     ApiNotFoundResponse({
       description: 'Profile not found',
       schema: { example: notFoundExample },
+    }),
+    ApiUnauthorizedResponse({
+      description: 'Missing or invalid JWT / soft-deleted user',
+      schema: { example: unauthorizedExample },
+    }),
+  );
+}
+
+export function UploadAvatarDocs() {
+  return applyDecorators(
+    ApiBearerAuth('JWT'),
+    ApiOperation({
+      summary: 'Upload authenticated user avatar',
+      description:
+        'Accepts multipart/form-data with a single field named `avatar`. ' +
+        'MIME type is validated from file buffer using file signature detection, not extension/header. ' +
+        'Allowed formats: JPEG, PNG, WebP. Maximum size: 2MB. ' +
+        'Stored path is generated server-side as `avatars/{userId}/{uuid}.{ext}`. ' +
+        'When a previous stored avatar exists, it is deleted after successful replacement.',
+    }),
+    ApiConsumes('multipart/form-data'),
+    ApiBody({ type: UploadAvatarDto }),
+    ApiOkResponse({
+      type: UserAvatarResponseDto,
+      description: 'Avatar uploaded and profile updated successfully',
+      schema: { example: avatarUploadedExample },
+    }),
+    ApiUnprocessableEntityResponse({
+      description: 'Invalid image type, oversized image, or missing avatar file',
+      schema: { example: avatarValidationErrorExample },
+    }),
+    ApiPayloadTooLargeResponse({
+      description: 'Request body exceeded server limits before validation',
+    }),
+    ApiNotFoundResponse({
+      description: 'Authenticated user profile was not found',
+      schema: { example: notFoundExample },
+    }),
+    ApiInternalServerErrorResponse({
+      description: 'Avatar upload failed due to storage/database failure',
+      schema: {
+        example: {
+          success: false,
+          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'InternalServerErrorException',
+          message: SYS_MSG.PROFILE_AVATAR_UPLOAD_FAILED,
+        },
+      },
+    }),
+    ApiUnauthorizedResponse({
+      description: 'Missing or invalid JWT / soft-deleted user',
+      schema: { example: unauthorizedExample },
+    }),
+  );
+}
+
+export function RemoveAvatarDocs() {
+  return applyDecorators(
+    ApiBearerAuth('JWT'),
+    ApiOperation({
+      summary: 'Delete authenticated user avatar',
+      description:
+        'Deletes current avatar object from storage when present and sets `avatar_url` to null. ' +
+        'When avatar is already null, endpoint still returns HTTP 200 (no-op).',
+    }),
+    ApiOkResponse({
+      type: UserAvatarResponseDto,
+      description: 'Avatar removed successfully (or already absent)',
+      schema: { example: avatarRemovedExample },
+    }),
+    ApiNotFoundResponse({
+      description: 'Authenticated user profile was not found',
+      schema: { example: notFoundExample },
+    }),
+    ApiInternalServerErrorResponse({
+      description: 'Avatar delete failed due to storage/database failure',
+      schema: {
+        example: {
+          success: false,
+          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'InternalServerErrorException',
+          message: SYS_MSG.PROFILE_AVATAR_DELETE_FAILED,
+        },
+      },
     }),
     ApiUnauthorizedResponse({
       description: 'Missing or invalid JWT / soft-deleted user',

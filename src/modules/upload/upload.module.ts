@@ -47,6 +47,6 @@ import { ExtractionProcessor } from './processors/extraction.processor';
       useExisting: MinioUploadStorageService,
     },
   ],
-  exports: [UploadService, UploadedDocumentModelAction],
+  exports: [UploadService, UploadedDocumentModelAction, UPLOAD_OBJECT_STORAGE],
 })
 export class UploadModule {}
