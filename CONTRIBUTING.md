@@ -279,7 +279,51 @@ async generate(
 // → HTTP 200  { "success": true, "statusCode": 200, "message": "...", "data": { ... } }
 ```
 
-### 7. Testing Proof Is Required in Every PR
+### 7. Domain Events — Emit Timing and Listener Safety
+
+This codebase uses `EventEmitter2` for in-process domain events. Three rules are mandatory for any code that emits or listens.
+
+#### Rule 1 — Emit AFTER the transaction commits, never inside it
+
+If a transaction rolls back after `emit()` fires, listeners have already acted on data that no longer exists.
+
+```ts
+// CORRECT — emit after commit
+await queryRunner.commitTransaction();
+this.eventEmitter.emit(APP_EVENTS.STAGE_COMPLETED, new StageCompletedEvent(...));
+
+// WRONG — transaction may roll back after this line
+await queryRunner.manager.save(stage);
+this.eventEmitter.emit(APP_EVENTS.STAGE_COMPLETED, new StageCompletedEvent(...));
+```
+
+#### Rule 2 — Listeners must wrap all logic in try/catch and never rethrow
+
+`EventEmitter2` is synchronous. An uncaught exception in a listener propagates directly to the service that called `emit()` and can kill a user-facing request. Activity logging, notifications, and analytics are not the critical path — they must not kill a user-facing request.
+
+> **Fire-and-forget**: `emit()` returns before any `async` listener settles. This means `ignoreErrors` only catches synchronous throws — async listener rejections become unhandled promise rejections regardless of that setting. The `try/catch` inside the listener is therefore the only reliable safety net for async work.
+
+```ts
+@OnEvent(APP_EVENTS.STAGE_COMPLETED)
+async handleStageCompleted(event: StageCompletedEvent): Promise<void> {
+  // emit() is fire-and-forget — this method runs after the caller has already returned.
+  // Any rejection here is an unhandled promise rejection if not caught below.
+  try {
+    await this.activityAction.create({ ... });
+  } catch (err) {
+    this.logger.error({ message: 'Activity write failed', error: (err as Error).message });
+    // Never rethrow here.
+  }
+}
+```
+
+#### Rule 3 — No PII in event payloads
+
+Event payloads can end up in activity logs and notification metadata. Do not include `email`, `password_hash`, `token_hash`, `refresh_token`, or `provider_user_id` in any event class. A `userId` UUID is safe to include.
+
+`business_name` is acceptable in event payloads (e.g. `FunnelGeneratedEvent`) because it serves a legitimate operational purpose — activity logs need it for display. Be aware that sole proprietors sometimes use their personal name as their business name; this is an accepted trade-off since the field is business-context data, not a credential or contact detail.
+
+### 8. Testing Proof Is Required in Every PR
 
 Every PR must include at least one of the following:
 
