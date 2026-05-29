@@ -11,6 +11,7 @@ import {
 } from '@nestjs/swagger';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { UpdateUserProfileDto } from '../dto/update-user-profile.dto';
+import { DeleteAccountDto } from '../dto/delete-account.dto';
 import { ChangePasswordDto } from '../dto/change-password.dto';
 
 const profileDataExample = {
@@ -39,7 +40,7 @@ const notFoundExample = {
   message: SYS_MSG.PROFILE_NOT_FOUND,
 };
 
-// ─── Profile Endpoints (from dev) ─────────────────────────────────────────────
+// ─── Profile Endpoints ─────────────────────────────────────────────────────
 
 export function GetProfileDocs() {
   return applyDecorators(
@@ -121,7 +122,7 @@ export function UpdateProfileDocs() {
   );
 }
 
-// ─── User State Endpoint (from your branch) ───────────────────────────────────
+// ─── User State Endpoint ──────────────────────────────────────────────────
 
 export function GetUserStateDocs() {
   return applyDecorators(
@@ -269,6 +270,51 @@ export function GetUserStateDocs() {
     }),
   );
 }
+
+// ─── Account Deletion Endpoint (from your branch) ─────────────────────────
+
+export function DeleteAccountDocs() {
+  return applyDecorators(
+    ApiBearerAuth('JWT'),
+    ApiOperation({
+      summary: 'Delete user account',
+      description:
+        'Soft deletes the account immediately (sets deleted_at, is_active=false, revokes all sessions). ' +
+        'Schedules a hard delete job 30 days later to permanently remove all user data. ' +
+        'Requires confirmation string "DELETE" (case-sensitive).',
+    }),
+    ApiBody({ type: DeleteAccountDto }),
+    ApiOkResponse({
+      description: 'Account deleted successfully',
+      schema: {
+        example: {
+          success: true,
+          statusCode: HttpStatus.OK,
+          message: SYS_MSG.ACCOUNT_DELETED_SUCCESSFULLY,
+          data: null,
+        },
+      },
+    }),
+    ApiUnprocessableEntityResponse({
+      description: 'Invalid confirmation string',
+      schema: {
+        example: {
+          success: false,
+          statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          message: SYS_MSG.ACCOUNT_DELETION_CONFIRMATION_REQUIRED,
+        },
+      },
+    }),
+    ApiNotFoundResponse({
+      description: 'User not found',
+    }),
+    ApiUnauthorizedResponse({
+      description: 'Account already deleted or unauthenticated',
+    }),
+  );
+}
+
+// ─── Change Password Endpoint (from dev branch) ───────────────────────────
 
 export function ChangePasswordDocs() {
   return applyDecorators(
