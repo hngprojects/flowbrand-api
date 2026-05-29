@@ -91,17 +91,29 @@ export class UserStateService {
 
   private async getActiveFunnelState(userId: string): Promise<ActiveFunnel | null> {
     const funnels = await this.funnelModelAction.findFunnelsByUserId(userId);
-    
+
     const nonFailedFunnels = funnels.filter(f => f.status !== FunnelStatus.FAILED);
 
     if (nonFailedFunnels.length === 0) {
       return null;
     }
 
-    const activeFunnel = nonFailedFunnels.find(f => f.status === FunnelStatus.ACTIVE);
-    const generatingFunnel = nonFailedFunnels.find(f => f.status === FunnelStatus.GENERATING);
+    // Priority: ACTIVE (1) > GENERATING (2); tiebreaker is newest created_at first.
+    // This ensures a user with both an active and a generating funnel always sees
+    // the active one until the new generation completes (EC-01).
+    const STATUS_PRIORITY: Partial<Record<FunnelStatus, number>> = {
+      [FunnelStatus.ACTIVE]: 1,
+      [FunnelStatus.GENERATING]: 2,
+    };
 
-    const selectedFunnel = activeFunnel ?? generatingFunnel;
+    const selectedFunnel = nonFailedFunnels
+      .filter(f => STATUS_PRIORITY[f.status] !== undefined)
+      .sort((a, b) => {
+        const priorityDiff = (STATUS_PRIORITY[a.status] ?? 99) - (STATUS_PRIORITY[b.status] ?? 99);
+        if (priorityDiff !== 0) return priorityDiff;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      })[0] ?? null;
+
     if (!selectedFunnel) {
       return null;
     }

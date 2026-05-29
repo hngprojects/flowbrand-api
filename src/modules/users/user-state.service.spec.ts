@@ -397,6 +397,61 @@ describe('UserStateService', () => {
       expect(result.activeFunnel?.funnelId).toBe('funnel-active');
       expect(result.activeFunnel?.status).toBe('active');
     });
+
+    it('returns the active funnel even when it is listed after the generating funnel in the array', async () => {
+      mockUserModelAction.findById.mockResolvedValue(mockUser());
+      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(
+        mockSession({ status: WizardStatus.COMPLETE })
+      );
+      // active funnel listed last — sort must pick it regardless of array order
+      mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([
+        mockFunnel({ id: 'funnel-generating', status: FunnelStatus.GENERATING, created_at: new Date('2026-03-01') }),
+        mockFunnel({ id: 'funnel-generating-2', status: FunnelStatus.GENERATING, created_at: new Date('2026-02-01') }),
+        mockFunnel({ id: 'funnel-active', status: FunnelStatus.ACTIVE, created_at: new Date('2026-01-01') }),
+      ]);
+      mockFunnelStageModelAction.getStagesByFunnelId.mockResolvedValue([]);
+
+      const result = await service.getUserState(USER_ID);
+
+      expect(result.activeFunnel?.funnelId).toBe('funnel-active');
+    });
+  });
+
+  // ─── created_at DESC tiebreaker ───────────────────────────────────────────
+
+  describe('created_at DESC tiebreaker', () => {
+    it('returns the most recently created active funnel when multiple active funnels exist', async () => {
+      mockUserModelAction.findById.mockResolvedValue(mockUser());
+      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(
+        mockSession({ status: WizardStatus.COMPLETE })
+      );
+      mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([
+        mockFunnel({ id: 'funnel-old-active', status: FunnelStatus.ACTIVE, created_at: new Date('2026-01-01') }),
+        mockFunnel({ id: 'funnel-new-active', status: FunnelStatus.ACTIVE, created_at: new Date('2026-04-01') }),
+      ]);
+      mockFunnelStageModelAction.getStagesByFunnelId.mockResolvedValue([mockStage()]);
+      mockStageTaskModelAction.findTasksByStageId.mockResolvedValue([]);
+
+      const result = await service.getUserState(USER_ID);
+
+      expect(result.activeFunnel?.funnelId).toBe('funnel-new-active');
+    });
+
+    it('returns the most recently created generating funnel when no active funnels exist', async () => {
+      mockUserModelAction.findById.mockResolvedValue(mockUser());
+      mockWizardSessionModelAction.findActiveSession.mockResolvedValue(
+        mockSession({ status: WizardStatus.COMPLETE })
+      );
+      mockFunnelModelAction.findFunnelsByUserId.mockResolvedValue([
+        mockFunnel({ id: 'gen-old', status: FunnelStatus.GENERATING, created_at: new Date('2026-01-01') }),
+        mockFunnel({ id: 'gen-new', status: FunnelStatus.GENERATING, created_at: new Date('2026-05-01') }),
+      ]);
+
+      const result = await service.getUserState(USER_ID);
+
+      expect(result.activeFunnel?.funnelId).toBe('gen-new');
+      expect(result.activeFunnel?.status).toBe('generating');
+    });
   });
 
   // ─── AC-10: Idempotency ───────────────────────────────────────────────────
