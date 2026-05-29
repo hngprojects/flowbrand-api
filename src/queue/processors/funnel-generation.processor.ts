@@ -72,7 +72,17 @@ export class FunnelGenerationProcessor {
         stageData = this.templateService.getTemplate(businessContext, userId);
       }
 
-      this.validateStageData(stageData);
+      try {
+        this.validateStageData(stageData);
+      } catch (validationErr) {
+        this.logger.warn({
+          event: 'funnel_stage_validation_failed',
+          funnelId,
+          jobId: job.id,
+          rule: (validationErr as Error).message,
+        });
+        throw validationErr;
+      }
 
       await job.progress(70);
 

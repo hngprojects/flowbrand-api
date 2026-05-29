@@ -222,9 +222,26 @@ describe('FunnelGenerationProcessor', () => {
     });
   });
 
-  // AC-08: LLM output validation 
+  // AC-08: LLM output validation
 
   describe('AC-08 — LLM output validation', () => {
+    it('logs funnel_stage_validation_failed with the failing rule before rethrowing', async () => {
+      const invalid = makeValidStageData();
+      invalid[0].explanation = 'x'.repeat(2001);
+      mockLlmService.generateWithGemini.mockResolvedValue(invalid);
+      const warnSpy = jest.spyOn((processor as any).logger, 'warn');
+
+      await expect(processor.handleGenerateFunnel(makeJob())).rejects.toThrow(/exceeds 2000/);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'funnel_stage_validation_failed',
+          funnelId: 'funnel-uuid',
+          rule: expect.stringMatching(/exceeds 2000/),
+        }),
+      );
+    });
+
     it('rejects explanation > 2000 chars before DB write', async () => {
       const invalid = makeValidStageData();
       invalid[0].explanation = 'x'.repeat(2001);
