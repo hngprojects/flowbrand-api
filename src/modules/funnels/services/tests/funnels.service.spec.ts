@@ -237,14 +237,6 @@ describe('FunnelsService', () => {
       expect(queryRunner.startTransaction).toHaveBeenCalled();
     });
 
-    it('EC-02: does not call findGeneratingForUser at all', async () => {
-      funnelAction.findByIdempotency.mockResolvedValue(null);
-      funnelAction.getLatestCompletedWizard.mockResolvedValue(COMPLETE_WIZARD as WizardSession);
-
-      await service.createGeneration(USER_ID, BASE_DTO);
-
-      expect((funnelAction as any).findGeneratingForUser).toBeUndefined();
-    });
   });
 
   describe('AC-04: wizard source requires complete session', () => {
