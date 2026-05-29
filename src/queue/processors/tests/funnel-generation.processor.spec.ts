@@ -176,22 +176,20 @@ describe('FunnelGenerationProcessor', () => {
     });
   });
 
-  // AC-04 / AC-09: DB failure + rollback + release 
+  // AC-04 / AC-09: DB failure + rollback + release
 
   describe('AC-04 — DB failure triggers rollback', () => {
-    it('calls rollbackTransaction and marks funnel FAILED when stage update throws on last attempt', async () => {
+    it('rolls back and rethrows without writing FAILED (onFailed owns that)', async () => {
       mockLlmService.generateWithGemini.mockResolvedValue(makeValidStageData());
       mockQueryRunner.manager.update.mockRejectedValueOnce(new Error('DB error'));
 
       await expect(processor.handleGenerateFunnel(makeJob({ attemptsMade: 2 }))).rejects.toThrow('DB error');
 
       expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalledTimes(1);
-      expect(mockFunnelAction.update).toHaveBeenCalledWith(
-        expect.objectContaining({ updatePayload: { status: FunnelStatus.FAILED } }),
-      );
+      expect(mockFunnelAction.update).not.toHaveBeenCalled();
     });
 
-    it('does NOT mark funnel FAILED on a non-last attempt (so Bull can retry)', async () => {
+    it('never writes FAILED on a non-last attempt either', async () => {
       mockLlmService.generateWithGemini.mockResolvedValue(makeValidStageData());
       mockQueryRunner.manager.update.mockRejectedValueOnce(new Error('DB error'));
 
@@ -210,19 +208,17 @@ describe('FunnelGenerationProcessor', () => {
     });
   });
 
-  // AC-06: Full failure marks funnel FAILED 
+  // AC-06: Full failure rethrows; state write delegated to onFailed
 
   describe('AC-06 — Full failure', () => {
-    it('marks funnel FAILED and re-throws when template also throws on last attempt', async () => {
+    it('rethrows the error without writing FAILED when all providers and template fail', async () => {
       mockLlmService.generateWithGemini.mockRejectedValue(new Error('Gemini down'));
       mockLlmService.generateWithGroq.mockRejectedValue(new Error('Groq down'));
       mockTemplateService.getTemplate.mockImplementation(() => { throw new Error('Template broken'); });
 
       await expect(processor.handleGenerateFunnel(makeJob({ attemptsMade: 2 }))).rejects.toThrow('Template broken');
 
-      expect(mockFunnelAction.update).toHaveBeenCalledWith(
-        expect.objectContaining({ updatePayload: { status: FunnelStatus.FAILED } }),
-      );
+      expect(mockFunnelAction.update).not.toHaveBeenCalled();
     });
   });
 
@@ -314,7 +310,68 @@ describe('FunnelGenerationProcessor', () => {
     });
   });
 
-  // Hook logging 
+  // onFailed — terminal state writes
+
+  describe('onFailed — terminal state writes', () => {
+    it('marks funnel FAILED when all attempts are exhausted and funnel is not ACTIVE', async () => {
+      const job = makeJob({ attemptsMade: 3 });
+      mockFunnelAction.get.mockResolvedValue({ id: 'funnel-uuid', status: FunnelStatus.GENERATING });
+
+      await processor.onFailed(job, new Error('boom'));
+
+      expect(mockFunnelAction.update).toHaveBeenCalledWith(
+        expect.objectContaining({ updatePayload: { status: FunnelStatus.FAILED } }),
+      );
+    });
+
+    it('does not write FAILED when willRetry is true', async () => {
+      const job = makeJob({ attemptsMade: 1 });
+
+      await processor.onFailed(job, new Error('transient'));
+
+      expect(mockFunnelAction.get).not.toHaveBeenCalled();
+      expect(mockFunnelAction.update).not.toHaveBeenCalled();
+    });
+
+    it('skips FAILED write and logs warning when funnel is already ACTIVE', async () => {
+      const job = makeJob({ attemptsMade: 3 });
+      mockFunnelAction.get.mockResolvedValue({ id: 'funnel-uuid', status: FunnelStatus.ACTIVE });
+      const warnSpy = jest.spyOn((processor as any).logger, 'warn');
+
+      await processor.onFailed(job, new Error('boom'));
+
+      expect(mockFunnelAction.update).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'funnel_job_failed_skip' }),
+      );
+    });
+
+    it('does not throw when the FAILED DB update itself fails', async () => {
+      const job = makeJob({ attemptsMade: 3 });
+      mockFunnelAction.get.mockResolvedValue({ id: 'funnel-uuid', status: FunnelStatus.GENERATING });
+      mockFunnelAction.update.mockRejectedValueOnce(new Error('DB down'));
+
+      await expect(processor.onFailed(job, new Error('boom'))).resolves.toBeUndefined();
+    });
+  });
+
+  // onStalled — observability only
+
+  describe('onStalled — observability only', () => {
+    it('logs funnel_job_stalled with attemptsMade and does not write any state', () => {
+      const warnSpy = jest.spyOn((processor as any).logger, 'warn');
+      const job = makeJob({ attemptsMade: 1 });
+
+      processor.onStalled(job);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'funnel_job_stalled', attemptsMade: 1 }),
+      );
+      expect(mockFunnelAction.update).not.toHaveBeenCalled();
+    });
+  });
+
+  // Hook logging
 
   describe('Hook logging', () => {
     it('FR-11: onCompleted logs duration', () => {
