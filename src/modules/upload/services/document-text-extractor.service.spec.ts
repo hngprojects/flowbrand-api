@@ -115,6 +115,30 @@ describe('DocumentTextExtractorService', () => {
         service.extract(Buffer.from('empty pptx'), 'pptx'),
       ).rejects.toThrow(SYS_MSG.FUNNEL_UPLOAD_NO_SLIDES);
     });
+
+    it('EC-03a: throws 422 when PPTX buffer exceeds the size gate', async () => {
+      const oversizedBuffer = Buffer.alloc(20 * 1024 * 1024 + 1);
+
+      await expect(service.extract(oversizedBuffer, 'pptx')).rejects.toThrow(
+        SYS_MSG.FUNNEL_UPLOAD_PPTX_TOO_LARGE,
+      );
+
+      expect(JSZip.loadAsync).not.toHaveBeenCalled();
+    });
+
+    it('EC-03b: throws 422 when PPTX exceeds the slide count gate', async () => {
+      const files: Record<string, { async: jest.Mock }> = {};
+      for (let i = 1; i <= 201; i++) {
+        files[`ppt/slides/slide${i}.xml`] = {
+          async: jest.fn().mockResolvedValue('<a:t>text</a:t>'),
+        };
+      }
+      (JSZip.loadAsync as jest.Mock).mockResolvedValueOnce({ files });
+
+      await expect(
+        service.extract(Buffer.from('big deck'), 'pptx'),
+      ).rejects.toThrow(SYS_MSG.FUNNEL_UPLOAD_PPTX_TOO_MANY_SLIDES);
+    });
   });
 
   describe('AC-04 — DOC/PPT legacy extraction', () => {

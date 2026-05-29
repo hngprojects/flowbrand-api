@@ -3,6 +3,13 @@ import type { UploadFileType } from '../upload.types';
 /** Max size per file (5 MiB) — enforced by Multer and service validation. */
 export const MAX_UPLOAD_BYTES = 5_242_880;
 
+/**
+ * Bull lock duration for the extraction queue (ms).
+ * Set above the measured p95 extraction time per format. Derive EXTRACTION_TIMEOUT_MS
+ * from this value — never hardcode the timeout separately.
+ */
+export const EXTRACTION_LOCK_MS = 300_000;
+
 /** Maximum number of files accepted on POST /funnels/upload. */
 export const MAX_FILES_PER_UPLOAD = 3;
 
