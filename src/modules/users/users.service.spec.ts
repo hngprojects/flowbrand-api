@@ -34,6 +34,22 @@ jest.mock('bcrypt', () => ({
   compare: jest.fn().mockResolvedValue(true),
 }));
 
+// file-type is a pure-ESM package loaded via dynamic import() in users.service.ts.
+// Under ts-jest's CommonJS VM the real module cannot load, so mock it with a
+// lightweight magic-byte sniffer returning the { ext, mime } shape the service expects.
+jest.mock('file-type', () => ({
+  fileTypeFromBuffer: jest.fn(async (input: Uint8Array) => {
+    const bytes = Buffer.isBuffer(input) ? input : Buffer.from(input);
+    if (bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+      return { ext: 'png', mime: 'image/png' };
+    }
+    if (bytes.subarray(0, 4).toString('utf8') === '%PDF') {
+      return { ext: 'pdf', mime: 'application/pdf' };
+    }
+    return undefined;
+  }),
+}));
+
 // Mock UserModelAction
 const mockUserModelAction = {
   findByEmail: jest.fn(),
