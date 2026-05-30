@@ -38,6 +38,16 @@ export class NotificationModelAction extends AbstractModelAction<Notification> {
       .getManyAndCount();
   }
 
+  /** True when a notification of `type` already exists for this user and funnelId (milestone idempotency). */
+  async existsForFunnelType(userId: string, type: string, funnelId: string): Promise<boolean> {
+    return this.repository
+      .createQueryBuilder('notification')
+      .where('notification.user_id = :userId', { userId })
+      .andWhere('notification.type = :type', { type })
+      .andWhere("notification.metadata ->> 'funnelId' = :funnelId", { funnelId })
+      .getExists();
+  }
+
   async countUnread(userId: string): Promise<number> {
     return this.repository
       .createQueryBuilder('notification')

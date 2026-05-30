@@ -18,6 +18,15 @@ export class NotificationPreferenceModelAction extends AbstractModelAction<Notif
     return this.get({ identifierOptions: { user_id: userId } });
   }
 
+  /** Preferences (with their user loaded) for everyone opted in to the weekly digest. */
+  async findWeeklyDigestRecipients(): Promise<NotificationPreference[]> {
+    return this.repository
+      .createQueryBuilder('p')
+      .innerJoinAndSelect('p.user', 'u')
+      .where('p.email_weekly_digest = true')
+      .getMany();
+  }
+
   async createDefaultForUser(userId: string): Promise<NotificationPreference> {
     return this.create({
       createPayload: { user_id: userId },
