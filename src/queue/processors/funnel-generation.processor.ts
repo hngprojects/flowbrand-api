@@ -207,7 +207,7 @@ export class FunnelGenerationProcessor {
           qr.manager.create(StageTask, {
             stage_id: stage.id,
             task_text: t.taskText,
-            name: t.taskText,
+            name: t.taskText.slice(0, 80),
             position: taskIdx + 1,
             is_complete: false,
             completed_at: null,
