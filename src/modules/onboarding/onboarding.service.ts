@@ -105,7 +105,7 @@ export class OnboardingService {
     .filter(Boolean)
     .join('. ');
 
-  const discoveryChannel = answers.step_3?.discovery_channel ?? '';
+  const discoveryChannel = (answers.step_3?.discovery_channel ?? '') as DiscoveryChannel;
   const primaryGoal = OnboardingService.GOAL_MAP[discoveryChannel] ?? 'awareness';
 
   await this.dataSource.transaction(async (manager) => {

@@ -10,6 +10,7 @@ import { WizardSession } from '../../onboarding/entities/wizzard-session.entity'
 import { WizardStatus } from '../../onboarding/enums/wizzard-status.enum';
 import { UploadedDocument } from '../../upload/entities/uploaded-document.entity';
 import { FunnelStatus } from '../../../modules/funnels/enums/funnel-status.enum';
+import { User } from '../../users/entities/user.entity';
 
 
 @Injectable()
@@ -113,6 +114,13 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
       .where('f.id = :funnelId', { funnelId })
       .andWhere('f.user_id = :userId', { userId })
       .getOne();
+  }
+
+  async getUserProfile(userId: string): Promise<{ business_type: string | null; target_customer: string | null } | null> {
+    return this.manager.getRepository(User).findOne({
+      where: { id: userId },
+      select: { business_type: true, target_customer: true },
+    });
   }
 
   async getUploadedDocuments(userId: string, ids: string[]): Promise<UploadedDocument[]> {
