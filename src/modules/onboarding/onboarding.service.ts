@@ -18,19 +18,18 @@ import {
   WizardAnswers,
   OnboardingCompleteResult
 } from './interfaces/onboarding.interface';
-import { Step1AnswerDto, Step2AnswerDto, Step3AnswerDto, StepAnswerDto } from './dto/step-answer.dto';
+import { DiscoveryChannel, Step1AnswerDto, Step2AnswerDto, Step3AnswerDto, StepAnswerDto } from './dto/step-answer.dto';
 import { ClassConstructor, plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
 @Injectable()
 export class OnboardingService {
-  private static readonly GOAL_MAP: Record<string, string> = {
-    Instagram:        'awareness',
-    TikTok:           'awareness',
-    Facebook:         'awareness',
-    LinkedIn:         'awareness',
-    WhatsApp:         'sales',
-    'Word of mouth':  'retention',
+  private static readonly GOAL_MAP: Record<DiscoveryChannel, string> = {
+    [DiscoveryChannel.INSTAGRAM]:          'awareness',
+    [DiscoveryChannel.FACEBOOK]:           'awareness',
+    [DiscoveryChannel.TIKTOK]:             'awareness',
+    [DiscoveryChannel.PHYSICAL_LOCATION]:  'sales',
+    [DiscoveryChannel.OTHERS]:             'awareness',
   };
 
   constructor(

@@ -59,7 +59,7 @@ export class Step2AnswerDto {
     additional_notes?: string 
 }
 
-enum DiscoveryChannel {
+export enum DiscoveryChannel {
   INSTAGRAM = 'Instagram',
   FACEBOOK = 'Facebook',
   TIKTOK = 'TikTok',
