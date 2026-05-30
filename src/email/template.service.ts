@@ -13,6 +13,10 @@ const EMAIL_TYPES: EmailType[] = [
   'waitlist',
   'contact-confirmation',
   'contact-admin-notification',
+  'funnel-ready',
+  'stage-unlocked',
+  'stage-completed',
+  'weekly-digest',
 ];
 
 @Injectable()
@@ -28,6 +32,10 @@ export class TemplateService implements OnModuleInit {
     'waitlist': 'You are on the waitlist',
     'contact-confirmation': "We've received your message",
     'contact-admin-notification': 'New contact form submission from {{fullName}}',
+    'funnel-ready': 'Your funnel is ready',
+    'stage-unlocked': '"{{stageName}}" is now active',
+    'stage-completed': 'You completed "{{stageName}}"',
+    'weekly-digest': 'Your weekly SEIL progress',
   };
 
   private compiledSubjects: Record<EmailType, Handlebars.TemplateDelegate>;
