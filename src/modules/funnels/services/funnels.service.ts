@@ -150,7 +150,7 @@ export class FunnelsService {
       completedAt: s.completed_at,
       explanation: s.explanation,
       actionPrompt: s.action_prompt,
-      tasks: (s.tasks ?? []).map((t) => ({ id: t.id, position: t.position, name: t.name, status: t.status })),
+      tasks: (s.tasks ?? []).map((t) => ({ id: t.id, position: t.position, name: t.name, description: t.task_text, status: t.status })),
       tasksTotal: countsMap.get(s.id)?.total ?? (s.tasks ?? []).length,
       tasksComplete: countsMap.get(s.id)?.complete ?? (s.tasks ?? []).filter((t) => t.status === 'complete').length,
     }));
@@ -219,7 +219,7 @@ export class FunnelsService {
       completedAt: stage.completed_at,
       explanation: stage.explanation,
       actionPrompt: stage.action_prompt,
-      tasks: tasks.map((t) => ({ id: t.id, position: t.position, name: t.name, status: t.status })),
+      tasks: tasks.map((t) => ({ id: t.id, position: t.position, name: t.name, description: t.task_text, status: t.status })),
       tasksTotal: Number(rawCount?.total ?? 0),
       tasksComplete: Number(rawCount?.complete ?? 0),
     };
@@ -581,6 +581,7 @@ export class FunnelsService {
     return {
       taskId: task.id,
       name: task.name,
+      description: task.task_text,
       status: task.status,
       isComplete: task.is_complete,
       completedAt: task.completed_at ? task.completed_at.toISOString() : null,
