@@ -514,6 +514,33 @@ describe('OnboardingService — completeOnboarding', () => {
       service.completeOnboarding(USER_ID, SESSION_ID),
     ).rejects.toThrow('DB failure');
   });
+
+  describe('primary_goal mapping for all DiscoveryChannel values', () => {
+    const cases: Array<{ channel: string; expected: string }> = [
+      { channel: 'Instagram',        expected: 'awareness' },
+      { channel: 'Facebook',         expected: 'awareness' },
+      { channel: 'TikTok',           expected: 'awareness' },
+      { channel: 'Physical Location', expected: 'sales' },
+      { channel: 'Others',           expected: 'awareness' },
+    ];
+
+    it.each(cases)(
+      'writes primary_goal "$expected" for discovery_channel "$channel"',
+      async ({ channel, expected }) => {
+        mockWizardSessionModelAction.findSessionById.mockResolvedValue({
+          ...validSession,
+          answers: { ...validAnswers, step_3: { discovery_channel: channel } },
+        });
+
+        await service.completeOnboarding(USER_ID, SESSION_ID);
+
+        const userUpdateCall = mockManager.update.mock.calls.find(
+          (call: unknown[]) => call[1] === USER_ID,
+        );
+        expect(userUpdateCall![2]).toMatchObject({ primary_goal: expected });
+      },
+    );
+  });
 });
 
 describe('OnboardingService — saveStepAnswer (BE-008)', () => {
