@@ -674,11 +674,36 @@ describe('OnboardingService — saveStepAnswer (BE-008)', () => {
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 
-  it('AC-09: throws 422 when step 2 customer_tags.type is empty array', async () => {
+  it('AC-09: throws 422 when step 2 has no tags and no additional_notes', async () => {
     mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession());
     await expect(
       service.saveStepAnswer(USER_ID, {
         session_id: SESSION_ID, step: 2, answer: { customer_tags: { type: [] } }
+      } as any)
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('AC-09a: accepts step 2 with additional_notes only (no tags selected)', async () => {
+    mockSaveSessionAction.findSessionById.mockResolvedValue(
+      buildSession({ steps_completed: 1, answers: { step_1: { business_description: 'test' } } }),
+    );
+    const result = await service.saveStepAnswer(USER_ID, {
+      session_id: SESSION_ID,
+      step: 2,
+      answer: { customer_tags: {}, additional_notes: 'They are people who want to make their lives easier' },
+    } as any);
+    expect(result.statusCode).toBe(200);
+  });
+
+  it('AC-09b: throws 422 when step 2 has empty tags and blank additional_notes', async () => {
+    mockSaveSessionAction.findSessionById.mockResolvedValue(
+      buildSession({ steps_completed: 1, answers: { step_1: { business_description: 'test' } } }),
+    );
+    await expect(
+      service.saveStepAnswer(USER_ID, {
+        session_id: SESSION_ID,
+        step: 2,
+        answer: { customer_tags: { type: [] }, additional_notes: '   ' },
       } as any)
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
