@@ -446,14 +446,18 @@ export class FunnelsService {
       const session = await this.funnelAction.getLatestCompletedWizard(userId);
       if (!session) throw new UnprocessableEntityException(SYS_MSG.ONBOARDING_INCOMPLETE);
 
-      const answers: Record<string, unknown> = session.answers ?? {};
-      const businessName = this.coerceString(answers.business_name) || DEFAULT_BUSINESS_NAME;
+      const step1 = (session.answers?.step_1 ?? {}) as { business_description?: string; business_type?: string };
+      const step3 = (session.answers?.step_3 ?? {}) as { discovery_channel?: string };
+      const user = await this.funnelAction.getUserProfile(userId);
+
+      const businessName = this.coerceString(step1.business_description) || DEFAULT_BUSINESS_NAME;
+      const businessType = this.coerceString(step1.business_type) || this.coerceString(user?.business_type) || 'unknown';
       const businessContext: BusinessContext = {
-        businessType: this.coerceString(answers.business_type) || 'unknown',
-        discoveryChannel: this.coerceString(answers.discovery_channel) || 'unknown',
+        businessType,
+        discoveryChannel: this.coerceString(step3.discovery_channel) || 'unknown',
         business_name: businessName,
-        business_description: this.coerceString(answers.business_description) || '',
-        target_customer: this.coerceString(answers.target_customer) || '',
+        business_description: this.coerceString(step1.business_description) || '',
+        target_customer: this.coerceString(user?.target_customer) || '',
       };
       return { businessName, businessContext };
     }
