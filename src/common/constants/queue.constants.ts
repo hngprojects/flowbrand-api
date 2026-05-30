@@ -8,6 +8,7 @@ export const JOBS = {
   GENERATE_FUNNEL: 'generate-funnel',
   SEND_EMAIL: 'send-email',
   EXTRACT_TEXT: 'extract-text',
+  WEEKLY_DIGEST: 'weekly-digest',
 } as const;
 
 export const JOB_RETENTION = {

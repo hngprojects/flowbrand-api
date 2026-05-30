@@ -12,6 +12,10 @@ const WAITLIST_HBS = `<p>Hi {{user.name}}</p><p>You are on the waitlist</p>`;
 const CONTACT_CONFIRMATION_HBS = `<p>Hi {{fullName}}</p><p>We've received your message</p>`;
 const CONTACT_ADMIN_HBS = `<p>New message from {{fullName}}</p><p>{{message}}</p>`;
 const PASSWORD_RESET_HBS = `<p>Hi {{fullName}}</p><p>Your reset code is {{otpCode}}</p>`;
+const FUNNEL_READY_HBS = `<p>Hi {{name}}</p><p>Your funnel for {{businessName}} is ready</p>`;
+const STAGE_UNLOCKED_HBS = `<p>Hi {{name}}</p><p>{{stageName}} is now active</p>`;
+const STAGE_COMPLETED_HBS = `<p>Hi {{name}}</p><p>You completed {{stageName}}</p>`;
+const WEEKLY_DIGEST_HBS = `<p>Hi {{name}}</p><p>{{completedTasks}} of {{totalTasks}}</p>`;
 
 describe('TemplateService', () => {
   let service: TemplateService;
@@ -31,6 +35,10 @@ describe('TemplateService', () => {
         if (p.includes('waitlist')) return Promise.resolve(WAITLIST_HBS as never);
         if (p.includes('contact-confirmation')) return Promise.resolve(CONTACT_CONFIRMATION_HBS as never);
         if (p.includes('contact-admin-notification')) return Promise.resolve(CONTACT_ADMIN_HBS as never);
+        if (p.includes('funnel-ready')) return Promise.resolve(FUNNEL_READY_HBS as never);
+        if (p.includes('stage-unlocked')) return Promise.resolve(STAGE_UNLOCKED_HBS as never);
+        if (p.includes('stage-completed')) return Promise.resolve(STAGE_COMPLETED_HBS as never);
+        if (p.includes('weekly-digest')) return Promise.resolve(WEEKLY_DIGEST_HBS as never);
         return Promise.reject(new Error(`Unexpected path: ${p}`));
       });
 
@@ -76,6 +84,41 @@ describe('TemplateService', () => {
       expect(html).toContain('waitlist');
       expect(html).toContain('/privacy-policy');
       expect(subject).toBe('You are on the waitlist');
+    });
+
+    it('renders funnel-ready with name and business name', () => {
+      const { html, subject } = service.render('funnel-ready', { name: 'Ada', businessName: 'Acme' });
+
+      expect(html).toContain('Ada');
+      expect(html).toContain('Acme');
+      expect(subject).toBe('Your funnel is ready');
+    });
+
+    it('renders stage-unlocked with the stage name interpolated into the subject', () => {
+      const { html, subject } = service.render('stage-unlocked', { name: 'Ada', stageName: 'Interest' });
+
+      expect(html).toContain('Interest');
+      expect(subject).toBe('"Interest" is now active');
+    });
+
+    it('renders stage-completed with the stage name interpolated into the subject', () => {
+      const { html, subject } = service.render('stage-completed', { name: 'Ada', stageName: 'Awareness' });
+
+      expect(html).toContain('Awareness');
+      expect(subject).toBe('You completed "Awareness"');
+    });
+
+    it('renders weekly-digest with task counts', () => {
+      const { html, subject } = service.render('weekly-digest', {
+        name: 'Ada',
+        completedTasks: 3,
+        totalTasks: 6,
+        activeStageName: null,
+      });
+
+      expect(html).toContain('3');
+      expect(html).toContain('6');
+      expect(subject).toBe('Your weekly SEIL progress');
     });
 
     it('wraps inner content in base layout (contains DOCTYPE)', () => {

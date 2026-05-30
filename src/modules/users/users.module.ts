@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FunnelsModule } from '../funnels/funnels.module';
 import { UploadModule } from '../upload/upload.module';
@@ -23,7 +23,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     TypeOrmModule.forFeature([User, UserSession, AuthMetadata]),
     OnboardingModule,
     FunnelsModule,
-    NotificationsModule,
+    forwardRef(() => NotificationsModule),
     RedisModule,
     UploadModule,
     BullModule.registerQueueAsync({
