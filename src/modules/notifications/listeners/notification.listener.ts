@@ -41,6 +41,10 @@ export class NotificationListener {
     await this.safely('stage.completed', event.userId, async () => {
       const prefs = await this.notificationsService.getNotificationPreferences(event.userId);
 
+      // inapp_stage_unlocked is the single "stage events" in-app toggle: it gates
+      // BOTH stage.completed and stage.unlocked. notification_preferences (M4-BE-004)
+      // has no separate inapp_stage_completed column, so the two stage events share
+      // this key by design, per FR-2.
       if (prefs.inapp_stage_unlocked) {
         await this.notificationsService.createNotification(
           event.userId,
@@ -86,11 +90,13 @@ export class NotificationListener {
   async onFunnelGenerated(event: FunnelGeneratedEvent): Promise<void> {
     await this.safely('funnel.generated', event.userId, async () => {
       // System event: in-app is always created, regardless of preferences.
+      // FUNNEL_GENERATED fires for first-time generation and regeneration alike,
+      // so the copy is generic ("ready") rather than regeneration-specific.
       await this.notificationsService.createNotification(
         event.userId,
-        'funnel_regenerated',
-        'Your funnel was regenerated',
-        'Your plan has been updated based on your inputs.',
+        'funnel_ready',
+        'Your funnel is ready',
+        'Your personalised plan has been created. Tap to start.',
         { funnelId: event.funnelId },
       );
 
@@ -106,6 +112,11 @@ export class NotificationListener {
   @OnEvent(APP_EVENTS.TASK_COMPLETED)
   async onTaskCompleted(event: TaskCompletedEvent): Promise<void> {
     await this.safely('task.completed', event.userId, async () => {
+      const prefs = await this.notificationsService.getNotificationPreferences(event.userId);
+      if (!prefs.inapp_task_completed) {
+        return;
+      }
+
       const { total, complete } = await this.taskAction.getFunnelTaskProgress(event.funnelId);
       if (total === 0 || complete / total < MILESTONE_THRESHOLD) {
         return;

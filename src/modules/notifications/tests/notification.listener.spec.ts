@@ -92,15 +92,15 @@ describe('NotificationListener', () => {
     );
   });
 
-  it('AC-03: FUNNEL_GENERATED creates a funnel_regenerated in-app regardless of preferences', async () => {
+  it('AC-03: FUNNEL_GENERATED creates a funnel_ready in-app regardless of preferences', async () => {
     prefs.inapp_stage_unlocked = false;
     await listener.onFunnelGenerated(funnelGenerated());
 
     expect(notificationsService.createNotification).toHaveBeenCalledWith(
       'user-1',
-      'funnel_regenerated',
-      'Your funnel was regenerated',
-      'Your plan has been updated based on your inputs.',
+      'funnel_ready',
+      'Your funnel is ready',
+      'Your personalised plan has been created. Tap to start.',
       { funnelId: 'funnel-1' },
     );
   });
@@ -138,7 +138,15 @@ describe('NotificationListener', () => {
     expect(notificationsService.createNotification).not.toHaveBeenCalled();
   });
 
-  it('AC-05: no in-app notification when the relevant inapp_ preference is false', async () => {
+  it('does not create funnel_progress when inapp_task_completed is false', async () => {
+    prefs.inapp_task_completed = false;
+    await listener.onTaskCompleted(taskCompleted());
+
+    expect(notificationsService.createNotification).not.toHaveBeenCalled();
+    expect(taskAction.getFunnelTaskProgress).not.toHaveBeenCalled();
+  });
+
+  it('AC-05: inapp_stage_unlocked=false suppresses BOTH stage_completed and stage_unlocked (shared stage-events key)', async () => {
     prefs.inapp_stage_unlocked = false;
     await listener.onStageCompleted(stageCompleted());
     await listener.onStageUnlocked(stageUnlocked());

@@ -18,12 +18,19 @@ export class NotificationPreferenceModelAction extends AbstractModelAction<Notif
     return this.get({ identifierOptions: { user_id: userId } });
   }
 
-  /** Preferences (with their user loaded) for everyone opted in to the weekly digest. */
-  async findWeeklyDigestRecipients(): Promise<NotificationPreference[]> {
+  /**
+   * One page of preferences (with their user loaded) for users opted in to the
+   * weekly digest. Paginated so the digest job never loads the whole table at once.
+   * Ordered by id for a stable cursor across pages.
+   */
+  async findWeeklyDigestRecipients(limit: number, offset: number): Promise<NotificationPreference[]> {
     return this.repository
       .createQueryBuilder('p')
       .innerJoinAndSelect('p.user', 'u')
       .where('p.email_weekly_digest = true')
+      .orderBy('p.id', 'ASC')
+      .take(limit)
+      .skip(offset)
       .getMany();
   }
 
