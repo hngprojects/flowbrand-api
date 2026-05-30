@@ -130,7 +130,7 @@ private validateAnswers(answers: WizardAnswers): void {
   const missingSteps: string[] = [];
 
   if (!answers?.step_1?.business_description)        missingSteps.push('step_1');
-  if (!answers?.step_2?.customer_tags?.type?.length) missingSteps.push('step_2');
+  if (!answers?.step_2?.customer_tags?.type?.length && !answers?.step_2?.additional_notes?.trim()) missingSteps.push('step_2');
   if (!answers?.step_3?.discovery_channel)           missingSteps.push('step_3');
 
   if (missingSteps.length > 0) {
@@ -190,7 +190,7 @@ private validateAnswers(answers: WizardAnswers): void {
         message: 'Step 1 must be completed before answering Step 2.'
       });
     }
-    if (dto.step === 3 && (!answers?.step_1?.business_description || !answers?.step_2?.customer_tags?.type?.length)) {
+    if (dto.step === 3 && (!answers?.step_1?.business_description || (!answers?.step_2?.customer_tags?.type?.length && !answers?.step_2?.additional_notes?.trim()))) {
       throw new UnprocessableEntityException({
         code: 'SEQUENCE_ERROR',
         message: 'Steps 1 and 2 must be completed before answering Step 3.'

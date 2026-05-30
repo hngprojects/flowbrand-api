@@ -675,7 +675,9 @@ describe('OnboardingService — saveStepAnswer (BE-008)', () => {
   });
 
   it('AC-09: throws 422 when step 2 has no tags and no additional_notes', async () => {
-    mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession());
+    mockSaveSessionAction.findSessionById.mockResolvedValue(
+      buildSession({ steps_completed: 1, answers: { step_1: { business_description: 'test' } } }),
+    );
     await expect(
       service.saveStepAnswer(USER_ID, {
         session_id: SESSION_ID, step: 2, answer: { customer_tags: { type: [] } }
