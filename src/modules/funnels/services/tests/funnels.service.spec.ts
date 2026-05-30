@@ -44,11 +44,9 @@ const COMPLETE_WIZARD: Partial<WizardSession> = {
   user_id: USER_ID,
   status: WizardStatus.COMPLETE,
   answers: {
-    business_name: 'Mama Adunni Kitchen',
-    business_type: 'restaurant',
-    discovery_channel: 'Instagram',
-    business_description: 'Casual jollof spot',
-    target_customer: 'office workers',
+    step_1: { business_description: 'Casual jollof spot' },
+    step_2: { customer_tags: { type: ['office workers'] }, additional_notes: '' },
+    step_3: { discovery_channel: 'Instagram' },
   },
 };
 
@@ -86,6 +84,10 @@ describe('FunnelsService', () => {
       listForUserPaginated: jest.fn(),
       getLatestCompletedWizard: jest.fn(),
       getUploadedDocuments: jest.fn(),
+      getUserProfile: jest.fn().mockResolvedValue({
+        business_type: 'restaurant',
+        target_customer: 'office workers',
+      }),
     } as unknown as jest.Mocked<FunnelModelAction>;
 
     // Mock the Stage action
@@ -590,6 +592,39 @@ describe('FunnelsService', () => {
       await expect(service.submitFeedback(USER_ID, FUNNEL_ID, 'stage-1', { comment: 'Great' })).rejects.toThrow(
         UnprocessableEntityException,
       );
+    });
+  });
+
+  describe('wizard context derivation', () => {
+    type SavedFunnel = {
+      business_name: string;
+      business_context: { businessType: string; business_description: string; target_customer: string };
+    };
+
+    it('uses step_1.business_description as business_name and business_description', async () => {
+      funnelAction.findByIdempotency.mockResolvedValue(null);
+      funnelAction.getLatestCompletedWizard.mockResolvedValue(COMPLETE_WIZARD as WizardSession);
+
+      await service.createGeneration(USER_ID, BASE_DTO);
+
+      const saved = queryRunner.manager.save.mock.calls[0][1] as SavedFunnel;
+      expect(saved.business_name).toBe('Casual jollof spot');
+      expect(saved.business_context.business_description).toBe('Casual jollof spot');
+    });
+
+    it('uses user profile fields for businessType and target_customer', async () => {
+      funnelAction.findByIdempotency.mockResolvedValue(null);
+      funnelAction.getLatestCompletedWizard.mockResolvedValue(COMPLETE_WIZARD as WizardSession);
+      funnelAction.getUserProfile.mockResolvedValue({
+        business_type: 'restaurant',
+        target_customer: 'office workers',
+      });
+
+      await service.createGeneration(USER_ID, BASE_DTO);
+
+      const saved = queryRunner.manager.save.mock.calls[0][1] as SavedFunnel;
+      expect(saved.business_context.businessType).toBe('restaurant');
+      expect(saved.business_context.target_customer).toBe('office workers');
     });
   });
 });
