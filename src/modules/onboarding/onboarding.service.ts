@@ -18,19 +18,18 @@ import {
   WizardAnswers,
   OnboardingCompleteResult
 } from './interfaces/onboarding.interface';
-import { Step1AnswerDto, Step2AnswerDto, Step3AnswerDto, StepAnswerDto } from './dto/step-answer.dto';
+import { DiscoveryChannel, Step1AnswerDto, Step2AnswerDto, Step3AnswerDto, StepAnswerDto } from './dto/step-answer.dto';
 import { ClassConstructor, plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
 @Injectable()
 export class OnboardingService {
-  private static readonly GOAL_MAP: Record<string, string> = {
-    Instagram:        'awareness',
-    TikTok:           'awareness',
-    Facebook:         'awareness',
-    LinkedIn:         'awareness',
-    WhatsApp:         'sales',
-    'Word of mouth':  'retention',
+  private static readonly GOAL_MAP: Record<DiscoveryChannel, string> = {
+    [DiscoveryChannel.INSTAGRAM]:          'awareness',
+    [DiscoveryChannel.FACEBOOK]:           'awareness',
+    [DiscoveryChannel.TIKTOK]:             'awareness',
+    [DiscoveryChannel.PHYSICAL_LOCATION]:  'sales',
+    [DiscoveryChannel.OTHERS]:             'awareness',
   };
 
   constructor(
@@ -106,7 +105,7 @@ export class OnboardingService {
     .filter(Boolean)
     .join('. ');
 
-  const discoveryChannel = answers.step_3?.discovery_channel ?? '';
+  const discoveryChannel = (answers.step_3?.discovery_channel ?? '') as DiscoveryChannel;
   const primaryGoal = OnboardingService.GOAL_MAP[discoveryChannel] ?? 'awareness';
 
   await this.dataSource.transaction(async (manager) => {
@@ -131,7 +130,7 @@ private validateAnswers(answers: WizardAnswers): void {
   const missingSteps: string[] = [];
 
   if (!answers?.step_1?.business_description)        missingSteps.push('step_1');
-  if (!answers?.step_2?.customer_tags?.type?.length) missingSteps.push('step_2');
+  if (!answers?.step_2?.customer_tags?.type?.length && !answers?.step_2?.additional_notes?.trim()) missingSteps.push('step_2');
   if (!answers?.step_3?.discovery_channel)           missingSteps.push('step_3');
 
   if (missingSteps.length > 0) {
@@ -191,7 +190,7 @@ private validateAnswers(answers: WizardAnswers): void {
         message: 'Step 1 must be completed before answering Step 2.'
       });
     }
-    if (dto.step === 3 && (!answers?.step_1?.business_description || !answers?.step_2?.customer_tags?.type?.length)) {
+    if (dto.step === 3 && (!answers?.step_1?.business_description || (!answers?.step_2?.customer_tags?.type?.length && !answers?.step_2?.additional_notes?.trim()))) {
       throw new UnprocessableEntityException({
         code: 'SEQUENCE_ERROR',
         message: 'Steps 1 and 2 must be completed before answering Step 3.'
