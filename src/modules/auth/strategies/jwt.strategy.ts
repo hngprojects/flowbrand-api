@@ -2,12 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { env } from '../../../config/env';
+import { UserRole } from '../../users/enums/user-role.enum';
 
 export interface JwtPayload {
   userId: string;
   sub: string;
   email: string;
   sessionId: string;
+  /** Present on admin-scoped tokens only; absent or USER on regular user tokens. */
+  role?: UserRole;
 }
 
 @Injectable()
