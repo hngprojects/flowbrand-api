@@ -26,6 +26,6 @@ import { AdminAuthController } from './admin-auth.controller';
   ],
   controllers: [AdminAuthController],
   providers: [AdminAuthService, AdminJwtGuard, AuthMetadataModelAction],
-  exports: [AdminJwtGuard, JwtModule, TypeOrmModule],
+  exports: [AdminJwtGuard, JwtModule, TypeOrmModule, RedisModule],
 })
 export class AdminAuthModule {}
