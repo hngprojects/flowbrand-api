@@ -8,7 +8,7 @@ import { CreateAdminDto } from './dto/create-admin.dto';
 import { AdminUsersService } from './admin-users.service';
 import { CreateAdminDocs } from './docs/admin-users-swagger.doc';
 
-@ApiTags('admin/users')
+@ApiTags('admin')
 @Controller('admin/users')
 export class AdminUsersController {
   constructor(private readonly adminUsersService: AdminUsersService) {}

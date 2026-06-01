@@ -19,7 +19,7 @@ import { AdminLoginDto } from './dto/admin-login.dto';
 import { AdminAuthService } from './admin-auth.service';
 import { AdminLoginDocs, AdminLogoutDocs, AdminRefreshTokenDocs } from './docs/admin-auth-swagger.doc';
 
-@ApiTags('admin/auth')
+@ApiTags('admin')
 @Controller('admin/auth')
 export class AdminAuthController {
   constructor(private readonly adminAuthService: AdminAuthService) {}
