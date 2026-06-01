@@ -1,8 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
 import * as SYS_MSG from '../../../../constants/system.messages';
-import { AdminJwtGuard } from '../../../auth/guards/admin-jwt.guard';
-import { RolesGuard } from '../../../auth/guards/roles.guard';
 import { AdminProfileController } from '../admin-profile.controller';
 import { AdminProfileService } from '../admin-profile.service';
 
@@ -26,19 +23,11 @@ const PROFILE = {
 describe('AdminProfileController', () => {
   let controller: AdminProfileController;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     jest.clearAllMocks();
-
-    const module: TestingModule = await Test.createTestingModule({
-      controllers: [AdminProfileController],
-      providers: [
-        { provide: AdminProfileService, useValue: mockAdminProfileService },
-        { provide: AdminJwtGuard, useValue: { canActivate: jest.fn().mockReturnValue(true) } },
-        { provide: RolesGuard, useValue: { canActivate: jest.fn().mockReturnValue(true) } },
-      ],
-    }).compile();
-
-    controller = module.get<AdminProfileController>(AdminProfileController);
+    controller = new AdminProfileController(
+      mockAdminProfileService as unknown as AdminProfileService,
+    );
   });
 
   describe('GET /admin/profile', () => {

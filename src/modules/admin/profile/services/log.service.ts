@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PinoLoggerService } from '../../../../common/logger/pino-logger.service';
 
-interface LogActionPayload {
+interface LogActionPayload extends Record<string, unknown> {
   admin_id: string;
   action_type: 'profile_updated';
   metadata?: Record<string, unknown>;
