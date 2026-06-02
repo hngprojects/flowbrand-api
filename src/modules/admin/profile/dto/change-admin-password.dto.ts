@@ -11,9 +11,7 @@ export class ChangeAdminPasswordDto {
   })
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? value.trim() : value,
-  )
+  @Transform(({ value }: { value: unknown }) => value)
   old_password: string;
 
   @ApiProperty({
@@ -23,9 +21,7 @@ export class ChangeAdminPasswordDto {
   })
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? value.trim() : value,
-  )
+  @Transform(({ value }: { value: unknown }) => value)
   @MinLength(8)
   @Matches(/^(?=.*[A-Z])(?=.*[a-z])(?=.*[^A-Za-z0-9]).{8,}$/, {
     message: SYS_MSG.ADMIN_PASSWORD_POLICY_VALIDATION_FAILED,
@@ -38,9 +34,7 @@ export class ChangeAdminPasswordDto {
   })
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? value.trim() : value,
-  )
+  @Transform(({ value }: { value: unknown }) => value)
   @MatchesField('new_password', { message: SYS_MSG.ADMIN_CONFIRM_PASSWORD_MISMATCH })
   confirm_password: string;
 }

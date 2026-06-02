@@ -29,7 +29,7 @@ describe('ChangeAdminPasswordDto', () => {
     const confirmPasswordError = errors.find((error) => error.property === 'confirm_password');
 
     expect(confirmPasswordError).toBeDefined();
-    expect(confirmPasswordError?.constraints).toHaveProperty('isMatch', SYS_MSG.ADMIN_CONFIRM_PASSWORD_MISMATCH);
+    expect(confirmPasswordError?.constraints).toHaveProperty('matchesField', SYS_MSG.ADMIN_CONFIRM_PASSWORD_MISMATCH);
   });
 
   it('FR-2: old_password is required', async () => {
@@ -43,6 +43,18 @@ describe('ChangeAdminPasswordDto', () => {
 
     expect(oldPasswordError).toBeDefined();
     expect(oldPasswordError?.constraints).toHaveProperty('isNotEmpty');
+  });
+
+  it('SEC-01: preserves surrounding whitespace so passwords are validated exactly as entered', async () => {
+    const dto = plainToInstance(ChangeAdminPasswordDto, {
+      old_password: ' CurrentAdmin@123 ',
+      new_password: ' NewAdmin!789 ',
+      confirm_password: ' NewAdmin!789 ',
+    });
+
+    expect(dto.old_password).toBe(' CurrentAdmin@123 ');
+    expect(dto.new_password).toBe(' NewAdmin!789 ');
+    expect(dto.confirm_password).toBe(' NewAdmin!789 ');
   });
 
   it('accepts valid password payload', async () => {
