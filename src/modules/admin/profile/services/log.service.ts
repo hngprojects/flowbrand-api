@@ -11,7 +11,8 @@ interface LogActionPayload extends Record<string, unknown> {
 export class LogService {
   constructor(private readonly logger: PinoLoggerService) {}
 
-  async logAction(payload: LogActionPayload): Promise<void> {
+  logAction(payload: LogActionPayload): Promise<void> {
     this.logger.info('admin.profile.action', payload);
+    return Promise.resolve();
   }
 }

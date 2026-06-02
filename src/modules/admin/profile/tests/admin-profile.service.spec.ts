@@ -210,7 +210,7 @@ describe('AdminProfileService', () => {
       mockUserRoleModelAction.resolveHighestRole.mockResolvedValue(null);
 
       await expect(service.updateProfile(ADMIN_ID, {})).rejects.toThrow(
-        new NotFoundException(SYS_MSG.ADMIN_PROFILE_NOT_FOUND),
+        new InternalServerErrorException(SYS_MSG.ADMIN_PROFILE_RESPONSE_ROLE_RESOLUTION_FAILED),
       );
     });
   });

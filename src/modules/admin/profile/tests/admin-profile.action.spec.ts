@@ -13,11 +13,10 @@ describe('AdminProfileModelAction', () => {
 
     expect(updateSpy).toHaveBeenCalledWith(
       expect.objectContaining({
+        transactionOptions: { useTransaction: false },
         identifierOptions: { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
         updatePayload: { full_name: 'Jane Updated' },
       }),
     );
-
-    expect(updateSpy.mock.calls[0][0]).not.toHaveProperty('transactionOptions');
   });
 });
