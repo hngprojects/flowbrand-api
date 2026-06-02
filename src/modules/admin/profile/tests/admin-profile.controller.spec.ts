@@ -1,5 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
+import { UnprocessableEntityException, ValidationError, ValidationPipe } from '@nestjs/common';
 import * as SYS_MSG from '../../../../constants/system.messages';
+import { UpdateAdminProfileDto } from '../dto/update-admin-profile.dto';
 import { AdminProfileController } from '../admin-profile.controller';
 import { AdminProfileService } from '../admin-profile.service';
 
@@ -54,6 +56,24 @@ describe('AdminProfileController', () => {
   });
 
   describe('PATCH /admin/profile', () => {
+    const createValidationPipe = () =>
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+        transformOptions: { enableImplicitConversion: false },
+        expectedType: UpdateAdminProfileDto,
+        validationError: { target: false, value: false },
+        exceptionFactory: (errors: ValidationError[]) =>
+          new UnprocessableEntityException({
+            success: false,
+            statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+            error: 'UnprocessableEntityException',
+            message: SYS_MSG.VALIDATION_FAILED,
+            details: errors,
+          }),
+      });
+
     it('AC-02: updates allowed profile fields and returns HTTP 200', async () => {
       const updated = { ...PROFILE, full_name: 'Jane Updated' };
       mockAdminProfileService.updateProfile.mockResolvedValue(updated);
@@ -80,6 +100,26 @@ describe('AdminProfileController', () => {
       expect(result.statusCode).toBe(HttpStatus.OK);
       expect(result.data).toEqual(PROFILE);
       expect(mockAdminProfileService.updateProfile).toHaveBeenCalledWith(ADMIN_ID, {});
+    });
+
+    it('uses ValidationPipe config to reject non-whitelisted fields with 422 envelope', async () => {
+      await expect(
+        createValidationPipe().transform(
+          { full_name: 'Jane Admin', extra_field: 'nope' },
+          { type: 'body', metatype: UpdateAdminProfileDto, data: '' },
+        ),
+      ).rejects.toMatchObject({
+        getStatus: expect.any(Function),
+      });
+    });
+
+    it('uses ValidationPipe config to trim input values during transformation', async () => {
+      const result = (await createValidationPipe().transform(
+        { full_name: '  Jane Admin  ' },
+        { type: 'body', metatype: UpdateAdminProfileDto, data: '' },
+      )) as UpdateAdminProfileDto;
+
+      expect(result.full_name).toBe('Jane Admin');
     });
   });
 });

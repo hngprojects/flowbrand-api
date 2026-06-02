@@ -90,7 +90,23 @@ export function UpdateAdminProfileDocs() {
     }),
     ApiResponse({
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'Invalid country/full_name, or email was provided in body',
+      description: 'Validation failed (full_name/country)',
+      schema: {
+        example: {
+          success: false,
+          statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          error: 'UnprocessableEntityException',
+          message: SYS_MSG.VALIDATION_FAILED,
+          details: [
+            { field: 'full_name', message: 'full_name must be longer than or equal to 2 characters' },
+            { field: 'country', message: 'country must be one of the allowed SSA countries' },
+          ],
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'Email change forbidden',
       schema: {
         example: {
           success: false,
