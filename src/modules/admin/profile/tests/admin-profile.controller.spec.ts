@@ -1,0 +1,123 @@
+import { HttpStatus } from '@nestjs/common';
+import * as SYS_MSG from '../../../../constants/system.messages';
+import { AdminProfileController } from '../admin-profile.controller';
+import { AdminProfileService } from '../admin-profile.service';
+
+const mockAdminProfileService = {
+  getProfile: jest.fn(),
+  updateProfile: jest.fn(),
+  changePassword: jest.fn(),
+};
+
+const ADMIN_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+const PROFILE = {
+  id: ADMIN_ID,
+  full_name: 'Jane Admin',
+  email: 'admin@example.com',
+  country: 'Nigeria',
+  avatar_url: null,
+  role: 'admin',
+  created_at: new Date('2026-05-29T10:30:00.000Z'),
+};
+
+describe('AdminProfileController', () => {
+  let controller: AdminProfileController;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    controller = new AdminProfileController(
+      mockAdminProfileService as unknown as AdminProfileService,
+    );
+  });
+
+  describe('GET /admin/profile', () => {
+    it('AC-01: returns authenticated admin profile including role', async () => {
+      mockAdminProfileService.getProfile.mockResolvedValue(PROFILE);
+
+      const result = await controller.getProfile(ADMIN_ID);
+
+      expect(result).toEqual({
+        statusCode: HttpStatus.OK,
+        message: SYS_MSG.ADMIN_PROFILE_RETRIEVED_SUCCESSFULLY,
+        data: PROFILE,
+      });
+      expect(mockAdminProfileService.getProfile).toHaveBeenCalledWith(ADMIN_ID);
+    });
+
+    it('SEC-01: never includes password_hash in response payload', async () => {
+      mockAdminProfileService.getProfile.mockResolvedValue(PROFILE);
+
+      const result = await controller.getProfile(ADMIN_ID);
+
+      expect(result.data).not.toHaveProperty('password_hash');
+    });
+  });
+
+  describe('PATCH /admin/profile', () => {
+    it('AC-02: updates allowed profile fields and returns HTTP 200', async () => {
+      const updated = { ...PROFILE, full_name: 'Jane Updated' };
+      mockAdminProfileService.updateProfile.mockResolvedValue(updated);
+
+      const result = await controller.updateProfile(ADMIN_ID, {
+        full_name: 'Jane Updated',
+      });
+
+      expect(result).toEqual({
+        statusCode: HttpStatus.OK,
+        message: SYS_MSG.ADMIN_PROFILE_UPDATED_SUCCESSFULLY,
+        data: updated,
+      });
+      expect(mockAdminProfileService.updateProfile).toHaveBeenCalledWith(ADMIN_ID, {
+        full_name: 'Jane Updated',
+      });
+    });
+
+    it('AC-05: empty body returns HTTP 200 with unchanged profile', async () => {
+      mockAdminProfileService.updateProfile.mockResolvedValue(PROFILE);
+
+      const result = await controller.updateProfile(ADMIN_ID, {});
+
+      expect(result.statusCode).toBe(HttpStatus.OK);
+      expect(result.data).toEqual(PROFILE);
+      expect(mockAdminProfileService.updateProfile).toHaveBeenCalledWith(ADMIN_ID, {});
+    });
+  });
+
+  describe('PATCH /admin/profile/password', () => {
+    it('AC-01: returns HTTP 200 when old password is correct and new password is valid', async () => {
+      mockAdminProfileService.changePassword.mockResolvedValue(undefined);
+
+      const result = await controller.changePassword(ADMIN_ID, {
+        old_password: 'CurrentAdmin@123',
+        new_password: 'NewAdmin!789',
+        confirm_password: 'NewAdmin!789',
+      });
+
+      expect(result).toEqual({
+        statusCode: HttpStatus.OK,
+        message: SYS_MSG.ADMIN_PASSWORD_UPDATED_SUCCESSFULLY,
+        data: null,
+      });
+      expect(mockAdminProfileService.changePassword).toHaveBeenCalledWith(ADMIN_ID, {
+        old_password: 'CurrentAdmin@123',
+        new_password: 'NewAdmin!789',
+        confirm_password: 'NewAdmin!789',
+      });
+    });
+
+    it('AC-07: controller never includes password values in response payload', async () => {
+      mockAdminProfileService.changePassword.mockResolvedValue(undefined);
+
+      const result = await controller.changePassword(ADMIN_ID, {
+        old_password: 'CurrentAdmin@123',
+        new_password: 'NewAdmin!789',
+        confirm_password: 'NewAdmin!789',
+      }) as unknown as Record<string, unknown>;
+
+      const serialized = JSON.stringify(result);
+      expect(serialized).not.toContain('CurrentAdmin@123');
+      expect(serialized).not.toContain('NewAdmin!789');
+    });
+  });
+});
