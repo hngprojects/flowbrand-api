@@ -1,4 +1,3 @@
-import { Exclude } from 'class-transformer';
 import { UserRole } from '../../../users/enums/user-role.enum';
 
 export class AdminProfileResponseDto {
@@ -9,7 +8,4 @@ export class AdminProfileResponseDto {
   avatar_url: string | null;
   role: UserRole;
   created_at: Date;
-
-  @Exclude()
-  password_hash?: string | null;
 }

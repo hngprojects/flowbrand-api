@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { Allow, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { ALLOWED_SSA_COUNTRIES } from '../../../users/enums/allowed-ssa-countries.enum';
 
 const IVORY_COAST_CANONICAL =
@@ -66,6 +66,6 @@ export class UpdateAdminProfileDto {
     example: 'admin@example.com',
     description: 'Read-only field. Sending this value returns HTTP 422.',
   })
-  @IsOptional()
+  @Allow()
   email?: unknown;
 }

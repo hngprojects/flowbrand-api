@@ -205,13 +205,12 @@ describe('AdminProfileService', () => {
       );
     });
 
-    it('throws 404 when admin role cannot be resolved', async () => {
+    it('throws 500 when admin role cannot be resolved', async () => {
       mockAdminProfileAction.findById.mockResolvedValue(ADMIN_USER);
       mockUserRoleModelAction.resolveHighestRole.mockResolvedValue(null);
 
       await expect(service.updateProfile(ADMIN_ID, {})).rejects.toThrow(
         new InternalServerErrorException(SYS_MSG.ADMIN_PROFILE_RESPONSE_ROLE_RESOLUTION_FAILED),
       );
-    });
-  });
+    });  });
 });
