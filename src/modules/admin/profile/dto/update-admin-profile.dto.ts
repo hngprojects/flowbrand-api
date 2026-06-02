@@ -22,7 +22,8 @@ const COUNTRY_ALIASES: Record<string, string> = {
   congo: 'Republic of the Congo',
   'republic of congo': 'Republic of the Congo',
   burkina: 'Burkina Faso',
-  'burkina faso': 'Burkina Faso', 'burkina-faso': 'Burkina-Faso',
+  'burkina faso': 'Burkina Faso',
+  'burkina-faso': 'Burkina Faso',
 };
 
 export class UpdateAdminProfileDto {

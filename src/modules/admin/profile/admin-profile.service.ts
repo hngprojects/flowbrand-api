@@ -74,7 +74,7 @@ export class AdminProfileService {
   private async toProfileResponse(user: User): Promise<IAdminProfile> {
     const role = await this.userRoleModelAction.resolveHighestRole(user.id);
     if (!role) {
-      throw new NotFoundException(SYS_MSG.ADMIN_PROFILE_NOT_FOUND);
+        throw new InternalServerErrorException(SYS_MSG.ADMIN_PROFILE_RESPONSE_ROLE_RESOLUTION_FAILED);
     }
 
     const response: AdminProfileResponseDto = {

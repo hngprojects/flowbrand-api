@@ -19,7 +19,7 @@ export class AdminProfileModelAction extends AbstractModelAction<User> {
 
   async updateProfile(userId: string, updatePayload: Partial<User>): Promise<User | null> {
     return this.update({
-      transactionOptions: { useTransaction: false },
+      transactionOptions: { useTransaction: true },
       identifierOptions: { id: userId },
       updatePayload,
     });
