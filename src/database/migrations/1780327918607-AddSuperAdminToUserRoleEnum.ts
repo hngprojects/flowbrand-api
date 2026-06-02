@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class AddSuperAdminToUserRoleEnum1780327918607 implements MigrationInterface {
-  public executeInTransaction = false;
+  public transaction = false;
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`ALTER TYPE "public"."user_roles_role_enum" ADD VALUE 'super_admin'`);

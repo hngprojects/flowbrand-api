@@ -51,20 +51,25 @@ export const userSeeder: Seeder = {
       return;
     }
 
-    const userRepository = dataSource.getRepository(User);
-    const admin = userRepository.create({
-      email,
-      password_hash: await bcrypt.hash(password, 12),
-      full_name: 'Super Admin',
-      termsAccepted: true,
-    });
-    const savedAdmin = await userRepository.save(admin);
+    const passwordHash = await bcrypt.hash(password, 12);
+    await dataSource.transaction(async (manager) => {
+      const userRepository = manager.getRepository(User);
+      const txRoleRepository = manager.getRepository(UserRoleEntity);
 
-    await roleRepository.save({
-      user_id: savedAdmin.id,
-      role: UserRole.SUPER_ADMIN,
+      const admin = userRepository.create({
+        email,
+        password_hash: passwordHash,
+        full_name: 'Super Admin',
+        termsAccepted: true,
+      });
+      const savedAdmin = await userRepository.save(admin);
+
+      await txRoleRepository.save({
+        user_id: savedAdmin.id,
+        role: UserRole.SUPER_ADMIN,
+      });
     });
 
-    console.log(`[UserSeeder] Super admin created: ${email} (password: ***)`);
+    console.log('[UserSeeder] Super admin created successfully');
   },
 };

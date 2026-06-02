@@ -1,10 +1,13 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { InjectRepository } from '@nestjs/typeorm';
 import { Request } from 'express';
+import { Repository } from 'typeorm';
 import { jwtConfig } from '../../../config/jwt.config';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { AdminRequest } from '../../admin/interfaces/admin-request.interface';
 import { RedisService } from '../../redis/redis.service';
+import { UserRoleEntity } from '../../users/entities/user-role.entity';
 import { UserRole } from '../../users/enums/user-role.enum';
 import { UsersService } from '../../users/users.service';
 import { JwtPayload } from '../strategies/jwt.strategy';
@@ -17,6 +20,8 @@ export class AdminJwtGuard implements CanActivate {
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
     private readonly usersService: UsersService,
+    @InjectRepository(UserRoleEntity)
+    private readonly userRoleRepository: Repository<UserRoleEntity>,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -51,13 +56,19 @@ export class AdminJwtGuard implements CanActivate {
       throw new UnauthorizedException(SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE);
     }
 
-    // A token without an admin role claim is rejected with 403, not 401.
-    // We never reveal that the role was the reason — same message for all denials.
-    if (!payload.role || !ADMIN_ROLES.includes(payload.role)) {
+    const roleRows = await this.userRoleRepository.find({
+      where: ADMIN_ROLES.map((role) => ({ user_id: userId, role })),
+    });
+
+    if (!roleRows.length) {
       throw new ForbiddenException(SYS_MSG.ADMIN_ACCESS_DENIED);
     }
 
-    request.user = payload;
+    const currentRole = roleRows.some((r) => r.role === UserRole.SUPER_ADMIN)
+      ? UserRole.SUPER_ADMIN
+      : UserRole.ADMIN;
+
+    request.user = { ...payload, role: currentRole };
     return true;
   }
 
