@@ -11,6 +11,8 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { CookieOptions, Request, Response } from 'express';
+import { env } from '../../../config/env';
+import { parseDurationMs } from '../../../utils/duration.utils';
 import { Public } from '../../../common/decorators/public.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../../constants/system.messages';
@@ -22,14 +24,14 @@ import { AdminLoginDocs, AdminLogoutDocs, AdminRefreshTokenDocs } from './docs/a
 @ApiTags('admin')
 @Controller('admin/auth')
 export class AdminAuthController {
-  constructor(private readonly adminAuthService: AdminAuthService) {}
+  constructor(private readonly adminAuthService: AdminAuthService) { }
 
   private getRefreshCookieOptions(): CookieOptions {
     return {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      secure: env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: parseDurationMs(env.JWT_REFRESH_EXPIRES_IN),
     };
   }
 
@@ -57,11 +59,7 @@ export class AdminAuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     await this.adminAuthService.logout(userId, sessionId);
-    res.clearCookie('refreshToken', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-    });
+    res.clearCookie('refreshToken', { ...this.getRefreshCookieOptions(), maxAge: 0 });
     return { statusCode: HttpStatus.OK, message: SYS_MSG.ADMIN_LOGOUT_SUCCESSFUL };
   }
 

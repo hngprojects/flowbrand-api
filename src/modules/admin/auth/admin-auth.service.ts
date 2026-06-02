@@ -5,6 +5,7 @@ import type { StringValue } from 'ms';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { env } from '../../../config/env';
+import { parseDurationMs } from '../../../utils/duration.utils';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { redisKeys } from '../../../constants/redis-keys';
 import { AuthMetadataModelAction } from '../../auth/actions/auth-metadata.action';
@@ -18,7 +19,7 @@ import { UserRole } from '../../users/enums/user-role.enum';
 import { UsersService } from '../../users/users.service';
 import { AdminLoginDto } from './dto/admin-login.dto';
 
-const REDIS_SESSION_TTL_SECONDS = 15 * 60;
+const REDIS_SESSION_TTL_SECONDS = Math.round(parseDurationMs(env.JWT_ACCESS_EXPIRES_IN) / 1000);
 const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 const ACCOUNT_LOCK_DURATION_MS = 60 * 60 * 1000;
 const ADMIN_ROLES: UserRole[] = [UserRole.ADMIN, UserRole.SUPER_ADMIN];
@@ -81,7 +82,7 @@ export class AdminAuthService {
     const passwordMatches = await bcrypt.compare(dto.password, user.password_hash);
 
     if (!passwordMatches) {
-      await this.recordFailedLogin(user.id, metadata);
+      await this.recordFailedLogin(user.id);
       throw new UnauthorizedException(SYS_MSG.ADMIN_INVALID_CREDENTIALS);
     }
 
@@ -168,14 +169,7 @@ export class AdminAuthService {
     const placeholder = `temp-${Date.now()}`;
     const refreshTokenHash = await bcrypt.hash(placeholder, 10);
 
-    const expiresAt = new Date();
-    const raw = parseInt(env.JWT_REFRESH_EXPIRES_IN.replace(/\D/g, ''), 10);
-    const expiresIn = env.JWT_REFRESH_EXPIRES_IN.includes('d')
-      ? raw * 24 * 60 * 60 * 1000
-      : env.JWT_REFRESH_EXPIRES_IN.includes('h')
-        ? raw * 60 * 60 * 1000
-        : raw * 1000;
-    expiresAt.setTime(expiresAt.getTime() + expiresIn);
+    const expiresAt = new Date(Date.now() + parseDurationMs(env.JWT_REFRESH_EXPIRES_IN));
 
     const session = await this.userSessionModelAction.createSession({
       user_id: userId,
@@ -216,17 +210,12 @@ export class AdminAuthService {
     }
   }
 
-  private async recordFailedLogin(userId: string, metadata: AuthMetadata): Promise<void> {
-    const nextAttempts = metadata.failed_attempts + 1;
-    const shouldLock = nextAttempts >= MAX_FAILED_LOGIN_ATTEMPTS;
-    const lockedUntil = shouldLock ? new Date(Date.now() + ACCOUNT_LOCK_DURATION_MS) : metadata.locked_until;
-
-    await this.authMetadataAction.updateByUserId(userId, {
-      failed_attempts: nextAttempts,
-      locked_until: lockedUntil,
-    });
-
-    if (shouldLock) {
+  private async recordFailedLogin(userId: string): Promise<void> {
+    const newCount = await this.authMetadataModelAction.incrementFailedAttempts(userId);
+    if (newCount >= MAX_FAILED_LOGIN_ATTEMPTS) {
+      await this.authMetadataAction.updateByUserId(userId, {
+        locked_until: new Date(Date.now() + ACCOUNT_LOCK_DURATION_MS),
+      });
       this.logger.warn({ message: 'Admin account locked after max failed attempts', userId });
       throw new HttpException(SYS_MSG.ADMIN_ACCOUNT_LOCKED, HttpStatus.LOCKED);
     }

@@ -1,6 +1,7 @@
 import { ConflictException, InternalServerErrorException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
+import { DataSource } from 'typeorm';
 import { AdminUsersService } from '../admin-users.service';
 import { UserModelAction } from '../../../users/actions/user.action';
 import { UserRoleModelAction } from '../../../users/actions/user-role.action';
@@ -13,6 +14,9 @@ jest.mock('bcrypt');
 const mockUsersService = { findByEmail: jest.fn() };
 const mockUserModelAction = { create: jest.fn() };
 const mockUserRoleModelAction = { create: jest.fn() };
+const mockDataSource = {
+  transaction: jest.fn().mockImplementation((cb: (m: unknown) => Promise<unknown>) => cb({})),
+};
 
 const CREATED_USER = { id: 'user-uuid-1', email: 'jane@example.com' };
 
@@ -36,6 +40,7 @@ describe('AdminUsersService', () => {
         { provide: UsersService, useValue: mockUsersService },
         { provide: UserModelAction, useValue: mockUserModelAction },
         { provide: UserRoleModelAction, useValue: mockUserRoleModelAction },
+        { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
 

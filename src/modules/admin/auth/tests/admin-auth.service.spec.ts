@@ -24,6 +24,7 @@ const mockAuthMetadataModelAction = {
   findByUserId: jest.fn(),
   updateByUserId: jest.fn(),
   createForUser: jest.fn(),
+  incrementFailedAttempts: jest.fn(),
 };
 const mockSessionRepository = { findOne: jest.fn() };
 
@@ -64,6 +65,7 @@ describe('AdminAuthService', () => {
     mockUserSessionModelAction.updateById.mockResolvedValue(null);
     mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata());
     mockAuthMetadataModelAction.updateByUserId.mockResolvedValue(null);
+    mockAuthMetadataModelAction.incrementFailedAttempts.mockResolvedValue(1);
     mockRedisService.setStrict.mockResolvedValue(undefined);
     mockRedisService.del.mockResolvedValue(undefined);
 
@@ -158,14 +160,15 @@ describe('AdminAuthService', () => {
     it('sets locked_until ~1 hour in the future on the 5th failed attempt', async () => {
       mockUsersService.findByEmail.mockResolvedValue(ADMIN_USER);
       mockUserRoleModelAction.resolveHighestRole.mockResolvedValue(UserRole.ADMIN);
-      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata({ failed_attempts: 4 }));
+      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata());
+      mockAuthMetadataModelAction.incrementFailedAttempts.mockResolvedValue(5);
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
       const before = Date.now();
       await expect(service.login(LOGIN_DTO)).rejects.toThrow(HttpException);
 
       const [[, updatePayload]] = mockAuthMetadataModelAction.updateByUserId.mock.calls;
-      expect(updatePayload.failed_attempts).toBe(5);
+      expect(updatePayload.locked_until).toBeInstanceOf(Date);
       expect(updatePayload.locked_until.getTime()).toBeGreaterThanOrEqual(before + 59 * 60 * 1000);
     });
 
