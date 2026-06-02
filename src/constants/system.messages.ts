@@ -255,3 +255,16 @@ export const ADMIN_EMAIL_CONFLICT = 'Email already registered';
 export const ADMIN_TOKEN_REFRESHED = 'Token refreshed';
 export const ADMIN_INVALID_PASSWORD_VALUE =
   'password must contain at least one uppercase letter, one lowercase letter, one digit, and one special character';
+export const ADMIN_PROFILE_RETRIEVED_SUCCESSFULLY = 'Admin profile retrieved successfully';
+export const ADMIN_PROFILE_UPDATED_SUCCESSFULLY = 'Admin profile updated successfully';
+export const ADMIN_PROFILE_NOT_FOUND = 'Admin profile not found';
+export const ADMIN_PROFILE_UPDATE_FAILED = 'Failed to update admin profile';
+export const ADMIN_PROFILE_EMAIL_CHANGE_FORBIDDEN = 'Email cannot be changed here.';
+export const ADMIN_PROFILE_RESPONSE_ROLE_RESOLUTION_FAILED = 'Failed to resolve admin role for profile response';
+export const ADMIN_PASSWORD_UPDATED_SUCCESSFULLY = 'Password updated successfully.';
+export const ADMIN_OLD_PASSWORD_INCORRECT = 'Old password is incorrect.';
+export const ADMIN_NEW_PASSWORD_MUST_DIFFER_FROM_OLD =
+  'New password must be different from your current password.';
+export const ADMIN_CONFIRM_PASSWORD_MISMATCH = 'Confirm password must match new password.';
+export const ADMIN_PASSWORD_POLICY_VALIDATION_FAILED =
+  'new_password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, and one symbol.';
