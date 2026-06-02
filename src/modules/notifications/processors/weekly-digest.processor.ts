@@ -1,12 +1,16 @@
 import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Job } from 'bull';
 import pLimit from 'p-limit';
+import { APP_EVENTS } from '../../../common/constants/app-events';
+import { NotificationsPendingEvent } from '../../../common/events/events';
 import { JOBS, QUEUES } from '../../../common/constants/queue.constants';
 import { EmailService } from '../../../email/email.service';
 import { StageTaskModelAction } from '../../funnels/actions/stage-task.action';
 import { NotificationPreference } from '../entities/notification-preference.entity';
 import { NotificationPreferenceModelAction } from '../actions/notification-preference.action';
+import { NotificationModelAction } from '../actions/notification.action';
 
 const PAGE_SIZE = 100;
 const DISPATCH_CONCURRENCY = 10;
@@ -27,6 +31,8 @@ export class WeeklyDigestProcessor {
     private readonly preferenceAction: NotificationPreferenceModelAction,
     private readonly taskAction: StageTaskModelAction,
     private readonly emailService: EmailService,
+    private readonly notificationAction: NotificationModelAction,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   @Process(JOBS.WEEKLY_DIGEST)
@@ -64,6 +70,8 @@ export class WeeklyDigestProcessor {
       return false;
     }
 
+    let dispatched = false;
+
     try {
       const { total, complete } = await this.taskAction.getUserTaskProgress(user.id);
       await this.emailService.sendWeeklyDigest(
@@ -76,14 +84,31 @@ export class WeeklyDigestProcessor {
         },
         user.id,
       );
-      return true;
+      dispatched = true;
     } catch (err) {
       this.logger.error({
         message: 'Weekly digest dispatch failed for user',
         userId: user.id,
         error: (err as Error).message,
       });
-      return false;
     }
+
+    // Independent of the digest: emit NOTIFICATIONS_PENDING so the NotificationListener
+    // can send a notification alert email if the user has unread in-app notifications.
+    // Runs regardless of whether the weekly digest succeeded.
+    try {
+      const unreadCount = await this.notificationAction.countUnread(user.id);
+      if (unreadCount > 0) {
+        this.eventEmitter.emit(APP_EVENTS.NOTIFICATIONS_PENDING, new NotificationsPendingEvent(user.id, unreadCount));
+      }
+    } catch (err) {
+      this.logger.error({
+        message: 'Notifications pending check failed for user',
+        userId: user.id,
+        error: (err as Error).message,
+      });
+    }
+
+    return dispatched;
   }
 }

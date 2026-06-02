@@ -33,6 +33,10 @@ export const APP_EVENTS = {
   // Emission wired once the change-password endpoint is merged
   PASSWORD_CHANGED: 'user.password_changed',
   ACCOUNT_DELETED: 'user.account_deleted',
+
+  // Notification system
+  // Emitted by WeeklyDigestProcessor for users with unread notifications — consumed by NotificationListener.
+  NOTIFICATIONS_PENDING: 'notifications.pending',
 } as const;
 
 export type AppEvent = (typeof APP_EVENTS)[keyof typeof APP_EVENTS];

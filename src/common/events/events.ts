@@ -102,3 +102,11 @@ export class UserSignedUpEvent {
     public readonly userAgent: string,
   ) {}
 }
+
+// Notification system
+export class NotificationsPendingEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly unreadCount: number,
+  ) {}
+}
