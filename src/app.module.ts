@@ -34,6 +34,7 @@ import { llmConfig } from './config/llm.config';
 import { AppController } from './app.controller';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TasksModule } from './modules/tasks/tasks.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 function collectValidationErrors(errors: ValidationError[], parentPath = ''): string[] {
   return errors.flatMap((error) => {
@@ -89,6 +90,7 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
     NotificationsModule,
     ActivityModule,
     TasksModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [
