@@ -255,3 +255,7 @@ export const ADMIN_EMAIL_CONFLICT = 'Email already registered';
 export const ADMIN_TOKEN_REFRESHED = 'Token refreshed';
 export const ADMIN_INVALID_PASSWORD_VALUE =
   'password must contain at least one uppercase letter, one lowercase letter, one digit, and one special character';
+export const ADMIN_DASHBOARD_STATS_RETRIEVED = 'Admin dashboard stats retrieved successfully';
+export const ADMIN_DASHBOARD_WEEKLY_OVERVIEW_RETRIEVED = 'Admin dashboard weekly overview retrieved successfully';
+export const ADMIN_DASHBOARD_USER_SEGMENTS_RETRIEVED = 'Admin dashboard user segments retrieved successfully';
+export const ADMIN_DASHBOARD_FUNNEL_PERFORMANCE_RETRIEVED = 'Admin dashboard funnel performance retrieved successfully';
