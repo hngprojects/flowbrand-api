@@ -1,0 +1,45 @@
+import { AbstractModelAction } from '@hng-sdk/orm';
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from '../../../users/entities/user.entity';
+import { UserSession } from '../../../users/entities/user-session.entity';
+
+@Injectable()
+export class AdminProfileModelAction extends AbstractModelAction<User> {
+  constructor(
+    @InjectRepository(User)
+    repository: Repository<User>,
+  ) {
+    super(repository, User);
+  }
+
+  async findById(id: string): Promise<User | null> {
+    return this.get({ identifierOptions: { id } });
+  }
+
+  async updateProfile(userId: string, updatePayload: Partial<User>): Promise<User | null> {
+    return this.update({
+      transactionOptions: { useTransaction: false },
+      identifierOptions: { id: userId },
+      updatePayload,
+    });
+  }
+
+  async updatePasswordHash(userId: string, passwordHash: string): Promise<User | null> {
+    return this.update({
+      transactionOptions: { useTransaction: false },
+      identifierOptions: { id: userId },
+      updatePayload: { password_hash: passwordHash },
+    });
+  }
+
+  async revokeAllSessions(userId: string): Promise<number> {
+    const result = await this.repository.manager.getRepository(UserSession).update(
+      { user_id: userId, is_revoked: false },
+      { is_revoked: true, revoked_at: new Date() },
+    );
+
+    return result.affected ?? 0;
+  }
+}
