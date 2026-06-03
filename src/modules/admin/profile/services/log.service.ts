@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { PinoLoggerService } from '../../../../common/logger/pino-logger.service';
+import { AdminProfileActionType } from '../enums/admin-profile-action-type.enum';
 
 interface LogActionPayload extends Record<string, unknown> {
   admin_id: string;
-  action_type: 'profile_updated' | 'password_changed';
+  action_type: AdminProfileActionType;
   metadata?: Record<string, unknown>;
 }
 

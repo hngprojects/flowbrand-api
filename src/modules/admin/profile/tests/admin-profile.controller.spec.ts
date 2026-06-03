@@ -1,5 +1,4 @@
-import { HttpStatus } from '@nestjs/common';
-import { UnprocessableEntityException, ValidationError, ValidationPipe } from '@nestjs/common';
+import { HttpStatus, UnprocessableEntityException, ValidationError, ValidationPipe } from '@nestjs/common';
 import * as SYS_MSG from '../../../../constants/system.messages';
 import { AuthenticatedUser } from '../../../../common/decorators/current-user.decorator';
 import { UserRole } from '../../../users/enums/user-role.enum';
@@ -151,14 +150,22 @@ describe('AdminProfileController', () => {
     });
 
     it('uses ValidationPipe config to reject non-whitelisted fields with 422 envelope', async () => {
-      await expect(
-        createValidationPipe().transform(
+      try {
+        await createValidationPipe().transform(
           { full_name: 'Jane Admin', extra_field: 'nope' },
           { type: 'body', metatype: UpdateAdminProfileDto, data: '' },
-        ),
-      ).rejects.toMatchObject({
-        getStatus: expect.any(Function),
-      });
+        );
+        fail('Expected validation to throw');
+      } catch (error) {
+        expect(error).toBeInstanceOf(UnprocessableEntityException);
+        expect((error as UnprocessableEntityException).getStatus()).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
+        expect((error as UnprocessableEntityException).getResponse()).toMatchObject({
+          success: false,
+          statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          error: 'UnprocessableEntityException',
+          message: SYS_MSG.VALIDATION_FAILED,
+        });
+      }
     });
 
     it('uses ValidationPipe config to trim input values during transformation', async () => {

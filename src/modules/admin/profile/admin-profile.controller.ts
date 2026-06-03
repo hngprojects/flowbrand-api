@@ -101,9 +101,8 @@ export class AdminProfileController {
           }),
       }),
     )
-    rawDto: Record<string, unknown>,
+    dto: ChangeAdminPasswordDto,
   ) {
-      const dto = rawDto as unknown as ChangeAdminPasswordDto;
     await this.adminProfileService.changePassword(adminId, dto);
     return {
       statusCode: HttpStatus.OK,

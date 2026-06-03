@@ -267,4 +267,4 @@ export const ADMIN_NEW_PASSWORD_MUST_DIFFER_FROM_OLD =
   'New password must be different from your current password';
 export const ADMIN_CONFIRM_PASSWORD_MISMATCH = 'Confirm password must match new password';
 export const ADMIN_PASSWORD_POLICY_VALIDATION_FAILED =
-  'new_password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, and one symbol';
+  'new_password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, one digit, and one symbol';
