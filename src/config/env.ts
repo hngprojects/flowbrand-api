@@ -29,6 +29,7 @@ const envSchema = z.object({
 
   CORS_ORIGIN: z.string().default('*'),
   SWAGGER_ENABLED: boolEnv.default(true),
+  FRONTEND_URL: z.string().default(''),
 
   REDIS_HOST: z.string().default('localhost'),
   REDIS_PORT: z.coerce.number().int().positive().default(6379),

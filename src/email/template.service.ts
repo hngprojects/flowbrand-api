@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as Handlebars from 'handlebars';
 import * as path from 'path';
+import { env } from '../config/env';
 import type { EmailType } from './interfaces/email-job.interface';
 
 type CompiledTemplate = Handlebars.TemplateDelegate;
@@ -17,6 +18,10 @@ const EMAIL_TYPES: EmailType[] = [
   'stage-unlocked',
   'stage-completed',
   'weekly-digest',
+  'payment-successful',
+  'payment-failed',
+  'subscription-cancelled',
+  'notification-alert',
 ];
 
 @Injectable()
@@ -36,6 +41,10 @@ export class TemplateService implements OnModuleInit {
     'stage-unlocked': '"{{stageName}}" is now active',
     'stage-completed': 'You completed "{{stageName}}"',
     'weekly-digest': 'Your weekly SEIL progress',
+    'payment-successful': 'Payment Successful — Your FlowBrand subscription is now active',
+    'payment-failed': 'Payment Failed — We could not process your payment',
+    'subscription-cancelled': 'Your FlowBrand subscription has been cancelled',
+    'notification-alert': 'You have {{unreadCount}} new notification(s) from FlowBrand',
   };
 
   private compiledSubjects: Record<EmailType, Handlebars.TemplateDelegate>;
@@ -68,13 +77,21 @@ export class TemplateService implements OnModuleInit {
       throw new Error(`No compiled template found for type: ${type}`);
     }
 
-    const body = compiled(payload);
+    const urlContext = {
+      unsubscribeUrl: `${env.FRONTEND_URL}/unsubscribe`,
+      privacyPolicyUrl: `${env.FRONTEND_URL}/privacy-policy`,
+      upgradeUrl: `${env.FRONTEND_URL}/upgrade`,
+      dashboardUrl: `${env.FRONTEND_URL}/dashboard`,
+      notificationPreferencesUrl: `${env.FRONTEND_URL}/settings/notifications`,
+    };
+
+    // URL context is merged into the body compiler so CTA hrefs in body templates resolve correctly.
+    const body = compiled({ ...payload, ...urlContext });
     const html = this.baseLayout({
       ...payload,
+      ...urlContext,
       body,
       year: new Date().getFullYear(),
-      unsubscribeUrl: `${process.env.FRONTEND_URL ?? ''}/unsubscribe`,
-      privacyPolicyUrl: `${process.env.FRONTEND_URL ?? ''}/privacy-policy`,
     });
 
     const subject = this.compiledSubjects[type](payload);
