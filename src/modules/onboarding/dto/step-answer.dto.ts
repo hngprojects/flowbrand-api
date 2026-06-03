@@ -1,19 +1,22 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { 
-    ArrayMinSize,
+import {
     IsArray,
     IsEnum,
     IsInt,
     IsNotEmpty,
     IsOptional,
-    IsString, 
-    IsUUID, 
-    Max, 
-    MaxLength, 
-    Min, 
-    MinLength, 
-    ValidateNested
+    IsString,
+    IsUUID,
+    Max,
+    MaxLength,
+    Min,
+    MinLength,
+    Validate,
+    ValidateNested,
+    ValidationArguments,
+    ValidatorConstraint,
+    ValidatorConstraintInterface,
 } from "class-validator";
 
 export class Step1AnswerDto {
@@ -24,13 +27,26 @@ export class Step1AnswerDto {
     business_description: string
 }
 
+@ValidatorConstraint({ name: 'tagsOrNotes' })
+class TagsOrNotesConstraint implements ValidatorConstraintInterface {
+    validate(_: unknown, args: ValidationArguments): boolean {
+        const dto = args.object as Step2AnswerDto;
+        const hasType = Array.isArray(dto.customer_tags?.type) && dto.customer_tags.type.length > 0;
+        const hasNotes = typeof dto.additional_notes === 'string' && dto.additional_notes.trim().length > 0;
+        return hasType || hasNotes;
+    }
+
+    defaultMessage(): string {
+        return 'Select at least one customer tag, or describe your customer in the notes field.';
+    }
+}
+
 class CustomerTagsDto {
-    @ApiProperty({ description: 'Customer Types', type: [String] })
-    @IsNotEmpty()
+    @ApiProperty({ description: 'Customer Types', type: [String], required: false })
+    @IsOptional()
     @IsArray()
     @IsString({ each: true })
-    @ArrayMinSize(1)
-    type: string[];
+    type?: string[];
 
     @ApiProperty({ required: false, type: [String]})
     @IsOptional()
@@ -48,6 +64,7 @@ class CustomerTagsDto {
 
 export class Step2AnswerDto {
     @ApiProperty({ type: CustomerTagsDto })
+    @Validate(TagsOrNotesConstraint)
     @ValidateNested()
     @Type(() => CustomerTagsDto)
     customer_tags: CustomerTagsDto;
@@ -56,10 +73,10 @@ export class Step2AnswerDto {
     @IsOptional()
     @IsString()
     @MaxLength(500, { message: 'Additional notes must be 500 characters or less' })
-    additional_notes?: string 
+    additional_notes?: string
 }
 
-enum DiscoveryChannel {
+export enum DiscoveryChannel {
   INSTAGRAM = 'Instagram',
   FACEBOOK = 'Facebook',
   TIKTOK = 'TikTok',

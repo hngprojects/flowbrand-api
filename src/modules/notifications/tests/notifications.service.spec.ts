@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { QueryFailedError } from 'typeorm';
 import { NotificationsService } from '../notifications.service';
@@ -309,51 +309,34 @@ describe('NotificationsService', () => {
       expect(result.email_weekly_digest).toBe(false);
     });
 
-    it('AC-19: reapplies update when preferences are deleted during patch', async () => {
+    it('AC-19: applies the update once against the existing preferences row', async () => {
       const current = mockPreferences();
-      const recreated = { ...current, id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' };
-      const updated = { ...recreated, email_weekly_digest: false };
-      mockPreferenceAction.findByUserId
-        .mockResolvedValueOnce(current)
-        .mockResolvedValueOnce(null);
-      mockPreferenceAction.createDefaultForUser.mockResolvedValue(recreated);
-      mockPreferenceAction.updateByUserId
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(updated);
+      const updated = { ...current, email_weekly_digest: false };
+      mockPreferenceAction.findByUserId.mockResolvedValue(current);
+      mockPreferenceAction.updateByUserId.mockResolvedValue(updated);
 
       const result = await service.updateNotificationPreferences(USER_ID, {
         email_weekly_digest: false,
       });
 
-      expect(mockPreferenceAction.createDefaultForUser).toHaveBeenCalledWith(USER_ID);
-      expect(mockPreferenceAction.updateByUserId).toHaveBeenCalledTimes(2);
-      expect(mockPreferenceAction.updateByUserId).toHaveBeenNthCalledWith(1, USER_ID, {
-        email_weekly_digest: false,
-      });
-      expect(mockPreferenceAction.updateByUserId).toHaveBeenNthCalledWith(2, USER_ID, {
+      expect(mockPreferenceAction.createDefaultForUser).not.toHaveBeenCalled();
+      expect(mockPreferenceAction.updateByUserId).toHaveBeenCalledTimes(1);
+      expect(mockPreferenceAction.updateByUserId).toHaveBeenCalledWith(USER_ID, {
         email_weekly_digest: false,
       });
       expect(result.email_weekly_digest).toBe(false);
     });
 
-    it('AC-20: returns recreated defaults if retry update misses again', async () => {
+    it('AC-20: throws a ConflictException when the update affects no row', async () => {
       const current = mockPreferences();
-      const recreated = { ...current, id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' };
-      mockPreferenceAction.findByUserId
-        .mockResolvedValueOnce(current)
-        .mockResolvedValueOnce(null);
-      mockPreferenceAction.createDefaultForUser.mockResolvedValue(recreated);
-      mockPreferenceAction.updateByUserId
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null);
+      mockPreferenceAction.findByUserId.mockResolvedValue(current);
+      mockPreferenceAction.updateByUserId.mockResolvedValue(null);
 
-      const result = await service.updateNotificationPreferences(USER_ID, {
-        email_weekly_digest: false,
-      });
+      await expect(
+        service.updateNotificationPreferences(USER_ID, { email_weekly_digest: false }),
+      ).rejects.toBeInstanceOf(ConflictException);
 
-      expect(mockPreferenceAction.updateByUserId).toHaveBeenCalledTimes(2);
-      expect(result).toBe(recreated);
-  
+      expect(mockPreferenceAction.updateByUserId).toHaveBeenCalledTimes(1);
     });
   });
 

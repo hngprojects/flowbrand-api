@@ -2,7 +2,8 @@ import { BadRequestException, Module, ValidationPipe } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { CustomThrottlerGuard } from './common/guards/throttler.guard';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import type { ValidationError } from 'class-validator';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -34,6 +35,7 @@ import { llmConfig } from './config/llm.config';
 import { AppController } from './app.controller';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TasksModule } from './modules/tasks/tasks.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 function collectValidationErrors(errors: ValidationError[], parentPath = ''): string[] {
   return errors.flatMap((error) => {
@@ -89,6 +91,7 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
     NotificationsModule,
     ActivityModule,
     TasksModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [
@@ -109,7 +112,7 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
           }),
       }),
     },
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: CustomThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },

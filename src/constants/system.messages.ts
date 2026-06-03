@@ -223,8 +223,7 @@ export const PROFILE_UPDATE_FAILED = 'Failed to update profile';
 export const PROFILE_AVATAR_FILE_REQUIRED = 'Avatar file is required';
 export const PROFILE_AVATAR_UPLOADED_SUCCESSFULLY = 'Profile avatar uploaded successfully';
 export const PROFILE_AVATAR_REMOVED_SUCCESSFULLY = 'Profile avatar removed successfully';
-export const PROFILE_AVATAR_UPLOAD_INVALID_TYPE =
-  'Avatar must be a valid JPEG, PNG, or WebP image';
+export const PROFILE_AVATAR_UPLOAD_INVALID_TYPE = 'Avatar must be a valid JPEG, PNG, or WebP image';
 export const PROFILE_AVATAR_UPLOAD_TOO_LARGE = 'Avatar file size must be 2MB or less';
 export const PROFILE_AVATAR_UPLOAD_FAILED = 'Failed to upload profile avatar';
 export const PROFILE_AVATAR_DELETE_FAILED = 'Failed to remove profile avatar';
@@ -239,7 +238,36 @@ export const ACCOUNT_ALREADY_DELETED = 'Account already deleted';
 export const ACCOUNT_DELETION_CONFIRMATION_REQUIRED = 'You must type DELETE to confirm account deletion';
 export const ACCOUNT_DELETION_FAILED = 'Failed to delete account';
 export const ACCOUNT_DELETION_SCHEDULED = 'Account deletion scheduled for 30 days from now';
-export const ACCOUNT_EXISTS_WITH_RETENTION = 'An account with this email exists. If you recently deleted your account, please wait 30 days.';
+export const ACCOUNT_EXISTS_WITH_RETENTION =
+  'An account with this email exists. If you recently deleted your account, please wait 30 days.';
 
 // Tasks
 export const REAPER_TRIGGERED_SUCCESSFULLY = 'Background reaper triggered successfully';
+
+// Rate limits
+export const AUTH_REGISTER_RATE_LIMITED = 'Too many registration attempts. Please try again in an hour.';
+export const AUTH_LOGIN_RATE_LIMITED = 'Too many login attempts from this IP. Please try again later.';
+export const AUTH_REFRESH_RATE_LIMITED = 'Too many token refresh requests. Please try again later.';
+export const UPLOAD_RATE_LIMIT_EXCEEDED = 'Upload limit reached. You can upload up to 20 batches per hour.';
+
+// Admin auth
+export const ADMIN_LOGIN_SUCCESSFUL = 'Admin login successful';
+export const ADMIN_LOGOUT_SUCCESSFUL = 'Admin logout successful';
+export const ADMIN_INVALID_CREDENTIALS = 'Invalid email or password';
+export const ADMIN_ACCOUNT_LOCKED = 'Account temporarily locked';
+export const ADMIN_ACCESS_DENIED = 'Access denied';
+export const ADMIN_CREATED_SUCCESSFULLY = 'Admin account created successfully';
+export const ADMIN_EMAIL_CONFLICT = 'Email already registered';
+export const ADMIN_TOKEN_REFRESHED = 'Token refreshed';
+export const ADMIN_INVALID_PASSWORD_VALUE =
+  'password must contain at least one uppercase letter, one lowercase letter, one digit, and one special character';
+export const ADMIN_PROFILE_RETRIEVED_SUCCESSFULLY = 'Admin profile retrieved successfully';
+export const ADMIN_PROFILE_UPDATED_SUCCESSFULLY = 'Admin profile updated successfully';
+export const ADMIN_PROFILE_NOT_FOUND = 'Admin profile not found';
+export const ADMIN_PROFILE_UPDATE_FAILED = 'Failed to update admin profile';
+export const ADMIN_PROFILE_EMAIL_CHANGE_FORBIDDEN = 'Email cannot be changed here';
+export const ADMIN_PROFILE_RESPONSE_ROLE_RESOLUTION_FAILED = 'Failed to resolve admin role for profile response';
+export const ADMIN_DASHBOARD_STATS_RETRIEVED = 'Admin dashboard stats retrieved successfully';
+export const ADMIN_DASHBOARD_WEEKLY_OVERVIEW_RETRIEVED = 'Admin dashboard weekly overview retrieved successfully';
+export const ADMIN_DASHBOARD_USER_SEGMENTS_RETRIEVED = 'Admin dashboard user segments retrieved successfully';
+export const ADMIN_DASHBOARD_FUNNEL_PERFORMANCE_RETRIEVED = 'Admin dashboard funnel performance retrieved successfully';

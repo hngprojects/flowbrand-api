@@ -50,6 +50,7 @@ export interface SubmitFeedbackResponse {
 export interface TaskUpdateResult {
   taskId: string;
   name: string;
+  description: string;
   status: 'pending' | 'complete';
   isComplete: boolean;
   completedAt: string | null;

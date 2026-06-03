@@ -9,6 +9,10 @@ import type {
   WaitlistPayload,
   ContactConfirmationPayload,
   ContactAdminNotificationPayload,
+  FunnelReadyPayload,
+  StageUnlockedPayload,
+  StageCompletedPayload,
+  WeeklyDigestPayload,
 } from './interfaces/email-job.interface';
 
 const DEFAULT_PRIORITY = 5;
@@ -66,6 +70,38 @@ export class EmailService {
       { to, type: 'contact-admin-notification', payload }, 
       DEFAULT_PRIORITY
     );
+  }
+
+  async sendFunnelReady(
+    to: string,
+    payload: FunnelReadyPayload,
+    userId?: string,
+  ): Promise<string | undefined> {
+    return this.dispatch({ to, type: 'funnel-ready', payload, userId }, DEFAULT_PRIORITY);
+  }
+
+  async sendStageUnlocked(
+    to: string,
+    payload: StageUnlockedPayload,
+    userId?: string,
+  ): Promise<string | undefined> {
+    return this.dispatch({ to, type: 'stage-unlocked', payload, userId }, DEFAULT_PRIORITY);
+  }
+
+  async sendStageCompleted(
+    to: string,
+    payload: StageCompletedPayload,
+    userId?: string,
+  ): Promise<string | undefined> {
+    return this.dispatch({ to, type: 'stage-completed', payload, userId }, DEFAULT_PRIORITY);
+  }
+
+  async sendWeeklyDigest(
+    to: string,
+    payload: WeeklyDigestPayload,
+    userId?: string,
+  ): Promise<string | undefined> {
+    return this.dispatch({ to, type: 'weekly-digest', payload, userId }, DEFAULT_PRIORITY);
   }
 
   private async dispatch(job: EmailJob, priority: number): Promise<string | undefined> {
