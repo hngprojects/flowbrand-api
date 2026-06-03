@@ -24,47 +24,42 @@ function buildContext(handler = jest.fn(), classRef = jest.fn()): ExecutionConte
 }
 
 describe('CustomThrottlerGuard.throwThrottlingException', () => {
-  it('throws HttpException with the message set by @ThrottleMessage on the handler', () => {
+  it('rejects with HttpException carrying the message set by @ThrottleMessage on the handler', async () => {
     const guard = buildGuard('Too many registration attempts. Please try again in an hour.');
     const ctx = buildContext();
 
-    expect(() => guard['throwThrottlingException'](ctx)).toThrow(HttpException);
-    expect(() => guard['throwThrottlingException'](ctx)).toThrow(
+    await expect(guard['throwThrottlingException'](ctx)).rejects.toThrow(HttpException);
+    await expect(guard['throwThrottlingException'](ctx)).rejects.toThrow(
       'Too many registration attempts. Please try again in an hour.',
     );
   });
 
-  it('throws HttpException with status 429', () => {
+  it('rejects with status 429', async () => {
     const guard = buildGuard('some message');
     const ctx = buildContext();
 
-    let caught: HttpException | undefined;
-    try {
-      guard['throwThrottlingException'](ctx);
-    } catch (e) {
-      caught = e as HttpException;
-    }
+    const caught = await guard['throwThrottlingException'](ctx).catch((e: unknown) => e);
 
-    expect(caught?.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
+    expect((caught as HttpException).getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
   });
 
-  it('falls back to the default message when no @ThrottleMessage metadata is present', () => {
+  it('falls back to the default message when no @ThrottleMessage metadata is present', async () => {
     const guard = buildGuard(undefined);
     const ctx = buildContext();
 
-    expect(() => guard['throwThrottlingException'](ctx)).toThrow(
+    await expect(guard['throwThrottlingException'](ctx)).rejects.toThrow(
       'Too many requests. Please try again later.',
     );
   });
 
-  it('reads metadata from handler then class via getAllAndOverride', () => {
+  it('reads metadata from handler then class via getAllAndOverride', async () => {
     const mockReflector = { getAllAndOverride: jest.fn().mockReturnValue('msg') } as unknown as Reflector;
     const guard = new CustomThrottlerGuard({} as never, {} as never, mockReflector);
     const handler = jest.fn();
     const classRef = jest.fn();
     const ctx = buildContext(handler, classRef);
 
-    try { guard['throwThrottlingException'](ctx); } catch { /* expected */ }
+    await guard['throwThrottlingException'](ctx).catch(() => { /* expected rejection */ });
 
     expect(mockReflector.getAllAndOverride).toHaveBeenCalledWith(THROTTLE_MESSAGE_KEY, [handler, classRef]);
   });

@@ -1,4 +1,4 @@
-import { applyDecorators } from '@nestjs/common';
+import { HttpStatus, applyDecorators } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -63,7 +63,7 @@ export const UploadFunnelDocumentsDocs = () =>
       schema: {
         example: {
           success: false,
-          statusCode: 429,
+          statusCode: HttpStatus.TOO_MANY_REQUESTS,
           error: 'HttpException',
           message: SYS_MSG.UPLOAD_RATE_LIMIT_EXCEEDED,
         },

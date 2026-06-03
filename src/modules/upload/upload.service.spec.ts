@@ -173,9 +173,11 @@ describe('UploadService', () => {
   describe('handleUpload', () => {
     it('RL-01: throws 429 when per-user upload rate limit is exceeded', async () => {
       mockRedisService.rateLimit.mockResolvedValue({ exceeded: true, count: 21 });
+      // Rate limit fires after file-presence check, so a non-empty array is required.
+      const files = [mockPdfFile()];
 
-      await expect(service.handleUpload(USER_ID, [])).rejects.toThrow(HttpException);
-      await expect(service.handleUpload(USER_ID, [])).rejects.toMatchObject({
+      await expect(service.handleUpload(USER_ID, files)).rejects.toThrow(HttpException);
+      await expect(service.handleUpload(USER_ID, files)).rejects.toMatchObject({
         message: SYS_MSG.UPLOAD_RATE_LIMIT_EXCEEDED,
         status: HttpStatus.TOO_MANY_REQUESTS,
       });

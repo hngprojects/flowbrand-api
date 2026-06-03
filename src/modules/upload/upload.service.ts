@@ -45,16 +45,16 @@ export class UploadService {
   ) {}
 
   async handleUpload(userId: string, files: Express.Multer.File[] | undefined): Promise<UploadBatchResponse> {
-    const { exceeded } = await this.redisService.rateLimit(redisKeys.uploadRateLimit(userId), 20, 3600);
-    if (exceeded) {
-      throw new HttpException(SYS_MSG.UPLOAD_RATE_LIMIT_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS);
-    }
-
     if (!files?.length) {
       throw new UnprocessableEntityException({
         error: 'UnprocessableEntityException',
         message: SYS_MSG.FUNNEL_UPLOAD_FILES_REQUIRED,
       });
+    }
+
+    const { exceeded } = await this.redisService.rateLimit(redisKeys.uploadRateLimit(userId), 20, 3600);
+    if (exceeded) {
+      throw new HttpException(SYS_MSG.UPLOAD_RATE_LIMIT_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS);
     }
 
     if (files.length > UploadFileConstraints.MAX_FILES) {
