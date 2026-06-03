@@ -1,5 +1,8 @@
 import { HttpStatus } from '@nestjs/common';
 import * as SYS_MSG from '../../../../constants/system.messages';
+import { AuthenticatedUser } from '../../../../common/decorators/current-user.decorator';
+import { UserRole } from '../../../users/enums/user-role.enum';
+import { UpdateAdminProfileDto } from '../dto/update-admin-profile.dto';
 import { AdminProfileController } from '../admin-profile.controller';
 import { AdminProfileService } from '../admin-profile.service';
 
@@ -10,6 +13,14 @@ const mockAdminProfileService = {
 };
 
 const ADMIN_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+const ADMIN_USER: AuthenticatedUser = {
+  userId: ADMIN_ID,
+  sub: ADMIN_ID,
+  email: 'admin@example.com',
+  sessionId: 'sess-123',
+  role: UserRole.ADMIN,
+};
 
 const PROFILE = {
   id: ADMIN_ID,
@@ -35,20 +46,20 @@ describe('AdminProfileController', () => {
     it('AC-01: returns authenticated admin profile including role', async () => {
       mockAdminProfileService.getProfile.mockResolvedValue(PROFILE);
 
-      const result = await controller.getProfile(ADMIN_ID);
+      const result = await controller.getProfile(ADMIN_USER);
 
       expect(result).toEqual({
         statusCode: HttpStatus.OK,
         message: SYS_MSG.ADMIN_PROFILE_RETRIEVED_SUCCESSFULLY,
         data: PROFILE,
       });
-      expect(mockAdminProfileService.getProfile).toHaveBeenCalledWith(ADMIN_ID);
+      expect(mockAdminProfileService.getProfile).toHaveBeenCalledWith(ADMIN_ID, 'admin');
     });
 
     it('SEC-01: never includes password_hash in response payload', async () => {
       mockAdminProfileService.getProfile.mockResolvedValue(PROFILE);
 
-      const result = await controller.getProfile(ADMIN_ID);
+      const result = await controller.getProfile(ADMIN_USER);
 
       expect(result.data).not.toHaveProperty('password_hash');
     });
@@ -59,7 +70,7 @@ describe('AdminProfileController', () => {
       const updated = { ...PROFILE, full_name: 'Jane Updated' };
       mockAdminProfileService.updateProfile.mockResolvedValue(updated);
 
-      const result = await controller.updateProfile(ADMIN_ID, {
+      const result = await controller.updateProfile(ADMIN_USER, {
         full_name: 'Jane Updated',
       });
 
@@ -70,17 +81,17 @@ describe('AdminProfileController', () => {
       });
       expect(mockAdminProfileService.updateProfile).toHaveBeenCalledWith(ADMIN_ID, {
         full_name: 'Jane Updated',
-      });
+      }, 'admin');
     });
 
     it('AC-05: empty body returns HTTP 200 with unchanged profile', async () => {
       mockAdminProfileService.updateProfile.mockResolvedValue(PROFILE);
 
-      const result = await controller.updateProfile(ADMIN_ID, {});
+      const result = await controller.updateProfile(ADMIN_USER, {});
 
       expect(result.statusCode).toBe(HttpStatus.OK);
       expect(result.data).toEqual(PROFILE);
-      expect(mockAdminProfileService.updateProfile).toHaveBeenCalledWith(ADMIN_ID, {});
+      expect(mockAdminProfileService.updateProfile).toHaveBeenCalledWith(ADMIN_ID, {}, 'admin');
     });
   });
 

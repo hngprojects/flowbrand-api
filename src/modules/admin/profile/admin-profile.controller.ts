@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../../../common/decorators/current-user.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { AdminJwtGuard } from '../../auth/guards/admin-jwt.guard';
@@ -37,8 +38,8 @@ export class AdminProfileController {
   @Get()
   @HttpCode(HttpStatus.OK)
   @GetAdminProfileDocs()
-  async getProfile(@CurrentUser('userId') adminId: string) {
-    const data = await this.adminProfileService.getProfile(adminId);
+  async getProfile(@CurrentUser() currentUser: AuthenticatedUser) {
+    const data = await this.adminProfileService.getProfile(currentUser.userId, currentUser.role);
     return {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.ADMIN_PROFILE_RETRIEVED_SUCCESSFULLY,
@@ -50,7 +51,7 @@ export class AdminProfileController {
   @HttpCode(HttpStatus.OK)
   @UpdateAdminProfileDocs()
   async updateProfile(
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser() currentUser: AuthenticatedUser,
     @Body(
       new ValidationPipe({
         whitelist: true,
@@ -70,7 +71,7 @@ export class AdminProfileController {
     )
     dto: UpdateAdminProfileDto,
   ) {
-    const data = await this.adminProfileService.updateProfile(adminId, dto);
+    const data = await this.adminProfileService.updateProfile(currentUser.userId, dto, currentUser.role);
     return {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.ADMIN_PROFILE_UPDATED_SUCCESSFULLY,
@@ -102,7 +103,7 @@ export class AdminProfileController {
     )
     rawDto: Record<string, unknown>,
   ) {
-    const dto = rawDto as ChangeAdminPasswordDto;
+      const dto = rawDto as unknown as ChangeAdminPasswordDto;
     await this.adminProfileService.changePassword(adminId, dto);
     return {
       statusCode: HttpStatus.OK,
