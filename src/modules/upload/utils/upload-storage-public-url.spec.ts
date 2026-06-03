@@ -30,6 +30,15 @@ describe('resolveUploadStoragePublicBaseUrl', () => {
     );
   });
 
+  it('strips leading and trailing slashes from bucket', () => {
+    env.UPLOAD_STORAGE_PUBLIC_ENDPOINT = 'https://storage.example.com';
+    env.UPLOAD_STORAGE_BUCKET = '/flowbrand-uploads/';
+
+    expect(resolveUploadStoragePublicBaseUrl()).toBe(
+      'https://storage.example.com/flowbrand-uploads',
+    );
+  });
+
   it('returns null when public endpoint is empty (presigned fallback)', () => {
     env.UPLOAD_STORAGE_PUBLIC_ENDPOINT = '';
     env.UPLOAD_STORAGE_BUCKET = 'flowbrand-uploads';

@@ -38,7 +38,6 @@ import {
   ALLOWED_AVATAR_MIME_TYPES,
   AVATAR_SIGNED_URL_EXPIRY_SECONDS,
   AVATAR_STORAGE_PREFIX,
-  buildPublicAvatarUrl,
   MAX_AVATAR_UPLOAD_BYTES,
 } from './constants/avatar.constants';
 import { AvatarFileExtension, AvatarMimeType } from './enums/avatar-mime-type.enum';
@@ -382,8 +381,9 @@ export class UsersService {
   }
 
   private async resolveAvatarUrl(storagePath: string): Promise<string> {
-    if (resolveUploadStoragePublicBaseUrl()) {
-      return buildPublicAvatarUrl(storagePath);
+    const publicBaseUrl = resolveUploadStoragePublicBaseUrl();
+    if (publicBaseUrl) {
+      return `${publicBaseUrl}/${storagePath}`;
     }
 
     try {

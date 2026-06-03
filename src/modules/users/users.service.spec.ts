@@ -29,6 +29,7 @@ import { UserRole } from './enums/user-role.enum';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UPLOAD_OBJECT_STORAGE } from '../upload/upload.types';
 import { env } from '../../config/env';
+import { AVATAR_SIGNED_URL_EXPIRY_SECONDS } from './constants/avatar.constants';
 
 const TEST_PUBLIC_HOST = 'https://public.example';
 const TEST_PUBLIC_BUCKET = 'flowbrand-staging-uploads';
@@ -749,6 +750,25 @@ describe('UsersService', () => {
       beforeEach(() => {
         env.UPLOAD_STORAGE_PUBLIC_ENDPOINT = '';
         env.UPLOAD_STORAGE_BUCKET = 'flowbrand-uploads';
+      });
+
+      it('uploads avatar successfully and returns signed URL', async () => {
+        mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+        mockObjectStorage.createPresignedGetObjectUrl.mockResolvedValue(
+          'https://signed.example/avatar.jpg',
+        );
+        mockUserModelAction.updateAvatarUrl.mockResolvedValue({
+          ...mockFullUser,
+          avatar_url: 'avatars/user/new.jpg',
+        });
+
+        const result = await service.uploadAvatar(USER_ID, avatarFile);
+
+        expect(mockObjectStorage.createPresignedGetObjectUrl).toHaveBeenCalledWith(
+          expect.stringMatching(new RegExp(`^avatars/${USER_ID}/`)),
+          AVATAR_SIGNED_URL_EXPIRY_SECONDS,
+        );
+        expect(result).toEqual({ avatarUrl: 'https://signed.example/avatar.jpg' });
       });
 
       it('cleans up uploaded file when signed URL creation fails', async () => {

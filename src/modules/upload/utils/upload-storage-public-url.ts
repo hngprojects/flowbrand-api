@@ -6,7 +6,7 @@ import { env } from '../../../config/env';
  */
 export function resolveUploadStoragePublicBaseUrl(): string | null {
   const publicHost = env.UPLOAD_STORAGE_PUBLIC_ENDPOINT.trim().replace(/\/$/, '');
-  const bucket = env.UPLOAD_STORAGE_BUCKET.trim();
+  const bucket = env.UPLOAD_STORAGE_BUCKET.trim().replace(/^\/+|\/+$/g, '');
 
   if (!publicHost || !bucket) {
     return null;
