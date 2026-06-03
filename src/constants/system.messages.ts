@@ -260,7 +260,8 @@ export const ADMIN_PROFILE_UPDATED_SUCCESSFULLY = 'Admin profile updated success
 export const ADMIN_PROFILE_NOT_FOUND = 'Admin profile not found';
 export const ADMIN_PROFILE_UPDATE_FAILED = 'Failed to update admin profile';
 export const ADMIN_PROFILE_EMAIL_CHANGE_FORBIDDEN = 'Email cannot be changed here';
-export const ADMIN_PROFILE_RESPONSE_ROLE_RESOLUTION_FAILED = 'Failed to resolve admin role for profile response';export const ADMIN_DASHBOARD_STATS_RETRIEVED = 'Admin dashboard stats retrieved success
+export const ADMIN_PROFILE_RESPONSE_ROLE_RESOLUTION_FAILED = 'Failed to resolve admin role for profile response';
+export const ADMIN_DASHBOARD_STATS_RETRIEVED = 'Admin dashboard stats retrieved successfully';
 export const ADMIN_DASHBOARD_WEEKLY_OVERVIEW_RETRIEVED = 'Admin dashboard weekly overview retrieved successfully';
 export const ADMIN_DASHBOARD_USER_SEGMENTS_RETRIEVED = 'Admin dashboard user segments retrieved successfully';
 export const ADMIN_DASHBOARD_FUNNEL_PERFORMANCE_RETRIEVED = 'Admin dashboard funnel performance retrieved successfully';
