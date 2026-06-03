@@ -13,6 +13,7 @@ import { UserRoleEntity } from '../../users/entities/user-role.entity';
 import { UsersModule } from '../../users/users.module';
 import { AdminAuthService } from './admin-auth.service';
 import { AdminAuthController } from './admin-auth.controller';
+import { UserRoleEntity } from '../../users/entities/user-role.entity';
 
 @Module({
   imports: [
@@ -27,6 +28,6 @@ import { AdminAuthController } from './admin-auth.controller';
   ],
   controllers: [AdminAuthController],
   providers: [AdminAuthService, AdminJwtGuard, AuthMetadataModelAction],
-  exports: [AdminJwtGuard, JwtModule, TypeOrmModule, RedisModule],
+  exports: [AdminJwtGuard, JwtModule, TypeOrmModule, RedisModule, UsersModule],
 })
 export class AdminAuthModule {}

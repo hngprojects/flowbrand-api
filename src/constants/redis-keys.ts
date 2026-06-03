@@ -10,4 +10,10 @@ export const redisKeys = {
   refreshRateLimit: (userId: string) => `ratelimit:refresh:${userId}`,
 
   uploadRateLimit: (userId: string) => `ratelimit:upload:${userId}`,
+
+
+  adminDashboardStats: () => 'admin-dashboard:stats',
+  adminDashboardWeeklyOverview: () => 'admin-dashboard:weekly-overview',
+  adminDashboardUserSegments: () => 'admin-dashboard:user-segments',
+  adminDashboardFunnelPerformance: () => 'admin-dashboard:funnel-performance',
 };
