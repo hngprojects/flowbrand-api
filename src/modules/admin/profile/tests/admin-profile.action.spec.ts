@@ -3,7 +3,7 @@ import { User } from '../../../users/entities/user.entity';
 import { AdminProfileModelAction } from '../actions/admin-profile.action';
 
 describe('AdminProfileModelAction', () => {
-  it('uses transactional updates for profile changes', async () => {
+  it('updates profile without an enclosing transaction', async () => {
     const action = new AdminProfileModelAction({} as Repository<User>);
     const updateSpy = jest.spyOn(action, 'update').mockResolvedValue(null);
 

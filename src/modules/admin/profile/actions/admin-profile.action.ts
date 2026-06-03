@@ -4,7 +4,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../../../users/entities/user.entity';
 import { UserSession } from '../../../users/entities/user-session.entity';
-
 @Injectable()
 export class AdminProfileModelAction extends AbstractModelAction<User> {
   constructor(

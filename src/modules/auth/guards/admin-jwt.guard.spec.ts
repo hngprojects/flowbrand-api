@@ -4,8 +4,8 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { AdminRequest } from '../../admin/interfaces/admin-request.interface';
-import { UserRoleEntity } from '../../users/entities/user-role.entity';
 import { UserRole } from '../../users/enums/user-role.enum';
+import { UserRoleEntity } from '../../users/entities/user-role.entity';
 import { UsersService } from '../../users/users.service';
 import { RedisService } from '../../redis/redis.service';
 import { AdminJwtGuard } from './admin-jwt.guard';
@@ -72,12 +72,13 @@ describe('AdminJwtGuard', () => {
     );
   });
 
-  it('allows admin JWT even when the token role claim is stale', async () => {
+  it('allows admin JWT', async () => {
     mockJwtService.verifyAsync.mockResolvedValue({
       sub: 'user-1',
       sessionId: 'sess-1',
       role: 'user',
     });
+    mockUserRoleRepository.find.mockResolvedValue([{ user_id: 'user-1', role: UserRole.ADMIN }]);
 
     const { ctx, request } = buildContext('Bearer valid.token');
 

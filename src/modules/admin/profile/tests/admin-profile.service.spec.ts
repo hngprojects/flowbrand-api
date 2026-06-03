@@ -155,7 +155,7 @@ describe('AdminProfileService', () => {
       });
       expect(mockLogService.logAction).toHaveBeenCalledWith({
         admin_id: ADMIN_ID,
-        action_type: AdminProfileActionType.PROFILE_UPDATED,
+        action_type: 'profile_updated',
         status: 'success',
         metadata: { updated_fields: ['full_name'] },
       });
@@ -195,7 +195,7 @@ describe('AdminProfileService', () => {
       expect(result.country).toBe('Ghana');
       expect(mockLogService.logAction).toHaveBeenCalledWith({
         admin_id: ADMIN_ID,
-        action_type: AdminProfileActionType.PROFILE_UPDATED,
+        action_type: 'profile_updated',
         status: 'success',
         metadata: { updated_fields: ['full_name', 'country'] },
       });
@@ -343,4 +343,4 @@ describe('AdminProfileService', () => {
       );
     });
   });
-});
+});  

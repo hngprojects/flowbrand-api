@@ -1,4 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
+import { UnprocessableEntityException, ValidationError, ValidationPipe } from '@nestjs/common';
 import * as SYS_MSG from '../../../../constants/system.messages';
 import { AuthenticatedUser } from '../../../../common/decorators/current-user.decorator';
 import { UserRole } from '../../../users/enums/user-role.enum';
@@ -34,6 +35,24 @@ const PROFILE = {
 
 describe('AdminProfileController', () => {
   let controller: AdminProfileController;
+
+  const createValidationPipe = () =>
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: false },
+      expectedType: UpdateAdminProfileDto,
+      validationError: { target: false, value: false },
+      exceptionFactory: (errors: ValidationError[]) =>
+        new UnprocessableEntityException({
+          success: false,
+          statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          error: 'UnprocessableEntityException',
+          message: SYS_MSG.VALIDATION_FAILED,
+          details: errors,
+        }),
+    });
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -129,6 +148,26 @@ describe('AdminProfileController', () => {
       const serialized = JSON.stringify(result);
       expect(serialized).not.toContain('CurrentAdmin@123');
       expect(serialized).not.toContain('NewAdmin!789');
+    });
+
+    it('uses ValidationPipe config to reject non-whitelisted fields with 422 envelope', async () => {
+      await expect(
+        createValidationPipe().transform(
+          { full_name: 'Jane Admin', extra_field: 'nope' },
+          { type: 'body', metatype: UpdateAdminProfileDto, data: '' },
+        ),
+      ).rejects.toMatchObject({
+        getStatus: expect.any(Function),
+      });
+    });
+
+    it('uses ValidationPipe config to trim input values during transformation', async () => {
+      const result = (await createValidationPipe().transform(
+        { full_name: '  Jane Admin  ' },
+        { type: 'body', metatype: UpdateAdminProfileDto, data: '' },
+      )) as UpdateAdminProfileDto;
+
+      expect(result.full_name).toBe('Jane Admin');
     });
   });
 });

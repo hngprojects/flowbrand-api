@@ -59,6 +59,7 @@ export class AdminProfileController {
         transform: true,
         transformOptions: { enableImplicitConversion: false },
         expectedType: UpdateAdminProfileDto,
+        validationError: { target: false, value: false },
         exceptionFactory: (errors: ValidationError[]) =>
           new UnprocessableEntityException({
             success: false,
@@ -66,8 +67,7 @@ export class AdminProfileController {
             error: 'UnprocessableEntityException',
             message: SYS_MSG.VALIDATION_FAILED,
             details: errors,
-          }),
-      }),
+          }),      }),
     )
     dto: UpdateAdminProfileDto,
   ) {

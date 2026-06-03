@@ -29,7 +29,7 @@ export class AdminProfileService {
     private readonly userRoleModelAction: UserRoleModelAction,
     private readonly logService: LogService,
   ) {}
-
+  
   /** Returns the authenticated admin's profile, resolved with their highest role. */
   async getProfile(adminId: string, fallbackRole?: UserRole): Promise<IAdminProfile> {
     const admin = await this.adminProfileAction.findById(adminId);
