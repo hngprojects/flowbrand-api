@@ -1,14 +1,13 @@
-import { Column, Entity, JoinColumn, ManyToOne, Unique } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from '../../../common/entities/base.entity';
 import { User } from '../../users/entities/user.entity';
 import { BillingCycle } from '../enums/billing-cycle.enum';
 import { PaymentPlan } from '../enums/payment-plan.enum';
 import { SubscriptionStatus } from '../enums/subscription-status.enum';
-import { Payment } from './payment.entity';
 
-// AC-10: one active subscription per user enforced at DB level
+// Partial unique index — one active subscription per user, but history rows are allowed
 @Entity('subscriptions')
-@Unique('UQ_subscriptions_user_id', ['user_id'])
+@Index('IDX_subscriptions_active_user', ['user_id'], { unique: true, where: '"status" = \'active\'' })
 export class Subscription extends BaseEntity {
   @Column({ type: 'uuid' })
   user_id: string;
@@ -16,13 +15,6 @@ export class Subscription extends BaseEntity {
   @ManyToOne(() => User, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'user_id' })
   user: User;
-
-  @Column({ type: 'uuid' })
-  payment_id: string;
-
-  @ManyToOne(() => Payment, { onDelete: 'RESTRICT' })
-  @JoinColumn({ name: 'payment_id' })
-  payment: Payment;
 
   @Column({ type: 'enum', enum: PaymentPlan })
   plan: PaymentPlan;
@@ -34,6 +26,9 @@ export class Subscription extends BaseEntity {
   status: SubscriptionStatus;
 
   @Column({ type: 'varchar', nullable: true })
+  provider_customer_code: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
   provider_subscription_code: string | null;
 
   @Column({ type: 'timestamptz' })
@@ -42,6 +37,12 @@ export class Subscription extends BaseEntity {
   @Column({ type: 'timestamptz' })
   current_period_end: Date;
 
+  @Column({ type: 'boolean', default: false })
+  cancel_at_period_end: boolean;
+
   @Column({ type: 'timestamptz', nullable: true })
   cancelled_at: Date | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  ended_at: Date | null;
 }

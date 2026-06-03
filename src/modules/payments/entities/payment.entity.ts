@@ -4,10 +4,13 @@ import { User } from '../../users/entities/user.entity';
 import { PaymentPlan } from '../enums/payment-plan.enum';
 import { PaymentStatus } from '../enums/payment-status.enum';
 import { PaymentType } from '../enums/payment-type.enum';
+import { Subscription } from './subscription.entity';
 
 @Entity('payments')
 @Index('IDX_payments_user_id', ['user_id'])
-@Index('IDX_payments_provider_reference', ['provider_reference'])
+// Partial unique — provider_reference is null until the gateway responds, but once set it must be unique
+@Index('IDX_payments_provider_reference', ['provider_reference'], { unique: true, where: '"provider_reference" IS NOT NULL' })
+@Index('IDX_payments_idempotency_key', ['idempotency_key'], { unique: true })
 export class Payment extends BaseEntity {
   @Column({ type: 'uuid' })
   user_id: string;
@@ -15,6 +18,14 @@ export class Payment extends BaseEntity {
   @ManyToOne(() => User, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'user_id' })
   user: User;
+
+  // Links renewal charges back to their subscription; null for one-time payments
+  @Column({ type: 'uuid', nullable: true })
+  subscription_id: string | null;
+
+  @ManyToOne(() => Subscription, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'subscription_id' })
+  subscription: Subscription | null;
 
   @Column({ type: 'enum', enum: PaymentType })
   payment_type: PaymentType;
@@ -36,6 +47,9 @@ export class Payment extends BaseEntity {
 
   @Column({ type: 'varchar' })
   provider: string;
+
+  @Column({ type: 'varchar' })
+  idempotency_key: string;
 
   // SEC-02: only last 4 digits and brand stored — no card_number, cvv, or expiry
   @Column({ type: 'varchar', length: 4, nullable: true })
