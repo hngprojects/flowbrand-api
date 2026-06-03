@@ -255,3 +255,9 @@ export const ADMIN_EMAIL_CONFLICT = 'Email already registered';
 export const ADMIN_TOKEN_REFRESHED = 'Token refreshed';
 export const ADMIN_INVALID_PASSWORD_VALUE =
   'password must contain at least one uppercase letter, one lowercase letter, one digit, and one special character';
+export const ADMIN_PROFILE_RETRIEVED_SUCCESSFULLY = 'Admin profile retrieved successfully';
+export const ADMIN_PROFILE_UPDATED_SUCCESSFULLY = 'Admin profile updated successfully';
+export const ADMIN_PROFILE_NOT_FOUND = 'Admin profile not found';
+export const ADMIN_PROFILE_UPDATE_FAILED = 'Failed to update admin profile';
+export const ADMIN_PROFILE_EMAIL_CHANGE_FORBIDDEN = 'Email cannot be changed here';
+export const ADMIN_PROFILE_RESPONSE_ROLE_RESOLUTION_FAILED = 'Failed to resolve admin role for profile response';
