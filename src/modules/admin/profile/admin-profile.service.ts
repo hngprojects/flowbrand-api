@@ -3,16 +3,22 @@ import {
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  UnauthorizedException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { UserRoleModelAction } from '../../users/actions/user-role.action';
 import { UserRole } from '../../users/enums/user-role.enum';
 import { User } from '../../users/entities/user.entity';
 import { AdminProfileModelAction } from './actions/admin-profile.action';
+import { ChangeAdminPasswordDto } from './dto/change-admin-password.dto';
 import { UpdateAdminProfileDto } from './dto/update-admin-profile.dto';
+import { AdminProfileActionType } from './enums/admin-profile-action-type.enum';
 import { IAdminProfile } from './interfaces/admin-profile.interface';
 import { LogService } from './services/log.service';
+
+const ADMIN_PASSWORD_BCRYPT_SALT_ROUNDS = 12;
 
 @Injectable()
 export class AdminProfileService {
@@ -73,11 +79,65 @@ export class AdminProfileService {
 
     await this.logService.logAction({
       admin_id: adminId,
-      action_type: 'profile_updated',
+      action_type: AdminProfileActionType.PROFILE_UPDATED,
+      status: 'success',
       metadata: { updated_fields: changedFields },
     });
 
     return this.toProfileResponse(updated, fallbackRole);
+  }
+
+  /** Verifies old password with bcrypt, hashes the new one, then atomically updates password_hash and revokes all sessions. */
+  async changePassword(adminId: string, dto: ChangeAdminPasswordDto): Promise<void> {
+    const admin = await this.adminProfileAction.findById(adminId);
+    if (!admin) {
+      await this.logPasswordChangeFailure(adminId, 'admin_not_found');
+      throw new NotFoundException(SYS_MSG.ADMIN_PROFILE_NOT_FOUND);
+    }
+
+    if (!admin.password_hash) {
+      await this.logPasswordChangeFailure(adminId, 'password_unavailable');
+      throw new UnprocessableEntityException(SYS_MSG.PASSWORD_CHANGE_UNAVAILABLE);
+    }
+
+    if (dto.new_password !== dto.confirm_password) {
+      await this.logPasswordChangeFailure(adminId, 'confirm_password_mismatch');
+      throw new UnprocessableEntityException(SYS_MSG.INCORRECT_CONFIRM_PASSWORD);
+    }
+
+    if (dto.new_password === dto.old_password) {
+      await this.logPasswordChangeFailure(adminId, 'new_password_equals_old_password');
+      throw new UnprocessableEntityException(SYS_MSG.ADMIN_NEW_PASSWORD_MUST_DIFFER_FROM_OLD);
+    }
+
+    const oldPasswordMatches = await bcrypt.compare(dto.old_password, admin.password_hash);
+    if (!oldPasswordMatches) {
+      await this.logPasswordChangeFailure(adminId, 'old_password_incorrect');
+      throw new UnauthorizedException(SYS_MSG.ADMIN_OLD_PASSWORD_INCORRECT);
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.new_password, ADMIN_PASSWORD_BCRYPT_SALT_ROUNDS);
+    try {
+      await this.adminProfileAction.updatePasswordAndRevokeSessions(adminId, hashedPassword);
+    } catch {
+      await this.logPasswordChangeFailure(adminId, 'update_failed');
+      throw new InternalServerErrorException(SYS_MSG.ADMIN_PROFILE_UPDATE_FAILED);
+    }
+    await this.logService.logAction({
+      admin_id: adminId,
+      action_type: AdminProfileActionType.PASSWORD_CHANGED,
+      status: 'success',
+      metadata: { fields_changed: ['password'] },
+    });
+  }
+
+  private async logPasswordChangeFailure(adminId: string, failedStage: string): Promise<void> {
+    await this.logService.logAction({
+      admin_id: adminId,
+      action_type: AdminProfileActionType.PASSWORD_CHANGED,
+      status: 'failed',
+      metadata: { failed_stage: failedStage },
+    });
   }
 
   private async toProfileResponse(user: User, fallbackRole?: UserRole): Promise<IAdminProfile> {

@@ -1,5 +1,4 @@
-import { HttpStatus } from '@nestjs/common';
-import { UnprocessableEntityException, ValidationError, ValidationPipe } from '@nestjs/common';
+import { HttpStatus, UnprocessableEntityException, ValidationError, ValidationPipe } from '@nestjs/common';
 import * as SYS_MSG from '../../../../constants/system.messages';
 import { AuthenticatedUser } from '../../../../common/decorators/current-user.decorator';
 import { UserRole } from '../../../users/enums/user-role.enum';
@@ -10,6 +9,7 @@ import { AdminProfileService } from '../admin-profile.service';
 const mockAdminProfileService = {
   getProfile: jest.fn(),
   updateProfile: jest.fn(),
+  changePassword: jest.fn(),
 };
 
 const ADMIN_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -34,6 +34,24 @@ const PROFILE = {
 
 describe('AdminProfileController', () => {
   let controller: AdminProfileController;
+
+  const createValidationPipe = () =>
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: false },
+      expectedType: UpdateAdminProfileDto,
+      validationError: { target: false, value: false },
+      exceptionFactory: (errors: ValidationError[]) =>
+        new UnprocessableEntityException({
+          success: false,
+          statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          error: 'UnprocessableEntityException',
+          message: SYS_MSG.VALIDATION_FAILED,
+          details: errors,
+        }),
+    });
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -66,24 +84,6 @@ describe('AdminProfileController', () => {
   });
 
   describe('PATCH /admin/profile', () => {
-    const createValidationPipe = () =>
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-        transformOptions: { enableImplicitConversion: false },
-        expectedType: UpdateAdminProfileDto,
-        validationError: { target: false, value: false },
-        exceptionFactory: (errors: ValidationError[]) =>
-          new UnprocessableEntityException({
-            success: false,
-            statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
-            error: 'UnprocessableEntityException',
-            message: SYS_MSG.VALIDATION_FAILED,
-            details: errors,
-          }),
-      });
-
     it('AC-02: updates allowed profile fields and returns HTTP 200', async () => {
       const updated = { ...PROFILE, full_name: 'Jane Updated' };
       mockAdminProfileService.updateProfile.mockResolvedValue(updated);
@@ -111,16 +111,61 @@ describe('AdminProfileController', () => {
       expect(result.data).toEqual(PROFILE);
       expect(mockAdminProfileService.updateProfile).toHaveBeenCalledWith(ADMIN_ID, {}, 'admin');
     });
+  });
+
+  describe('PATCH /admin/profile/password', () => {
+    it('AC-01: returns HTTP 200 when old password is correct and new password is valid', async () => {
+      mockAdminProfileService.changePassword.mockResolvedValue(undefined);
+
+      const result = await controller.changePassword(ADMIN_ID, {
+        old_password: 'CurrentAdmin@123',
+        new_password: 'NewAdmin!789',
+        confirm_password: 'NewAdmin!789',
+      });
+
+      expect(result).toEqual({
+        statusCode: HttpStatus.OK,
+        message: SYS_MSG.ADMIN_PASSWORD_UPDATED_SUCCESSFULLY,
+        data: null,
+      });
+      expect(mockAdminProfileService.changePassword).toHaveBeenCalledWith(ADMIN_ID, {
+        old_password: 'CurrentAdmin@123',
+        new_password: 'NewAdmin!789',
+        confirm_password: 'NewAdmin!789',
+      });
+    });
+
+    it('AC-07: controller never includes password values in response payload', async () => {
+      mockAdminProfileService.changePassword.mockResolvedValue(undefined);
+
+      const result = await controller.changePassword(ADMIN_ID, {
+        old_password: 'CurrentAdmin@123',
+        new_password: 'NewAdmin!789',
+        confirm_password: 'NewAdmin!789',
+      }) as unknown as Record<string, unknown>;
+
+      const serialized = JSON.stringify(result);
+      expect(serialized).not.toContain('CurrentAdmin@123');
+      expect(serialized).not.toContain('NewAdmin!789');
+    });
 
     it('uses ValidationPipe config to reject non-whitelisted fields with 422 envelope', async () => {
-      await expect(
-        createValidationPipe().transform(
+      try {
+        await createValidationPipe().transform(
           { full_name: 'Jane Admin', extra_field: 'nope' },
           { type: 'body', metatype: UpdateAdminProfileDto, data: '' },
-        ),
-      ).rejects.toMatchObject({
-        getStatus: expect.any(Function),
-      });
+        );
+        fail('Expected validation to throw');
+      } catch (error) {
+        expect(error).toBeInstanceOf(UnprocessableEntityException);
+        expect((error as UnprocessableEntityException).getStatus()).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
+        expect((error as UnprocessableEntityException).getResponse()).toMatchObject({
+          success: false,
+          statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          error: 'UnprocessableEntityException',
+          message: SYS_MSG.VALIDATION_FAILED,
+        });
+      }
     });
 
     it('uses ValidationPipe config to trim input values during transformation', async () => {

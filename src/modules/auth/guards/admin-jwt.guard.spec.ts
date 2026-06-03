@@ -13,6 +13,7 @@ import { AdminJwtGuard } from './admin-jwt.guard';
 const mockJwtService = { verifyAsync: jest.fn() };
 const mockRedisService = { get: jest.fn() };
 const mockUsersService = { findById: jest.fn() };
+const mockUserRoleRepository = { find: jest.fn() };
 
 function buildContext(authHeader?: string): {
   ctx: ExecutionContext;
@@ -31,11 +32,9 @@ function buildContext(authHeader?: string): {
 
 describe('AdminJwtGuard', () => {
   let guard: AdminJwtGuard;
-  let roleRepository: { find: jest.Mock };
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    roleRepository = { find: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -43,7 +42,7 @@ describe('AdminJwtGuard', () => {
         { provide: JwtService, useValue: mockJwtService },
         { provide: RedisService, useValue: mockRedisService },
         { provide: UsersService, useValue: mockUsersService },
-        { provide: getRepositoryToken(UserRoleEntity), useValue: roleRepository },
+        { provide: getRepositoryToken(UserRoleEntity), useValue: mockUserRoleRepository },
       ],
     }).compile();
 
@@ -55,16 +54,16 @@ describe('AdminJwtGuard', () => {
       deleted_at: null,
       is_active: true,
     });
-    roleRepository.find.mockResolvedValue([{ role: UserRole.ADMIN }]);
+    mockUserRoleRepository.find.mockResolvedValue([{ user_id: 'user-1', role: UserRole.ADMIN }]);
   });
 
   it('AC-06: rejects non-admin JWT with 403', async () => {
     mockJwtService.verifyAsync.mockResolvedValue({
       sub: 'user-1',
       sessionId: 'sess-1',
-      role: UserRole.ADMIN,
+      role: UserRole.USER,
     });
-    roleRepository.find.mockResolvedValue([]);
+    mockUserRoleRepository.find.mockResolvedValue([]);
 
     const { ctx } = buildContext('Bearer valid.token');
 
@@ -79,12 +78,26 @@ describe('AdminJwtGuard', () => {
       sessionId: 'sess-1',
       role: 'user',
     });
-    roleRepository.find.mockResolvedValue([{ role: UserRole.ADMIN }]);
+    mockUserRoleRepository.find.mockResolvedValue([{ user_id: 'user-1', role: UserRole.ADMIN }]);
 
     const { ctx, request } = buildContext('Bearer valid.token');
 
     await expect(guard.canActivate(ctx)).resolves.toBe(true);
     expect(request.user).toMatchObject({ role: UserRole.ADMIN, sub: 'user-1' });
+    expect(mockUserRoleRepository.find).toHaveBeenCalled();
+  });
+
+  it('rejects when the Redis session key is missing', async () => {
+    mockJwtService.verifyAsync.mockResolvedValue({
+      sub: 'user-1',
+      sessionId: 'sess-1',
+      role: UserRole.ADMIN,
+    });
+    mockRedisService.get.mockResolvedValueOnce(null);
+
+    const { ctx } = buildContext('Bearer valid.token');
+
+    await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
   });
 
   it('rejects missing Authorization header with 401', async () => {
