@@ -106,6 +106,7 @@ export class AdminProfileService {
     }
 
     if (dto.new_password === dto.old_password) {
+      await this.logPasswordChangeFailure(adminId, 'new_password_equals_old_password');
       throw new UnprocessableEntityException(SYS_MSG.ADMIN_NEW_PASSWORD_MUST_DIFFER_FROM_OLD);
     }
 
@@ -118,16 +119,16 @@ export class AdminProfileService {
     const hashedPassword = await bcrypt.hash(dto.new_password, ADMIN_PASSWORD_BCRYPT_SALT_ROUNDS);
     try {
       await this.adminProfileAction.updatePasswordAndRevokeSessions(adminId, hashedPassword);
-      await this.logService.logAction({
-        admin_id: adminId,
-        action_type: AdminProfileActionType.PASSWORD_CHANGED,
-        status: 'success',
-        metadata: { fields_changed: ['password'] },
-      });
     } catch {
       await this.logPasswordChangeFailure(adminId, 'update_failed');
       throw new InternalServerErrorException(SYS_MSG.ADMIN_PROFILE_UPDATE_FAILED);
     }
+    await this.logService.logAction({
+      admin_id: adminId,
+      action_type: AdminProfileActionType.PASSWORD_CHANGED,
+      status: 'success',
+      metadata: { fields_changed: ['password'] },
+    });
   }
 
   private async logPasswordChangeFailure(adminId: string, failedStage: string): Promise<void> {
