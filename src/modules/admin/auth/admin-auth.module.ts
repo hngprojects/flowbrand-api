@@ -27,6 +27,6 @@ import { UserRoleEntity } from '../../users/entities/user-role.entity';
   ],
   controllers: [AdminAuthController],
   providers: [AdminAuthService, AdminJwtGuard, AuthMetadataModelAction],
-  exports: [AdminJwtGuard, JwtModule, TypeOrmModule, RedisModule],
+  exports: [AdminJwtGuard, JwtModule, TypeOrmModule, RedisModule, UsersModule],
 })
 export class AdminAuthModule {}

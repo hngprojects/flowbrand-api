@@ -14,7 +14,9 @@ import {
   GetUserSegmentsDocs, 
   GetFunnelPerformanceDocs 
 } from '../docs/admin-dashboard-swagger.doc';
+import { ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Admin Dashboard')
 @Controller('admin/dashboard')
 @UseGuards(AdminJwtGuard)
 export class AdminDashboardController {
