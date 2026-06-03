@@ -15,6 +15,7 @@ import { NotificationPreferenceModelAction } from './actions/notification-prefer
 import { NotificationListener } from './listeners/notification.listener';
 import { WeeklyDigestProcessor } from './processors/weekly-digest.processor';
 import { NotificationsService } from './notifications.service';
+import { PaymentModelAction } from '../payments/actions/payment.action';
 
 const WEEKLY_DIGEST_CRON = '0 9 * * MON';
 const WEEKLY_DIGEST_JOB_ID = 'weekly-digest-recurring';
@@ -34,6 +35,8 @@ const WEEKLY_DIGEST_JOB_ID = 'weekly-digest-recurring';
     NotificationsService,
     NotificationListener,
     WeeklyDigestProcessor,
+    // Stub until M4-BE-018 (PaymentService foundation) ships and wires the real PaymentsModule.
+    PaymentModelAction,
   ],
   exports: [NotificationModelAction, NotificationPreferenceModelAction, NotificationsService],
 })

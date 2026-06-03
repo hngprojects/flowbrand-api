@@ -3,13 +3,18 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { APP_EVENTS } from '../../../common/constants/app-events';
 import {
   FunnelGeneratedEvent,
+  NotificationsPendingEvent,
+  PaymentFailedEvent,
+  PlanUpgradedEvent,
   StageCompletedEvent,
   StageUnlockedEvent,
+  SubscriptionCancelledEvent,
   TaskCompletedEvent,
 } from '../../../common/events/events';
 import { EmailService } from '../../../email/email.service';
 import { StageTaskModelAction } from '../../funnels/actions/stage-task.action';
 import { UserModelAction } from '../../users/actions/user.action';
+import { PaymentModelAction } from '../../payments/actions/payment.action';
 import { NotificationModelAction } from '../actions/notification.action';
 import { NotificationsService } from '../notifications.service';
 
@@ -34,6 +39,7 @@ export class NotificationListener {
     private readonly emailService: EmailService,
     private readonly taskAction: StageTaskModelAction,
     private readonly userAction: UserModelAction,
+    private readonly paymentModelAction: PaymentModelAction,
   ) {}
 
   @OnEvent(APP_EVENTS.STAGE_COMPLETED)
@@ -141,11 +147,78 @@ export class NotificationListener {
     });
   }
 
+  @OnEvent(APP_EVENTS.PLAN_UPGRADED)
+  async onPlanUpgraded(event: PlanUpgradedEvent): Promise<void> {
+    await this.safely('plan.upgraded', event.userId, async () => {
+      // EC-03: payment row may not exist if deleted between emit and handler execution
+      const payment = await this.paymentModelAction.findByReference(event.reference);
+      if (!payment) {
+        this.logger.warn({ message: 'Payment row not found for PLAN_UPGRADED event', reference: event.reference });
+        return;
+      }
+
+      // EC-04: amount 0 or null is formatted as ₦0.00 — log a warning but still send
+      if (!payment.amount) {
+        this.logger.warn({ message: 'Payment amount is 0 or null', reference: event.reference });
+      }
+
+      // SEC-02: only include card_last4 when it is a valid 4-digit numeric string
+      const cardLast4 = /^\d{4}$/.test(payment.card_last4 ?? '') ? payment.card_last4 : null;
+
+      await this.email(event.userId, (to, name) =>
+        this.emailService.sendPaymentSuccessful(
+          to,
+          {
+            name,
+            amount: this.formatKobo(payment.amount),
+            cardLast4,
+            cardBrand: payment.card_brand,
+            reference: event.reference,
+            paidAt: this.formatDate(payment.paid_at ?? new Date()),
+          },
+          event.userId,
+        ),
+      );
+    });
+  }
+
+  @OnEvent(APP_EVENTS.PAYMENT_FAILED)
+  async onPaymentFailed(event: PaymentFailedEvent): Promise<void> {
+    await this.safely('payment.failed', event.userId, async () => {
+      await this.email(event.userId, (to, name) =>
+        this.emailService.sendPaymentFailed(to, { name, failureReason: event.failureReason }, event.userId),
+      );
+    });
+  }
+
+  @OnEvent(APP_EVENTS.SUBSCRIPTION_CANCELLED)
+  async onSubscriptionCancelled(event: SubscriptionCancelledEvent): Promise<void> {
+    await this.safely('subscription.cancelled', event.userId, async () => {
+      await this.email(event.userId, (to, name) =>
+        this.emailService.sendSubscriptionCancelled(
+          to,
+          { name, accessUntil: this.formatDate(event.accessUntil) },
+          event.userId,
+        ),
+      );
+    });
+  }
+
+  @OnEvent(APP_EVENTS.NOTIFICATIONS_PENDING)
+  async onNotificationsPending(event: NotificationsPendingEvent): Promise<void> {
+    await this.safely('notifications.pending', event.userId, async () => {
+      const prefs = await this.notificationsService.getNotificationPreferences(event.userId);
+      if (!prefs.email_weekly_digest) {
+        return;
+      }
+      await this.email(event.userId, (to, name) =>
+        this.emailService.sendNotificationAlert(to, { name, unreadCount: event.unreadCount }, event.userId),
+      );
+    });
+  }
+
   /** Resolves the recipient from the trusted userId (SEC-02) and dispatches when an email exists. */
-  private async email(
-    userId: string,
-    dispatch: (to: string, name: string) => Promise<unknown>,
-  ): Promise<void> {
+  private async email(userId: string, dispatch: (to: string, name: string) => Promise<unknown>): Promise<void> {
     const user = await this.userAction.findById(userId);
     if (!user?.email) {
       return;
@@ -164,5 +237,17 @@ export class NotificationListener {
         error: (err as Error).message,
       });
     }
+  }
+
+  /** Converts a kobo integer to a formatted Naira string e.g. 1000000 → '₦10,000.00'. */
+  private formatKobo(amountInKobo: number | null): string {
+    const naira = (amountInKobo ?? 0) / 100;
+    const formatted = naira.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `₦${formatted}`;
+  }
+
+  /** Formats a Date as 'Month D, YYYY' e.g. 'May 4, 2026'. */
+  private formatDate(date: Date): string {
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   }
 }
