@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class CreatePaymentTables1780489598849 implements MigrationInterface {
-    name = 'CreatePaymentTables1780489598849'
+export class CreatePaymentTables1780501664979 implements MigrationInterface {
+    name = 'CreatePaymentTables1780501664979'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`ALTER TABLE "notification_preferences" DROP CONSTRAINT "FK_notification_preferences_user_id"`);
@@ -17,7 +17,8 @@ export class CreatePaymentTables1780489598849 implements MigrationInterface {
         await queryRunner.query(`CREATE TYPE "public"."payments_payment_type_enum" AS ENUM('one_time', 'subscription')`);
         await queryRunner.query(`CREATE TYPE "public"."payments_plan_enum" AS ENUM('pro')`);
         await queryRunner.query(`CREATE TYPE "public"."payments_status_enum" AS ENUM('pending', 'success', 'failed', 'refunded')`);
-        await queryRunner.query(`CREATE TABLE "payments" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "user_id" uuid NOT NULL, "subscription_id" uuid, "payment_type" "public"."payments_payment_type_enum" NOT NULL, "plan" "public"."payments_plan_enum" NOT NULL, "amount" numeric(10,2) NOT NULL, "currency" character varying(3) NOT NULL DEFAULT 'NGN', "status" "public"."payments_status_enum" NOT NULL DEFAULT 'pending', "provider_reference" character varying, "provider" character varying NOT NULL, "idempotency_key" character varying NOT NULL, "card_last4" character varying(4), "card_brand" character varying, "failure_reason" text, "metadata" jsonb NOT NULL DEFAULT '{}', CONSTRAINT "PK_197ab7af18c93fbb0c9b28b4a59" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TYPE "public"."payments_provider_enum" AS ENUM('mock', 'paystack', 'flutterwave', 'stripe')`);
+        await queryRunner.query(`CREATE TABLE "payments" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "user_id" uuid NOT NULL, "subscription_id" uuid, "payment_type" "public"."payments_payment_type_enum" NOT NULL, "plan" "public"."payments_plan_enum" NOT NULL, "amount_kobo" integer NOT NULL, "currency" character varying(3) NOT NULL DEFAULT 'NGN', "status" "public"."payments_status_enum" NOT NULL DEFAULT 'pending', "provider_reference" character varying, "provider" "public"."payments_provider_enum" NOT NULL, "idempotency_key" character varying NOT NULL, "card_last4" character varying(4), "card_brand" character varying, "failure_reason" text, "paid_at" TIMESTAMP WITH TIME ZONE, "metadata" jsonb NOT NULL DEFAULT '{}', CONSTRAINT "PK_197ab7af18c93fbb0c9b28b4a59" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_payments_idempotency_key" ON "payments" ("idempotency_key") `);
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_payments_provider_reference" ON "payments" ("provider_reference") WHERE "provider_reference" IS NOT NULL`);
         await queryRunner.query(`CREATE INDEX "IDX_payments_user_id" ON "payments" ("user_id") `);
@@ -44,6 +45,7 @@ export class CreatePaymentTables1780489598849 implements MigrationInterface {
         await queryRunner.query(`DROP INDEX "public"."IDX_payments_provider_reference"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_payments_idempotency_key"`);
         await queryRunner.query(`DROP TABLE "payments"`);
+        await queryRunner.query(`DROP TYPE "public"."payments_provider_enum"`);
         await queryRunner.query(`DROP TYPE "public"."payments_status_enum"`);
         await queryRunner.query(`DROP TYPE "public"."payments_plan_enum"`);
         await queryRunner.query(`DROP TYPE "public"."payments_payment_type_enum"`);

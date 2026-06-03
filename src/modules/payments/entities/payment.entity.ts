@@ -33,8 +33,9 @@ export class Payment extends BaseEntity {
   @Column({ type: 'enum', enum: PaymentPlan })
   plan: PaymentPlan;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
-  amount: number;
+  /** Amount in kobo (smallest NGN unit). 100000 = ₦1,000.00 */
+  @Column({ type: 'int' })
+  amount_kobo: number;
 
   @Column({ type: 'varchar', length: 3, default: 'NGN' })
   currency: string;
@@ -45,7 +46,7 @@ export class Payment extends BaseEntity {
   @Column({ type: 'varchar', nullable: true })
   provider_reference: string | null;
 
-  @Column({ type: 'varchar' })
+  @Column({ type: 'enum', enum: ['mock', 'paystack', 'flutterwave', 'stripe'] as const })
   provider: string;
 
   @Column({ type: 'varchar' })
@@ -60,6 +61,9 @@ export class Payment extends BaseEntity {
 
   @Column({ type: 'text', nullable: true })
   failure_reason: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  paid_at: Date | null;
 
   @Column({ type: 'jsonb', default: () => "'{}'" })
   metadata: Record<string, unknown>;
