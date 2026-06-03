@@ -25,6 +25,7 @@ const mockLogService = {
 };
 
 const ADMIN_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const FALLBACK_ROLE = UserRole.ADMIN;
 
 const ADMIN_USER = {
   id: ADMIN_ID,
@@ -59,7 +60,7 @@ describe('AdminProfileService', () => {
     it('AC-01: returns admin profile with role and created_at', async () => {
       mockAdminProfileAction.findById.mockResolvedValue(ADMIN_USER);
 
-      const result = await service.getProfile(ADMIN_ID);
+      const result = await service.getProfile(ADMIN_ID, FALLBACK_ROLE);
 
       expect(result).toEqual({
         id: ADMIN_ID,
@@ -75,7 +76,7 @@ describe('AdminProfileService', () => {
     it('SEC-01: excludes password_hash from returned profile', async () => {
       mockAdminProfileAction.findById.mockResolvedValue(ADMIN_USER);
 
-      const result = await service.getProfile(ADMIN_ID) as unknown as Record<string, unknown>;
+      const result = (await service.getProfile(ADMIN_ID, FALLBACK_ROLE)) as unknown as Record<string, unknown>;
 
       expect(result).not.toHaveProperty('password_hash');
     });
@@ -83,7 +84,7 @@ describe('AdminProfileService', () => {
     it('throws 404 when admin row does not exist', async () => {
       mockAdminProfileAction.findById.mockResolvedValue(null);
 
-      await expect(service.getProfile(ADMIN_ID)).rejects.toThrow(
+      await expect(service.getProfile(ADMIN_ID, FALLBACK_ROLE)).rejects.toThrow(
         new NotFoundException(SYS_MSG.ADMIN_PROFILE_NOT_FOUND),
       );
     });
@@ -94,7 +95,7 @@ describe('AdminProfileService', () => {
       mockAdminProfileAction.findById.mockResolvedValue(ADMIN_USER);
 
       await expect(
-        service.updateProfile(ADMIN_ID, { email: 'other@example.com' }),
+        service.updateProfile(ADMIN_ID, { email: 'other@example.com' }, FALLBACK_ROLE),
       ).rejects.toThrow(new UnprocessableEntityException(SYS_MSG.ADMIN_PROFILE_EMAIL_CHANGE_FORBIDDEN));
 
       expect(mockAdminProfileAction.updateProfile).not.toHaveBeenCalled();
@@ -103,7 +104,7 @@ describe('AdminProfileService', () => {
     it('AC-05: empty body returns current profile and skips DB write', async () => {
       mockAdminProfileAction.findById.mockResolvedValue(ADMIN_USER);
 
-      const result = await service.updateProfile(ADMIN_ID, {});
+      const result = await service.updateProfile(ADMIN_ID, {}, FALLBACK_ROLE);
 
       expect(result.full_name).toBe('Jane Admin');
       expect(mockAdminProfileAction.updateProfile).not.toHaveBeenCalled();
@@ -113,7 +114,7 @@ describe('AdminProfileService', () => {
     it('EC-01: no-change full_name returns current profile without DB write', async () => {
       mockAdminProfileAction.findById.mockResolvedValue(ADMIN_USER);
 
-      const result = await service.updateProfile(ADMIN_ID, { full_name: 'Jane Admin' });
+      const result = await service.updateProfile(ADMIN_ID, { full_name: 'Jane Admin' }, FALLBACK_ROLE);
 
       expect(result.full_name).toBe('Jane Admin');
       expect(mockAdminProfileAction.updateProfile).not.toHaveBeenCalled();
@@ -123,7 +124,7 @@ describe('AdminProfileService', () => {
     it('EC-01: no-change country returns current profile without DB write', async () => {
       mockAdminProfileAction.findById.mockResolvedValue(ADMIN_USER);
 
-      await service.updateProfile(ADMIN_ID, { country: 'Nigeria' });
+      await service.updateProfile(ADMIN_ID, { country: 'Nigeria' }, FALLBACK_ROLE);
 
       expect(mockAdminProfileAction.updateProfile).not.toHaveBeenCalled();
       expect(mockLogService.logAction).not.toHaveBeenCalled();
@@ -136,7 +137,7 @@ describe('AdminProfileService', () => {
         full_name: 'Jane Updated',
       });
 
-      const result = await service.updateProfile(ADMIN_ID, { full_name: 'Jane Updated' });
+      const result = await service.updateProfile(ADMIN_ID, { full_name: 'Jane Updated' }, FALLBACK_ROLE);
 
       expect(result.full_name).toBe('Jane Updated');
       expect(mockAdminProfileAction.updateProfile).toHaveBeenCalledWith(ADMIN_ID, {
@@ -156,7 +157,7 @@ describe('AdminProfileService', () => {
         country: 'Ghana',
       });
 
-      const result = await service.updateProfile(ADMIN_ID, { country: 'Ghana' });
+      const result = await service.updateProfile(ADMIN_ID, { country: 'Ghana' }, FALLBACK_ROLE);
 
       expect(result.country).toBe('Ghana');
       expect(mockAdminProfileAction.updateProfile).toHaveBeenCalledWith(ADMIN_ID, {
@@ -177,7 +178,7 @@ describe('AdminProfileService', () => {
       const result = await service.updateProfile(ADMIN_ID, {
         full_name: 'Jane Updated',
         country: 'Ghana',
-      });
+      }, FALLBACK_ROLE);
 
       expect(result.full_name).toBe('Jane Updated');
       expect(result.country).toBe('Ghana');
@@ -191,7 +192,7 @@ describe('AdminProfileService', () => {
     it('throws 404 when admin cannot be found before update', async () => {
       mockAdminProfileAction.findById.mockResolvedValue(null);
 
-      await expect(service.updateProfile(ADMIN_ID, { full_name: 'Different Name' })).rejects.toThrow(
+      await expect(service.updateProfile(ADMIN_ID, { full_name: 'Different Name' }, FALLBACK_ROLE)).rejects.toThrow(
         new NotFoundException(SYS_MSG.ADMIN_PROFILE_NOT_FOUND),
       );
     });
@@ -200,17 +201,18 @@ describe('AdminProfileService', () => {
       mockAdminProfileAction.findById.mockResolvedValue(ADMIN_USER);
       mockAdminProfileAction.updateProfile.mockResolvedValue(null);
 
-      await expect(service.updateProfile(ADMIN_ID, { full_name: 'Different Name' })).rejects.toThrow(
+      await expect(service.updateProfile(ADMIN_ID, { full_name: 'Different Name' }, FALLBACK_ROLE)).rejects.toThrow(
         new InternalServerErrorException(SYS_MSG.ADMIN_PROFILE_UPDATE_FAILED),
       );
     });
 
-    it('throws 500 when admin role cannot be resolved', async () => {
+    it('falls back to JWT role when role resolution fails', async () => {
       mockAdminProfileAction.findById.mockResolvedValue(ADMIN_USER);
-      mockUserRoleModelAction.resolveHighestRole.mockResolvedValue(null);
+      mockUserRoleModelAction.resolveHighestRole.mockRejectedValue(new Error('db down'));
 
-      await expect(service.updateProfile(ADMIN_ID, {})).rejects.toThrow(
-        new InternalServerErrorException(SYS_MSG.ADMIN_PROFILE_RESPONSE_ROLE_RESOLUTION_FAILED),
-      );
+      const result = await service.updateProfile(ADMIN_ID, {}, FALLBACK_ROLE);
+
+      expect(result.role).toBe(FALLBACK_ROLE);
+      expect(mockLogService.logAction).not.toHaveBeenCalled();
     });  });
 });

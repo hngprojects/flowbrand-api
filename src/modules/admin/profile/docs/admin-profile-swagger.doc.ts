@@ -27,7 +27,8 @@ export function GetAdminProfileDocs() {
       summary: 'Get authenticated admin profile',
       description:
         'Returns the current authenticated admin profile details for the Settings > My Profile tab. ' +
-        'Response includes role and excludes sensitive fields such as password_hash.',
+        'Response includes role and excludes sensitive fields such as password_hash. ' +
+        'If profile-role lookup is unavailable, the endpoint falls back to the authenticated JWT role so the read never fails after a committed write.',
     }),
     ApiOkResponse({
       description: 'Admin profile retrieved successfully',
@@ -74,7 +75,8 @@ export function UpdateAdminProfileDocs() {
       description:
         'Accepts partial updates for full_name and country only. ' +
         'Email is read-only and returns HTTP 422 when provided. ' +
-        'Empty request body or unchanged values return HTTP 200 with no DB write.',
+        'Empty request body or unchanged values return HTTP 200 with no DB write. ' +
+        'If role lookup fails after a successful update, the endpoint falls back to the authenticated JWT role instead of returning a 500.',
     }),
     ApiBody({ type: UpdateAdminProfileDto }),
     ApiOkResponse({

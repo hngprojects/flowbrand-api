@@ -6,6 +6,6 @@ export interface IAdminProfile {
   email: string;
   country: string | null;
   avatar_url: string | null;
-  role: UserRole;
+  role: UserRole | null;
   created_at: Date;
 }
