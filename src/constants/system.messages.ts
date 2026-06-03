@@ -244,6 +244,12 @@ export const ACCOUNT_EXISTS_WITH_RETENTION =
 // Tasks
 export const REAPER_TRIGGERED_SUCCESSFULLY = 'Background reaper triggered successfully';
 
+// Rate limits
+export const AUTH_REGISTER_RATE_LIMITED = 'Too many registration attempts. Please try again in an hour.';
+export const AUTH_LOGIN_RATE_LIMITED = 'Too many login attempts from this IP. Please try again later.';
+export const AUTH_REFRESH_RATE_LIMITED = 'Too many token refresh requests. Please try again later.';
+export const UPLOAD_RATE_LIMIT_EXCEEDED = 'Upload limit reached. You can upload up to 20 batches per hour.';
+
 // Admin auth
 export const ADMIN_LOGIN_SUCCESSFUL = 'Admin login successful';
 export const ADMIN_LOGOUT_SUCCESSFUL = 'Admin logout successful';

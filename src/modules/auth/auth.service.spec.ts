@@ -770,3 +770,61 @@ describe('AuthService - Password Reset Flow (BE-012)', () => {
     });
   });
 });
+
+describe('AuthService - refresh() rate limit (BE-64)', () => {
+  let service: AuthService;
+
+  const REFRESH_PAYLOAD = {
+    sub: 'user-uuid-1',
+    userId: 'user-uuid-1',
+    email: 'jane@example.com',
+    sessionId: 'session-uuid-1',
+  };
+
+  const mockJwtService = { signAsync: jest.fn(), verifyAsync: jest.fn() };
+  const mockRedisService = { rateLimit: jest.fn(), setStrict: jest.fn(), del: jest.fn() };
+  const mockUserSessionModelAction = { findById: jest.fn(), updateById: jest.fn(), createSession: jest.fn() };
+  const mockUsersService = { findById: jest.fn() };
+  const mockAuthMetadataModelAction = { findByUserId: jest.fn(), updateByUserId: jest.fn(), createForUser: jest.fn() };
+  const mockOtpTokenModelAction = { replaceToken: jest.fn() };
+  const mockEmailService = { sendOtpVerification: jest.fn() };
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+
+    mockJwtService.verifyAsync.mockResolvedValue(REFRESH_PAYLOAD);
+    mockRedisService.rateLimit.mockResolvedValue({ exceeded: false, count: 1 });
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AuthService,
+        { provide: UsersService, useValue: mockUsersService },
+        { provide: JwtService, useValue: mockJwtService },
+        { provide: RedisService, useValue: mockRedisService },
+        { provide: UserSessionModelAction, useValue: mockUserSessionModelAction },
+        { provide: AuthMetadataModelAction, useValue: mockAuthMetadataModelAction },
+        { provide: OtpTokenModelAction, useValue: mockOtpTokenModelAction },
+        { provide: EmailService, useValue: mockEmailService },
+      ],
+    }).compile();
+
+    service = module.get<AuthService>(AuthService);
+  });
+
+  it('RL-01: throws 429 when the per-user refresh rate limit is exceeded', async () => {
+    mockRedisService.rateLimit.mockResolvedValue({ exceeded: true, count: 11 });
+
+    await expect(service.refresh('any.refresh.token')).rejects.toThrow(HttpException);
+    await expect(service.refresh('any.refresh.token')).rejects.toMatchObject({
+      message: SYS_MSG.AUTH_REFRESH_RATE_LIMITED,
+      status: HttpStatus.TOO_MANY_REQUESTS,
+    });
+  });
+
+  it('RL-02: proceeds past rate limit check when limit is not exceeded', async () => {
+    mockRedisService.rateLimit.mockResolvedValue({ exceeded: false, count: 1 });
+    mockUserSessionModelAction.findById.mockResolvedValue(null);
+
+    await expect(service.refresh('any.refresh.token')).rejects.toThrow(UnauthorizedException);
+  });
+});

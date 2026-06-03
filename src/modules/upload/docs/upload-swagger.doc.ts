@@ -1,4 +1,4 @@
-import { applyDecorators } from '@nestjs/common';
+import { HttpStatus, applyDecorators } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -8,6 +8,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiPayloadTooLargeResponse,
+  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
@@ -56,6 +57,17 @@ export const UploadFunnelDocumentsDocs = () =>
     }),
     ApiPayloadTooLargeResponse({
       description: 'Multer rejected file before handler (size/count).',
+    }),
+    ApiTooManyRequestsResponse({
+      description: 'Rate limit exceeded: 20 upload batches per hour per user.',
+      schema: {
+        example: {
+          success: false,
+          statusCode: HttpStatus.TOO_MANY_REQUESTS,
+          error: 'HttpException',
+          message: SYS_MSG.UPLOAD_RATE_LIMIT_EXCEEDED,
+        },
+      },
     }),
   );
 
