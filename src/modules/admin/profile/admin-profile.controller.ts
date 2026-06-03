@@ -32,7 +32,7 @@ export class AdminProfileController {
   @Get()
   @HttpCode(HttpStatus.OK)
   @GetAdminProfileDocs()
-  async getProfile(@CurrentUser('sub') adminId: string) {
+  async getProfile(@CurrentUser('userId') adminId: string) {
     const data = await this.adminProfileService.getProfile(adminId);
     return {
       statusCode: HttpStatus.OK,
@@ -45,7 +45,7 @@ export class AdminProfileController {
   @HttpCode(HttpStatus.OK)
   @UpdateAdminProfileDocs()
   async updateProfile(
-    @CurrentUser('sub') adminId: string,
+    @CurrentUser('userId') adminId: string,
     @Body(
       new ValidationPipe({
         whitelist: true,
@@ -63,9 +63,8 @@ export class AdminProfileController {
             details: errors,
           }),      }),
     )
-    rawDto: Record<string, unknown>,
+    dto: UpdateAdminProfileDto,
   ) {
-    const dto = rawDto as UpdateAdminProfileDto;
     const data = await this.adminProfileService.updateProfile(adminId, dto);
     return {
       statusCode: HttpStatus.OK,
