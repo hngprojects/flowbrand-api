@@ -8,7 +8,11 @@ export type EmailType =
   | 'funnel-ready'
   | 'stage-unlocked'
   | 'stage-completed'
-  | 'weekly-digest';
+  | 'weekly-digest'
+  | 'payment-successful'
+  | 'payment-failed'
+  | 'subscription-cancelled'
+  | 'notification-alert';
 
 export interface OtpPayload {
   fullName: string;
@@ -54,6 +58,35 @@ export interface WeeklyDigestPayload {
   activeStageName: string | null;
 }
 
+export interface PaymentSuccessfulPayload {
+  name: string;
+  /** Pre-formatted naira string, e.g. '₦10,000.00'. */
+  amount: string;
+  /** null when card details are absent or invalid — template omits the line. */
+  cardLast4: string | null;
+  cardBrand: string | null;
+  /** Paystack transaction reference shown as Transaction ID. */
+  reference: string;
+  /** Pre-formatted date string, e.g. 'May 4, 2026'. */
+  paidAt: string;
+}
+
+export interface PaymentFailedPayload {
+  name: string;
+  failureReason?: string;
+}
+
+export interface SubscriptionCancelledPayload {
+  name: string;
+  /** Pre-formatted date string, e.g. 'May 4, 2026'. */
+  accessUntil: string;
+}
+
+export interface NotificationAlertPayload {
+  name: string;
+  unreadCount: number;
+}
+
 export type EmailPayload =
   | OtpPayload
   | WaitlistPayload
@@ -61,7 +94,11 @@ export type EmailPayload =
   | FunnelReadyPayload
   | StageUnlockedPayload
   | StageCompletedPayload
-  | WeeklyDigestPayload;
+  | WeeklyDigestPayload
+  | PaymentSuccessfulPayload
+  | PaymentFailedPayload
+  | SubscriptionCancelledPayload
+  | NotificationAlertPayload;
 
 interface BaseEmailJob {
   to: string;
@@ -79,4 +116,8 @@ export type EmailJob = BaseEmailJob &
     | { type: 'stage-unlocked'; payload: StageUnlockedPayload }
     | { type: 'stage-completed'; payload: StageCompletedPayload }
     | { type: 'weekly-digest'; payload: WeeklyDigestPayload }
+    | { type: 'payment-successful'; payload: PaymentSuccessfulPayload }
+    | { type: 'payment-failed'; payload: PaymentFailedPayload }
+    | { type: 'subscription-cancelled'; payload: SubscriptionCancelledPayload }
+    | { type: 'notification-alert'; payload: NotificationAlertPayload }
   );

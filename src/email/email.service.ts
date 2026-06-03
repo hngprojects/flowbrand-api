@@ -5,7 +5,11 @@ import { JOBS, QUEUES } from '../common/constants/queue.constants';
 import { maskEmail, maskId } from '../utils/pii.utils';
 import type {
   EmailJob,
+  NotificationAlertPayload,
   OtpPayload,
+  PaymentFailedPayload,
+  PaymentSuccessfulPayload,
+  SubscriptionCancelledPayload,
   WaitlistPayload,
   ContactConfirmationPayload,
   ContactAdminNotificationPayload,
@@ -102,6 +106,42 @@ export class EmailService {
     userId?: string,
   ): Promise<string | undefined> {
     return this.dispatch({ to, type: 'weekly-digest', payload, userId }, DEFAULT_PRIORITY);
+  }
+
+  /** Sends a payment confirmation email with amount, card details, and transaction reference. */
+  async sendPaymentSuccessful(
+    to: string,
+    payload: PaymentSuccessfulPayload,
+    userId?: string,
+  ): Promise<string | undefined> {
+    return this.dispatch({ to, type: 'payment-successful', payload, userId }, DEFAULT_PRIORITY);
+  }
+
+  /** Sends a payment failure email with an optional failure reason and an upgrade CTA. */
+  async sendPaymentFailed(
+    to: string,
+    payload: PaymentFailedPayload,
+    userId?: string,
+  ): Promise<string | undefined> {
+    return this.dispatch({ to, type: 'payment-failed', payload, userId }, DEFAULT_PRIORITY);
+  }
+
+  /** Sends a subscription cancellation confirmation email with the access expiry date and a reactivate CTA. */
+  async sendSubscriptionCancelled(
+    to: string,
+    payload: SubscriptionCancelledPayload,
+    userId?: string,
+  ): Promise<string | undefined> {
+    return this.dispatch({ to, type: 'subscription-cancelled', payload, userId }, DEFAULT_PRIORITY);
+  }
+
+  /** Sends a notification alert email informing the user of unread in-app notifications. */
+  async sendNotificationAlert(
+    to: string,
+    payload: NotificationAlertPayload,
+    userId?: string,
+  ): Promise<string | undefined> {
+    return this.dispatch({ to, type: 'notification-alert', payload, userId }, DEFAULT_PRIORITY);
   }
 
   private async dispatch(job: EmailJob, priority: number): Promise<string | undefined> {
