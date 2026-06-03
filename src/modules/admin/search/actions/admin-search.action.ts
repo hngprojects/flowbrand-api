@@ -14,7 +14,9 @@ export class AdminSearchModelAction extends AbstractModelAction<User> {
   }
 
   async searchUsers(query: string): Promise<User[]> {
-    const pattern = `%${query}%`;
+    // Escape standard SQL LIKE wildcards (% and _) to treat them as literal values
+    const normalizedQuery = query.replace(/[%_]/g, '\\$&');
+    const pattern = `%${normalizedQuery}%`;
     return this.repository.find({
       where: [
         { full_name: ILike(pattern) },
