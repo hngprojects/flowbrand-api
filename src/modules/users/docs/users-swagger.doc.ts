@@ -65,7 +65,7 @@ const avatarUploadedExample = {
   message: SYS_MSG.PROFILE_AVATAR_UPLOADED_SUCCESSFULLY,
   data: {
     avatarUrl:
-      'https://staging.flowbrand.hng14.com/flowbrand-staging-uploads/avatars/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/avatar.jpg',
+      'https://storage.example.com/flowbrand-uploads/avatars/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/avatar.jpg',
   },
 };
 

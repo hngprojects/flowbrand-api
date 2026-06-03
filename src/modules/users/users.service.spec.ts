@@ -593,6 +593,11 @@ describe('UsersService', () => {
   });
 
   describe('avatar operations', () => {
+    const originalUploadEnv = {
+      publicEndpoint: env.UPLOAD_STORAGE_PUBLIC_ENDPOINT,
+      bucket: env.UPLOAD_STORAGE_BUCKET,
+    };
+
     const onePixelPngBuffer = Buffer.from(
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7f4b4AAAAASUVORK5CYII=',
       'base64',
@@ -611,6 +616,11 @@ describe('UsersService', () => {
       mockObjectStorage.deleteObject.mockReset();
       mockObjectStorage.createPresignedGetObjectUrl.mockReset();
       mockUserModelAction.updateAvatarUrl.mockReset();
+    });
+
+    afterEach(() => {
+      env.UPLOAD_STORAGE_PUBLIC_ENDPOINT = originalUploadEnv.publicEndpoint;
+      env.UPLOAD_STORAGE_BUCKET = originalUploadEnv.bucket;
     });
 
     it('uploads avatar successfully and returns public URL', async () => {
@@ -739,11 +749,6 @@ describe('UsersService', () => {
       beforeEach(() => {
         env.UPLOAD_STORAGE_PUBLIC_ENDPOINT = '';
         env.UPLOAD_STORAGE_BUCKET = 'flowbrand-uploads';
-      });
-
-      afterEach(() => {
-        env.UPLOAD_STORAGE_PUBLIC_ENDPOINT = TEST_PUBLIC_HOST;
-        env.UPLOAD_STORAGE_BUCKET = TEST_PUBLIC_BUCKET;
       });
 
       it('cleans up uploaded file when signed URL creation fails', async () => {
