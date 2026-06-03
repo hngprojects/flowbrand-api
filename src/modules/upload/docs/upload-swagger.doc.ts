@@ -8,6 +8,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiPayloadTooLargeResponse,
+  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
@@ -56,6 +57,17 @@ export const UploadFunnelDocumentsDocs = () =>
     }),
     ApiPayloadTooLargeResponse({
       description: 'Multer rejected file before handler (size/count).',
+    }),
+    ApiTooManyRequestsResponse({
+      description: 'Rate limit exceeded: 20 upload batches per hour per user.',
+      schema: {
+        example: {
+          success: false,
+          statusCode: 429,
+          error: 'HttpException',
+          message: SYS_MSG.UPLOAD_RATE_LIMIT_EXCEEDED,
+        },
+      },
     }),
   );
 

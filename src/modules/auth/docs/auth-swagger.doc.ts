@@ -48,6 +48,17 @@ export const RegisterDocs = () =>
         },
       },
     }),
+    ApiTooManyRequestsResponse({
+      description: 'Rate limit exceeded: 5 registration requests per hour per IP.',
+      schema: {
+        example: {
+          success: false,
+          statusCode: 429,
+          error: 'HttpException',
+          message: SYS_MSG.AUTH_REGISTER_RATE_LIMITED,
+        },
+      },
+    }),
   );
 
 export const LoginDocs = () =>
@@ -106,6 +117,17 @@ export const LoginDocs = () =>
         },
       },
     }),
+    ApiTooManyRequestsResponse({
+      description: 'Rate limit exceeded: 10 login requests per minute per IP.',
+      schema: {
+        example: {
+          success: false,
+          statusCode: 429,
+          error: 'HttpException',
+          message: SYS_MSG.AUTH_LOGIN_RATE_LIMITED,
+        },
+      },
+    }),
   );
 
 export const RefreshDocs = () =>
@@ -138,6 +160,17 @@ export const RefreshDocs = () =>
           statusCode: HttpStatus.UNAUTHORIZED,
           error: 'UnauthorizedException',
           message: SYS_MSG.AUTH_INVALID_REFRESH_TOKEN,
+        },
+      },
+    }),
+    ApiTooManyRequestsResponse({
+      description: 'Rate limit exceeded: 10 refresh requests per hour per user.',
+      schema: {
+        example: {
+          success: false,
+          statusCode: 429,
+          error: 'HttpException',
+          message: SYS_MSG.AUTH_REFRESH_RATE_LIMITED,
         },
       },
     }),
