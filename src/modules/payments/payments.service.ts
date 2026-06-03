@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import { createHash } from 'crypto';
+import { DataSource, QueryFailedError } from 'typeorm';
 import { env } from '../../config/env';
 import * as SYS_MSG from '../../constants/system.messages';
 import { PaymentModelAction } from './actions/payment.model-action';
@@ -19,6 +20,8 @@ import {
 } from './interfaces/payment-provider.interface';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
 import { InitiateSubscriptionDto } from './dto/initiate-subscription.dto';
+import { Payment } from './entities/payment.entity';
+import { Subscription } from './entities/subscription.entity';
 
 @Injectable()
 export class PaymentsService {
@@ -29,6 +32,7 @@ export class PaymentsService {
     private readonly paymentModelAction: PaymentModelAction,
     private readonly subscriptionModelAction: SubscriptionModelAction,
     private readonly mockAdapter: MockPaymentAdapter,
+    private readonly dataSource: DataSource,
   ) {
     this.adapter = this.resolveAdapter();
   }
@@ -45,26 +49,48 @@ export class PaymentsService {
     }
   }
 
-  /** Initiates a one-time or subscription-intent payment and records a pending payment row. */
-  async initiatePayment(dto: InitiatePaymentDto): Promise<InitiatePaymentResult> {
-    const amount = this.resolveAmount(dto);
-    const result = await this.adapter.initiatePayment(dto);
-    await this.paymentModelAction.create({
-      createPayload: {
-        user_id: dto.userId,
-        subscription_id: null,
-        payment_type: dto.type,
-        plan: dto.plan,
-        amount,
-        currency: 'NGN',
-        status: PaymentStatus.PENDING,
-        provider_reference: result.reference,
-        provider: env.PAYMENT_PROVIDER,
-        idempotency_key: randomUUID(),
-        metadata: this.sanitizeMetadata({}),
-      },
+  /**
+   * Creates a PENDING payment row first, then calls the provider.
+   * If the provider call fails the row remains as an audit trail.
+   * The unique idempotency_key index prevents duplicate charges on retry.
+   */
+  async initiatePayment(userId: string, email: string, dto: InitiatePaymentDto): Promise<InitiatePaymentResult> {
+    const idempotencyKey = this.buildIdempotencyKey(userId, dto.plan, dto.type);
+
+    let payment: Payment;
+    try {
+
+      payment = await this.paymentModelAction.create({
+        createPayload: {
+          user_id: userId,
+          subscription_id: null,
+          payment_type: dto.type,
+          plan: dto.plan,
+          amount_kobo: this.resolveAmountKobo(dto),
+          currency: 'NGN',
+          status: PaymentStatus.PENDING,
+          provider_reference: null,
+          provider: env.PAYMENT_PROVIDER,
+          idempotency_key: idempotencyKey,
+          metadata: this.sanitizeMetadata({}),
+        },
+        transactionOptions: { useTransaction: false },
+      });
+    } catch (err: unknown) {
+      if (err instanceof QueryFailedError && (err as { code?: string }).code === '23505') {
+        throw new ConflictException(SYS_MSG.PAYMENT_ALREADY_INITIATED);
+      }
+      throw err;
+    }
+
+    const result = await this.adapter.initiatePayment(dto, userId, email);
+
+    await this.paymentModelAction.update({
+      identifierOptions: { id: payment.id },
+      updatePayload: { provider_reference: result.reference },
       transactionOptions: { useTransaction: false },
     });
+
     return result;
   }
 
@@ -73,9 +99,13 @@ export class PaymentsService {
     return this.adapter.verifyPayment(reference);
   }
 
-  /** Creates a subscription, then records its initial pending payment linked back via subscription_id. */
-  async initiateSubscription(dto: InitiateSubscriptionDto): Promise<InitiateSubscriptionResult> {
-    const result = await this.adapter.initiateSubscription(dto);
+  /**
+   * Creates subscription + payment rows atomically in PENDING state, then calls
+   * the provider. Status is upgraded to ACTIVE by the M4-BE-021 webhook handler
+   * on charge.success — never here.
+   */
+  async initiateSubscription(userId: string, email: string, dto: InitiateSubscriptionDto): Promise<InitiateSubscriptionResult> {
+    const idempotencyKey = this.buildIdempotencyKey(userId, dto.plan, dto.billingCycle);
 
     const periodStart = new Date();
     const periodEnd = new Date(periodStart);
@@ -85,33 +115,55 @@ export class PaymentsService {
       periodEnd.setMonth(periodEnd.getMonth() + 1);
     }
 
-    // Subscription row is created first; the payment FK points to it (not the reverse).
-    const subscription = await this.subscriptionModelAction.create({
-      createPayload: {
-        user_id: dto.userId,
-        plan: dto.plan,
-        billing_cycle: dto.billingCycle,
-        status: SubscriptionStatus.ACTIVE,
-        provider_subscription_code: result.subscriptionCode,
-        current_period_start: periodStart,
-        current_period_end: periodEnd,
-      },
-      transactionOptions: { useTransaction: false },
-    });
+    let subscription: Subscription;
+    try {
+      subscription = await this.dataSource.transaction<Subscription>(async (manager) => {
+         
+        const sub: Subscription = await this.subscriptionModelAction.create({
+          createPayload: {
+            user_id: userId,
+            plan: dto.plan,
+            billing_cycle: dto.billingCycle,
+            // PENDING until charge.success webhook confirms payment (set by M4-BE-021)
+            status: SubscriptionStatus.PENDING,
+            current_period_start: periodStart,
+            current_period_end: periodEnd,
+          },
+          transactionOptions: { useTransaction: true, transaction: manager },
+        });
 
-    await this.paymentModelAction.create({
-      createPayload: {
-        user_id: dto.userId,
-        subscription_id: subscription.id,
-        payment_type: PaymentType.SUBSCRIPTION,
-        plan: dto.plan,
-        amount: dto.billingCycle === BillingCycle.ANNUAL ? PRICING.PRO_ANNUAL : PRICING.PRO_MONTHLY,
-        currency: 'NGN',
-        status: PaymentStatus.PENDING,
-        provider: env.PAYMENT_PROVIDER,
-        idempotency_key: randomUUID(),
-        metadata: this.sanitizeMetadata({}),
-      },
+
+        await this.paymentModelAction.create({
+          createPayload: {
+            user_id: userId,
+            subscription_id: sub.id,
+            payment_type: PaymentType.SUBSCRIPTION,
+            plan: dto.plan,
+            amount_kobo: dto.billingCycle === BillingCycle.ANNUAL ? PRICING.PRO_ANNUAL_KOBO : PRICING.PRO_MONTHLY_KOBO,
+            currency: 'NGN',
+            status: PaymentStatus.PENDING,
+            provider: env.PAYMENT_PROVIDER,
+            idempotency_key: idempotencyKey,
+            provider_reference: null,
+            metadata: this.sanitizeMetadata({}),
+          },
+          transactionOptions: { useTransaction: true, transaction: manager },
+        });
+
+        return sub;
+      });
+    } catch (err: unknown) {
+      if (err instanceof QueryFailedError && (err as { code?: string }).code === '23505') {
+        throw new ConflictException(SYS_MSG.SUBSCRIPTION_ALREADY_ACTIVE);
+      }
+      throw err;
+    }
+
+    const result = await this.adapter.initiateSubscription(dto, userId, email);
+
+    await this.subscriptionModelAction.update({
+      identifierOptions: { id: subscription.id },
+      updatePayload: { provider_subscription_code: result.subscriptionCode },
       transactionOptions: { useTransaction: false },
     });
 
@@ -128,13 +180,24 @@ export class PaymentsService {
     return this.adapter.handleWebhookEvent(payload, signature);
   }
 
-  private resolveAmount(dto: InitiatePaymentDto): number {
-    return dto.type === PaymentType.ONE_TIME ? PRICING.PRO_ONETIME : PRICING.PRO_MONTHLY;
+  private resolveAmountKobo(dto: InitiatePaymentDto): number {
+    return dto.type === PaymentType.ONE_TIME ? PRICING.PRO_ONETIME_KOBO : PRICING.PRO_MONTHLY_KOBO;
   }
 
   // SEC-04: strip card fields from any jsonb metadata before storage
   private sanitizeMetadata(raw: Record<string, unknown>): Record<string, unknown> {
     const BLOCKED = new Set(['card_number', 'cvv', 'pan', 'pin']);
     return Object.fromEntries(Object.entries(raw).filter(([k]) => !BLOCKED.has(k)));
+  }
+
+  /**
+   * Deterministic idempotency key scoped to user + intent + 1-hour window.
+   * Same request within the window hits the unique index → 409 instead of double charge.
+   */
+  private buildIdempotencyKey(userId: string, plan: string, type: string): string {
+    const windowHour = Math.floor(Date.now() / (60 * 60 * 1000));
+    return createHash('sha256')
+      .update(`${userId}:${plan}:${type}:${windowHour}`)
+      .digest('hex');
   }
 }

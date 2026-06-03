@@ -24,7 +24,7 @@ export class MockPaymentAdapter implements PaymentProvider {
 
   verifyPayment(reference: string): Promise<VerifyPaymentResult> {
     const status = env.TEST_PAYMENT_OUTCOME === 'pending' ? 'pending' : 'success';
-    return Promise.resolve({ reference, status, amount: 9999, currency: 'NGN' });
+    return Promise.resolve({ reference, status, amount: 999900, currency: 'NGN' });
   }
 
   initiateSubscription(): Promise<InitiateSubscriptionResult> {
@@ -46,7 +46,7 @@ export class MockPaymentAdapter implements PaymentProvider {
     return Promise.resolve({
       type: 'mock.event',
       reference: 'mock_ref',
-      data: payload as Record<string, unknown>,
+      data: (payload !== null && typeof payload === 'object') ? (payload as Record<string, unknown>) : {},
     });
   }
 }
