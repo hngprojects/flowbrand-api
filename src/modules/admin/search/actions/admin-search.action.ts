@@ -13,17 +13,29 @@ export class AdminSearchModelAction extends AbstractModelAction<User> {
     super(repository, User);
   }
 
+  /**
+   * Search users by name or email with wildcard escaping, prioritizing exact matches at the DB level,
+   * and including soft-deleted accounts. Direct repository access is necessary here because 
+   * the abstract find/list CRUD methods do not support CASE-WHEN ranking selections and withDeleted options.
+   */
   async searchUsers(query: string): Promise<User[]> {
-    // Escape standard SQL LIKE wildcards (% and _) to treat them as literal values
     const normalizedQuery = query.replace(/[%_]/g, '\\$&');
     const pattern = `%${normalizedQuery}%`;
-    return this.repository.find({
-      where: [
-        { full_name: ILike(pattern) },
-        { email: ILike(pattern) },
-      ],
-      withDeleted: true,
-      take: 100,
-    });
+
+    return this.repository
+      .createQueryBuilder('user')
+      .addSelect(
+        `CASE WHEN lower(user.email) = lower(:q) THEN 1
+              WHEN lower(user.full_name) = lower(:q) THEN 2
+              ELSE 3 END`,
+        'rank',
+      )
+      .where('user.full_name ILIKE :pattern OR user.email ILIKE :pattern', { pattern, q: query })
+      .orderBy('rank', 'ASC')
+      .addOrderBy('user.created_at', 'DESC')
+      .withDeleted()
+      .take(10)
+      .setParameter('q', query)
+      .getMany();
   }
 }

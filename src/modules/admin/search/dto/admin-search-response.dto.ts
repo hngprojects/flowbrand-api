@@ -10,9 +10,6 @@ export class AdminSearchResultDto {
   @ApiProperty({ example: 'John Doe' })
   display_name: string;
 
-  @ApiProperty({ example: 'John Doe' })
-  displayName: string;
-
   @ApiProperty({ example: 'john.doe@example.com' })
   email: string;
 

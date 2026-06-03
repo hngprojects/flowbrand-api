@@ -2,7 +2,6 @@ export interface IAdminSearchResult {
   type: 'user';
   id: string;
   display_name: string;
-  displayName: string;
   email: string;
   status: 'active' | 'inactive' | 'deleted';
   plan: string | null;

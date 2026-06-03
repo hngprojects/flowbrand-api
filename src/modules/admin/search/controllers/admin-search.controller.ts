@@ -55,7 +55,7 @@ export class AdminSearchController {
     )
     queryDto: AdminSearchQueryDto,
   ) {
-    const data: IAdminSearchResponse = await this.adminSearchService.search(queryDto.q.trim());
+    const data: IAdminSearchResponse = await this.adminSearchService.search(queryDto.q);
     return {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.ADMIN_GLOBAL_SEARCH_SUCCESSFUL,

@@ -22,7 +22,6 @@ describe('AdminSearchController', () => {
           type: 'user' as const,
           id: 'user-1',
           display_name: 'John Doe',
-          displayName: 'John Doe',
           email: 'john.doe@example.com',
           status: 'active' as const,
           plan: null,
