@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AdminSearchService } from './admin-search.service';
+import { AdminSearchService } from '../services/admin-search.service';
 import { AdminSearchModelAction } from '../actions/admin-search.action';
 import { User } from '../../../users/entities/user.entity';
 
@@ -47,7 +47,7 @@ describe('AdminSearchService', () => {
       },
     ] as User[];
 
-    mockSearchAction.searchUsers.mockResolvedValue([mockUsers, 3]);
+    mockSearchAction.searchUsers.mockResolvedValue(mockUsers);
 
     const result = await service.search('john');
 
@@ -88,7 +88,7 @@ describe('AdminSearchService', () => {
   });
 
   it('should return empty results when no matches found (AC-03, FR-4)', async () => {
-    mockSearchAction.searchUsers.mockResolvedValue([[], 0]);
+    mockSearchAction.searchUsers.mockResolvedValue([]);
 
     const result = await service.search('nonexistent');
 
