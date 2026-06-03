@@ -5,9 +5,9 @@ import { BillingCycle } from '../enums/billing-cycle.enum';
 import { PaymentPlan } from '../enums/payment-plan.enum';
 import { SubscriptionStatus } from '../enums/subscription-status.enum';
 
-// Partial unique index — one active subscription per user, but history rows are allowed
+// Partial unique index — one in-flight (pending or active) subscription per user at a time
 @Entity('subscriptions')
-@Index('IDX_subscriptions_active_user', ['user_id'], { unique: true, where: '"status" = \'active\'' })
+@Index('IDX_subscriptions_active_user', ['user_id'], { unique: true, where: '"status" IN (\'pending\', \'active\')' })
 export class Subscription extends BaseEntity {
   @Column({ type: 'uuid' })
   user_id: string;
@@ -22,7 +22,7 @@ export class Subscription extends BaseEntity {
   @Column({ type: 'enum', enum: BillingCycle })
   billing_cycle: BillingCycle;
 
-  @Column({ type: 'enum', enum: SubscriptionStatus, default: SubscriptionStatus.ACTIVE })
+  @Column({ type: 'enum', enum: SubscriptionStatus, default: SubscriptionStatus.PENDING })
   status: SubscriptionStatus;
 
   @Column({ type: 'varchar', nullable: true })

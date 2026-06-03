@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class CreatePaymentTables1780501664979 implements MigrationInterface {
-    name = 'CreatePaymentTables1780501664979'
+export class CreatePaymentTables1780524650621 implements MigrationInterface {
+    name = 'CreatePaymentTables1780524650621'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`ALTER TABLE "notification_preferences" DROP CONSTRAINT "FK_notification_preferences_user_id"`);
@@ -11,9 +11,9 @@ export class CreatePaymentTables1780501664979 implements MigrationInterface {
         await queryRunner.query(`DROP INDEX "public"."IDX_activity_events_event_type"`);
         await queryRunner.query(`CREATE TYPE "public"."subscriptions_plan_enum" AS ENUM('pro')`);
         await queryRunner.query(`CREATE TYPE "public"."subscriptions_billing_cycle_enum" AS ENUM('monthly', 'annual')`);
-        await queryRunner.query(`CREATE TYPE "public"."subscriptions_status_enum" AS ENUM('active', 'cancelled', 'expired')`);
-        await queryRunner.query(`CREATE TABLE "subscriptions" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "user_id" uuid NOT NULL, "plan" "public"."subscriptions_plan_enum" NOT NULL, "billing_cycle" "public"."subscriptions_billing_cycle_enum" NOT NULL, "status" "public"."subscriptions_status_enum" NOT NULL DEFAULT 'active', "provider_customer_code" character varying, "provider_subscription_code" character varying, "current_period_start" TIMESTAMP WITH TIME ZONE NOT NULL, "current_period_end" TIMESTAMP WITH TIME ZONE NOT NULL, "cancel_at_period_end" boolean NOT NULL DEFAULT false, "cancelled_at" TIMESTAMP WITH TIME ZONE, "ended_at" TIMESTAMP WITH TIME ZONE, CONSTRAINT "PK_a87248d73155605cf782be9ee5e" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_subscriptions_active_user" ON "subscriptions" ("user_id") WHERE "status" = 'active'`);
+        await queryRunner.query(`CREATE TYPE "public"."subscriptions_status_enum" AS ENUM('pending', 'active', 'cancelled', 'expired')`);
+        await queryRunner.query(`CREATE TABLE "subscriptions" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "user_id" uuid NOT NULL, "plan" "public"."subscriptions_plan_enum" NOT NULL, "billing_cycle" "public"."subscriptions_billing_cycle_enum" NOT NULL, "status" "public"."subscriptions_status_enum" NOT NULL DEFAULT 'pending', "provider_customer_code" character varying, "provider_subscription_code" character varying, "current_period_start" TIMESTAMP WITH TIME ZONE NOT NULL, "current_period_end" TIMESTAMP WITH TIME ZONE NOT NULL, "cancel_at_period_end" boolean NOT NULL DEFAULT false, "cancelled_at" TIMESTAMP WITH TIME ZONE, "ended_at" TIMESTAMP WITH TIME ZONE, CONSTRAINT "PK_a87248d73155605cf782be9ee5e" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_subscriptions_active_user" ON "subscriptions" ("user_id") WHERE "status" IN ('pending', 'active')`);
         await queryRunner.query(`CREATE TYPE "public"."payments_payment_type_enum" AS ENUM('one_time', 'subscription')`);
         await queryRunner.query(`CREATE TYPE "public"."payments_plan_enum" AS ENUM('pro')`);
         await queryRunner.query(`CREATE TYPE "public"."payments_status_enum" AS ENUM('pending', 'success', 'failed', 'refunded')`);
