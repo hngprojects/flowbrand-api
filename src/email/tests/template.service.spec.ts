@@ -16,6 +16,10 @@ const FUNNEL_READY_HBS = `<p>Hi {{name}}</p><p>Your funnel for {{businessName}} 
 const STAGE_UNLOCKED_HBS = `<p>Hi {{name}}</p><p>{{stageName}} is now active</p>`;
 const STAGE_COMPLETED_HBS = `<p>Hi {{name}}</p><p>You completed {{stageName}}</p>`;
 const WEEKLY_DIGEST_HBS = `<p>Hi {{name}}</p><p>{{completedTasks}} of {{totalTasks}}</p>`;
+const PAYMENT_SUCCESSFUL_HBS = `<p>Hi {{name}}</p><p>{{amount}}</p>{{#if cardLast4}}<p>{{cardLast4}}</p>{{/if}}<p>{{reference}}</p><p>{{paidAt}}</p>`;
+const PAYMENT_FAILED_HBS = `<p>Hi {{name}}</p>{{#if failureReason}}<p>{{failureReason}}</p>{{/if}}<a href="{{upgradeUrl}}">Update</a>`;
+const SUBSCRIPTION_CANCELLED_HBS = `<p>Hi {{name}}</p><p>{{accessUntil}}</p><a href="{{upgradeUrl}}">Reactivate</a>`;
+const NOTIFICATION_ALERT_HBS = `<p>Hi {{name}}</p><p>{{unreadCount}}</p><a href="{{notificationPreferencesUrl}}">Preferences</a>`;
 
 describe('TemplateService', () => {
   let service: TemplateService;
@@ -39,6 +43,10 @@ describe('TemplateService', () => {
         if (p.includes('stage-unlocked')) return Promise.resolve(STAGE_UNLOCKED_HBS as never);
         if (p.includes('stage-completed')) return Promise.resolve(STAGE_COMPLETED_HBS as never);
         if (p.includes('weekly-digest')) return Promise.resolve(WEEKLY_DIGEST_HBS as never);
+        if (p.includes('payment-successful')) return Promise.resolve(PAYMENT_SUCCESSFUL_HBS as never);
+        if (p.includes('payment-failed')) return Promise.resolve(PAYMENT_FAILED_HBS as never);
+        if (p.includes('subscription-cancelled')) return Promise.resolve(SUBSCRIPTION_CANCELLED_HBS as never);
+        if (p.includes('notification-alert')) return Promise.resolve(NOTIFICATION_ALERT_HBS as never);
         return Promise.reject(new Error(`Unexpected path: ${p}`));
       });
 
@@ -140,6 +148,93 @@ describe('TemplateService', () => {
 
       expect(html).toContain(String(new Date().getFullYear()));
       expect(html).toContain('/unsubscribe');
+    });
+
+    it('AC-01: renders payment-successful with amount, reference, and date', () => {
+      const { html, subject } = service.render('payment-successful', {
+        name: 'Ada',
+        amount: '₦10,000.00',
+        cardLast4: '4242',
+        cardBrand: 'Visa',
+        reference: 'ref-uuid-123',
+        paidAt: 'May 4, 2026',
+      });
+
+      expect(html).toContain('₦10,000.00');
+      expect(html).toContain('ref-uuid-123');
+      expect(html).toContain('May 4, 2026');
+      expect(html).toContain('4242');
+      expect(subject).toBe('Payment Successful — Your FlowBrand subscription is now active');
+    });
+
+    it('AC-02: payment-successful omits card line when cardLast4 is falsy', () => {
+      const { html } = service.render('payment-successful', {
+        name: 'Ada',
+        amount: '₦10,000.00',
+        cardLast4: null,
+        cardBrand: null,
+        reference: 'ref-uuid-456',
+        paidAt: 'May 4, 2026',
+      });
+
+      expect(html).not.toContain('ending in');
+    });
+
+    it('AC-03: renders payment-failed with failure reason and upgrade URL', () => {
+      const { html, subject } = service.render('payment-failed', {
+        name: 'Ada',
+        failureReason: 'Insufficient funds',
+      });
+
+      expect(html).toContain('Ada');
+      expect(html).toContain('Insufficient funds');
+      expect(html).toContain('/upgrade');
+      expect(subject).toBe('Payment Failed — We could not process your payment');
+    });
+
+    it('AC-04: payment-failed renders without failure reason when absent', () => {
+      const { html } = service.render('payment-failed', { name: 'Bob' });
+
+      expect(html).toContain('Bob');
+      expect(html).toContain('/upgrade');
+    });
+
+    it('AC-05: renders subscription-cancelled with access-until date and reactivate URL', () => {
+      const { html, subject } = service.render('subscription-cancelled', {
+        name: 'Ada',
+        accessUntil: 'June 30, 2026',
+      });
+
+      expect(html).toContain('June 30, 2026');
+      expect(html).toContain('/upgrade');
+      expect(subject).toBe('Your FlowBrand subscription has been cancelled');
+    });
+
+    it('AC-06: renders notification-alert with unread count, preferences URL, and correct subject', () => {
+      const { html, subject } = service.render('notification-alert', {
+        name: 'Ada',
+        unreadCount: 7,
+      });
+
+      expect(html).toContain('7');
+      expect(html).toContain('/settings/notifications');
+      expect(subject).toBe('You have 7 new notification(s) from FlowBrand');
+    });
+
+    it('AC-07: all new templates are wrapped in the base layout (contain DOCTYPE)', () => {
+      const types = ['payment-successful', 'payment-failed', 'subscription-cancelled', 'notification-alert'] as const;
+      const payloads = {
+        'payment-successful': { name: 'X', amount: '₦0.00', cardLast4: null, cardBrand: null, reference: 'r', paidAt: 'd' },
+        'payment-failed': { name: 'X' },
+        'subscription-cancelled': { name: 'X', accessUntil: 'd' },
+        'notification-alert': { name: 'X', unreadCount: 1 },
+      } as const;
+
+      for (const type of types) {
+        const { html } = service.render(type, payloads[type] as Record<string, unknown>);
+        expect(html).toContain('<!DOCTYPE html>');
+        expect(html).toContain('/privacy-policy');
+      }
     });
   });
 

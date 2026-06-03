@@ -76,4 +76,103 @@ describe('EmailService', () => {
 
     expect(mockQueue.add).toHaveBeenCalledTimes(2);
   });
+
+  describe('sendPaymentSuccessful()', () => {
+    const payload = {
+      name: 'Ada',
+      amount: '₦10,000.00',
+      cardLast4: '4242',
+      cardBrand: 'Visa',
+      reference: 'ref-uuid-123',
+      paidAt: 'May 4, 2026',
+    };
+
+    it('AC-01: enqueues a payment-successful job and returns the job id', async () => {
+      mockQueue.add.mockResolvedValue({ id: 'job-10' });
+
+      const jobId = await service.sendPaymentSuccessful('ada@test.com', payload, 'user-1');
+
+      expect(mockQueue.add).toHaveBeenCalledWith(
+        JOBS.SEND_EMAIL,
+        expect.objectContaining({ type: 'payment-successful', to: 'ada@test.com' }),
+        expect.any(Object),
+      );
+      expect(jobId).toBe('job-10');
+    });
+
+    it('AC-02: resolves without throwing when Redis is unavailable', async () => {
+      mockQueue.add.mockRejectedValue(new Error('Redis down'));
+
+      await expect(service.sendPaymentSuccessful('ada@test.com', payload)).resolves.toBeUndefined();
+    });
+  });
+
+  describe('sendPaymentFailed()', () => {
+    const payload = { name: 'Ada', failureReason: 'Insufficient funds' };
+
+    it('AC-03: enqueues a payment-failed job and returns the job id', async () => {
+      mockQueue.add.mockResolvedValue({ id: 'job-11' });
+
+      const jobId = await service.sendPaymentFailed('ada@test.com', payload, 'user-1');
+
+      expect(mockQueue.add).toHaveBeenCalledWith(
+        JOBS.SEND_EMAIL,
+        expect.objectContaining({ type: 'payment-failed', to: 'ada@test.com' }),
+        expect.any(Object),
+      );
+      expect(jobId).toBe('job-11');
+    });
+
+    it('AC-04: resolves without throwing when Redis is unavailable', async () => {
+      mockQueue.add.mockRejectedValue(new Error('Redis down'));
+
+      await expect(service.sendPaymentFailed('ada@test.com', payload)).resolves.toBeUndefined();
+    });
+  });
+
+  describe('sendSubscriptionCancelled()', () => {
+    const payload = { name: 'Ada', accessUntil: 'June 30, 2026' };
+
+    it('AC-05: enqueues a subscription-cancelled job and returns the job id', async () => {
+      mockQueue.add.mockResolvedValue({ id: 'job-12' });
+
+      const jobId = await service.sendSubscriptionCancelled('ada@test.com', payload, 'user-1');
+
+      expect(mockQueue.add).toHaveBeenCalledWith(
+        JOBS.SEND_EMAIL,
+        expect.objectContaining({ type: 'subscription-cancelled', to: 'ada@test.com' }),
+        expect.any(Object),
+      );
+      expect(jobId).toBe('job-12');
+    });
+
+    it('AC-06: resolves without throwing when Redis is unavailable', async () => {
+      mockQueue.add.mockRejectedValue(new Error('Redis down'));
+
+      await expect(service.sendSubscriptionCancelled('ada@test.com', payload)).resolves.toBeUndefined();
+    });
+  });
+
+  describe('sendNotificationAlert()', () => {
+    const payload = { name: 'Ada', unreadCount: 5 };
+
+    it('AC-07: enqueues a notification-alert job and returns the job id', async () => {
+      mockQueue.add.mockResolvedValue({ id: 'job-13' });
+
+      const jobId = await service.sendNotificationAlert('ada@test.com', payload, 'user-1');
+
+      expect(mockQueue.add).toHaveBeenCalledWith(
+        JOBS.SEND_EMAIL,
+        expect.objectContaining({ type: 'notification-alert', to: 'ada@test.com' }),
+        expect.any(Object),
+      );
+      expect(jobId).toBe('job-13');
+    });
+
+    it('AC-08: resolves without throwing when Redis is unavailable', async () => {
+      mockQueue.add.mockRejectedValue(new Error('Redis down'));
+
+      await expect(service.sendNotificationAlert('ada@test.com', payload)).resolves.toBeUndefined();
+    });
+  });
 });
