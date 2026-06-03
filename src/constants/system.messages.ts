@@ -268,3 +268,7 @@ export const ADMIN_NEW_PASSWORD_MUST_DIFFER_FROM_OLD =
 export const ADMIN_CONFIRM_PASSWORD_MISMATCH = 'Confirm password must match new password';
 export const ADMIN_PASSWORD_POLICY_VALIDATION_FAILED =
   'new_password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, one digit, and one symbol';
+export const ADMIN_DASHBOARD_STATS_RETRIEVED = 'Admin dashboard stats retrieved successfully';
+export const ADMIN_DASHBOARD_WEEKLY_OVERVIEW_RETRIEVED = 'Admin dashboard weekly overview retrieved successfully';
+export const ADMIN_DASHBOARD_USER_SEGMENTS_RETRIEVED = 'Admin dashboard user segments retrieved successfully';
+export const ADMIN_DASHBOARD_FUNNEL_PERFORMANCE_RETRIEVED = 'Admin dashboard funnel performance retrieved successfully';
