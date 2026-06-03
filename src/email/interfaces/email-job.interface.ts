@@ -67,8 +67,8 @@ export interface PaymentSuccessfulPayload {
   cardBrand: string | null;
   /** Paystack transaction reference shown as Transaction ID. */
   reference: string;
-  /** Pre-formatted date string, e.g. 'May 4, 2026'. */
-  paidAt: string;
+  /** Pre-formatted date string e.g. 'May 4, 2026'. null when paid_at is missing — template omits the row. */
+  paidAt: string | null;
 }
 
 export interface PaymentFailedPayload {

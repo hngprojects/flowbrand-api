@@ -162,6 +162,11 @@ export class NotificationListener {
         this.logger.warn({ message: 'Payment amount is 0 or null', reference: event.reference });
       }
 
+      // Log when paid_at is missing so ops can investigate — pass null to template which omits the row
+      if (!payment.paid_at) {
+        this.logger.warn({ message: 'Payment paid_at is null', reference: event.reference });
+      }
+
       // SEC-02: only include card_last4 when it is a valid 4-digit numeric string
       const cardLast4 = /^\d{4}$/.test(payment.card_last4 ?? '') ? payment.card_last4 : null;
 
@@ -174,7 +179,7 @@ export class NotificationListener {
             cardLast4,
             cardBrand: payment.card_brand,
             reference: event.reference,
-            paidAt: this.formatDate(payment.paid_at ?? new Date()),
+            paidAt: payment.paid_at ? this.formatDate(payment.paid_at) : null,
           },
           event.userId,
         ),

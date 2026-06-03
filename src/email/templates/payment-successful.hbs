@@ -22,10 +22,12 @@
         <td style="padding: 12px 0; font-size: 14px; color: #64748b; border-bottom: 1px solid #e2e8f0">Transaction ID</td>
         <td style="padding: 12px 0; font-size: 14px; color: #020e1f; text-align: right; border-bottom: 1px solid #e2e8f0">{{reference}}</td>
       </tr>
+      {{#if paidAt}}
       <tr>
         <td style="padding: 12px 0; font-size: 14px; color: #64748b">Date</td>
         <td style="padding: 12px 0; font-size: 14px; color: #020e1f; text-align: right">{{paidAt}}</td>
       </tr>
+      {{/if}}
     </table>
     <a href="{{dashboardUrl}}" style="display: inline-block; background-color: #326ad1; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; padding: 14px 32px; border-radius: 6px
   </td>
