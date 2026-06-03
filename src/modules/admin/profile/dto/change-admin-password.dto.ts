@@ -35,6 +35,6 @@ export class ChangeAdminPasswordDto {
   @IsString()
   @IsNotEmpty()
   @Transform(({ value }: { value: unknown }) => value)
-  @MatchesField('new_password', { message: SYS_MSG.ADMIN_CONFIRM_PASSWORD_MISMATCH })
+  @MatchesField('new_password', { message: SYS_MSG.INCORRECT_CONFIRM_PASSWORD })
   confirm_password: string;
 }

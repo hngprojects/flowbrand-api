@@ -23,6 +23,7 @@ const mockAdminProfileAction = {
   findById: jest.fn(),
   updateProfile: jest.fn(),
   updatePasswordHash: jest.fn(),
+  updatePasswordAndRevokeSessions: jest.fn(),
   revokeAllSessions: jest.fn(),
 };
 
@@ -240,10 +241,7 @@ describe('AdminProfileService', () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
       mockAdminProfileAction.findById.mockResolvedValue(ADMIN_USER);
-      mockAdminProfileAction.updatePasswordHash.mockResolvedValue({
-        ...ADMIN_USER,
-        password_hash: 'new-hash',
-      });
+      mockAdminProfileAction.updatePasswordAndRevokeSessions.mockResolvedValue(undefined);
       mockAdminProfileAction.revokeAllSessions.mockResolvedValue(2);
     });
 
@@ -252,8 +250,9 @@ describe('AdminProfileService', () => {
 
       expect(bcrypt.compare).toHaveBeenCalledWith(dto.old_password, ADMIN_USER.password_hash);
       expect(bcrypt.hash).toHaveBeenCalledWith(dto.new_password, 12);
-      expect(mockAdminProfileAction.updatePasswordHash).toHaveBeenCalledWith(ADMIN_ID, 'new-hash');
-      expect(mockAdminProfileAction.revokeAllSessions).toHaveBeenCalledWith(ADMIN_ID);
+      expect(mockAdminProfileAction.updatePasswordAndRevokeSessions).toHaveBeenCalledWith(ADMIN_ID, 'new-hash');
+      expect(mockAdminProfileAction.updatePasswordHash).not.toHaveBeenCalled();
+      expect(mockAdminProfileAction.revokeAllSessions).not.toHaveBeenCalled();
       expect(mockLogService.logAction).toHaveBeenCalledWith({
         admin_id: ADMIN_ID,
         action_type: AdminProfileActionType.PASSWORD_CHANGED,
@@ -269,6 +268,26 @@ describe('AdminProfileService', () => {
         new UnauthorizedException(SYS_MSG.ADMIN_OLD_PASSWORD_INCORRECT),
       );
 
+      expect(mockAdminProfileAction.updatePasswordHash).not.toHaveBeenCalled();
+      expect(mockAdminProfileAction.revokeAllSessions).not.toHaveBeenCalled();
+      expect(mockLogService.logAction).toHaveBeenCalledWith({
+        admin_id: ADMIN_ID,
+        action_type: AdminProfileActionType.PASSWORD_CHANGED,
+        status: 'failed',
+        metadata: { failed_stage: 'old_password_incorrect' },
+      });
+    });
+
+    it('AC-04: throws HTTP 422 when confirm_password does not match new_password', async () => {
+      await expect(
+        service.changePassword(ADMIN_ID, {
+          old_password: 'CurrentAdmin@123',
+          new_password: 'NewAdmin!789',
+          confirm_password: 'DifferentPassword!456',
+        }),
+      ).rejects.toThrow(new UnprocessableEntityException(SYS_MSG.INCORRECT_CONFIRM_PASSWORD));
+
+      expect(mockAdminProfileAction.updatePasswordAndRevokeSessions).not.toHaveBeenCalled();
       expect(mockAdminProfileAction.updatePasswordHash).not.toHaveBeenCalled();
       expect(mockAdminProfileAction.revokeAllSessions).not.toHaveBeenCalled();
     });
@@ -289,8 +308,8 @@ describe('AdminProfileService', () => {
 
     it('AC-06 / SEC-02: revokes all existing sessions after successful password change', async () => {
       await service.changePassword(ADMIN_ID, dto);
-      expect(mockAdminProfileAction.revokeAllSessions).toHaveBeenCalledTimes(1);
-      expect(mockAdminProfileAction.revokeAllSessions).toHaveBeenCalledWith(ADMIN_ID);
+      expect(mockAdminProfileAction.updatePasswordAndRevokeSessions).toHaveBeenCalledTimes(1);
+      expect(mockAdminProfileAction.updatePasswordAndRevokeSessions).toHaveBeenCalledWith(ADMIN_ID, 'new-hash');
     });
 
     it('AC-07: writes audit log with action_type=password_changed and no password values', async () => {
@@ -325,6 +344,12 @@ describe('AdminProfileService', () => {
       await expect(service.changePassword(ADMIN_ID, dto)).rejects.toThrow(
         new NotFoundException(SYS_MSG.ADMIN_PROFILE_NOT_FOUND),
       );
+      expect(mockLogService.logAction).toHaveBeenCalledWith({
+        admin_id: ADMIN_ID,
+        action_type: AdminProfileActionType.PASSWORD_CHANGED,
+        status: 'failed',
+        metadata: { failed_stage: 'admin_not_found' },
+      });
     });
 
     it('throws 422 when password change is unavailable for account without password_hash', async () => {
@@ -333,14 +358,26 @@ describe('AdminProfileService', () => {
       await expect(service.changePassword(ADMIN_ID, dto)).rejects.toThrow(
         new UnprocessableEntityException(SYS_MSG.PASSWORD_CHANGE_UNAVAILABLE),
       );
+      expect(mockLogService.logAction).toHaveBeenCalledWith({
+        admin_id: ADMIN_ID,
+        action_type: AdminProfileActionType.PASSWORD_CHANGED,
+        status: 'failed',
+        metadata: { failed_stage: 'password_unavailable' },
+      });
     });
 
     it('throws 500 when updatePasswordHash returns null', async () => {
-      mockAdminProfileAction.updatePasswordHash.mockResolvedValue(null);
+      mockAdminProfileAction.updatePasswordAndRevokeSessions.mockRejectedValue(new Error('db failure'));
 
       await expect(service.changePassword(ADMIN_ID, dto)).rejects.toThrow(
         new InternalServerErrorException(SYS_MSG.ADMIN_PROFILE_UPDATE_FAILED),
       );
+      expect(mockLogService.logAction).toHaveBeenCalledWith({
+        admin_id: ADMIN_ID,
+        action_type: AdminProfileActionType.PASSWORD_CHANGED,
+        status: 'failed',
+        metadata: { failed_stage: 'update_failed' },
+      });
     });
   });
 });  

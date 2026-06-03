@@ -208,7 +208,7 @@ export function ChangeAdminPasswordDocs() {
                 {
                   property: 'new_password',
                   constraints: {
-                    matches: SYS_MSG.ADMIN_PASSWORD_POLICY_VALIDATION_FAILED,
+                    matches: SYS_MSG.ADMIN_INVALID_PASSWORD_VALUE,
                   },
                 },
               ],
@@ -220,7 +220,15 @@ export function ChangeAdminPasswordDocs() {
               success: false,
               statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
               error: 'UnprocessableEntityException',
-              message: SYS_MSG.ADMIN_CONFIRM_PASSWORD_MISMATCH,
+               message: SYS_MSG.VALIDATION_FAILED,
+              details: [
+                {
+                  property: 'confirm_password',
+                  constraints: {
+                    matchesField: SYS_MSG.INCORRECT_CONFIRM_PASSWORD,
+                  },
+                },
+              ],
             },
           },
           sameAsOld: {

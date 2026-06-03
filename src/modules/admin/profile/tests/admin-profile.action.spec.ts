@@ -1,5 +1,6 @@
 import { Repository } from 'typeorm';
 import { User } from '../../../users/entities/user.entity';
+import { UserSession } from '../../../users/entities/user-session.entity';
 import { AdminProfileModelAction } from '../actions/admin-profile.action';
 
 describe('AdminProfileModelAction', () => {
@@ -32,6 +33,48 @@ describe('AdminProfileModelAction', () => {
         identifierOptions: { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
         updatePayload: { password_hash: 'new-password-hash' },
       }),
+    );
+  });
+
+  it('updates password and revokes sessions transactionally', async () => {
+    const userUpdate = jest.fn().mockResolvedValue({ affected: 1 });
+    const sessionUpdate = jest.fn().mockResolvedValue({ affected: 2 });
+    const transaction = jest.fn(async (handler: (manager: {
+      getRepository: (entity: unknown) => { update: typeof userUpdate };
+    }) => Promise<void>) =>
+      handler({
+        getRepository: (entity: unknown) => {
+          if (entity === User) {
+            return { update: userUpdate };
+          }
+
+          if (entity === UserSession) {
+            return { update: sessionUpdate };
+          }
+
+          throw new Error('Unexpected repository entity');
+        },
+      }),
+    );
+
+    const repository = {
+      manager: { transaction },
+    } as unknown as Repository<User>;
+
+    const action = new AdminProfileModelAction(repository);
+
+    await expect(
+      action.updatePasswordAndRevokeSessions('user-1', 'new-password-hash'),
+    ).resolves.toBeUndefined();
+
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(userUpdate).toHaveBeenCalledWith(
+      { id: 'user-1' },
+      { password_hash: 'new-password-hash' },
+    );
+    expect(sessionUpdate).toHaveBeenCalledWith(
+      { user_id: 'user-1', is_revoked: false },
+      expect.objectContaining({ is_revoked: true, revoked_at: expect.any(Date) }),
     );
   });
 

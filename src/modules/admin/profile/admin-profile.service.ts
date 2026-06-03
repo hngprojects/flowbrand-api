@@ -90,15 +90,23 @@ export class AdminProfileService {
   async changePassword(adminId: string, dto: ChangeAdminPasswordDto): Promise<void> {
     const admin = await this.adminProfileAction.findById(adminId);
     if (!admin) {
+      await this.logPasswordChangeFailure(adminId, 'admin_not_found');
       throw new NotFoundException(SYS_MSG.ADMIN_PROFILE_NOT_FOUND);
     }
 
     if (!admin.password_hash) {
+      await this.logPasswordChangeFailure(adminId, 'password_unavailable');
       throw new UnprocessableEntityException(SYS_MSG.PASSWORD_CHANGE_UNAVAILABLE);
+    }
+
+    if (dto.new_password !== dto.confirm_password) {
+      await this.logPasswordChangeFailure(adminId, 'confirm_password_mismatch');
+      throw new UnprocessableEntityException(SYS_MSG.INCORRECT_CONFIRM_PASSWORD);
     }
 
     const oldPasswordMatches = await bcrypt.compare(dto.old_password, admin.password_hash);
     if (!oldPasswordMatches) {
+      await this.logPasswordChangeFailure(adminId, 'old_password_incorrect');
       throw new UnauthorizedException(SYS_MSG.ADMIN_OLD_PASSWORD_INCORRECT);
     }
 
@@ -107,18 +115,26 @@ export class AdminProfileService {
     }
 
     const hashedPassword = await bcrypt.hash(dto.new_password, ADMIN_PASSWORD_BCRYPT_SALT_ROUNDS);
-    const updated = await this.adminProfileAction.updatePasswordHash(adminId, hashedPassword);
-
-    if (!updated) {
+    try {
+      await this.adminProfileAction.updatePasswordAndRevokeSessions(adminId, hashedPassword);
+      await this.logService.logAction({
+        admin_id: adminId,
+        action_type: AdminProfileActionType.PASSWORD_CHANGED,
+        status: 'success',
+        metadata: { fields_changed: ['password'] },
+      });
+    } catch {
+      await this.logPasswordChangeFailure(adminId, 'update_failed');
       throw new InternalServerErrorException(SYS_MSG.ADMIN_PROFILE_UPDATE_FAILED);
     }
+  }
 
-    await this.adminProfileAction.revokeAllSessions(adminId);
+  private async logPasswordChangeFailure(adminId: string, failedStage: string): Promise<void> {
     await this.logService.logAction({
       admin_id: adminId,
       action_type: AdminProfileActionType.PASSWORD_CHANGED,
-      status: 'success',
-      metadata: { fields_changed: ['password'] },
+      status: 'failed',
+      metadata: { failed_stage: failedStage },
     });
   }
 

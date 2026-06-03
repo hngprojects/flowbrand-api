@@ -91,6 +91,7 @@ export class AdminProfileController {
         transform: true,
         transformOptions: { enableImplicitConversion: false },
         expectedType: ChangeAdminPasswordDto,
+        validationError: { target: false, value: false },
         exceptionFactory: (errors: ValidationError[]) =>
           new UnprocessableEntityException({
             success: false,

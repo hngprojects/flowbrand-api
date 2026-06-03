@@ -33,6 +33,24 @@ export class AdminProfileModelAction extends AbstractModelAction<User> {
     });
   }
 
+  async updatePasswordAndRevokeSessions(userId: string, passwordHash: string): Promise<void> {
+    await this.repository.manager.transaction(async (manager) => {
+      const passwordUpdate = await manager.getRepository(User).update(
+        { id: userId },
+        { password_hash: passwordHash },
+      );
+
+      if (!passwordUpdate.affected) {
+        throw new Error('Failed to update admin password hash');
+      }
+
+      await manager.getRepository(UserSession).update(
+        { user_id: userId, is_revoked: false },
+        { is_revoked: true, revoked_at: new Date() },
+      );
+    });
+  }
+
   async revokeAllSessions(userId: string): Promise<number> {
     const result = await this.repository.manager.getRepository(UserSession).update(
       { user_id: userId, is_revoked: false },
