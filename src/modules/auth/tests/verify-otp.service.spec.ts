@@ -164,6 +164,19 @@ describe('AuthService.verifyOtp (BE-004)', () => {
 
       expect(mockRedisService.del).toHaveBeenCalledWith(`otp:verify:lock:${USER_ID}`);
     });
+
+    it('acquires the lock with a 30-second TTL (M-3)', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(UNVERIFIED_USER);
+      mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(null);
+
+      await service.verifyOtp(USER_EMAIL, OTP_CODE).catch(() => undefined);
+
+      expect(mockRedisService.setNx).toHaveBeenCalledWith(
+        expect.stringContaining('otp:verify:lock:'),
+        '1',
+        30,
+      );
+    });
   });
 
   describe('no token in DB', () => {
