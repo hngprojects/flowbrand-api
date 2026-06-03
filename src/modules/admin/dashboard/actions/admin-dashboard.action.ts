@@ -3,6 +3,7 @@ import { EntityManager } from 'typeorm';
 import { User } from '../../../users/entities/user.entity';
 import { Funnel } from '../../../funnels/entities/funnel.entity';
 import { FunnelStage } from '../../../funnels/entities/funnel-stage.entity';
+import { StageStatus } from '../../../funnels/enums/stage-status.enum';
 import { 
   CountResult, 
   SegmentResult, 
@@ -127,7 +128,7 @@ export class AdminDashboardAction {
       let percentage = Math.round((segment.count / totalCount) * 100);
       
       if (index === finalSegments.length - 1) {
-        percentage = 100 - runningPercentage;
+        percentage = Math.max(0, 100 - runningPercentage);
       } else {
         runningPercentage += percentage;
       }
@@ -160,7 +161,7 @@ export class AdminDashboardAction {
       
       const cnt = parseInt(curr.count, 10);
       acc[pos].total += cnt;
-      if (curr.status === 'complete') {
+      if (curr.status === StageStatus.COMPLETE) {
         acc[pos].completed += cnt;
       }
       return acc;

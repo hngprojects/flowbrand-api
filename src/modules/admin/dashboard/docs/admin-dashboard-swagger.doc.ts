@@ -6,7 +6,9 @@ import {
   ApiOkResponse, 
   ApiOperation, 
   ApiUnauthorizedResponse, 
-  ApiResponse 
+  ApiResponse,
+  ApiExtraModels,
+  getSchemaPath
 } from '@nestjs/swagger';
 import * as SYS_MSG from '../../../../constants/system.messages';
 import { 
@@ -59,9 +61,17 @@ export function GetStatsDocs() {
   return applyDecorators(
     ApiBearerAuth('JWT'),
     ApiOperation({ summary: 'Get admin dashboard headline stats' }),
+    ApiExtraModels(DashboardStatsDataDto),
     ApiOkResponse({
       description: 'Dashboard stats retrieved successfully',
-      type: DashboardStatsDataDto,
+      schema: {
+        properties: {
+          success: { type: 'boolean', example: true },
+          statusCode: { type: 'number', example: HttpStatus.OK },
+          message: { type: 'string', example: SYS_MSG.ADMIN_DASHBOARD_STATS_RETRIEVED },
+          data: { $ref: getSchemaPath(DashboardStatsDataDto) },
+        },
+      },
     }),
     CommonErrorResponses(),
   );
@@ -71,9 +81,17 @@ export function GetWeeklyOverviewDocs() {
   return applyDecorators(
     ApiBearerAuth('JWT'),
     ApiOperation({ summary: 'Get admin dashboard weekly overview chart data' }),
+    ApiExtraModels(WeeklyOverviewItemDto),
     ApiOkResponse({
       description: 'Dashboard weekly overview retrieved successfully',
-      type: [WeeklyOverviewItemDto],
+      schema: {
+        properties: {
+          success: { type: 'boolean', example: true },
+          statusCode: { type: 'number', example: HttpStatus.OK },
+          message: { type: 'string', example: SYS_MSG.ADMIN_DASHBOARD_WEEKLY_OVERVIEW_RETRIEVED },
+          data: { type: 'array', items: { $ref: getSchemaPath(WeeklyOverviewItemDto) } },
+        },
+      },
     }),
     CommonErrorResponses(),
   );
@@ -83,9 +101,17 @@ export function GetUserSegmentsDocs() {
   return applyDecorators(
     ApiBearerAuth('JWT'),
     ApiOperation({ summary: 'Get admin dashboard user segments donut chart data' }),
+    ApiExtraModels(UserSegmentItemDto),
     ApiOkResponse({
       description: 'Dashboard user segments retrieved successfully',
-      type: [UserSegmentItemDto],
+      schema: {
+        properties: {
+          success: { type: 'boolean', example: true },
+          statusCode: { type: 'number', example: HttpStatus.OK },
+          message: { type: 'string', example: SYS_MSG.ADMIN_DASHBOARD_USER_SEGMENTS_RETRIEVED },
+          data: { type: 'array', items: { $ref: getSchemaPath(UserSegmentItemDto) } },
+        },
+      },
     }),
     CommonErrorResponses(),
   );
@@ -95,9 +121,17 @@ export function GetFunnelPerformanceDocs() {
   return applyDecorators(
     ApiBearerAuth('JWT'),
     ApiOperation({ summary: 'Get admin dashboard funnel performance horizontal bar chart data' }),
+    ApiExtraModels(FunnelPerformanceItemDto),
     ApiOkResponse({
       description: 'Dashboard funnel performance retrieved successfully',
-      type: [FunnelPerformanceItemDto],
+      schema: {
+        properties: {
+          success: { type: 'boolean', example: true },
+          statusCode: { type: 'number', example: HttpStatus.OK },
+          message: { type: 'string', example: SYS_MSG.ADMIN_DASHBOARD_FUNNEL_PERFORMANCE_RETRIEVED },
+          data: { type: 'array', items: { $ref: getSchemaPath(FunnelPerformanceItemDto) } },
+        },
+      },
     }),
     CommonErrorResponses(),
   );

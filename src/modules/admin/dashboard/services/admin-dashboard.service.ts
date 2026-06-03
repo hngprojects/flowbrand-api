@@ -19,75 +19,52 @@ export class AdminDashboardService {
     private readonly redisService: RedisService,
   ) {}
 
-  async getStats(): Promise<DashboardStats> {
-    const key = redisKeys.adminDashboardStats();
-    const cached = await this.redisService.get(key);
-    
-    if (cached) {
-      try {
-        return JSON.parse(cached) as DashboardStats;
-      } catch (err) {
-        this.logger.warn(`Failed to parse cache for key ${key}: ${(err as Error).message}`);
+  private async getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+    try {
+      const cached = await this.redisService.get(key);
+      if (cached) {
+        return JSON.parse(cached) as T;
       }
+    } catch (err) {
+      this.logger.warn(`Redis get/parse failed for key ${key}: ${(err as Error).message}`);
     }
 
-    const data = await this.adminDashboardAction.getDashboardStats();
-    await this.redisService.set(key, JSON.stringify(data), this.CACHE_TTL);
-    
+    const data = await fetcher();
+
+    try {
+      await this.redisService.set(key, JSON.stringify(data), this.CACHE_TTL);
+    } catch (err) {
+      this.logger.warn(`Redis set failed for key ${key}: ${(err as Error).message}`);
+    }
+
     return data;
+  }
+
+  async getStats(): Promise<DashboardStats> {
+    return this.getCachedOrFetch<DashboardStats>(
+      redisKeys.adminDashboardStats(),
+      () => this.adminDashboardAction.getDashboardStats()
+    );
   }
 
   async getWeeklyOverview(): Promise<WeeklyOverviewItem[]> {
-    const key = redisKeys.adminDashboardWeeklyOverview();
-    const cached = await this.redisService.get(key);
-    
-    if (cached) {
-      try {
-        return JSON.parse(cached) as WeeklyOverviewItem[];
-      } catch (err) {
-        this.logger.warn(`Failed to parse cache for key ${key}: ${(err as Error).message}`);
-      }
-    }
-
-    const data = await this.adminDashboardAction.getWeeklyOverview();
-    await this.redisService.set(key, JSON.stringify(data), this.CACHE_TTL);
-    
-    return data;
+    return this.getCachedOrFetch<WeeklyOverviewItem[]>(
+      redisKeys.adminDashboardWeeklyOverview(),
+      () => this.adminDashboardAction.getWeeklyOverview()
+    );
   }
 
   async getUserSegments(): Promise<UserSegmentItem[]> {
-    const key = redisKeys.adminDashboardUserSegments();
-    const cached = await this.redisService.get(key);
-    
-    if (cached) {
-      try {
-        return JSON.parse(cached) as UserSegmentItem[];
-      } catch (err) {
-        this.logger.warn(`Failed to parse cache for key ${key}: ${(err as Error).message}`);
-      }
-    }
-
-    const data = await this.adminDashboardAction.getUserSegments();
-    await this.redisService.set(key, JSON.stringify(data), this.CACHE_TTL);
-    
-    return data;
+    return this.getCachedOrFetch<UserSegmentItem[]>(
+      redisKeys.adminDashboardUserSegments(),
+      () => this.adminDashboardAction.getUserSegments()
+    );
   }
 
   async getFunnelPerformance(): Promise<FunnelPerformanceItem[]> {
-    const key = redisKeys.adminDashboardFunnelPerformance();
-    const cached = await this.redisService.get(key);
-    
-    if (cached) {
-      try {
-        return JSON.parse(cached) as FunnelPerformanceItem[];
-      } catch (err) {
-        this.logger.warn(`Failed to parse cache for key ${key}: ${(err as Error).message}`);
-      }
-    }
-
-    const data = await this.adminDashboardAction.getFunnelPerformance();
-    await this.redisService.set(key, JSON.stringify(data), this.CACHE_TTL);
-    
-    return data;
+    return this.getCachedOrFetch<FunnelPerformanceItem[]>(
+      redisKeys.adminDashboardFunnelPerformance(),
+      () => this.adminDashboardAction.getFunnelPerformance()
+    );
   }
 }
