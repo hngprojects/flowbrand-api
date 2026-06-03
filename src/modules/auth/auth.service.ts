@@ -59,7 +59,7 @@ export class AuthService {
     private readonly otpTokenModelAction: OtpTokenModelAction,
     private readonly emailService: EmailService,
     @Optional() private readonly logger = new Logger(AuthService.name),
-  ) {}
+  ) { }
 
   // Local minimal interface to avoid unsafe-call lint issues from third-party model action types
   private get userSessionAction(): {
@@ -245,6 +245,11 @@ export class AuthService {
       });
     } catch {
       throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_REFRESH_TOKEN);
+    }
+
+    const { exceeded } = await this.redisService.rateLimit(redisKeys.refreshRateLimit(payload.userId), 10, 3600);
+    if (exceeded) {
+      throw new HttpException(SYS_MSG.AUTH_REFRESH_RATE_LIMITED, HttpStatus.TOO_MANY_REQUESTS);
     }
 
     const session = await this.userSessionAction.findById(payload.sessionId);
