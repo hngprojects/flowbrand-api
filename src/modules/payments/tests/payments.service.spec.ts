@@ -18,7 +18,7 @@ jest.mock('../../../config/env', () => ({
 }));
 
 jest.mock('../constants/pricing.constants', () => ({
-  PRICING: { PRO_ONETIME_KOBO: 999900, PRO_MONTHLY_KOBO: 299900, PRO_ANNUAL_KOBO: 2999900 },
+  PRICING: { PRO_ONETIME_KOBO: 900000, PRO_MONTHLY_KOBO: 300000, PRO_ANNUAL_KOBO: 3200000 },
 }));
 
 const mockPaymentCreate = jest.fn().mockResolvedValue({ id: 'payment-uuid' });
@@ -51,7 +51,7 @@ const MOCK_ADAPTER_MOCK: Partial<MockPaymentAdapter> = {
     provider: 'mock',
   }),
   cancelSubscription: jest.fn().mockResolvedValue(undefined),
-  verifyPayment: jest.fn().mockResolvedValue({ reference: 'ref', status: 'success', amount: 999900, currency: 'NGN' }),
+  verifyPayment: jest.fn().mockResolvedValue({ reference: 'ref', status: 'success', amount: 900000, currency: 'NGN' }),
 };
 
 const mockTransaction = jest.fn().mockImplementation(async (cb: (manager: unknown) => Promise<unknown>) => cb({}));
@@ -124,10 +124,10 @@ describe('PaymentsService', () => {
       );
     });
 
-    it('stores amount_kobo (not naira) — 999900 for one-time PRO', async () => {
+    it('stores amount_kobo (not naira) — 900000 (₦9,000) for one-time PRO', async () => {
       await service.initiatePayment(userId, email, dto);
       const { createPayload } = mockPaymentCreate.mock.calls[0][0] as { createPayload: Record<string, unknown> };
-      expect(createPayload.amount_kobo).toBe(999900);
+      expect(createPayload.amount_kobo).toBe(900000);
     });
 
     it('throws ConflictException on 23505 — does not call provider (no double charge)', async () => {
@@ -186,7 +186,7 @@ describe('PaymentsService', () => {
     it('uses PRO_ANNUAL_KOBO for annual billing', async () => {
       await service.initiateSubscription(userId, email, { ...dto, billingCycle: BillingCycle.ANNUAL });
       const { createPayload } = mockPaymentCreate.mock.calls[0][0] as { createPayload: Record<string, unknown> };
-      expect(createPayload.amount_kobo).toBe(2999900);
+      expect(createPayload.amount_kobo).toBe(3200000);
     });
 
     it('wraps both creates in a single transaction', async () => {

@@ -3,7 +3,7 @@ import { env } from '../../../config/env';
 
 const logger = new Logger('PricingConstants');
 
-const FALLBACK_KOBO = { ONETIME: 999900, MONTHLY: 299900, ANNUAL: 2999900 };
+const FALLBACK_KOBO = { ONETIME: 900000, MONTHLY: 300000, ANNUAL: 3200000 };
 
 function resolvePrice(value: number | undefined, fallback: number, label: string): number {
   if (value === undefined) {
@@ -18,7 +18,7 @@ function resolvePrice(value: number | undefined, fallback: number, label: string
   return value;
 }
 
-/** All values are in kobo (smallest NGN unit). 999900 = ₦9,999.00 */
+/** All values are in kobo (smallest NGN unit). 300000 = ₦3,000.00 */
 export const PRICING = {
   PRO_ONETIME_KOBO: resolvePrice(env.PRO_PLAN_PRICE_ONETIME_KOBO, FALLBACK_KOBO.ONETIME, 'PRO_PLAN_PRICE_ONETIME_KOBO'),
   PRO_MONTHLY_KOBO: resolvePrice(env.PRO_PLAN_PRICE_MONTHLY_KOBO, FALLBACK_KOBO.MONTHLY, 'PRO_PLAN_PRICE_MONTHLY_KOBO'),
