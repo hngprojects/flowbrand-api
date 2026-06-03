@@ -184,7 +184,10 @@ export class LlmServiceImpl extends LlmService {
     }
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-    const systemPrompt = 'Extract a concise business name (≤ 60 chars) from the provided business description. Return ONLY the business name. No extra commentary, no quotes, no markdown, no punctuatio
+    const systemPrompt =
+      'Extract a concise business name (≤ 60 chars) from the provided business description. ' +
+      'Return ONLY the business name. ' +
+      'No extra commentary, no quotes, no markdown, no punctuation unless part of the name.';
 
     const body = JSON.stringify({
       system_instruction: { parts: [{ text: systemPrompt }] },
@@ -230,7 +233,10 @@ export class LlmServiceImpl extends LlmService {
       throw new Error(SYS_MSG.AI_GROQ_API_KEY_MISSING);
     }
 
-    const systemPrompt = 'Extract a concise business name (≤ 60 chars) from the provided business description. Return ONLY the business name. No extra commentary, no quotes, no markdown, no punctuatio
+    const systemPrompt =
+      'Extract a concise business name (≤ 60 chars) from the provided business description. ' +
+      'Return ONLY the business name. ' +
+      'No extra commentary, no quotes, no markdown, no punctuation unless part of the name.';
 
     const body = JSON.stringify({
       model,
