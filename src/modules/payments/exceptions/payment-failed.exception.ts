@@ -1,8 +1,9 @@
-import { UnprocessableEntityException } from '@nestjs/common';
+import { HttpException, HttpStatus } from '@nestjs/common';
 import * as SYS_MSG from '../../../constants/system.messages';
 
-export class PaymentFailedException extends UnprocessableEntityException {
+// 402 Payment Required — semantically correct for a provider decline or payment failure
+export class PaymentFailedException extends HttpException {
   constructor(reason?: string) {
-    super({ message: SYS_MSG.PAYMENT_FAILED, reason });
+    super({ message: SYS_MSG.PAYMENT_FAILED, reason }, HttpStatus.PAYMENT_REQUIRED);
   }
 }
