@@ -23,16 +23,20 @@ jest.mock('../constants/pricing.constants', () => ({
 
 const mockPaymentCreate = jest.fn().mockResolvedValue({ id: 'payment-uuid' });
 const mockPaymentUpdate = jest.fn().mockResolvedValue(undefined);
+const mockPaymentGet = jest.fn().mockResolvedValue(null);
 const mockSubscriptionCreate = jest.fn().mockResolvedValue({ id: 'sub-uuid' });
 const mockSubscriptionUpdate = jest.fn().mockResolvedValue(undefined);
+const mockSubscriptionFind = jest.fn().mockResolvedValue({ payload: [], paginationMeta: {} });
 
 const PAYMENT_ACTION_MOCK: Partial<PaymentModelAction> = {
   create: mockPaymentCreate,
   update: mockPaymentUpdate,
+  get: mockPaymentGet,
 };
 const SUBSCRIPTION_ACTION_MOCK: Partial<SubscriptionModelAction> = {
   create: mockSubscriptionCreate,
   update: mockSubscriptionUpdate,
+  find: mockSubscriptionFind,
 };
 
 const MOCK_ADAPTER_MOCK: Partial<MockPaymentAdapter> = {
@@ -133,6 +137,27 @@ describe('PaymentsService', () => {
       expect(MOCK_ADAPTER_MOCK.initiatePayment).not.toHaveBeenCalled();
     });
 
+    it('returns existing result on 23505 when prior attempt fully succeeded (idempotent retry)', async () => {
+      const pgError = Object.assign(new QueryFailedError('', [], new Error()), { code: '23505' });
+      mockPaymentCreate.mockRejectedValueOnce(pgError);
+      // Row exists with a reference — prior attempt completed
+      mockPaymentGet.mockResolvedValueOnce({ id: 'p-1', provider_reference: 'ref_prior', provider: 'mock' });
+
+      const result = await service.initiatePayment(userId, email, dto);
+      expect(result.reference).toBe('ref_prior');
+      expect(MOCK_ADAPTER_MOCK.initiatePayment).not.toHaveBeenCalled();
+    });
+
+    it('throws 409 on 23505 when prior attempt partially failed (null provider_reference)', async () => {
+      const pgError = Object.assign(new QueryFailedError('', [], new Error()), { code: '23505' });
+      mockPaymentCreate.mockRejectedValueOnce(pgError);
+      // Row exists but has no reference — provider update failed previously
+      mockPaymentGet.mockResolvedValueOnce({ id: 'p-1', provider_reference: null, provider: 'mock' });
+
+      await expect(service.initiatePayment(userId, email, dto)).rejects.toBeInstanceOf(ConflictException);
+      expect(MOCK_ADAPTER_MOCK.initiatePayment).not.toHaveBeenCalled();
+    });
+
     it('propagates non-idempotency DB errors before calling provider', async () => {
       mockPaymentCreate.mockRejectedValueOnce(new Error('DB down'));
       await expect(service.initiatePayment(userId, email, dto)).rejects.toThrow('DB down');
@@ -172,6 +197,33 @@ describe('PaymentsService', () => {
     it('throws ConflictException on 23505 — active subscription already exists', async () => {
       const pgError = Object.assign(new QueryFailedError('', [], new Error()), { code: '23505' });
       mockTransaction.mockRejectedValueOnce(pgError);
+      await expect(service.initiateSubscription(userId, email, dto)).rejects.toBeInstanceOf(ConflictException);
+      expect(MOCK_ADAPTER_MOCK.initiateSubscription).not.toHaveBeenCalled();
+    });
+
+    it('returns existing result on 23505 when prior attempt fully succeeded (idempotent retry)', async () => {
+      const pgError = Object.assign(new QueryFailedError('', [], new Error()), { code: '23505' });
+      mockTransaction.mockRejectedValueOnce(pgError);
+      // Prior attempt completed — subscription has a provider code
+      mockSubscriptionFind.mockResolvedValueOnce({
+        payload: [{ id: 's-1', provider_subscription_code: 'sub_prior' }],
+        paginationMeta: {},
+      });
+
+      const result = await service.initiateSubscription(userId, email, dto);
+      expect(result.subscriptionCode).toBe('sub_prior');
+      expect(MOCK_ADAPTER_MOCK.initiateSubscription).not.toHaveBeenCalled();
+    });
+
+    it('throws 409 on 23505 when prior attempt partially failed (null provider_subscription_code)', async () => {
+      const pgError = Object.assign(new QueryFailedError('', [], new Error()), { code: '23505' });
+      mockTransaction.mockRejectedValueOnce(pgError);
+      // Prior attempt failed after DB write — no subscription code yet
+      mockSubscriptionFind.mockResolvedValueOnce({
+        payload: [{ id: 's-1', provider_subscription_code: null }],
+        paginationMeta: {},
+      });
+
       await expect(service.initiateSubscription(userId, email, dto)).rejects.toBeInstanceOf(ConflictException);
       expect(MOCK_ADAPTER_MOCK.initiateSubscription).not.toHaveBeenCalled();
     });
