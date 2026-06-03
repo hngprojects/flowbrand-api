@@ -26,7 +26,8 @@ export class AdminProfileService {
     private readonly userRoleModelAction: UserRoleModelAction,
     private readonly logService: LogService,
   ) {}
-
+  
+  /** Returns the authenticated admin's profile, resolved with their highest role. */
   async getProfile(adminId: string): Promise<IAdminProfile> {
     const admin = await this.adminProfileAction.findById(adminId);
     if (!admin) {
@@ -36,6 +37,7 @@ export class AdminProfileService {
     return this.toProfileResponse(admin);
   }
 
+  /** Updates full_name and/or country, skipping the DB write when no fields changed. Rejects email changes with 422. */
   async updateProfile(adminId: string, dto: UpdateAdminProfileDto): Promise<IAdminProfile> {
     if (dto.email !== undefined) {
       throw new UnprocessableEntityException(SYS_MSG.ADMIN_PROFILE_EMAIL_CHANGE_FORBIDDEN);
