@@ -14,6 +14,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
 import type { CookieOptions, Request, Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
+import { ThrottleMessage } from '../../common/decorators/throttle-message.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../constants/system.messages';
 import { Public } from '../../common/decorators/public.decorator';
@@ -71,6 +72,7 @@ export class AuthController {
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 3_600_000, limit: 5 } })
+  @ThrottleMessage(SYS_MSG.AUTH_REGISTER_RATE_LIMITED)
   @RegisterDocs()
   async register(@Body() dto: RegisterDto) {
     const { message } = await this.authService.register(dto);
@@ -81,6 +83,7 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  @ThrottleMessage(SYS_MSG.AUTH_LOGIN_RATE_LIMITED)
   @LoginDocs()
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(dto);
