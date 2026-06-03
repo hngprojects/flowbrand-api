@@ -3,23 +3,24 @@ import { env } from '../../../config/env';
 
 const logger = new Logger('PricingConstants');
 
-const FALLBACK = { ONETIME: 9999, MONTHLY: 2999, ANNUAL: 29999 };
+const FALLBACK_KOBO = { ONETIME: 999900, MONTHLY: 299900, ANNUAL: 2999900 };
 
 function resolvePrice(value: number | undefined, fallback: number, label: string): number {
   if (value === undefined) {
-    logger.warn(`${label} not set — using placeholder ${fallback}`);
+    logger.warn(`${label} not set — using placeholder ${fallback} kobo`);
     return fallback;
   }
-  // EC-03: zero price is a misconfiguration — never initiate a 0-amount payment
+  // EC-03: zero is a misconfiguration — never initiate a 0-amount payment
   if (value === 0) {
-    logger.error(`${label} is zero — treating as misconfiguration, using placeholder ${fallback}`);
+    logger.error(`${label} is zero — treating as misconfiguration, using placeholder ${fallback} kobo`);
     return fallback;
   }
   return value;
 }
 
+/** All values are in kobo (smallest NGN unit). 999900 = ₦9,999.00 */
 export const PRICING = {
-  PRO_ONETIME: resolvePrice(env.PRO_PLAN_PRICE_ONETIME, FALLBACK.ONETIME, 'PRO_PLAN_PRICE_ONETIME'),
-  PRO_MONTHLY: resolvePrice(env.PRO_PLAN_PRICE_MONTHLY, FALLBACK.MONTHLY, 'PRO_PLAN_PRICE_MONTHLY'),
-  PRO_ANNUAL: resolvePrice(env.PRO_PLAN_PRICE_ANNUAL, FALLBACK.ANNUAL, 'PRO_PLAN_PRICE_ANNUAL'),
+  PRO_ONETIME_KOBO: resolvePrice(env.PRO_PLAN_PRICE_ONETIME_KOBO, FALLBACK_KOBO.ONETIME, 'PRO_PLAN_PRICE_ONETIME_KOBO'),
+  PRO_MONTHLY_KOBO: resolvePrice(env.PRO_PLAN_PRICE_MONTHLY_KOBO, FALLBACK_KOBO.MONTHLY, 'PRO_PLAN_PRICE_MONTHLY_KOBO'),
+  PRO_ANNUAL_KOBO: resolvePrice(env.PRO_PLAN_PRICE_ANNUAL_KOBO, FALLBACK_KOBO.ANNUAL, 'PRO_PLAN_PRICE_ANNUAL_KOBO'),
 } as const;

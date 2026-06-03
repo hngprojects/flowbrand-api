@@ -284,5 +284,5 @@ export const ADMIN_GLOBAL_SEARCH_SUCCESSFUL = 'Admin global search results retri
 export const PAYMENT_FAILED = 'Payment could not be processed';
 export const PAYMENT_PROVIDER_NOT_IMPLEMENTED = 'Payment provider is not yet implemented';
 export const PAYMENT_PRICE_ZERO_FALLBACK = 'Price is zero or missing — using placeholder value';
-
-
+export const PAYMENT_ALREADY_INITIATED = 'A payment for this request is already in progress';
+export const SUBSCRIPTION_ALREADY_ACTIVE = 'An active subscription already exists for this user';
