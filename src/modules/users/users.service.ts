@@ -38,11 +38,13 @@ import {
   ALLOWED_AVATAR_MIME_TYPES,
   AVATAR_SIGNED_URL_EXPIRY_SECONDS,
   AVATAR_STORAGE_PREFIX,
+  buildPublicAvatarUrl,
   MAX_AVATAR_UPLOAD_BYTES,
 } from './constants/avatar.constants';
 import { AvatarFileExtension, AvatarMimeType } from './enums/avatar-mime-type.enum';
 import type { IUserAvatarResponse } from './interfaces/user-avatar.interface';
 import { UPLOAD_OBJECT_STORAGE, type ObjectStorage } from '../upload/upload.types';
+import { resolveUploadStoragePublicBaseUrl } from '../upload/utils/upload-storage-public-url';
 import { ACCOUNT_DELETION_QUEUE } from './processors/account-deletion.processor';
 import { PinoLoggerService } from '../../common/logger/pino-logger.service';
 import { redisKeys } from '../../constants/redis-keys';
@@ -278,9 +280,8 @@ export class UsersService {
 
     if (!user.password_hash) {
       throw new UnprocessableEntityException({
-        message: user.auth_provider === 'google'
-          ? SYS_MSG.PASSWORD_CHANGE_NOT_SUPPORTED
-          : SYS_MSG.PASSWORD_CHANGE_UNAVAILABLE,
+        message:
+          user.auth_provider === 'google' ? SYS_MSG.PASSWORD_CHANGE_NOT_SUPPORTED : SYS_MSG.PASSWORD_CHANGE_UNAVAILABLE,
       });
     }
 
@@ -352,9 +353,7 @@ export class UsersService {
     };
   }
 
-  private toNotificationPreferenceResponse(
-    preference: NotificationPreference,
-  ): NotificationPreferenceResponse {
+  private toNotificationPreferenceResponse(preference: NotificationPreference): NotificationPreferenceResponse {
     return {
       id: preference.id,
       userId: preference.user_id,
@@ -383,11 +382,12 @@ export class UsersService {
   }
 
   private async resolveAvatarUrl(storagePath: string): Promise<string> {
+    if (resolveUploadStoragePublicBaseUrl()) {
+      return buildPublicAvatarUrl(storagePath);
+    }
+
     try {
-      return await this.objectStorage.createPresignedGetObjectUrl(
-        storagePath,
-        AVATAR_SIGNED_URL_EXPIRY_SECONDS,
-      );
+      return await this.objectStorage.createPresignedGetObjectUrl(storagePath, AVATAR_SIGNED_URL_EXPIRY_SECONDS);
     } catch (error) {
       this.logger.error(
         `Failed to create avatar signed URL for ${storagePath}`,
@@ -463,10 +463,7 @@ export class UsersService {
         }
       }
 
-      if (
-        error instanceof UnprocessableEntityException ||
-        error instanceof NotFoundException
-      ) {
+      if (error instanceof UnprocessableEntityException || error instanceof NotFoundException) {
         throw error;
       }
 
@@ -520,9 +517,7 @@ export class UsersService {
 
     let normalisedCountry: string | undefined;
     if (dto.country !== undefined) {
-      normalisedCountry = ALLOWED_SSA_COUNTRIES.find(
-        (c) => c.toLowerCase() === dto.country!.toLowerCase(),
-      );
+      normalisedCountry = ALLOWED_SSA_COUNTRIES.find((c) => c.toLowerCase() === dto.country!.toLowerCase());
       // If IsIn() passed in the DTO, a match is guaranteed — this is a safety net
       if (!normalisedCountry) {
         throw new UnprocessableEntityException(SYS_MSG.VALIDATION_FAILED);
@@ -595,7 +590,7 @@ export class UsersService {
         deleted_at: now,
         is_active: false,
       };
-      
+
       if (user.auth_provider === 'google') {
         updatePayload.provider_user_id = null;
       }
@@ -616,12 +611,7 @@ export class UsersService {
 
       this.pinoLogger.info('Account deleted', { userId });
 
-      await this.accountDeletionQueue.add(
-        'hard-delete',
-        { userId, email: user.email },
-        { delay: thirtyDaysLater },
-      );
-
+      await this.accountDeletionQueue.add('hard-delete', { userId, email: user.email }, { delay: thirtyDaysLater });
     } catch (error) {
       if (!committed) {
         await queryRunner.rollbackTransaction();

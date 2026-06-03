@@ -28,6 +28,11 @@ import { PinoLoggerService } from '../../common/logger/pino-logger.service';
 import { UserRole } from './enums/user-role.enum';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UPLOAD_OBJECT_STORAGE } from '../upload/upload.types';
+import { env } from '../../config/env';
+
+const TEST_PUBLIC_HOST = 'https://public.example';
+const TEST_PUBLIC_BUCKET = 'flowbrand-staging-uploads';
+const TEST_PUBLIC_AVATAR_BASE_URL = `${TEST_PUBLIC_HOST}/${TEST_PUBLIC_BUCKET}`;
 
 jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('hashed-password'),
@@ -600,17 +605,16 @@ describe('UsersService', () => {
     } as Express.Multer.File;
 
     beforeEach(() => {
+      env.UPLOAD_STORAGE_PUBLIC_ENDPOINT = TEST_PUBLIC_HOST;
+      env.UPLOAD_STORAGE_BUCKET = TEST_PUBLIC_BUCKET;
       mockObjectStorage.putObject.mockReset();
       mockObjectStorage.deleteObject.mockReset();
       mockObjectStorage.createPresignedGetObjectUrl.mockReset();
       mockUserModelAction.updateAvatarUrl.mockReset();
     });
 
-    it('uploads avatar successfully and returns signed URL', async () => {
+    it('uploads avatar successfully and returns public URL', async () => {
       mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
-      mockObjectStorage.createPresignedGetObjectUrl.mockResolvedValue(
-        'https://signed.example/avatar.jpg',
-      );
       mockUserModelAction.updateAvatarUrl.mockResolvedValue({
         ...mockFullUser,
         avatar_url: 'avatars/user/new.jpg',
@@ -624,12 +628,13 @@ describe('UsersService', () => {
           contentLength: onePixelPngBuffer.length,
         }),
       );
-      expect(mockObjectStorage.createPresignedGetObjectUrl).toHaveBeenCalledWith(
-        expect.stringMatching(new RegExp(`^avatars/${USER_ID}/`)),
-        900,
-      );
+      expect(mockObjectStorage.createPresignedGetObjectUrl).not.toHaveBeenCalled();
       expect(mockUserModelAction.updateAvatarUrl).toHaveBeenCalled();
-      expect(result).toEqual({ avatarUrl: 'https://signed.example/avatar.jpg' });
+      expect(result.avatarUrl).toMatch(
+        new RegExp(
+          `^${TEST_PUBLIC_AVATAR_BASE_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/avatars/${USER_ID}/`,
+        ),
+      );
     });
 
     it('deletes previous stored avatar after successful DB update', async () => {
@@ -637,9 +642,6 @@ describe('UsersService', () => {
         ...mockFullUser,
         avatar_url: `avatars/${USER_ID}/old.jpg`,
       });
-      mockObjectStorage.createPresignedGetObjectUrl.mockResolvedValue(
-        'https://signed.example/avatar.jpg',
-      );
       mockUserModelAction.updateAvatarUrl.mockResolvedValue({
         ...mockFullUser,
         avatar_url: `avatars/${USER_ID}/new.jpg`,
@@ -694,22 +696,7 @@ describe('UsersService', () => {
 
     it('cleans up uploaded file when DB update fails after upload', async () => {
       mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
-      mockObjectStorage.createPresignedGetObjectUrl.mockResolvedValue(
-        'https://signed.example/avatar.jpg',
-      );
       mockUserModelAction.updateAvatarUrl.mockResolvedValue(null);
-
-      await expect(service.uploadAvatar(USER_ID, avatarFile)).rejects.toBeInstanceOf(
-        InternalServerErrorException,
-      );
-
-      const uploadedPath = mockObjectStorage.putObject.mock.calls[0][0].storagePath as string;
-      expect(mockObjectStorage.deleteObject).toHaveBeenCalledWith(uploadedPath);
-    });
-
-    it('cleans up uploaded file when signed URL creation fails', async () => {
-      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
-      mockObjectStorage.createPresignedGetObjectUrl.mockRejectedValue(new Error('sign failed'));
 
       await expect(service.uploadAvatar(USER_ID, avatarFile)).rejects.toBeInstanceOf(
         InternalServerErrorException,
@@ -727,6 +714,49 @@ describe('UsersService', () => {
         InternalServerErrorException,
       );
       expect(mockObjectStorage.createPresignedGetObjectUrl).not.toHaveBeenCalled();
+    });
+
+    it('builds public avatar URL from PUBLIC_ENDPOINT and bucket', async () => {
+      env.UPLOAD_STORAGE_PUBLIC_ENDPOINT = 'https://staging.flowbrand.hng14.com';
+      env.UPLOAD_STORAGE_BUCKET = 'flowbrand-staging-uploads';
+      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+      mockUserModelAction.updateAvatarUrl.mockResolvedValue({
+        ...mockFullUser,
+        avatar_url: 'avatars/user/new.jpg',
+      });
+
+      const result = await service.uploadAvatar(USER_ID, avatarFile);
+
+      expect(mockObjectStorage.createPresignedGetObjectUrl).not.toHaveBeenCalled();
+      expect(result.avatarUrl).toMatch(
+        new RegExp(
+          `^https://staging\\.flowbrand\\.hng14\\.com/flowbrand-staging-uploads/avatars/${USER_ID}/`,
+        ),
+      );
+    });
+
+    describe('presigned URL fallback when public endpoint is unset', () => {
+      beforeEach(() => {
+        env.UPLOAD_STORAGE_PUBLIC_ENDPOINT = '';
+        env.UPLOAD_STORAGE_BUCKET = 'flowbrand-uploads';
+      });
+
+      afterEach(() => {
+        env.UPLOAD_STORAGE_PUBLIC_ENDPOINT = TEST_PUBLIC_HOST;
+        env.UPLOAD_STORAGE_BUCKET = TEST_PUBLIC_BUCKET;
+      });
+
+      it('cleans up uploaded file when signed URL creation fails', async () => {
+        mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+        mockObjectStorage.createPresignedGetObjectUrl.mockRejectedValue(new Error('sign failed'));
+
+        await expect(service.uploadAvatar(USER_ID, avatarFile)).rejects.toBeInstanceOf(
+          InternalServerErrorException,
+        );
+
+        const uploadedPath = mockObjectStorage.putObject.mock.calls[0][0].storagePath as string;
+        expect(mockObjectStorage.deleteObject).toHaveBeenCalledWith(uploadedPath);
+      });
     });
 
     it('returns no-op 200 response when avatar is already null', async () => {
@@ -909,22 +939,20 @@ describe('UsersService', () => {
       });
     });
 
-    it('regenerates signed avatar URL when stored path exists', async () => {
+    it('returns public avatar URL when stored path exists', async () => {
+      env.UPLOAD_STORAGE_PUBLIC_ENDPOINT = TEST_PUBLIC_HOST;
+      env.UPLOAD_STORAGE_BUCKET = TEST_PUBLIC_BUCKET;
       mockUserModelAction.get.mockResolvedValue({
         ...mockFullUser,
         avatar_url: `avatars/${USER_ID}/profile.png`,
       });
-      mockObjectStorage.createPresignedGetObjectUrl.mockResolvedValue(
-        'https://signed.example/avatar/profile.png',
-      );
 
       const result = await service.getProfile(USER_ID);
 
-      expect(mockObjectStorage.createPresignedGetObjectUrl).toHaveBeenCalledWith(
-        `avatars/${USER_ID}/profile.png`,
-        900,
+      expect(mockObjectStorage.createPresignedGetObjectUrl).not.toHaveBeenCalled();
+      expect(result.avatarUrl).toBe(
+        `${TEST_PUBLIC_AVATAR_BASE_URL}/avatars/${USER_ID}/profile.png`,
       );
-      expect(result.avatarUrl).toBe('https://signed.example/avatar/profile.png');
     });
 
     it('keeps external avatar URL unchanged on profile read', async () => {
