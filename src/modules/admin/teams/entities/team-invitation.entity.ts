@@ -1,11 +1,11 @@
-import { Column, Entity, ManyToOne, JoinColumn, Unique } from 'typeorm';
+import { Column, Entity, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { BaseEntity } from '../../../../common/entities/base.entity';
 import { User } from '../../../users/entities/user.entity';
 import { AdminTeam } from './admin-team.entity';
 import { InviteStatus } from '../enums/invite-status.enum';
 
 @Entity('team_invitations')
-@Unique(['team_id', 'email'])
+@Index(['team_id', 'email'], { unique: true, where: `"status" = 'pending'` })
 export class TeamInvitation extends BaseEntity {
   @Column({ type: 'uuid' })
   team_id: string;
