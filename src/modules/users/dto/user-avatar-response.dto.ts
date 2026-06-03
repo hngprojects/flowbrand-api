@@ -3,9 +3,10 @@ import { ApiProperty } from '@nestjs/swagger';
 export class UserAvatarResponseDto {
   @ApiProperty({
     nullable: true,
-    description: 'Signed avatar URL when present, otherwise null after deletion',
+    description:
+      'Public avatar URL when present (browser-readable), otherwise null after deletion',
     example:
-      'https://storage.example.com/uploads/avatars/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/avatar.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256',
+      'https://storage.example.com/flowbrand-uploads/avatars/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/avatar.jpg',
   })
   avatarUrl: string | null;
 }
