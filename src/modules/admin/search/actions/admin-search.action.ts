@@ -23,6 +23,7 @@ export class AdminSearchModelAction extends AbstractModelAction<User> {
         { email: ILike(pattern) },
       ],
       withDeleted: true,
+      take: 100,
     });
   }
 }

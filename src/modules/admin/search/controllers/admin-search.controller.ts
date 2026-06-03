@@ -6,6 +6,8 @@ import {
   Query,
   UnprocessableEntityException,
   UseGuards,
+  ValidationError,
+  ValidationPipe,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../../../common/decorators/roles.decorator';
@@ -16,6 +18,7 @@ import { UserRole } from '../../../users/enums/user-role.enum';
 import { AdminSearchService } from '../services/admin-search.service';
 import { GetAdminSearchDocs } from '../docs/admin-search-swagger.doc';
 import { IAdminSearchResponse } from '../interfaces/admin-search.interface';
+import { AdminSearchQueryDto } from '../dto/admin-search-query.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth('JWT')
@@ -28,18 +31,31 @@ export class AdminSearchController {
   @Get()
   @HttpCode(HttpStatus.OK)
   @GetAdminSearchDocs()
-  async search(@Query('q') q?: string) {
-    if (!q || q.trim().length < 2) {
-      throw new UnprocessableEntityException({
-        success: false,
-        statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
-        error: 'UnprocessableEntityException',
-        message: SYS_MSG.VALIDATION_FAILED,
-        details: ['q: Search query must be at least 2 characters long'],
-      });
-    }
-
-    const data: IAdminSearchResponse = await this.adminSearchService.search(q.trim());
+  async search(
+    @Query(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+        forbidNonWhitelisted: true,
+        transformOptions: { enableImplicitConversion: true },
+        expectedType: AdminSearchQueryDto,
+        validationError: { target: false, value: false },
+        exceptionFactory: (errors: ValidationError[]) =>
+          new UnprocessableEntityException({
+            success: false,
+            statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+            error: 'UnprocessableEntityException',
+            message: SYS_MSG.VALIDATION_FAILED,
+            details: errors.map(err => {
+              const constraints = err.constraints ? Object.values(err.constraints) : [];
+              return `${err.property}: ${constraints.join(', ')}`;
+            }),
+          }),
+      }),
+    )
+    queryDto: AdminSearchQueryDto,
+  ) {
+    const data: IAdminSearchResponse = await this.adminSearchService.search(queryDto.q.trim());
     return {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.ADMIN_GLOBAL_SEARCH_SUCCESSFUL,

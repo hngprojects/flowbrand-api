@@ -21,7 +21,7 @@ export function GetAdminSearchDocs() {
       type: AdminSearchResponseDto,
     }),
     ApiUnprocessableEntityResponse({
-      description: 'Validation failed (e.g. query query length less than 2)',
+      description: 'Validation failed (e.g. query length less than 2)',
       schema: {
         example: {
           success: false,

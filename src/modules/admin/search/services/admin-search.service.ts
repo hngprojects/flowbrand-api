@@ -33,7 +33,7 @@ export class AdminSearchService {
 
     const results: IAdminSearchResult[] = paginated.map((user) => {
       let status: 'active' | 'inactive' | 'deleted';
-      if (user.deleted_at !== null) {
+      if (user.deleted_at) {
         status = 'deleted';
       } else if (!user.is_active) {
         status = 'inactive';
