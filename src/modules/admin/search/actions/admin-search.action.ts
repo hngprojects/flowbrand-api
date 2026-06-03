@@ -1,7 +1,7 @@
 import { AbstractModelAction } from '@hng-sdk/orm';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { User } from '../../../users/entities/user.entity';
 
 @Injectable()
