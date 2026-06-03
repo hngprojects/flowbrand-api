@@ -34,6 +34,11 @@ export const APP_EVENTS = {
   PASSWORD_CHANGED: 'user.password_changed',
   ACCOUNT_DELETED: 'user.account_deleted',
 
+  // Payment / subscription lifecycle
+  PLAN_UPGRADED: 'plan.upgraded',
+  PAYMENT_FAILED: 'payment.failed',
+  SUBSCRIPTION_CANCELLED: 'subscription.cancelled',
+
   // Notification system
   // Emitted by WeeklyDigestProcessor for users with unread notifications — consumed by NotificationListener.
   NOTIFICATIONS_PENDING: 'notifications.pending',

@@ -103,6 +103,31 @@ export class UserSignedUpEvent {
   ) {}
 }
 
+// Payment / subscription lifecycle
+export class PlanUpgradedEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly plan: string,
+    public readonly reference: string,
+  ) {}
+}
+
+export class PaymentFailedEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly reference: string,
+    public readonly failureReason: string,
+  ) {}
+}
+
+export class SubscriptionCancelledEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly subscriptionId: string,
+    public readonly accessUntil: Date,
+  ) {}
+}
+
 // Notification system
 export class NotificationsPendingEvent {
   constructor(
