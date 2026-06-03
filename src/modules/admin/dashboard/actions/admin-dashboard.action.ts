@@ -1,9 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { EntityManager } from 'typeorm';
+import { DataSource } from 'typeorm';
+import { InjectDataSource } from '@nestjs/typeorm';
 import { User } from '../../../users/entities/user.entity';
 import { Funnel } from '../../../funnels/entities/funnel.entity';
 import { FunnelStage } from '../../../funnels/entities/funnel-stage.entity';
 import { StageStatus } from '../../../funnels/enums/stage-status.enum';
+import { FunnelStatus } from '../../../funnels/enums/funnel-status.enum';
+import { UserModelAction } from '../../../users/actions/user.action';
 import { 
   CountResult, 
   SegmentResult, 
@@ -14,23 +17,27 @@ import {
 
 @Injectable()
 export class AdminDashboardAction {
-  constructor(private readonly manager: EntityManager) {}
+  constructor(
+    private readonly userModelAction: UserModelAction,
+    @InjectDataSource() private readonly dataSource: DataSource,
+  ) {}
 
   async getDashboardStats() {
-    const totalUsers = await this.manager.getRepository(User).count();
+    const userResult = await this.userModelAction.list({ paginationPayload: { page: 1, limit: 1 } });
+    const totalUsers = userResult.paginationMeta?.total ?? 0;
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const activeUsers = await this.manager
+    const activeUsers = await this.dataSource
       .createQueryBuilder(User, 'user')
       .innerJoin('user.auth_metadata', 'auth')
       .where('auth.last_login_at > :date', { date: thirtyDaysAgo })
       .getCount();
 
-    const totalFunnelsGenerated = await this.manager
+    const totalFunnelsGenerated = await this.dataSource
       .createQueryBuilder(Funnel, 'funnel')
-      .where('funnel.status IN (:...statuses)', { statuses: ['active', 'failed'] })
+      .where('funnel.status IN (:...statuses)', { statuses: [FunnelStatus.ACTIVE, FunnelStatus.FAILED] })
       .getCount();
 
     const startOfWeek = new Date();
@@ -39,7 +46,7 @@ export class AdminDashboardAction {
     startOfWeek.setDate(diff);
     startOfWeek.setHours(0, 0, 0, 0);
 
-    const funnelsThisWeek = await this.manager
+    const funnelsThisWeek = await this.dataSource
       .createQueryBuilder(Funnel, 'funnel')
       .where('funnel.created_at >= :startOfWeek', { startOfWeek })
       .getCount();
@@ -57,7 +64,7 @@ export class AdminDashboardAction {
     startOfRange.setDate(startOfRange.getDate() - 6);
     startOfRange.setHours(0, 0, 0, 0);
 
-    const userCounts = await this.manager
+    const userCounts = await this.dataSource
       .createQueryBuilder(User, 'user')
       .select("DATE_TRUNC('day', user.created_at)", 'date')
       .addSelect('COUNT(*)', 'count')
@@ -65,7 +72,7 @@ export class AdminDashboardAction {
       .groupBy("DATE_TRUNC('day', user.created_at)")
       .getRawMany<CountResult>();
 
-    const funnelCounts = await this.manager
+    const funnelCounts = await this.dataSource
       .createQueryBuilder(Funnel, 'funnel')
       .select("DATE_TRUNC('day', funnel.created_at)", 'date')
       .addSelect('COUNT(*)', 'count')
@@ -100,7 +107,7 @@ export class AdminDashboardAction {
   }
 
   async getUserSegments() {
-    const result = await this.manager
+    const result = await this.dataSource
       .createQueryBuilder(User, 'user')
       .select('user.business_type', 'label')
       .addSelect('COUNT(*)', 'count')
@@ -142,7 +149,7 @@ export class AdminDashboardAction {
   }
 
   async getFunnelPerformance() {
-    const result = await this.manager
+    const result = await this.dataSource
       .createQueryBuilder(FunnelStage, 'stage')
       .select('stage.position', 'position')
       .addSelect('MAX(stage.name)', 'name')

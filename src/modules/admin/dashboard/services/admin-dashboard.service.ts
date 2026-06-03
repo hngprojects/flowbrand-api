@@ -40,6 +40,7 @@ export class AdminDashboardService {
     return data;
   }
 
+  /** Returns headline platform KPIs, serving from a 5-minute Redis cache on hit. */
   async getStats(): Promise<DashboardStats> {
     return this.getCachedOrFetch<DashboardStats>(
       redisKeys.adminDashboardStats(),
@@ -47,6 +48,7 @@ export class AdminDashboardService {
     );
   }
 
+  /** Returns 7 daily data points charting new users and funnels over the last week. */
   async getWeeklyOverview(): Promise<WeeklyOverviewItem[]> {
     return this.getCachedOrFetch<WeeklyOverviewItem[]>(
       redisKeys.adminDashboardWeeklyOverview(),
@@ -54,6 +56,7 @@ export class AdminDashboardService {
     );
   }
 
+  /** Returns business-type groupings with percentage distributions summing to 100. */
   async getUserSegments(): Promise<UserSegmentItem[]> {
     return this.getCachedOrFetch<UserSegmentItem[]>(
       redisKeys.adminDashboardUserSegments(),
@@ -61,6 +64,7 @@ export class AdminDashboardService {
     );
   }
 
+  /** Returns completion rates per funnel stage position across all platform funnels. */
   async getFunnelPerformance(): Promise<FunnelPerformanceItem[]> {
     return this.getCachedOrFetch<FunnelPerformanceItem[]>(
       redisKeys.adminDashboardFunnelPerformance(),
