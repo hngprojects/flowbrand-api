@@ -36,6 +36,7 @@ import { AppController } from './app.controller';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 
 function collectValidationErrors(errors: ValidationError[], parentPath = ''): string[] {
   return errors.flatMap((error) => {
@@ -92,6 +93,7 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
     ActivityModule,
     TasksModule,
     AdminModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [
