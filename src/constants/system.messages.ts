@@ -265,3 +265,11 @@ export const ADMIN_DASHBOARD_STATS_RETRIEVED = 'Admin dashboard stats retrieved 
 export const ADMIN_DASHBOARD_WEEKLY_OVERVIEW_RETRIEVED = 'Admin dashboard weekly overview retrieved successfully';
 export const ADMIN_DASHBOARD_USER_SEGMENTS_RETRIEVED = 'Admin dashboard user segments retrieved successfully';
 export const ADMIN_DASHBOARD_FUNNEL_PERFORMANCE_RETRIEVED = 'Admin dashboard funnel performance retrieved successfully';
+
+// Admin teams
+export const INVITATION_EXPIRY_DAYS = 7;
+export const MAX_BATCH_INVITES = 20;
+export const DEFAULT_PAGE = 1;
+export const DEFAULT_LIMIT = 20;
+export const MAX_LIMIT = 100;
+export const INVITE_TOKEN_BYTES = 32;
