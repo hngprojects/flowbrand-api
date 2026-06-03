@@ -45,6 +45,7 @@ export class AuthMetadataModelAction extends AbstractModelAction<AuthMetadata> {
       .where('user_id = :userId', { userId })
       .returning('failed_attempts')
       .execute();
-    return (result.raw[0] as { failed_attempts: number })?.failed_attempts ?? 1;
+    const rows = result.raw as { failed_attempts: number }[];
+    return rows[0]?.failed_attempts ?? 1;
   }
 }
