@@ -328,7 +328,8 @@ export class AuthService {
     }
 
     const lockKey = `otp:verify:lock:${user.id}`;
-    const lockAcquired = await this.redisService.setNx(lockKey, '1', 30);
+    const lockToken = crypto.randomUUID();
+    const lockAcquired = await this.redisService.setNx(lockKey, lockToken, 30);
     if (!lockAcquired) {
       throw new BadRequestException(SYS_MSG.OTP_INVALID);
     }
@@ -364,7 +365,7 @@ export class AuthService {
       const verifiedUser = await this.usersService.markVerified(user.id);
       return this.issueTokens(verifiedUser);
     } finally {
-      await this.redisService.del(lockKey);
+      await this.redisService.releaseLock(lockKey, lockToken);
     }
   }
 
@@ -488,7 +489,8 @@ export class AuthService {
     }
 
     const lockKey = `password-reset:verify:lock:${user.id}`;
-    const lockAcquired = await this.redisService.setNx(lockKey, '1', 30);
+    const lockToken = crypto.randomUUID();
+    const lockAcquired = await this.redisService.setNx(lockKey, lockToken, 30);
     if (!lockAcquired) {
       throw new BadRequestException(SYS_MSG.PASSWORD_RESET_INVALID_OTP);
     }
@@ -533,7 +535,7 @@ export class AuthService {
 
       return { reset_token };
     } finally {
-      await this.redisService.del(lockKey);
+      await this.redisService.releaseLock(lockKey, lockToken);
     }
   }
 

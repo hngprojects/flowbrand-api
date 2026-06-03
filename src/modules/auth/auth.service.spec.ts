@@ -534,6 +534,7 @@ describe('AuthService - Password Reset Flow (BE-012)', () => {
     expire: jest.fn(),
     rateLimit: jest.fn(),
     del: jest.fn(),
+    releaseLock: jest.fn(),
     set: jest.fn(),
     get: jest.fn(),
     getdel: jest.fn(),
@@ -721,17 +722,19 @@ describe('AuthService - Password Reset Flow (BE-012)', () => {
       expect(mockOtpTokenModelAction.delete).toHaveBeenCalled();
     });
 
-    it('acquires the lock with a 30-second TTL (M-3)', async () => {
+    it('acquires the lock with a per-request token and 30-second TTL (M-3)', async () => {
       mockUsersService.findByEmail.mockResolvedValue(validUser);
       mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
 
       await service.verifyResetOtp(USER_EMAIL, OTP_CODE);
 
-      expect(mockRedisService.setNx).toHaveBeenCalledWith(
-        expect.stringContaining('password-reset:verify:lock:'),
-        '1',
-        30,
-      );
+      const [lockKey, lockToken, ttl] = mockRedisService.setNx.mock.calls.find(
+        ([k]: [string]) => k.includes('password-reset:verify:lock:'),
+      ) as [string, string, number];
+      expect(lockKey).toContain('password-reset:verify:lock:');
+      expect(typeof lockToken).toBe('string');
+      expect(lockToken).not.toBe('1');
+      expect(ttl).toBe(30);
     });
   });
 
