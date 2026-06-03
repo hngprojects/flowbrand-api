@@ -48,6 +48,7 @@ import { UploadedDocument } from '../../upload/entities/uploaded-document.entity
 import { StageFeedbackModelAction } from '../actions/stage-feedback.action';
 import { SubmitStageFeedbackDto } from '../dto/submit-stage-feedback.dto';
 import { StageFeedback } from '../entities/stage-feedback.entity';
+import { LlmService } from '../../../queue/interfaces/llm.service.interface';
 
 const STAGE_NAMES = ['Get Noticed', 'Spark Interest', 'Make First Sale', 'Bring Them Back'] as const;
 const QUEUE_DELAY_MS = 250;
@@ -66,6 +67,7 @@ export class FunnelsService {
     private readonly dataSource: DataSource,
     private readonly feedbackAction: StageFeedbackModelAction,
     private readonly eventEmitter: EventEmitter2,
+    private readonly llmService: LlmService,
   ) {}
 
   normalizePagination(page?: number, perPage?: number) {
@@ -447,16 +449,45 @@ export class FunnelsService {
       if (!session) throw new UnprocessableEntityException(SYS_MSG.ONBOARDING_INCOMPLETE);
 
       const step1 = (session.answers?.step_1 ?? {}) as { business_description?: string; business_type?: string };
-      const step3 = (session.answers?.step_3 ?? {}) as { discovery_channel?: string };
+      const step3 = (session.answers?.step_3 ?? {}) as { discovery_channel?: string | string[] };
       const user = await this.funnelAction.getUserProfile(userId);
 
-      const businessName = this.coerceString(step1.business_description) || DEFAULT_BUSINESS_NAME;
+      const description = this.coerceString(step1.business_description);
+      let businessName = DEFAULT_BUSINESS_NAME;
+      if (description) {
+        try {
+          businessName = await this.llmService.extractBusinessNameWithGemini(description);
+        } catch (err) {
+          this.logger.warn({
+            message: 'Gemini business name extraction failed, trying Groq',
+            error: (err as Error).message,
+          });
+          try {
+            businessName = await this.llmService.extractBusinessNameWithGroq(description);
+          } catch (groqErr) {
+            this.logger.warn({
+              message: 'Groq business name extraction failed, falling back to default',
+              error: (groqErr as Error).message,
+            });
+            businessName = description.length <= 60 ? description : DEFAULT_BUSINESS_NAME;
+          }
+        }
+      }
+
+      let discoveryChannelStr = 'unknown';
+      const rawChannel = step3.discovery_channel;
+      if (Array.isArray(rawChannel)) {
+        discoveryChannelStr = rawChannel.join(', ');
+      } else if (typeof rawChannel === 'string' && rawChannel.trim()) {
+        discoveryChannelStr = rawChannel.trim();
+      }
+
       const businessType = this.coerceString(step1.business_type) || this.coerceString(user?.business_type) || 'unknown';
       const businessContext: BusinessContext = {
         businessType,
-        discoveryChannel: this.coerceString(step3.discovery_channel) || 'unknown',
+        discoveryChannel: discoveryChannelStr,
         business_name: businessName,
-        business_description: this.coerceString(step1.business_description) || '',
+        business_description: description,
         target_customer: this.coerceString(user?.target_customer) || '',
       };
       return { businessName, businessContext };

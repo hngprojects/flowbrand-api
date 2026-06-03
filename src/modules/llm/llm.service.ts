@@ -174,6 +174,106 @@ export class LlmServiceImpl extends LlmService {
     return stages;
   }
 
+  async extractBusinessNameWithGemini(description: string): Promise<string> {
+    const apiKey = this.config.get<string>('llm.geminiApiKey');
+    const model = this.config.get<string>('llm.geminiModel') ?? 'gemini-2.5-flash';
+    const timeoutMs = this.config.get<number>('llm.geminiTimeoutMs') ?? 60_000;
+
+    if (!apiKey) {
+      throw new Error(SYS_MSG.AI_GEMINI_API_KEY_MISSING);
+    }
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const systemPrompt = 'Extract a concise business name (≤ 60 chars) from the provided business description. Return ONLY the business name. No extra commentary, no quotes, no markdown, no punctuatio
+
+    const body = JSON.stringify({
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ role: 'user', parts: [{ text: description }] }],
+      generationConfig: { maxOutputTokens: 100, temperature: 0.2 },
+    });
+
+    let raw: string;
+    try {
+      raw = await this.fetchWithTimeout(
+        url,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body,
+        },
+        timeoutMs,
+        'Gemini-NameExtract',
+      );
+    } catch (err) {
+      this.logger.error({
+        provider: 'Gemini-NameExtract',
+        error: (err as Error).message,
+        context: { description: description.slice(0, 100) },
+      });
+      throw err;
+    }
+
+    const text = this.extractGeminiText(raw);
+    const cleaned = text.replace(/["']/g, '').trim();
+    if (!cleaned) {
+      throw new Error('Empty business name extracted');
+    }
+    return cleaned.slice(0, 100);
+  }
+
+  async extractBusinessNameWithGroq(description: string): Promise<string> {
+    const apiKey = this.config.get<string>('llm.groqApiKey');
+    const model = this.config.get<string>('llm.groqModel') ?? 'llama-3.3-70b-versatile';
+    const timeoutMs = this.config.get<number>('llm.groqTimeoutMs') ?? 60_000;
+
+    if (!apiKey) {
+      throw new Error(SYS_MSG.AI_GROQ_API_KEY_MISSING);
+    }
+
+    const systemPrompt = 'Extract a concise business name (≤ 60 chars) from the provided business description. Return ONLY the business name. No extra commentary, no quotes, no markdown, no punctuatio
+
+    const body = JSON.stringify({
+      model,
+      max_tokens: 100,
+      temperature: 0.2,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: description },
+      ],
+    });
+
+    let raw: string;
+    try {
+      raw = await this.fetchWithTimeout(
+        'https://api.groq.com/openai/v1/chat/completions',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body,
+        },
+        timeoutMs,
+        'Groq-NameExtract',
+      );
+    } catch (err) {
+      this.logger.error({
+        provider: 'Groq-NameExtract',
+        error: (err as Error).message,
+        context: { description: description.slice(0, 100) },
+      });
+      throw err;
+    }
+
+    const text = this.extractGroqText(raw);
+    const cleaned = text.replace(/["']/g, '').trim();
+    if (!cleaned) {
+      throw new Error('Empty business name extracted');
+    }
+    return cleaned.slice(0, 100);
+  }
+
   buildPrompt(ctx: BusinessContext): string {
     return [
       `Business type: ${ctx.businessType}`,

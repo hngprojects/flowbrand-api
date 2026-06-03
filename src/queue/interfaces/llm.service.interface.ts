@@ -6,6 +6,8 @@ import type { LlmStageData } from '../../modules/funnels/interfaces/llm-stage-da
 export abstract class LlmService {
   abstract generateWithGemini(ctx: BusinessContext): Promise<LlmStageData[]>;
   abstract generateWithGroq(ctx: BusinessContext): Promise<LlmStageData[]>;
+  abstract extractBusinessNameWithGemini(description: string): Promise<string>;
+  abstract extractBusinessNameWithGroq(description: string): Promise<string>;
 }
 
 // Placeholder until BE-304 lands — always throws, forcing template fallback.
@@ -15,6 +17,16 @@ export class NullLlmService extends LlmService {
   }
 
   generateWithGroq(): Promise<LlmStageData[]> {
+    return Promise.reject(new Error('LLM not configured — awaiting BE-304'));
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  extractBusinessNameWithGemini(description: string): Promise<string> {
+    return Promise.reject(new Error('LLM not configured — awaiting BE-304'));
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  extractBusinessNameWithGroq(description: string): Promise<string> {
     return Promise.reject(new Error('LLM not configured — awaiting BE-304'));
   }
 }
