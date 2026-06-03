@@ -1,3 +1,5 @@
+import { StageStatus } from '../../../funnels/enums/stage-status.enum';
+
 export interface DashboardStats {
   totalUsers: number;
   activeUsers: number;
@@ -36,7 +38,7 @@ export interface SegmentResult {
 export interface StageCountResult {
   position: number;
   name: string;
-  status: string;
+  status: StageStatus;
   count: string;
 }
 
