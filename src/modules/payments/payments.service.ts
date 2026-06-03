@@ -78,6 +78,17 @@ export class PaymentsService {
       });
     } catch (err: unknown) {
       if (err instanceof QueryFailedError && (err as { code?: string }).code === '23505') {
+        // Row exists — may be a fully-completed prior attempt or a partially-failed one
+         
+        const existing: Payment | null = await this.paymentModelAction.get({
+          identifierOptions: { idempotency_key: idempotencyKey },
+        });
+        if (existing?.provider_reference) {
+          // Prior attempt fully succeeded — idempotent return, no second provider call
+          return { reference: existing.provider_reference, authorizationUrl: '', provider: existing.provider };
+        }
+        // Row has no reference — prior attempt failed between provider call and DB update.
+        // 409 is correct: client should call verifyPayment to reconcile.
         throw new ConflictException(SYS_MSG.PAYMENT_ALREADY_INITIATED);
       }
       throw err;
@@ -154,6 +165,21 @@ export class PaymentsService {
       });
     } catch (err: unknown) {
       if (err instanceof QueryFailedError && (err as { code?: string }).code === '23505') {
+        // Row exists — check if a prior completed attempt left a subscription code
+         
+        const { payload: subs } = await this.subscriptionModelAction.find({
+          findOptions: { user_id: userId, plan: dto.plan },
+          order: { created_at: 'DESC' },
+          paginationPayload: { limit: 1, page: 1 },
+          transactionOptions: { useTransaction: false },
+        });
+        const existing: Subscription | undefined = subs[0];
+        if (existing?.provider_subscription_code) {
+          // Prior attempt fully succeeded — idempotent return
+          return { subscriptionCode: existing.provider_subscription_code, authorizationUrl: '', provider: env.PAYMENT_PROVIDER };
+        }
+        // Subscription exists but has no code — prior attempt failed after DB write but before provider update.
+        // 409 is correct: the in-flight subscription must be resolved before creating another.
         throw new ConflictException(SYS_MSG.SUBSCRIPTION_ALREADY_ACTIVE);
       }
       throw err;
@@ -191,8 +217,12 @@ export class PaymentsService {
   }
 
   /**
-   * Deterministic idempotency key scoped to user + intent + 1-hour window.
-   * Same request within the window hits the unique index → 409 instead of double charge.
+   * Deterministic idempotency key for dedup within a 1-hour window.
+   *
+   * LIMITATION: Requests that span an hour boundary (e.g. 10:59:59 → 11:00:01) produce
+   * different keys and bypass the unique index guard, allowing a duplicate charge.
+   * The correct fix is a client-supplied Idempotency-Key header passed through the
+   * controller — see M4-BE-020. Do not rely on this method for cross-hour dedup.
    */
   private buildIdempotencyKey(userId: string, plan: string, type: string): string {
     const windowHour = Math.floor(Date.now() / (60 * 60 * 1000));
