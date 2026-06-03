@@ -226,6 +226,7 @@ describe('NotificationListener', () => {
           cardLast4: '4242',
           cardBrand: 'Visa',
           reference: 'ref-uuid-001',
+          paidAt: 'May 4, 2026',
         }),
         'user-1',
       );
@@ -245,6 +246,27 @@ describe('NotificationListener', () => {
       expect(emailService.sendPaymentSuccessful).toHaveBeenCalledWith(
         'ada@seil.app',
         expect.objectContaining({ amount: '₦0.00' }),
+        'user-1',
+      );
+      expect(warnSpy).toHaveBeenCalled();
+
+      warnSpy.mockRestore();
+    });
+
+    it('AC-10: passes paidAt as null when paid_at is missing — template omits the date row', async () => {
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      paymentModelAction.findByReference.mockResolvedValueOnce({
+        amount: 1_000_000,
+        card_last4: '4242',
+        card_brand: 'Visa',
+        paid_at: null,
+      });
+
+      await listener.onPlanUpgraded(planUpgraded());
+
+      expect(emailService.sendPaymentSuccessful).toHaveBeenCalledWith(
+        'ada@seil.app',
+        expect.objectContaining({ paidAt: null }),
         'user-1',
       );
       expect(warnSpy).toHaveBeenCalled();
@@ -352,10 +374,7 @@ describe('NotificationListener', () => {
 
       expect(emailService.sendSubscriptionCancelled).toHaveBeenCalledWith(
         'ada@seil.app',
-        expect.objectContaining({
-          name: 'Ada',
-          accessUntil: expect.stringContaining('2026'),
-        }),
+        { name: 'Ada', accessUntil: 'June 30, 2026' },
         'user-1',
       );
     });
@@ -392,16 +411,10 @@ describe('NotificationListener', () => {
       expect(emailService.sendNotificationAlert).not.toHaveBeenCalled();
     });
 
-    it('EC-02: missing preferences row → defaults (treated as true) → email sent', async () => {
-      notificationsService.getNotificationPreferences.mockResolvedValueOnce({
-        ...allPrefsOn(),
-        email_weekly_digest: true,
-      });
-
-      await listener.onNotificationsPending(notificationsPending());
-
-      expect(emailService.sendNotificationAlert).toHaveBeenCalled();
-    });
+    // EC-02 (missing preferences row → defaults) is NOT tested at listener level.
+    // NotificationsService.getNotificationPreferences() always creates a default row
+    // when none exists — it never returns a partial or empty object to the listener.
+    // Default-row creation is covered by notifications.service.spec.ts.
 
     it('EC-01: emailService failure is swallowed and does not rethrow', async () => {
       const loggerSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);

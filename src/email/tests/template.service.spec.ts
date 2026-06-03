@@ -16,7 +16,7 @@ const FUNNEL_READY_HBS = `<p>Hi {{name}}</p><p>Your funnel for {{businessName}} 
 const STAGE_UNLOCKED_HBS = `<p>Hi {{name}}</p><p>{{stageName}} is now active</p>`;
 const STAGE_COMPLETED_HBS = `<p>Hi {{name}}</p><p>You completed {{stageName}}</p>`;
 const WEEKLY_DIGEST_HBS = `<p>Hi {{name}}</p><p>{{completedTasks}} of {{totalTasks}}</p>`;
-const PAYMENT_SUCCESSFUL_HBS = `<p>Hi {{name}}</p><p>{{amount}}</p>{{#if cardLast4}}<p>{{cardLast4}}</p>{{/if}}<p>{{reference}}</p><p>{{paidAt}}</p>`;
+const PAYMENT_SUCCESSFUL_HBS = `<p>Hi {{name}}</p><p>{{amount}}</p>{{#if cardLast4}}<p>{{cardLast4}}</p>{{/if}}<p>{{reference}}</p>{{#if paidAt}}<p>{{paidAt}}</p>{{/if}}`;
 const PAYMENT_FAILED_HBS = `<p>Hi {{name}}</p>{{#if failureReason}}<p>{{failureReason}}</p>{{/if}}<a href="{{upgradeUrl}}">Update</a>`;
 const SUBSCRIPTION_CANCELLED_HBS = `<p>Hi {{name}}</p><p>{{accessUntil}}</p><a href="{{upgradeUrl}}">Reactivate</a>`;
 const NOTIFICATION_ALERT_HBS = `<p>Hi {{name}}</p><p>{{unreadCount}}</p><a href="{{notificationPreferencesUrl}}">Preferences</a>`;
