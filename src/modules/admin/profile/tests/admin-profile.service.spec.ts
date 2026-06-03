@@ -22,9 +22,7 @@ jest.mock('bcrypt', () => ({
 const mockAdminProfileAction = {
   findById: jest.fn(),
   updateProfile: jest.fn(),
-  updatePasswordHash: jest.fn(),
   updatePasswordAndRevokeSessions: jest.fn(),
-  revokeAllSessions: jest.fn(),
 };
 
 const mockUserRoleModelAction = {
@@ -242,7 +240,6 @@ describe('AdminProfileService', () => {
       (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
       mockAdminProfileAction.findById.mockResolvedValue(ADMIN_USER);
       mockAdminProfileAction.updatePasswordAndRevokeSessions.mockResolvedValue(undefined);
-      mockAdminProfileAction.revokeAllSessions.mockResolvedValue(2);
     });
 
     it('AC-01: returns successfully for correct old password and valid new password', async () => {
@@ -251,8 +248,6 @@ describe('AdminProfileService', () => {
       expect(bcrypt.compare).toHaveBeenCalledWith(dto.old_password, ADMIN_USER.password_hash);
       expect(bcrypt.hash).toHaveBeenCalledWith(dto.new_password, 12);
       expect(mockAdminProfileAction.updatePasswordAndRevokeSessions).toHaveBeenCalledWith(ADMIN_ID, 'new-hash');
-      expect(mockAdminProfileAction.updatePasswordHash).not.toHaveBeenCalled();
-      expect(mockAdminProfileAction.revokeAllSessions).not.toHaveBeenCalled();
       expect(mockLogService.logAction).toHaveBeenCalledWith({
         admin_id: ADMIN_ID,
         action_type: AdminProfileActionType.PASSWORD_CHANGED,
@@ -268,8 +263,6 @@ describe('AdminProfileService', () => {
         new UnauthorizedException(SYS_MSG.ADMIN_OLD_PASSWORD_INCORRECT),
       );
 
-      expect(mockAdminProfileAction.updatePasswordHash).not.toHaveBeenCalled();
-      expect(mockAdminProfileAction.revokeAllSessions).not.toHaveBeenCalled();
       expect(mockLogService.logAction).toHaveBeenCalledWith({
         admin_id: ADMIN_ID,
         action_type: AdminProfileActionType.PASSWORD_CHANGED,
@@ -288,8 +281,6 @@ describe('AdminProfileService', () => {
       ).rejects.toThrow(new UnprocessableEntityException(SYS_MSG.INCORRECT_CONFIRM_PASSWORD));
 
       expect(mockAdminProfileAction.updatePasswordAndRevokeSessions).not.toHaveBeenCalled();
-      expect(mockAdminProfileAction.updatePasswordHash).not.toHaveBeenCalled();
-      expect(mockAdminProfileAction.revokeAllSessions).not.toHaveBeenCalled();
     });
 
     it('AC-05 / EC-01: throws HTTP 422 when new_password is the same as old_password', async () => {
@@ -303,7 +294,7 @@ describe('AdminProfileService', () => {
         new UnprocessableEntityException(SYS_MSG.ADMIN_NEW_PASSWORD_MUST_DIFFER_FROM_OLD),
       );
 
-      expect(mockAdminProfileAction.updatePasswordHash).not.toHaveBeenCalled();
+      expect(mockAdminProfileAction.updatePasswordAndRevokeSessions).not.toHaveBeenCalled();
     });
 
     it('AC-06 / SEC-02: revokes all existing sessions after successful password change', async () => {
@@ -366,7 +357,7 @@ describe('AdminProfileService', () => {
       });
     });
 
-    it('throws 500 when updatePasswordHash returns null', async () => {
+    it('throws 500 when transactional password update fails', async () => {
       mockAdminProfileAction.updatePasswordAndRevokeSessions.mockRejectedValue(new Error('db failure'));
 
       await expect(service.changePassword(ADMIN_ID, dto)).rejects.toThrow(

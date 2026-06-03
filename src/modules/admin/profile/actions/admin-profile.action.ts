@@ -25,14 +25,6 @@ export class AdminProfileModelAction extends AbstractModelAction<User> {
     });
   }
 
-  async updatePasswordHash(userId: string, passwordHash: string): Promise<User | null> {
-    return this.update({
-      transactionOptions: { useTransaction: false },
-      identifierOptions: { id: userId },
-      updatePayload: { password_hash: passwordHash },
-    });
-  }
-
   async updatePasswordAndRevokeSessions(userId: string, passwordHash: string): Promise<void> {
     await this.repository.manager.transaction(async (manager) => {
       const passwordUpdate = await manager.getRepository(User).update(
@@ -49,14 +41,5 @@ export class AdminProfileModelAction extends AbstractModelAction<User> {
         { is_revoked: true, revoked_at: new Date() },
       );
     });
-  }
-
-  async revokeAllSessions(userId: string): Promise<number> {
-    const result = await this.repository.manager.getRepository(UserSession).update(
-      { user_id: userId, is_revoked: false },
-      { is_revoked: true, revoked_at: new Date() },
-    );
-
-    return result.affected ?? 0;
   }
 }

@@ -1,5 +1,4 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
 import { IsNotEmpty, IsString, Matches, MinLength } from 'class-validator';
 import { MatchesField } from '../../../../common/decorators/match-field.decorator';
 import * as SYS_MSG from '../../../../constants/system.messages';
@@ -11,7 +10,6 @@ export class ChangeAdminPasswordDto {
   })
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }: { value: unknown }) => value)
   old_password: string;
 
   @ApiProperty({
@@ -21,7 +19,6 @@ export class ChangeAdminPasswordDto {
   })
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }: { value: unknown }) => value)
   @MinLength(8)
   @Matches(/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/, {
     message: SYS_MSG.ADMIN_INVALID_PASSWORD_VALUE,
@@ -34,7 +31,6 @@ export class ChangeAdminPasswordDto {
   })
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }: { value: unknown }) => value)
   @MatchesField('new_password', { message: SYS_MSG.INCORRECT_CONFIRM_PASSWORD })
   confirm_password: string;
 }

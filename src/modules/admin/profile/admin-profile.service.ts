@@ -87,6 +87,7 @@ export class AdminProfileService {
     return this.toProfileResponse(updated, fallbackRole);
   }
 
+  /** Verifies old password with bcrypt, hashes the new one, then atomically updates password_hash and revokes all sessions. */
   async changePassword(adminId: string, dto: ChangeAdminPasswordDto): Promise<void> {
     const admin = await this.adminProfileAction.findById(adminId);
     if (!admin) {
@@ -104,14 +105,14 @@ export class AdminProfileService {
       throw new UnprocessableEntityException(SYS_MSG.INCORRECT_CONFIRM_PASSWORD);
     }
 
+    if (dto.new_password === dto.old_password) {
+      throw new UnprocessableEntityException(SYS_MSG.ADMIN_NEW_PASSWORD_MUST_DIFFER_FROM_OLD);
+    }
+
     const oldPasswordMatches = await bcrypt.compare(dto.old_password, admin.password_hash);
     if (!oldPasswordMatches) {
       await this.logPasswordChangeFailure(adminId, 'old_password_incorrect');
       throw new UnauthorizedException(SYS_MSG.ADMIN_OLD_PASSWORD_INCORRECT);
-    }
-
-    if (dto.new_password === dto.old_password) {
-      throw new UnprocessableEntityException(SYS_MSG.ADMIN_NEW_PASSWORD_MUST_DIFFER_FROM_OLD);
     }
 
     const hashedPassword = await bcrypt.hash(dto.new_password, ADMIN_PASSWORD_BCRYPT_SALT_ROUNDS);
