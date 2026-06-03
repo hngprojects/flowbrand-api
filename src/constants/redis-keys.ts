@@ -10,4 +10,9 @@ export const redisKeys = {
 
   passwordResetRate: (userId: string) =>
     `password-reset:rate:${userId}`,
+
+  adminDashboardStats: () => 'admin-dashboard:stats',
+  adminDashboardWeeklyOverview: () => 'admin-dashboard:weekly-overview',
+  adminDashboardUserSegments: () => 'admin-dashboard:user-segments',
+  adminDashboardFunnelPerformance: () => 'admin-dashboard:funnel-performance',
 };
