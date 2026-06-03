@@ -5,10 +5,9 @@ import { AdminDashboardAction } from './actions/admin-dashboard.action';
 import { RedisModule } from '../../redis/redis.module';
 import { AdminAuthModule } from '../auth/admin-auth.module';
 import { UsersModule } from '../../users/users.module';
-import { FunnelsModule } from '../../funnels/funnels.module';
 
 @Module({
-  imports: [RedisModule, AdminAuthModule, UsersModule, FunnelsModule],
+  imports: [RedisModule, AdminAuthModule, UsersModule],
   controllers: [AdminDashboardController],
   providers: [AdminDashboardService, AdminDashboardAction],
 })
