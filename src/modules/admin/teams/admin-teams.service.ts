@@ -13,7 +13,7 @@ import { PinoLoggerService } from '../../../common/logger/pino-logger.service';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { PaginationDto } from '../../users/dto/pagination.dto';
 
-interface InviteResult {
+export interface InviteResult {
   email: string;
   status: 'sent' | 'failed';
   reason?: string;
