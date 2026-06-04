@@ -8,14 +8,17 @@ import { TeamMembershipModelAction } from './actions/team-membership.action';
 import { TeamInvitationModelAction } from './actions/team-invitation.action';
 import { AdminTeamsController } from './admin-teams.controller';
 import { AdminTeamsService } from './admin-teams.service';
-import { EmailService } from '../../../email/email.service';
+import { EmailModule } from '../../../email/email.module';
 import { QueueModule } from '../../../queue/queue.module';
+import { AdminAuthModule } from '../auth/admin-auth.module';
 import { User } from '../../users/entities/user.entity';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([AdminTeam, TeamMembership, TeamInvitation, User]),
     QueueModule,
+    EmailModule,
+    AdminAuthModule,
   ],
   controllers: [AdminTeamsController],
   providers: [
@@ -23,7 +26,6 @@ import { User } from '../../users/entities/user.entity';
     TeamMembershipModelAction,
     TeamInvitationModelAction,
     AdminTeamsService,
-    EmailService,
   ],
   exports: [AdminTeamsService],
 })
