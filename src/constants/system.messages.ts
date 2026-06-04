@@ -244,6 +244,12 @@ export const ACCOUNT_EXISTS_WITH_RETENTION =
 // Tasks
 export const REAPER_TRIGGERED_SUCCESSFULLY = 'Background reaper triggered successfully';
 
+// Rate limits
+export const AUTH_REGISTER_RATE_LIMITED = 'Too many registration attempts. Please try again in an hour.';
+export const AUTH_LOGIN_RATE_LIMITED = 'Too many login attempts from this IP. Please try again later.';
+export const AUTH_REFRESH_RATE_LIMITED = 'Too many token refresh requests. Please try again later.';
+export const UPLOAD_RATE_LIMIT_EXCEEDED = 'Upload limit reached. You can upload up to 20 batches per hour.';
+
 // Admin auth
 export const ADMIN_LOGIN_SUCCESSFUL = 'Admin login successful';
 export const ADMIN_LOGOUT_SUCCESSFUL = 'Admin logout successful';
@@ -261,12 +267,22 @@ export const ADMIN_PROFILE_NOT_FOUND = 'Admin profile not found';
 export const ADMIN_PROFILE_UPDATE_FAILED = 'Failed to update admin profile';
 export const ADMIN_PROFILE_EMAIL_CHANGE_FORBIDDEN = 'Email cannot be changed here';
 export const ADMIN_PROFILE_RESPONSE_ROLE_RESOLUTION_FAILED = 'Failed to resolve admin role for profile response';
+export const ADMIN_PASSWORD_UPDATED_SUCCESSFULLY = 'Password updated successfully';
+export const ADMIN_OLD_PASSWORD_INCORRECT = 'Old password is incorrect';
+export const ADMIN_NEW_PASSWORD_MUST_DIFFER_FROM_OLD =
+  'New password must be different from your current password';
+export const ADMIN_CONFIRM_PASSWORD_MISMATCH = 'Confirm password must match new password';
+export const ADMIN_PASSWORD_POLICY_VALIDATION_FAILED =
+  'new_password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, one digit, and one symbol';
 export const ADMIN_DASHBOARD_STATS_RETRIEVED = 'Admin dashboard stats retrieved successfully';
 export const ADMIN_DASHBOARD_WEEKLY_OVERVIEW_RETRIEVED = 'Admin dashboard weekly overview retrieved successfully';
 export const ADMIN_DASHBOARD_USER_SEGMENTS_RETRIEVED = 'Admin dashboard user segments retrieved successfully';
 export const ADMIN_DASHBOARD_FUNNEL_PERFORMANCE_RETRIEVED = 'Admin dashboard funnel performance retrieved successfully';
+export const ADMIN_GLOBAL_SEARCH_SUCCESSFUL = 'Admin global search results retrieved successfully';
 
 // Payment messages
 export const PAYMENT_FAILED = 'Payment could not be processed';
 export const PAYMENT_PROVIDER_NOT_IMPLEMENTED = 'Payment provider is not yet implemented';
 export const PAYMENT_PRICE_ZERO_FALLBACK = 'Price is zero or missing — using placeholder value';
+
+

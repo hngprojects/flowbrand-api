@@ -36,7 +36,7 @@ export interface WizardAnswers {
     customer_tags?: { type?: string[]; location?: string[]; wants?: string[] };
     additional_notes?: string;
   };
-  step_3?: { discovery_channel?: string };
+  step_3?: { discovery_channel?: string | string[] };
 }
 export interface OnboardingCompleteResult {
   statusCode: number;

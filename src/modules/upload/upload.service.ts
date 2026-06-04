@@ -2,6 +2,8 @@ import {
   Inject,
   Injectable,
   Logger,
+  HttpException,
+  HttpStatus,
   NotFoundException,
   UnprocessableEntityException,
   BadRequestException,
@@ -13,6 +15,8 @@ import { InjectQueue } from '@nestjs/bull';
 import type { Queue } from 'bull';
 import { JOBS, QUEUES } from '../../common/constants/queue.constants';
 import * as SYS_MSG from '../../constants/system.messages';
+import { redisKeys } from '../../constants/redis-keys';
+import { RedisService } from '../redis/redis.service';
 import { UploadedDocumentModelAction } from './actions/uploaded-document.action';
 import { ALLOWED_UPLOAD_RULES, MAX_UPLOAD_BYTES, UPLOAD_PROGRESS } from './constants/upload.constants';
 import { UploadFileConstraints } from './dto/upload-files.dto';
@@ -37,6 +41,7 @@ export class UploadService {
     private readonly extractionQueue: Queue,
     @Inject(UPLOAD_OBJECT_STORAGE)
     private readonly objectStorage: ObjectStorage,
+    private readonly redisService: RedisService,
   ) {}
 
   async handleUpload(userId: string, files: Express.Multer.File[] | undefined): Promise<UploadBatchResponse> {
@@ -45,6 +50,11 @@ export class UploadService {
         error: 'UnprocessableEntityException',
         message: SYS_MSG.FUNNEL_UPLOAD_FILES_REQUIRED,
       });
+    }
+
+    const { exceeded } = await this.redisService.rateLimit(redisKeys.uploadRateLimit(userId), 20, 3600);
+    if (exceeded) {
+      throw new HttpException(SYS_MSG.UPLOAD_RATE_LIMIT_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS);
     }
 
     if (files.length > UploadFileConstraints.MAX_FILES) {

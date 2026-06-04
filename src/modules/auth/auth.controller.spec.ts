@@ -28,17 +28,23 @@ describe('AuthController Google OAuth', () => {
   });
 
   it('redirects to /onboarding with the short-lived exchange code after Google callback', async () => {
-    mockAuthService.initiateOAuthExchange.mockResolvedValue('mock-exchange-code-xyz');
+    const originalFrontendUrl = process.env.FRONTEND_URL;
+    process.env.FRONTEND_URL = 'http://localhost:3000';
+    try {
+      mockAuthService.initiateOAuthExchange.mockResolvedValue('mock-exchange-code-xyz');
 
-    const redirect = jest.fn();
+      const redirect = jest.fn();
 
-    await controller.googleAuthRedirect({ user: { email: 'jane@example.com' } } as never, { redirect } as never);
+      await controller.googleAuthRedirect({ user: { email: 'jane@example.com' } } as never, { redirect } as never);
 
-    expect(mockAuthService.initiateOAuthExchange).toHaveBeenCalledWith({ email: 'jane@example.com' });
-    expect(redirect).toHaveBeenCalledWith(
-      HttpStatus.FOUND,
-      'http://localhost:3000/onboarding?code=mock-exchange-code-xyz',
-    );
+      expect(mockAuthService.initiateOAuthExchange).toHaveBeenCalledWith({ email: 'jane@example.com' });
+      expect(redirect).toHaveBeenCalledWith(
+        HttpStatus.FOUND,
+        'http://localhost:3000/onboarding?code=mock-exchange-code-xyz',
+      );
+    } finally {
+      process.env.FRONTEND_URL = originalFrontendUrl;
+    }
   });
 
   it('throws unauthorized when Google callback has no payload', async () => {
