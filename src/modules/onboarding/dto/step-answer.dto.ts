@@ -17,13 +17,14 @@ import {
     ValidationArguments,
     ValidatorConstraint,
     ValidatorConstraintInterface,
+    ArrayMinSize,
 } from "class-validator";
 
 export class Step1AnswerDto {
-    @ApiProperty({ description: 'Business Description', minLength: 1, maxLength: 500 })
+    @ApiProperty({ description: 'Business Description', minLength: 1, maxLength: 2000 })
     @IsString()
     @MinLength(1)
-    @MaxLength(500, { message: 'Business description must be 500 characters or less' })
+    @MaxLength(2000, { message: 'Business description must be 2000 characters or less' })
     business_description: string
 }
 
@@ -85,9 +86,11 @@ export enum DiscoveryChannel {
 }
 
 export class Step3AnswerDto {
-  @ApiProperty({ enum: DiscoveryChannel })
-  @IsEnum(DiscoveryChannel)
-  discovery_channel: DiscoveryChannel;
+  @ApiProperty({ enum: DiscoveryChannel, isArray: true })
+  @IsArray()
+  @IsEnum(DiscoveryChannel, { each: true })
+  @ArrayMinSize(1, { message: 'At least one discovery channel must be selected' })
+  discovery_channel: DiscoveryChannel[];
 }
 
 export class StepAnswerDto {
