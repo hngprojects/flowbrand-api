@@ -34,6 +34,8 @@ Rules:
 - Plain text only inside field values — no nested JSON, no HTML.
 - Return ONLY the JSON object. No text before or after. No markdown.`;
 
+const MAX_FUNNEL_NAME_LENGTH = 60;
+
 const EXPECTED_STAGE_COUNT = 4;
 const TASKS_MIN = 2;
 const TASKS_MAX = 3;
@@ -185,7 +187,7 @@ export class LlmServiceImpl extends LlmService {
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     const systemPrompt =
-      'Generate a short, memorable name (≤ 60 chars) for a marketing funnel based on the business context. ' +
+      `Generate a short, memorable name (≤ ${MAX_FUNNEL_NAME_LENGTH} chars) for a marketing funnel based on the business context. ` +
       'Make it specific and brandable. ' +
       'Return ONLY the name. No quotes, no markdown, no punctuation unless part of the name.';
     const userMessage = [
@@ -217,7 +219,7 @@ export class LlmServiceImpl extends LlmService {
       this.logger.error({
         provider: 'Gemini-FunnelName',
         error: (err as Error).message,
-        context: { description: description.slice(0, 100) },
+        context: { descriptionLength: description.length, hasDiscoveryChannel: discoveryChannel !== 'unknown' },
       });
       throw err;
     }
@@ -227,7 +229,7 @@ export class LlmServiceImpl extends LlmService {
     if (!cleaned) {
       throw new Error('Empty funnel name generated');
     }
-    return cleaned.slice(0, 100);
+    return cleaned.slice(0, MAX_FUNNEL_NAME_LENGTH);
   }
 
   async generateFunnelNameWithGroq(description: string, discoveryChannel: string): Promise<string> {
@@ -240,7 +242,7 @@ export class LlmServiceImpl extends LlmService {
     }
 
     const systemPrompt =
-      'Generate a short, memorable name (≤ 60 chars) for a marketing funnel based on the business context. ' +
+      `Generate a short, memorable name (≤ ${MAX_FUNNEL_NAME_LENGTH} chars) for a marketing funnel based on the business context. ` +
       'Make it specific and brandable. ' +
       'Return ONLY the name. No quotes, no markdown, no punctuation unless part of the name.';
     const userMessage = [
@@ -279,7 +281,7 @@ export class LlmServiceImpl extends LlmService {
       this.logger.error({
         provider: 'Groq-FunnelName',
         error: (err as Error).message,
-        context: { description: description.slice(0, 100) },
+        context: { descriptionLength: description.length, hasDiscoveryChannel: discoveryChannel !== 'unknown' },
       });
       throw err;
     }
@@ -289,7 +291,7 @@ export class LlmServiceImpl extends LlmService {
     if (!cleaned) {
       throw new Error('Empty funnel name generated');
     }
-    return cleaned.slice(0, 100);
+    return cleaned.slice(0, MAX_FUNNEL_NAME_LENGTH);
   }
 
   buildPrompt(ctx: BusinessContext): string {

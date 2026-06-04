@@ -649,6 +649,25 @@ describe('FunnelsService', () => {
       expect(saved.funnel_name).toBe('My Funnel');
     });
 
+    it('joins multiple discovery channels into a comma-separated string for the LLM', async () => {
+      funnelAction.findByIdempotency.mockResolvedValue(null);
+      funnelAction.getLatestCompletedWizard.mockResolvedValue({
+        ...COMPLETE_WIZARD,
+        answers: {
+          ...COMPLETE_WIZARD.answers,
+          step_3: { discovery_channel: ['Instagram', 'WhatsApp'] },
+        },
+      } as WizardSession);
+      mockLlmService.generateFunnelNameWithGemini.mockResolvedValueOnce('Jollof Spot');
+
+      await service.createGeneration(USER_ID, BASE_DTO);
+
+      expect(mockLlmService.generateFunnelNameWithGemini).toHaveBeenCalledWith(
+        'Casual jollof spot',
+        'Instagram, WhatsApp',
+      );
+    });
+
     it('uses user profile fields for businessType and target_customer', async () => {
       funnelAction.findByIdempotency.mockResolvedValue(null);
       funnelAction.getLatestCompletedWizard.mockResolvedValue(COMPLETE_WIZARD as WizardSession);
