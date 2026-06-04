@@ -219,8 +219,8 @@ describe('LlmServiceImpl', () => {
     });
   });
 
-  describe('extractBusinessNameWithGemini', () => {
-    it('returns extracted and sanitized name on valid response', async () => {
+  describe('generateFunnelNameWithGemini', () => {
+    it('returns generated and sanitized name on valid response', async () => {
       const geminiWrapped = JSON.stringify({
         candidates: [{ content: { parts: [{ text: '"My Awesome Store"' }] } }],
       });
@@ -230,11 +230,11 @@ describe('LlmServiceImpl', () => {
         text: () => Promise.resolve(geminiWrapped),
       } as unknown as Response);
 
-      const result = await service.extractBusinessNameWithGemini('We sell great custom clothes');
+      const result = await service.generateFunnelNameWithGemini('We sell great custom clothes', 'Instagram');
       expect(result).toBe('My Awesome Store');
     });
 
-    it('throws error when extracted name is empty', async () => {
+    it('throws error when generated name is empty', async () => {
       const geminiWrapped = JSON.stringify({
         candidates: [{ content: { parts: [{ text: '""' }] } }],
       });
@@ -244,12 +244,12 @@ describe('LlmServiceImpl', () => {
         text: () => Promise.resolve(geminiWrapped),
       } as unknown as Response);
 
-      await expect(service.extractBusinessNameWithGemini('text')).rejects.toThrow('Empty business name extracted');
+      await expect(service.generateFunnelNameWithGemini('text', 'unknown')).rejects.toThrow('Empty funnel name generated');
     });
   });
 
-  describe('extractBusinessNameWithGroq', () => {
-    it('returns extracted and sanitized name on valid response', async () => {
+  describe('generateFunnelNameWithGroq', () => {
+    it('returns generated and sanitized name on valid response', async () => {
       const groqWrapped = JSON.stringify({
         choices: [{ message: { content: 'My Awesome Cafe' } }],
       });
@@ -259,7 +259,7 @@ describe('LlmServiceImpl', () => {
         text: () => Promise.resolve(groqWrapped),
       } as unknown as Response);
 
-      const result = await service.extractBusinessNameWithGroq('Delicious coffee shop');
+      const result = await service.generateFunnelNameWithGroq('Delicious coffee shop', 'WhatsApp');
       expect(result).toBe('My Awesome Cafe');
     });
   });
