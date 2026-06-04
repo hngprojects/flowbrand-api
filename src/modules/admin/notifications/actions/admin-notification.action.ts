@@ -2,6 +2,7 @@ import { AbstractModelAction } from '@hng-sdk/orm';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { AdminNotification } from '../entities/admin-notification.entity';
 import {
   AdminNotificationReadFilter,
@@ -156,14 +157,26 @@ export class AdminNotificationModelAction extends AbstractModelAction<AdminNotif
     return this.repository.findOne({ where: { id: notificationId, admin_id: adminId } });
   }
 
-  /** Single multi-row INSERT used when an event fans out to every admin (FR-9). */
-  async createMany(payloads: Partial<AdminNotification>[]): Promise<AdminNotification[]> {
+  /**
+   * Single multi-row INSERT used when an event fans out to every admin (FR-9).
+   * ON CONFLICT DO NOTHING defers to the partial unique risk index, so concurrent
+   * risk scans cannot insert duplicate alerts. Returns the number of rows inserted.
+   */
+  async createMany(payloads: Partial<AdminNotification>[]): Promise<number> {
     if (payloads.length === 0) {
-      return [];
+      return 0;
     }
 
-    const entities = this.repository.create(payloads);
-    return this.repository.save(entities);
+    const result = await this.repository
+      .createQueryBuilder()
+      .insert()
+      .into(AdminNotification)
+      .values(payloads as QueryDeepPartialEntity<AdminNotification>[])
+      .orIgnore()
+      .returning('id')
+      .execute();
+
+    return Array.isArray(result.raw) ? result.raw.length : 0;
   }
 
   /** Stage ids among `stageIds` that already have a risk notification; one batched dedup query (FR-9). */

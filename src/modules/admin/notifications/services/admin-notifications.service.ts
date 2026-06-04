@@ -153,10 +153,9 @@ export class AdminNotificationsService {
     sender: AdminNotificationSender = {},
   ): Promise<number> {
     const adminIds = await this.findAdminIds();
-    const created = await this.notificationAction.createMany(
+    return this.notificationAction.createMany(
       adminIds.map((adminId) => this.toCreatePayload(adminId, type, title, message, metadata, sender)),
     );
-    return created.length;
   }
 
   /** Distinct active admin/super admin user ids (deleted accounts are excluded). */

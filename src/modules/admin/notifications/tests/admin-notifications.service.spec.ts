@@ -323,7 +323,7 @@ describe('AdminNotificationsService', () => {
     it('FR-9: fans the notification out to every admin and super admin', async () => {
       mockUserRoleModelAction.findAdminIds.mockResolvedValue([ADMIN_ID, OTHER_ADMIN_ID]);
       mockNotificationAction.createMany.mockImplementation((payloads: Partial<AdminNotification>[]) =>
-        Promise.resolve(payloads as AdminNotification[]),
+        Promise.resolve(payloads.length),
       );
 
       const created = await service.notifyAllAdmins(AdminNotificationType.RISK, 'User stuck on a stage', 'Ada is stuck');
@@ -338,7 +338,7 @@ describe('AdminNotificationsService', () => {
 
     it('creates nothing when no admins exist', async () => {
       mockUserRoleModelAction.findAdminIds.mockResolvedValue([]);
-      mockNotificationAction.createMany.mockResolvedValue([]);
+      mockNotificationAction.createMany.mockResolvedValue(0);
 
       const created = await service.notifyAllAdmins(AdminNotificationType.FEEDBACK, 'Feedback', 'New feedback');
 
