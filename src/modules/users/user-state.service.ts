@@ -110,7 +110,7 @@ export class UserStateService {
     if (selectedFunnel.status === FunnelStatus.GENERATING) {
       return {
         funnelId: selectedFunnel.id,
-        businessName: selectedFunnel.business_name,
+        funnelName: selectedFunnel.funnel_name,
         status: 'generating',
         createdAt: selectedFunnel.created_at,
         currentStage: null,
@@ -141,7 +141,7 @@ export class UserStateService {
 
     return {
       funnelId: selectedFunnel.id,
-      businessName: selectedFunnel.business_name,
+      funnelName: selectedFunnel.funnel_name,
       status: 'active',
       createdAt: selectedFunnel.created_at,
       currentStage,
