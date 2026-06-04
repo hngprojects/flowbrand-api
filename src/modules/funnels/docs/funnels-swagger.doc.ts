@@ -2,6 +2,7 @@ import { applyDecorators, HttpStatus } from '@nestjs/common';
 import {
   ApiAcceptedResponse,
   ApiBearerAuth,
+  ApiBadRequestResponse,
   ApiConflictResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -320,6 +321,37 @@ export function GetFunnelDecorators() {
     ApiOkResponse({ description: 'Full funnel with stages and tasks', schema: { example: funnelFullExample } }),
     ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token', schema: { example: unauthorizedExample } }),
     ApiNotFoundResponse({ description: 'Funnel not found or not owned by the authenticated user', schema: { example: notFoundExample('/api/funnels/{id}') } }),
+  );
+}
+
+export const deleteFunnelExample = {
+  success: true,
+  statusCode: HttpStatus.OK,
+  message: SYS_MSG.FUNNEL_DELETED,
+  data: null,
+};
+
+export const deleteFunnelConflictExample = {
+  success: false,
+  statusCode: HttpStatus.CONFLICT,
+  error: 'Conflict',
+  message: SYS_MSG.FUNNEL_CANNOT_DELETE_ONLY_ACTIVE,
+};
+
+export function DeleteFunnelDecorators() {
+  return applyDecorators(
+    ApiOperation({ summary: 'Delete a funnel permanently' }),
+    ApiOkResponse({ description: 'Funnel deleted', schema: { example: deleteFunnelExample } }),
+    ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token', schema: { example: unauthorizedExample } }),
+    ApiBadRequestResponse({ description: 'Invalid funnel id (not a UUID)' }),
+    ApiNotFoundResponse({
+      description: 'Funnel not found or not owned by the authenticated user',
+      schema: { example: notFoundExample('/api/funnels/{id}') },
+    }),
+    ApiConflictResponse({
+      description: 'Cannot delete the only active funnel for the user',
+      schema: { example: deleteFunnelConflictExample },
+    }),
   );
 }
 

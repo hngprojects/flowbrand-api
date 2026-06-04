@@ -4,6 +4,7 @@ import { APP_EVENTS, AppEvent } from '../../../common/constants/app-events';
 import {
   AccountDeletedEvent,
   FeedbackSubmittedEvent,
+  FunnelDeletedEvent,
   FunnelFailedEvent,
   FunnelGeneratedEvent,
   PasswordChangedEvent,
@@ -55,6 +56,16 @@ export class ActivityListener {
       user_id: event.userId,
       event_type: APP_EVENTS.FUNNEL_FAILED,
       funnel_id: event.funnelId,
+    });
+  }
+
+  @OnEvent(APP_EVENTS.FUNNEL_DELETED)
+  async onFunnelDeleted(event: FunnelDeletedEvent): Promise<void> {
+    await this.persist({
+      user_id: event.userId,
+      event_type: APP_EVENTS.FUNNEL_DELETED,
+      funnel_id: event.funnelId,
+      metadata: { funnelName: event.funnelName },
     });
   }
 

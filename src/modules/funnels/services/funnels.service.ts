@@ -20,6 +20,7 @@ import {
   FeedbackSubmittedEvent,
   TaskCompletedEvent,
   TaskReopenedEvent,
+  FunnelDeletedEvent,
 } from '../../../common/events';
 import { emitSafely } from '../../../common/events/emit-safely';
 import { JOBS, QUEUES } from '../../../common/constants/queue.constants';
@@ -315,6 +316,32 @@ export class FunnelsService {
       };
     }
     return base;
+  }
+
+  async deleteFunnel(
+    userId: string,
+    funnelId: string,
+  ): Promise<{ statusCode: HttpStatus; message: string }> {
+    const funnel = await this.funnelAction.findOwnedById(funnelId, userId);
+    if (!funnel) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
+
+    if (funnel.status === FunnelStatus.ACTIVE) {
+      const remainingActive = await this.funnelAction.countActiveFunnelsExcluding(userId, funnelId);
+      if (remainingActive === 0) {
+        throw new ConflictException(SYS_MSG.FUNNEL_CANNOT_DELETE_ONLY_ACTIVE);
+      }
+    }
+
+    emitSafely(
+      this.eventEmitter,
+      this.logger,
+      APP_EVENTS.FUNNEL_DELETED,
+      new FunnelDeletedEvent(userId, funnelId, funnel.funnel_name),
+    );
+
+    await this.funnelAction.deleteOwnedFunnel(funnelId);
+
+    return { statusCode: HttpStatus.OK, message: SYS_MSG.FUNNEL_DELETED };
   }
 
   async completeStage(

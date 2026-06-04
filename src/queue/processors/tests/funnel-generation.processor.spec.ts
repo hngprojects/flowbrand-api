@@ -26,7 +26,7 @@ const mockQueryRunner = {
   rollbackTransaction: jest.fn().mockResolvedValue(undefined),
   release: jest.fn().mockResolvedValue(undefined),
   manager: {
-    update: jest.fn().mockResolvedValue(undefined),
+    update: jest.fn().mockResolvedValue({ affected: 1 }),
     find: jest.fn(),
     create: jest.fn((_, data) => data),
     save: jest.fn().mockResolvedValue(undefined),
@@ -349,18 +349,24 @@ describe('FunnelGenerationProcessor', () => {
   });
 
 
-  // EC-06: Funnel not found throws so Bull retries
-
-
-  describe('EC-06 — Funnel not found', () => {
-    it('throws so Bull retries instead of silently completing the job', async () => {
+  describe('EC-01 — Funnel deleted during generation', () => {
+    it('completes without retry when funnel row is gone at job start', async () => {
       mockFunnelAction.get.mockResolvedValue(null);
 
-
-      await expect(processor.handleGenerateFunnel(makeJob())).rejects.toThrow(/not found/);
-
+      await expect(processor.handleGenerateFunnel(makeJob())).resolves.toBeUndefined();
 
       expect(mockLlmService.generateWithGemini).not.toHaveBeenCalled();
+      expect(mockQueryRunner.startTransaction).not.toHaveBeenCalled();
+    });
+
+    it('aborts quietly when funnel is removed before writeFunnelData', async () => {
+      mockFunnelAction.get
+        .mockResolvedValueOnce({ id: 'funnel-uuid', status: FunnelStatus.GENERATING, funnel_name: 'Biz' })
+        .mockResolvedValueOnce(null);
+      mockLlmService.generateWithGemini.mockResolvedValue(makeValidStageData());
+
+      await expect(processor.handleGenerateFunnel(makeJob())).resolves.toBeUndefined();
+
       expect(mockQueryRunner.startTransaction).not.toHaveBeenCalled();
     });
   });

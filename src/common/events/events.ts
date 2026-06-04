@@ -14,6 +14,14 @@ export class FunnelFailedEvent {
   ) {}
 }
 
+export class FunnelDeletedEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly funnelId: string,
+    public readonly funnelName: string,
+  ) {}
+}
+
 // Stage progression
 export class StageCompletedEvent {
   constructor(

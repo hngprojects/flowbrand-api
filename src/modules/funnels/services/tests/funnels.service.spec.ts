@@ -13,6 +13,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import { JOBS, QUEUES } from '../../../../common/constants/queue.constants';
 import { APP_EVENTS } from '../../../../common/constants/app-events';
+import { FunnelDeletedEvent } from '../../../../common/events/events';
+import * as SYS_MSG from '../../../../constants/system.messages';
 import { WizardSession } from '../../../onboarding/entities/wizzard-session.entity';
 import { WizardStatus } from '../../../onboarding/enums/wizzard-status.enum';
 import { RedisService } from '../../../redis/redis.service';
@@ -90,6 +92,8 @@ describe('FunnelsService', () => {
       listForUserPaginated: jest.fn(),
       getLatestCompletedWizard: jest.fn(),
       getUploadedDocuments: jest.fn(),
+      countActiveFunnelsExcluding: jest.fn(),
+      deleteOwnedFunnel: jest.fn().mockResolvedValue(undefined),
       getUserProfile: jest.fn().mockResolvedValue({
         business_type: 'restaurant',
         target_customer: 'office workers',
@@ -681,6 +685,90 @@ describe('FunnelsService', () => {
       const saved = queryRunner.manager.save.mock.calls[0][1] as SavedFunnel;
       expect(saved.business_context.businessType).toBe('restaurant');
       expect(saved.business_context.target_customer).toBe('office workers');
+    });
+  });
+
+  describe('deleteFunnel', () => {
+    const activeFunnel = {
+      id: FUNNEL_ID,
+      user_id: USER_ID,
+      status: FunnelStatus.ACTIVE,
+      funnel_name: 'Acme Studio',
+    } as Funnel;
+
+    it('AC-01: deletes owned active funnel when another active funnel remains', async () => {
+      funnelAction.findOwnedById.mockResolvedValue(activeFunnel);
+      funnelAction.countActiveFunnelsExcluding.mockResolvedValue(1);
+
+      const result = await service.deleteFunnel(USER_ID, FUNNEL_ID);
+
+      expect(result).toEqual({ statusCode: HttpStatus.OK, message: SYS_MSG.FUNNEL_DELETED });
+      expect(funnelAction.countActiveFunnelsExcluding).toHaveBeenCalledWith(USER_ID, FUNNEL_ID);
+      expect(funnelAction.deleteOwnedFunnel).toHaveBeenCalledWith(FUNNEL_ID);
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        APP_EVENTS.FUNNEL_DELETED,
+        expect.any(FunnelDeletedEvent),
+      );
+      const event = mockEventEmitter.emit.mock.calls[0][1] as FunnelDeletedEvent;
+      expect(event.userId).toBe(USER_ID);
+      expect(event.funnelId).toBe(FUNNEL_ID);
+      expect(event.funnelName).toBe('Acme Studio');
+    });
+
+    it('AC-04: rejects deleting the only active funnel with 409 message', async () => {
+      funnelAction.findOwnedById.mockResolvedValue(activeFunnel);
+      funnelAction.countActiveFunnelsExcluding.mockResolvedValue(0);
+
+      await expect(service.deleteFunnel(USER_ID, FUNNEL_ID)).rejects.toThrow(ConflictException);
+      expect(funnelAction.deleteOwnedFunnel).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('AC-05: deletes failed funnel without active-funnel guard', async () => {
+      funnelAction.findOwnedById.mockResolvedValue({
+        ...activeFunnel,
+        status: FunnelStatus.FAILED,
+      } as Funnel);
+
+      await service.deleteFunnel(USER_ID, FUNNEL_ID);
+
+      expect(funnelAction.countActiveFunnelsExcluding).not.toHaveBeenCalled();
+      expect(funnelAction.deleteOwnedFunnel).toHaveBeenCalledWith(FUNNEL_ID);
+    });
+
+    it('AC-06: deletes generating funnel without active-funnel guard', async () => {
+      funnelAction.findOwnedById.mockResolvedValue({
+        ...activeFunnel,
+        status: FunnelStatus.GENERATING,
+      } as Funnel);
+
+      await service.deleteFunnel(USER_ID, FUNNEL_ID);
+
+      expect(funnelAction.countActiveFunnelsExcluding).not.toHaveBeenCalled();
+      expect(funnelAction.deleteOwnedFunnel).toHaveBeenCalledWith(FUNNEL_ID);
+    });
+
+    it('AC-07/AC-08: returns 404 when funnel is missing or not owned', async () => {
+      funnelAction.findOwnedById.mockResolvedValue(null);
+
+      await expect(service.deleteFunnel(USER_ID, FUNNEL_ID)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.deleteFunnel(OTHER_USER_ID, FUNNEL_ID)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('FR-7/EC-04: emits before hard delete', async () => {
+      const order: string[] = [];
+      funnelAction.findOwnedById.mockResolvedValue(activeFunnel);
+      funnelAction.countActiveFunnelsExcluding.mockResolvedValue(1);
+      mockEventEmitter.emit.mockImplementation(() => {
+        order.push('emit');
+      });
+      funnelAction.deleteOwnedFunnel.mockImplementation(async () => {
+        order.push('delete');
+      });
+
+      await service.deleteFunnel(USER_ID, FUNNEL_ID);
+
+      expect(order).toEqual(['emit', 'delete']);
     });
   });
 });

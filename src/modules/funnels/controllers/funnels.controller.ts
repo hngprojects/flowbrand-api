@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { CreateFunnelDto, FunnelIdParamDto } from '../dto/create-funnel.dto';
@@ -7,6 +7,7 @@ import {
   CompleteStageDecorators,
   CreateFunnelDocs,
   FunnelControllerDecorators,
+  DeleteFunnelDecorators,
   GetFunnelDecorators,
   GetFunnelStatusDocs,
   GetStageDetailDecorators,
@@ -43,6 +44,13 @@ export class FunnelsController {
       message: SYS_MSG.FUNNEL_RETRIEVED_SUCCESSFULLY,
       data,
     };
+  }
+
+  @DeleteFunnelDecorators()
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  async remove(@CurrentUser('userId') userId: string, @Param('id', ParseUUIDPipe) id: string) {
+    return this.funnelsService.deleteFunnel(userId, id);
   }
 
   @GetStagesSummaryDecorators()

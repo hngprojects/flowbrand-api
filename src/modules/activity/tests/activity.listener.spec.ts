@@ -4,6 +4,7 @@ import { APP_EVENTS } from '../../../common/constants/app-events';
 import {
   AccountDeletedEvent,
   FeedbackSubmittedEvent,
+  FunnelDeletedEvent,
   FunnelFailedEvent,
   FunnelGeneratedEvent,
   PasswordChangedEvent,
@@ -57,6 +58,19 @@ describe('ActivityListener', () => {
     await listener.onFunnelFailed(new FunnelFailedEvent('user-1', 'funnel-1'));
     expect(lastPayload()).toEqual(
       expect.objectContaining({ event_type: APP_EVENTS.FUNNEL_FAILED, funnel_id: 'funnel-1' }),
+    );
+  });
+
+  it('AC-11: writes a funnel.deleted row with funnelName in metadata', async () => {
+    await listener.onFunnelDeleted(new FunnelDeletedEvent('user-1', 'funnel-1', 'Acme Studio'));
+
+    expect(lastPayload()).toEqual(
+      expect.objectContaining({
+        user_id: 'user-1',
+        event_type: APP_EVENTS.FUNNEL_DELETED,
+        funnel_id: 'funnel-1',
+        metadata: { funnelName: 'Acme Studio' },
+      }),
     );
   });
 

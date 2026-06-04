@@ -1,7 +1,7 @@
 import { AbstractModelAction } from '@hng-sdk/orm';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository, QueryDeepPartialEntity, In } from 'typeorm';
+import { EntityManager, Repository, QueryDeepPartialEntity, In, Not } from 'typeorm';
 import { Funnel } from '../entities/funnel.entity';
 import { FunnelStage } from '../entities/funnel-stage.entity';
 import { StageTask } from '../entities/stage-task.entity';
@@ -79,6 +79,23 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
   async findOwnedById(funnelId: string, userId: string, manager?: EntityManager): Promise<Funnel | null> {
     const repo = manager ? manager.getRepository(Funnel) : this.funnelRepository;
     return repo.findOne({ where: { id: funnelId, user_id: userId } });
+  }
+
+  async countActiveFunnelsExcluding(userId: string, excludeFunnelId: string): Promise<number> {
+    return this.funnelRepository.count({
+      where: {
+        user_id: userId,
+        status: FunnelStatus.ACTIVE,
+        id: Not(excludeFunnelId),
+      },
+    });
+  }
+
+  async deleteOwnedFunnel(funnelId: string): Promise<void> {
+    await this.delete({
+      identifierOptions: { id: funnelId },
+      transactionOptions: { useTransaction: false },
+    });
   }
 
   async listForUserPaginated(userId: string, page: number, perPage: number): Promise<[Funnel[], number]> {
