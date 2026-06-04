@@ -3,9 +3,10 @@ import { AdminAuthModule } from './auth/admin-auth.module';
 import { AdminProfileModule } from './profile/admin-profile.module';
 import { AdminUsersModule } from './users/admin-users.module';
 import { AdminDashboardModule } from './dashboard/admin-dashboard.module';
+import { AdminTeamsModule } from './teams/admin-teams.module';
 
 
 @Module({
-  imports: [AdminAuthModule, AdminUsersModule, AdminProfileModule, AdminDashboardModule],
+  imports: [AdminAuthModule, AdminUsersModule, AdminProfileModule, AdminDashboardModule, AdminTeamsModule],
 })
 export class AdminModule {}
