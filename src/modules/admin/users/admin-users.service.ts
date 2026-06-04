@@ -6,7 +6,7 @@ import { UserModelAction } from '../../users/actions/user.action';
 import { UserRoleModelAction } from '../../users/actions/user-role.action';
 import { UsersService } from '../../users/users.service';
 import { UserPlan } from '../../users/enums/user-plan.enum';
-import { AdminUsersListAction } from './actions/admin-users-list.action';
+import { ACTIVE_WINDOW_DAYS, AdminUsersListAction } from './actions/admin-users-list.action';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { GetAdminUsersQueryDto } from './dto/get-admin-users-query.dto';
 import { SortDir, UserSortBy, UserStatusFilter } from './enums/admin-users-query.enum';
@@ -16,7 +16,6 @@ import { AdminUsersListResponse } from './interfaces/admin-users-list-response.i
 const MAX_PER_PAGE = 50;
 const DEFAULT_PAGE = 1;
 const DEFAULT_PER_PAGE = 20;
-const ACTIVE_WINDOW_DAYS = 30;
 
 @Injectable()
 export class AdminUsersService {
