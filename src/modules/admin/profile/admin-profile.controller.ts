@@ -19,7 +19,12 @@ import { AdminJwtGuard } from '../../auth/guards/admin-jwt.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { UserRole } from '../../users/enums/user-role.enum';
 import { AdminProfileService } from './admin-profile.service';
-import { GetAdminProfileDocs, UpdateAdminProfileDocs } from './docs/admin-profile-swagger.doc';
+import {
+  ChangeAdminPasswordDocs,
+  GetAdminProfileDocs,
+  UpdateAdminProfileDocs,
+} from './docs/admin-profile-swagger.doc';
+import { ChangeAdminPasswordDto } from './dto/change-admin-password.dto';
 import { UpdateAdminProfileDto } from './dto/update-admin-profile.dto';
 
 @ApiTags('admin')
@@ -71,6 +76,39 @@ export class AdminProfileController {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.ADMIN_PROFILE_UPDATED_SUCCESSFULLY,
       data,
+    };
+  }
+
+  @Patch('password')
+  @HttpCode(HttpStatus.OK)
+  @ChangeAdminPasswordDocs()
+  async changePassword(
+    @CurrentUser('userId') adminId: string,
+    @Body(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+        transformOptions: { enableImplicitConversion: false },
+        expectedType: ChangeAdminPasswordDto,
+        validationError: { target: false, value: false },
+        exceptionFactory: (errors: ValidationError[]) =>
+          new UnprocessableEntityException({
+            success: false,
+            statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+            error: 'UnprocessableEntityException',
+            message: SYS_MSG.VALIDATION_FAILED,
+            details: errors,
+          }),
+      }),
+    )
+    dto: ChangeAdminPasswordDto,
+  ) {
+    await this.adminProfileService.changePassword(adminId, dto);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.ADMIN_PASSWORD_UPDATED_SUCCESSFULLY,
+      data: null,
     };
   }
 }
