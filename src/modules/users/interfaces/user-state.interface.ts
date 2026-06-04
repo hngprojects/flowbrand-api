@@ -22,7 +22,7 @@ export type ActiveFunnelStatus = "active" | "generating";
 
 export interface ActiveFunnel {
   funnelId: string;
-  businessName: string;
+  funnelName: string;
   status: ActiveFunnelStatus;
   createdAt: Date;
   currentStage: CurrentStage | null;
