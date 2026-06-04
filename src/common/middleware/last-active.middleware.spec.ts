@@ -21,7 +21,7 @@ const mockQueryBuilder = {
 const mockDataSource = {
   createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
 };
-const mockJwtService = { decode: jest.fn() };
+const mockJwtService = { verifyAsync: jest.fn() };
 
 describe('LastActiveMiddleware', () => {
   let middleware: LastActiveMiddleware;
@@ -45,7 +45,7 @@ describe('LastActiveMiddleware', () => {
 
   describe('use', () => {
     it('always calls next() synchronously before any async work', () => {
-      mockJwtService.decode.mockReturnValue({ sub: 'user-uuid' });
+      mockJwtService.verifyAsync.mockResolvedValue({ sub: 'user-uuid' });
       middleware.use(makeReq('Bearer valid.jwt.token') as Request, {} as Response, next);
 
       // Assert synchronously — next must be called before promises resolve
@@ -58,15 +58,15 @@ describe('LastActiveMiddleware', () => {
       expect(next).toHaveBeenCalledTimes(1);
     });
 
-    it('calls next() even when jwtService.decode returns null', () => {
-      mockJwtService.decode.mockReturnValue(null);
-      middleware.use(makeReq('Bearer invalid.token') as Request, {} as Response, next);
+    it('calls next() even when verifyAsync throws (invalid token)', () => {
+      mockJwtService.verifyAsync.mockRejectedValue(new Error('invalid signature'));
+      middleware.use(makeReq('Bearer bad.token') as Request, {} as Response, next);
 
       expect(next).toHaveBeenCalledTimes(1);
     });
 
     it('calls next() even when the DB throws', async () => {
-      mockJwtService.decode.mockReturnValue({ sub: 'user-uuid' });
+      mockJwtService.verifyAsync.mockResolvedValue({ sub: 'user-uuid' });
       mockExecute.mockRejectedValueOnce(new Error('DB down'));
 
       middleware.use(makeReq('Bearer valid.jwt.token') as Request, {} as Response, next);
@@ -78,8 +78,8 @@ describe('LastActiveMiddleware', () => {
 
     // --- Happy path ---
 
-    it('stamps last_login_at when a valid Bearer JWT with sub is present', async () => {
-      mockJwtService.decode.mockReturnValue({ sub: 'user-uuid-123' });
+    it('stamps last_login_at when a valid verified JWT with sub is present', async () => {
+      mockJwtService.verifyAsync.mockResolvedValue({ sub: 'user-uuid-123' });
       middleware.use(makeReq('Bearer valid.jwt.token') as Request, {} as Response, next);
 
       await flushPromises();
@@ -90,13 +90,25 @@ describe('LastActiveMiddleware', () => {
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
     });
 
-    it('passes the correct userId from the JWT sub claim to the WHERE clause', async () => {
-      mockJwtService.decode.mockReturnValue({ sub: 'user-uuid-123' });
+    it('passes the correct userId from the verified JWT sub claim to the WHERE clause', async () => {
+      mockJwtService.verifyAsync.mockResolvedValue({ sub: 'user-uuid-123' });
       middleware.use(makeReq('Bearer valid.jwt.token') as Request, {} as Response, next);
 
       await flushPromises();
 
       expect(mockQueryBuilder.where).toHaveBeenCalledWith('user_id = :userId', { userId: 'user-uuid-123' });
+    });
+
+    it('verifies the JWT with the access secret — not just decodes it', async () => {
+      mockJwtService.verifyAsync.mockResolvedValue({ sub: 'user-uuid-123' });
+      middleware.use(makeReq('Bearer valid.jwt.token') as Request, {} as Response, next);
+
+      await flushPromises();
+
+      expect(mockJwtService.verifyAsync).toHaveBeenCalledWith(
+        'valid.jwt.token',
+        expect.objectContaining({ secret: expect.any(String) }),
+      );
     });
 
     // --- Early return cases — DB must not be called ---
@@ -110,26 +122,26 @@ describe('LastActiveMiddleware', () => {
     });
 
     it('skips DB update when Authorization scheme is not Bearer', async () => {
-      mockJwtService.decode.mockReturnValue({ sub: 'user-uuid' });
       middleware.use(makeReq('Basic dXNlcjpwYXNz') as Request, {} as Response, next);
 
       await flushPromises();
 
+      expect(mockJwtService.verifyAsync).not.toHaveBeenCalled();
       expect(mockDataSource.createQueryBuilder).not.toHaveBeenCalled();
     });
 
-    it('skips DB update when jwtService.decode returns null', async () => {
-      mockJwtService.decode.mockReturnValue(null);
-      middleware.use(makeReq('Bearer malformed') as Request, {} as Response, next);
+    it('skips DB update when verifyAsync throws (forged or expired token)', async () => {
+      mockJwtService.verifyAsync.mockRejectedValue(new Error('invalid signature'));
+      middleware.use(makeReq('Bearer forged.token') as Request, {} as Response, next);
 
       await flushPromises();
 
       expect(mockDataSource.createQueryBuilder).not.toHaveBeenCalled();
     });
 
-    it('skips DB update when decoded JWT has no sub field', async () => {
-      mockJwtService.decode.mockReturnValue({ iat: 1234567890 });
-      middleware.use(makeReq('Bearer valid.but.no.sub') as Request, {} as Response, next);
+    it('skips DB update when verifyAsync throws due to token expiry', async () => {
+      mockJwtService.verifyAsync.mockRejectedValue(new Error('jwt expired'));
+      middleware.use(makeReq('Bearer expired.token') as Request, {} as Response, next);
 
       await flushPromises();
 
@@ -139,7 +151,7 @@ describe('LastActiveMiddleware', () => {
     // --- Fire-and-forget safety ---
 
     it('silently swallows DB errors — does not produce an unhandled rejection', async () => {
-      mockJwtService.decode.mockReturnValue({ sub: 'user-uuid' });
+      mockJwtService.verifyAsync.mockResolvedValue({ sub: 'user-uuid' });
       mockExecute.mockRejectedValueOnce(new Error('Connection timeout'));
 
       // If the error were not caught, Jest would detect an unhandled rejection and fail this test
@@ -149,6 +161,17 @@ describe('LastActiveMiddleware', () => {
 
       // Reaching here means the error was swallowed
       expect(next).toHaveBeenCalled();
+    });
+
+    // --- Security ---
+
+    it('SEC-01: a forged token with a valid sub but bad signature does not trigger a DB write', async () => {
+      mockJwtService.verifyAsync.mockRejectedValue(new Error('invalid signature'));
+      middleware.use(makeReq('Bearer forged.sub.token') as Request, {} as Response, next);
+
+      await flushPromises();
+
+      expect(mockDataSource.createQueryBuilder).not.toHaveBeenCalled();
     });
   });
 });
