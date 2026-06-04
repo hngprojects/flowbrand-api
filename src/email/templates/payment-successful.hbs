@@ -1,34 +1,17 @@
 <tr>
   <td align="left" style="padding: 40px 40px 48px">
-    <h1 style="margin: 0 0 28px; font-size: 32px; line-height: 1.2; font-weight: 700; color: #020e1f; letter-spacing: -0.03em">Payment Successful</h1>
+    <h1 style="margin: 0 0 28px; font-size: 32px; line-height: 1.2; font-weight: 700; color: #020e1f">Payment Successful</h1>
     <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.55; color: #020e1f">Hi {{name}},</p>
-    <p style="margin: 0 0 28px; font-size: 16px; line-height: 1.55; color: #020e1f">Thank you for your payment. Your FlowBrand Pro subscription is now active.</p>
-    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 28px; border-collapse: collapse">
-      <tr>
-        <td style="padding: 12px 0; font-size: 14px; color: #64748b; border-bottom: 1px solid #e2e8f0">Plan</td>
-        <td style="padding: 12px 0; font-size: 14px; color: #020e1f; text-align: right; border-bottom: 1px solid #e2e8f0">Pro</td>
-      </tr>
-      <tr>
-        <td style="padding: 12px 0; font-size: 14px; color: #64748b; border-bottom: 1px solid #e2e8f0">Amount</td>
-        <td style="padding: 12px 0; font-size: 14px; color: #020e1f; text-align: right; border-bottom: 1px solid #e2e8f0">{{amount}}</td>
-      </tr>
-      {{#if cardLast4}}
-      <tr>
-        <td style="padding: 12px 0; font-size: 14px; color: #64748b; border-bottom: 1px solid #e2e8f0">Payment Method</td>
-        <td style="padding: 12px 0; font-size: 14px; color: #020e1f; text-align: right; border-bottom: 1px solid #e2e8f0">{{#if cardBrand}}{{cardBrand}} ending in {{else}}Card ending in {{/if}}{{cardLast4}}</td>
-      </tr>
+    <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.55; color: #020e1f">Your payment has been processed successfully, and your Seil subscription is now active.</p>
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="font-size: 16px; line-height: 1.8; color: #020e1f">
+      <tr><td style="padding: 4px 0"><strong>Amount:</strong> {{amount}}</td></tr>
+      {{#if cardBrand}}
+      <tr><td style="padding: 4px 0"><strong>Payment Method:</strong> {{cardBrand}}{{#if cardLast4}} ending in {{cardLast4}}{{/if}}</td></tr>
       {{/if}}
-      <tr>
-        <td style="padding: 12px 0; font-size: 14px; color: #64748b; border-bottom: 1px solid #e2e8f0">Transaction ID</td>
-        <td style="padding: 12px 0; font-size: 14px; color: #020e1f; text-align: right; border-bottom: 1px solid #e2e8f0">{{reference}}</td>
-      </tr>
+      <tr><td style="padding: 4px 0"><strong>Transaction ID:</strong> {{reference}}</td></tr>
       {{#if paidAt}}
-      <tr>
-        <td style="padding: 12px 0; font-size: 14px; color: #64748b">Date</td>
-        <td style="padding: 12px 0; font-size: 14px; color: #020e1f; text-align: right">{{paidAt}}</td>
-      </tr>
+      <tr><td style="padding: 4px 0"><strong>Date:</strong> {{paidAt}}</td></tr>
       {{/if}}
     </table>
-    <a href="{{dashboardUrl}}" style="display: inline-block; background-color: #326ad1; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; padding: 14px 32px; border-radius: 6px">Go to Dashboard</a>
   </td>
 </tr>
