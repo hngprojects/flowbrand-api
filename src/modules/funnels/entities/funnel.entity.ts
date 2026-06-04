@@ -15,8 +15,8 @@ export class Funnel extends BaseEntity {
   @Column({ type: 'uuid', name: 'user_id' })
   user_id: string;
 
-  @Column({ type: 'varchar', length: 255, name: 'business_name', default: 'My Business' })
-  business_name: string;
+  @Column({ type: 'text', name: 'funnel_name', default: 'My Funnel' })
+  funnel_name: string;
 
   @Column({
     type: 'enum',

@@ -34,6 +34,8 @@ Rules:
 - Plain text only inside field values — no nested JSON, no HTML.
 - Return ONLY the JSON object. No text before or after. No markdown.`;
 
+const MAX_FUNNEL_NAME_LENGTH = 60;
+
 const EXPECTED_STAGE_COUNT = 4;
 const TASKS_MIN = 2;
 const TASKS_MAX = 3;
@@ -172,6 +174,124 @@ export class LlmServiceImpl extends LlmService {
     }
 
     return stages;
+  }
+
+  async generateFunnelNameWithGemini(description: string, discoveryChannel: string): Promise<string> {
+    const apiKey = this.config.get<string>('llm.geminiApiKey');
+    const model = this.config.get<string>('llm.geminiModel') ?? 'gemini-2.5-flash';
+    const timeoutMs = this.config.get<number>('llm.geminiTimeoutMs') ?? 60_000;
+
+    if (!apiKey) {
+      throw new Error(SYS_MSG.AI_GEMINI_API_KEY_MISSING);
+    }
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const systemPrompt =
+      `Generate a short, memorable name (≤ ${MAX_FUNNEL_NAME_LENGTH} chars) for a marketing funnel based on the business context. ` +
+      'Make it specific and brandable. ' +
+      'Return ONLY the name. No quotes, no markdown, no punctuation unless part of the name.';
+    const userMessage = [
+      `Business description: ${description}`,
+      discoveryChannel && discoveryChannel !== 'unknown' ? `Primary channel: ${discoveryChannel}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const body = JSON.stringify({
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+      generationConfig: { maxOutputTokens: 100, temperature: 0.4 },
+    });
+
+    let raw: string;
+    try {
+      raw = await this.fetchWithTimeout(
+        url,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body,
+        },
+        timeoutMs,
+        'Gemini-FunnelName',
+      );
+    } catch (err) {
+      this.logger.error({
+        provider: 'Gemini-FunnelName',
+        error: (err as Error).message,
+        context: { descriptionLength: description.length, hasDiscoveryChannel: discoveryChannel !== 'unknown' },
+      });
+      throw err;
+    }
+
+    const text = this.extractGeminiText(raw);
+    const cleaned = text.replace(/["']/g, '').trim();
+    if (!cleaned) {
+      throw new Error('Empty funnel name generated');
+    }
+    return cleaned.slice(0, MAX_FUNNEL_NAME_LENGTH);
+  }
+
+  async generateFunnelNameWithGroq(description: string, discoveryChannel: string): Promise<string> {
+    const apiKey = this.config.get<string>('llm.groqApiKey');
+    const model = this.config.get<string>('llm.groqModel') ?? 'llama-3.3-70b-versatile';
+    const timeoutMs = this.config.get<number>('llm.groqTimeoutMs') ?? 60_000;
+
+    if (!apiKey) {
+      throw new Error(SYS_MSG.AI_GROQ_API_KEY_MISSING);
+    }
+
+    const systemPrompt =
+      `Generate a short, memorable name (≤ ${MAX_FUNNEL_NAME_LENGTH} chars) for a marketing funnel based on the business context. ` +
+      'Make it specific and brandable. ' +
+      'Return ONLY the name. No quotes, no markdown, no punctuation unless part of the name.';
+    const userMessage = [
+      `Business description: ${description}`,
+      discoveryChannel && discoveryChannel !== 'unknown' ? `Primary channel: ${discoveryChannel}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const body = JSON.stringify({
+      model,
+      max_tokens: 100,
+      temperature: 0.4,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+    });
+
+    let raw: string;
+    try {
+      raw = await this.fetchWithTimeout(
+        'https://api.groq.com/openai/v1/chat/completions',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body,
+        },
+        timeoutMs,
+        'Groq-FunnelName',
+      );
+    } catch (err) {
+      this.logger.error({
+        provider: 'Groq-FunnelName',
+        error: (err as Error).message,
+        context: { descriptionLength: description.length, hasDiscoveryChannel: discoveryChannel !== 'unknown' },
+      });
+      throw err;
+    }
+
+    const text = this.extractGroqText(raw);
+    const cleaned = text.replace(/["']/g, '').trim();
+    if (!cleaned) {
+      throw new Error('Empty funnel name generated');
+    }
+    return cleaned.slice(0, MAX_FUNNEL_NAME_LENGTH);
   }
 
   buildPrompt(ctx: BusinessContext): string {
