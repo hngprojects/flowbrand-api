@@ -137,7 +137,7 @@ export function GetAdminUsersDocs(): ReturnType<typeof applyDecorators> {
     }),
     ApiResponse({
       status: HttpStatus.BAD_REQUEST,
-      description: 'Invalid query parameter value (e.g. perPage > 50, unknown status enum)',
+      description: 'Invalid query parameter — unknown enum value for status or sortBy, non-integer or negative value for page or perPage. Note: perPage values above 50 are silently capped, not rejecte
       schema: {
         example: {
           success: false,

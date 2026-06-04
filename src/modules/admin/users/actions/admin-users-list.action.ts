@@ -104,6 +104,7 @@ export class AdminUsersListAction {
 
     const rows = await dataQb
       .orderBy(SORT_COLUMN_MAP[sortBy], sortDir === SortDir.ASC ? 'ASC' : 'DESC')
+      .addOrderBy('user.id', 'ASC')
       .skip((page - 1) * perPage)
       .take(perPage)
       .getRawMany<RawAdminUserRow>();
