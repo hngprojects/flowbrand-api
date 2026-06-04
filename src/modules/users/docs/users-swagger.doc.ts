@@ -273,7 +273,7 @@ export function GetUserStateDocs() {
             onboarding: { status: 'complete' },
             activeFunnel: {
               funnelId: '550e8400-e29b-41d4-a716-446655440000',
-              businessName: 'My Business',
+              funnelName: 'My Funnel',
               status: 'active',
               createdAt: '2026-01-01T00:00:00.000Z',
               currentStage: {
@@ -301,7 +301,7 @@ export function GetUserStateDocs() {
             onboarding: { status: 'complete' },
             activeFunnel: {
               funnelId: '550e8400-e29b-41d4-a716-446655440000',
-              businessName: 'My Business',
+              funnelName: 'My Funnel',
               status: 'active',
               createdAt: '2026-01-01T00:00:00.000Z',
               currentStage: null,
@@ -321,7 +321,7 @@ export function GetUserStateDocs() {
             onboarding: { status: 'complete' },
             activeFunnel: {
               funnelId: '550e8400-e29b-41d4-a716-446655440000',
-              businessName: 'My Business',
+              funnelName: 'My Funnel',
               status: 'generating',
               createdAt: '2026-01-01T00:00:00.000Z',
               currentStage: null,
