@@ -42,6 +42,8 @@ const envSchema = z.object({
   UPLOAD_STORAGE_SECRET_KEY: z.string().default(''),
   UPLOAD_STORAGE_BUCKET: z.string().default(''),
   UPLOAD_STORAGE_REGION: z.string().default(''),
+  /** Public host for browser-readable object URLs (no trailing slash). Combined with bucket + storage path. */
+  UPLOAD_STORAGE_PUBLIC_ENDPOINT: z.string().default(''),
 
   GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required'),
   GEMINI_MODEL: z.string().default('gemini-2.5-flash'),

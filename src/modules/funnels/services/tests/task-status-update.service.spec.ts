@@ -1,4 +1,5 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { LlmService } from '../../../../queue/interfaces/llm.service.interface';
 import { getQueueToken } from '@nestjs/bull';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -78,6 +79,7 @@ describe('FunnelsService - task status update', () => {
         { provide: getRepositoryToken(UploadedDocument), useValue: {} },
         { provide: getRepositoryToken(StageFeedback), useValue: {} },
         { provide: EventEmitter2, useValue: mockEventEmitter },
+        { provide: LlmService, useValue: {} },
       ],
     }).compile();
 
