@@ -174,7 +174,7 @@ export class LlmServiceImpl extends LlmService {
     return stages;
   }
 
-  async extractBusinessNameWithGemini(description: string): Promise<string> {
+  async generateFunnelNameWithGemini(description: string, discoveryChannel: string): Promise<string> {
     const apiKey = this.config.get<string>('llm.geminiApiKey');
     const model = this.config.get<string>('llm.geminiModel') ?? 'gemini-2.5-flash';
     const timeoutMs = this.config.get<number>('llm.geminiTimeoutMs') ?? 60_000;
@@ -185,14 +185,20 @@ export class LlmServiceImpl extends LlmService {
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     const systemPrompt =
-      'Extract a concise business name (≤ 60 chars) from the provided business description. ' +
-      'Return ONLY the business name. ' +
-      'No extra commentary, no quotes, no markdown, no punctuation unless part of the name.';
+      'Generate a short, memorable name (≤ 60 chars) for a marketing funnel based on the business context. ' +
+      'Make it specific and brandable. ' +
+      'Return ONLY the name. No quotes, no markdown, no punctuation unless part of the name.';
+    const userMessage = [
+      `Business description: ${description}`,
+      discoveryChannel && discoveryChannel !== 'unknown' ? `Primary channel: ${discoveryChannel}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n');
 
     const body = JSON.stringify({
       system_instruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ role: 'user', parts: [{ text: description }] }],
-      generationConfig: { maxOutputTokens: 100, temperature: 0.2 },
+      contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+      generationConfig: { maxOutputTokens: 100, temperature: 0.4 },
     });
 
     let raw: string;
@@ -205,11 +211,11 @@ export class LlmServiceImpl extends LlmService {
           body,
         },
         timeoutMs,
-        'Gemini-NameExtract',
+        'Gemini-FunnelName',
       );
     } catch (err) {
       this.logger.error({
-        provider: 'Gemini-NameExtract',
+        provider: 'Gemini-FunnelName',
         error: (err as Error).message,
         context: { description: description.slice(0, 100) },
       });
@@ -219,12 +225,12 @@ export class LlmServiceImpl extends LlmService {
     const text = this.extractGeminiText(raw);
     const cleaned = text.replace(/["']/g, '').trim();
     if (!cleaned) {
-      throw new Error('Empty business name extracted');
+      throw new Error('Empty funnel name generated');
     }
     return cleaned.slice(0, 100);
   }
 
-  async extractBusinessNameWithGroq(description: string): Promise<string> {
+  async generateFunnelNameWithGroq(description: string, discoveryChannel: string): Promise<string> {
     const apiKey = this.config.get<string>('llm.groqApiKey');
     const model = this.config.get<string>('llm.groqModel') ?? 'llama-3.3-70b-versatile';
     const timeoutMs = this.config.get<number>('llm.groqTimeoutMs') ?? 60_000;
@@ -234,17 +240,23 @@ export class LlmServiceImpl extends LlmService {
     }
 
     const systemPrompt =
-      'Extract a concise business name (≤ 60 chars) from the provided business description. ' +
-      'Return ONLY the business name. ' +
-      'No extra commentary, no quotes, no markdown, no punctuation unless part of the name.';
+      'Generate a short, memorable name (≤ 60 chars) for a marketing funnel based on the business context. ' +
+      'Make it specific and brandable. ' +
+      'Return ONLY the name. No quotes, no markdown, no punctuation unless part of the name.';
+    const userMessage = [
+      `Business description: ${description}`,
+      discoveryChannel && discoveryChannel !== 'unknown' ? `Primary channel: ${discoveryChannel}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n');
 
     const body = JSON.stringify({
       model,
       max_tokens: 100,
-      temperature: 0.2,
+      temperature: 0.4,
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: description },
+        { role: 'user', content: userMessage },
       ],
     });
 
@@ -261,11 +273,11 @@ export class LlmServiceImpl extends LlmService {
           body,
         },
         timeoutMs,
-        'Groq-NameExtract',
+        'Groq-FunnelName',
       );
     } catch (err) {
       this.logger.error({
-        provider: 'Groq-NameExtract',
+        provider: 'Groq-FunnelName',
         error: (err as Error).message,
         context: { description: description.slice(0, 100) },
       });
@@ -275,7 +287,7 @@ export class LlmServiceImpl extends LlmService {
     const text = this.extractGroqText(raw);
     const cleaned = text.replace(/["']/g, '').trim();
     if (!cleaned) {
-      throw new Error('Empty business name extracted');
+      throw new Error('Empty funnel name generated');
     }
     return cleaned.slice(0, 100);
   }
