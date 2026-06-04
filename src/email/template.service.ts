@@ -17,6 +17,7 @@ const EMAIL_TYPES: EmailType[] = [
   'stage-unlocked',
   'stage-completed',
   'weekly-digest',
+  'team-invite'
 ];
 
 @Injectable()
@@ -36,6 +37,8 @@ export class TemplateService implements OnModuleInit {
     'stage-unlocked': '"{{stageName}}" is now active',
     'stage-completed': 'You completed "{{stageName}}"',
     'weekly-digest': 'Your weekly SEIL progress',
+    'team-invite' : "You've been invited to '{{teamName}}'",
+
   };
 
   private compiledSubjects: Record<EmailType, Handlebars.TemplateDelegate>;
