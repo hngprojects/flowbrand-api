@@ -267,12 +267,6 @@ export const ADMIN_DASHBOARD_USER_SEGMENTS_RETRIEVED = 'Admin dashboard user seg
 export const ADMIN_DASHBOARD_FUNNEL_PERFORMANCE_RETRIEVED = 'Admin dashboard funnel performance retrieved successfully';
 
 // Admin teams
-export const INVITATION_EXPIRY_DAYS = 7;
-export const MAX_BATCH_INVITES = 20;
-export const DEFAULT_PAGE = 1;
-export const DEFAULT_LIMIT = 20;
-export const MAX_LIMIT = 100;
-export const INVITE_TOKEN_BYTES = 32;
 export const TEAMS_RETRIEVED_SUCCESSFULLY   = 'Teams retrieved successfully';
 export const TEAM_CREATED_SUCCESSFULLY      = 'Team created successfully';
 export const TEAM_NOT_FOUND                 = 'Team not found';
@@ -281,4 +275,5 @@ export const TEAM_INVITATIONS_RETRIEVED     = 'Invitations retrieved successfull
 export const TEAM_INVITATION_REVOKED        = 'Invitation revoked successfully';
 export const TEAM_INVITATION_NOT_FOUND      = 'Invitation not found or already processed';
 export const TEAM_INVITE_ALREADY_PENDING    = 'An invitation for this email is already pending';
-export const TEAM_ALREADY_MEMBER           = 'This user is already a team member.';
+export const TEAM_ALREADY_MEMBER            = 'This user is already a team member.';
+export const TEAM_DELETED_SUCCESSFULLY      = 'Team deleted successfully';
