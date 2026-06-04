@@ -7,7 +7,7 @@ import { FunnelStatus } from '../../../funnels/enums/funnel-status.enum';
 import { User } from '../../../users/entities/user.entity';
 import { SortDir, UserSortBy, UserStatusFilter } from '../enums/admin-users-query.enum';
 
-const ACTIVE_WINDOW_DAYS = 30;
+export const ACTIVE_WINDOW_DAYS = 30;
 
 const SORT_COLUMN_MAP: Record<UserSortBy, string> = {
   [UserSortBy.CREATED_AT]: 'user.created_at',
@@ -40,6 +40,7 @@ export class AdminUsersListAction {
   ): Promise<[RawAdminUserRow[], number]> {
     const threshold = new Date();
     threshold.setDate(threshold.getDate() - ACTIVE_WINDOW_DAYS);
+    const escapedSearch = search ? search.replace(/[%_]/g, '\\$&') : undefined;
 
     // Count query — lightweight, no subquery, used for pagination meta
     const countQb = this.dataSource
@@ -56,10 +57,10 @@ export class AdminUsersListAction {
       );
     }
 
-    if (search) {
+    if (escapedSearch) {
       countQb.andWhere(
         '(user.email ILIKE :search OR user.full_name ILIKE :search)',
-        { search: `%${search}%` },
+        { search: `%${escapedSearch}%` },
       );
     }
 
