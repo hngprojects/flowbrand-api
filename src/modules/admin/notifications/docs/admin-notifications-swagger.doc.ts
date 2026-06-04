@@ -74,7 +74,9 @@ const badSelectionExample = {
 };
 
 const bulkSelectionBody = {
-  description: 'Provide either an ids array or all: true. An empty ids array is accepted as a no-op.',
+  description:
+    'Provide exactly one selector: an ids array OR all: true. Sending both is rejected with 400. ' +
+    'An empty ids array is accepted as a no-op.',
   schema: {
     oneOf: [
       {

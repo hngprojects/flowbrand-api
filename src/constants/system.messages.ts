@@ -289,3 +289,4 @@ export const ADMIN_NOTIFICATION_DELETED = 'Notification deleted successfully';
 export const ADMIN_NOTIFICATIONS_BULK_DELETED = 'Notifications deleted successfully';
 export const ADMIN_NOTIFICATION_STAR_TOGGLED = 'Notification star updated successfully';
 export const ADMIN_NOTIFICATION_BULK_SELECTION_REQUIRED = 'Provide either ids or all: true';
+export const ADMIN_NOTIFICATION_BULK_SELECTION_AMBIGUOUS = 'Provide either ids or all: true, not both';

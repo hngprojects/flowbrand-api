@@ -201,6 +201,14 @@ describe('AdminNotificationsService', () => {
     it('rejects a body that provides neither ids nor all: true', async () => {
       await expect(service.markUnread(ADMIN_ID, {})).rejects.toThrow(BadRequestException);
     });
+
+    it('rejects an ambiguous body that provides both ids and all: true', async () => {
+      await expect(service.markUnread(ADMIN_ID, { all: true, ids: [NOTIFICATION_ID] })).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockNotificationAction.markAllUnread).not.toHaveBeenCalled();
+      expect(mockNotificationAction.markUnreadByIds).not.toHaveBeenCalled();
+    });
   });
 
   describe('deleteOne', () => {
@@ -239,6 +247,14 @@ describe('AdminNotificationsService', () => {
 
     it('rejects a body that provides neither ids nor all: true', async () => {
       await expect(service.bulkDelete(ADMIN_ID, {})).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects an ambiguous body that provides both ids and all: true', async () => {
+      await expect(service.bulkDelete(ADMIN_ID, { all: true, ids: [NOTIFICATION_ID] })).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockNotificationAction.deleteAllForAdmin).not.toHaveBeenCalled();
+      expect(mockNotificationAction.deleteOwnedByIds).not.toHaveBeenCalled();
     });
   });
 

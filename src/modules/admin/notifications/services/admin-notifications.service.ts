@@ -115,8 +115,16 @@ export class AdminNotificationsService {
     return this.mapToFeedItem(updated);
   }
 
-  /** The bulk body must carry either ids or all: true; an empty ids array is a valid no-op (FR-8). */
+  /**
+   * The bulk body must carry exactly one selector: ids OR all: true. Sending both is
+   * rejected so a client bug cannot silently widen a targeted request into an
+   * admin-wide one. An empty ids array is a valid no-op (FR-8).
+   */
   private assertSelection(selection: BulkSelectionDto): void {
+    if (selection.all === true && Array.isArray(selection.ids)) {
+      throw new BadRequestException(SYS_MSG.ADMIN_NOTIFICATION_BULK_SELECTION_AMBIGUOUS);
+    }
+
     if (selection.all !== true && !Array.isArray(selection.ids)) {
       throw new BadRequestException(SYS_MSG.ADMIN_NOTIFICATION_BULK_SELECTION_REQUIRED);
     }
