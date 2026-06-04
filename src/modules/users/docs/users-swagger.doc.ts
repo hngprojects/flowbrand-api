@@ -65,7 +65,7 @@ const avatarUploadedExample = {
   message: SYS_MSG.PROFILE_AVATAR_UPLOADED_SUCCESSFULLY,
   data: {
     avatarUrl:
-      'https://storage.example.com/uploads/avatars/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/avatar.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256',
+      'https://storage.example.com/flowbrand-uploads/avatars/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/avatar.jpg',
   },
 };
 
@@ -273,7 +273,7 @@ export function GetUserStateDocs() {
             onboarding: { status: 'complete' },
             activeFunnel: {
               funnelId: '550e8400-e29b-41d4-a716-446655440000',
-              businessName: 'My Business',
+              funnelName: 'My Funnel',
               status: 'active',
               createdAt: '2026-01-01T00:00:00.000Z',
               currentStage: {
@@ -301,7 +301,7 @@ export function GetUserStateDocs() {
             onboarding: { status: 'complete' },
             activeFunnel: {
               funnelId: '550e8400-e29b-41d4-a716-446655440000',
-              businessName: 'My Business',
+              funnelName: 'My Funnel',
               status: 'active',
               createdAt: '2026-01-01T00:00:00.000Z',
               currentStage: null,
@@ -321,7 +321,7 @@ export function GetUserStateDocs() {
             onboarding: { status: 'complete' },
             activeFunnel: {
               funnelId: '550e8400-e29b-41d4-a716-446655440000',
-              businessName: 'My Business',
+              funnelName: 'My Funnel',
               status: 'generating',
               createdAt: '2026-01-01T00:00:00.000Z',
               currentStage: null,

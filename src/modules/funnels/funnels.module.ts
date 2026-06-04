@@ -15,12 +15,14 @@ import { StageTaskModelAction } from './actions/stage-task.action';
 import { FunnelsService } from './services/funnels.service';
 import { StageFeedback } from './entities/stage-feedback.entity';
 import { StageFeedbackModelAction } from './actions/stage-feedback.action';
+import { LlmModule } from '../llm/llm.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Funnel, FunnelStage, StageTask, WizardSession, UploadedDocument, StageFeedback]),
     BullModule.registerQueue({ name: QUEUES.FUNNEL_GENERATION }),
     RedisModule,
+    LlmModule,
   ],
   controllers: [FunnelsController],
   providers: [

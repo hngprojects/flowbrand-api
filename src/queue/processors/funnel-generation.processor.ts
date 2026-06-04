@@ -90,7 +90,7 @@ export class FunnelGenerationProcessor {
     await job.progress(100);
 
     this.logger.log({ message: 'Funnel generation complete', funnelId, jobId: job.id });
-    emitSafely(this.eventEmitter, this.logger, APP_EVENTS.FUNNEL_GENERATED, new FunnelGeneratedEvent(userId, funnelId, funnel.business_name));
+    emitSafely(this.eventEmitter, this.logger, APP_EVENTS.FUNNEL_GENERATED, new FunnelGeneratedEvent(userId, funnelId, funnel.funnel_name));
   }
 
   private async tryAiGeneration(ctx: BusinessContext): Promise<LlmStageData[] | null> {

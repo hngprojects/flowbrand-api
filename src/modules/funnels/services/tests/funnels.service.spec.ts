@@ -28,6 +28,7 @@ import { FunnelsService } from '.././funnels.service';
 import { Logger } from '@nestjs/common';
 import { StageFeedbackModelAction } from '../../actions/stage-feedback.action';
 import { StageFeedback } from '../../entities/stage-feedback.entity';
+import { LlmService } from '../../../../queue/interfaces/llm.service.interface';
 
 const USER_ID = '00000000-0000-4000-8000-0000000000a1';
 const OTHER_USER_ID = '00000000-0000-4000-8000-0000000000b2';
@@ -37,6 +38,11 @@ const FUNNEL_ID = '22222222-2222-4222-8222-222222222222';
 const BASE_DTO = {
   source: FunnelCreationPath.WIZARD,
   idempotency_key: IDEMPOTENCY_KEY,
+};
+
+const mockLlmService = {
+  generateFunnelNameWithGemini: jest.fn(),
+  generateFunnelNameWithGroq: jest.fn(),
 };
 
 const COMPLETE_WIZARD: Partial<WizardSession> = {
@@ -125,6 +131,9 @@ describe('FunnelsService', () => {
     };
     dataSource = { createQueryRunner: jest.fn().mockReturnValue(queryRunner) };
 
+    mockLlmService.generateFunnelNameWithGemini.mockImplementation(async (desc: string) => desc);
+    mockLlmService.generateFunnelNameWithGroq.mockImplementation(async (desc: string) => desc);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         FunnelsService,
@@ -136,6 +145,7 @@ describe('FunnelsService', () => {
         { provide: DataSource, useValue: dataSource },
         { provide: StageFeedbackModelAction, useValue: feedbackAction },
         { provide: EventEmitter2, useValue: mockEventEmitter },
+        { provide: LlmService, useValue: mockLlmService },
       ],
     }).compile();
 
@@ -342,7 +352,7 @@ describe('FunnelsService', () => {
     it('listForUser caps per_page at 20 and returns summaries with task counts', async () => {
       const sampleFunnel: any = {
         id: 'f1',
-        business_name: 'B',
+        funnel_name: 'B',
         creation_path: 'cp',
         status: 'active',
         created_at: new Date(),
@@ -357,7 +367,7 @@ describe('FunnelsService', () => {
       expect(res.funnels.length).toBe(1);
       expect(res.funnels[0]).toMatchObject({
         funnelId: 'f1',
-        businessName: 'B',
+        funnelName: 'B',
         creationPath: 'cp',
         status: 'active',
       });
@@ -597,19 +607,65 @@ describe('FunnelsService', () => {
 
   describe('wizard context derivation', () => {
     type SavedFunnel = {
-      business_name: string;
+      funnel_name: string;
       business_context: { businessType: string; business_description: string; target_customer: string };
     };
 
-    it('uses step_1.business_description as business_name and business_description', async () => {
+    it('uses step_1.business_description to generate funnel_name', async () => {
       funnelAction.findByIdempotency.mockResolvedValue(null);
       funnelAction.getLatestCompletedWizard.mockResolvedValue(COMPLETE_WIZARD as WizardSession);
+      mockLlmService.generateFunnelNameWithGemini.mockResolvedValueOnce('Jollof Spot');
 
       await service.createGeneration(USER_ID, BASE_DTO);
 
       const saved = queryRunner.manager.save.mock.calls[0][1] as SavedFunnel;
-      expect(saved.business_name).toBe('Casual jollof spot');
+      expect(saved.funnel_name).toBe('Jollof Spot');
       expect(saved.business_context.business_description).toBe('Casual jollof spot');
+      expect(mockLlmService.generateFunnelNameWithGemini).toHaveBeenCalledWith('Casual jollof spot', 'Instagram');
+    });
+
+    it('falls back to Groq if Gemini funnel name generation fails', async () => {
+      funnelAction.findByIdempotency.mockResolvedValue(null);
+      funnelAction.getLatestCompletedWizard.mockResolvedValue(COMPLETE_WIZARD as WizardSession);
+      mockLlmService.generateFunnelNameWithGemini.mockRejectedValueOnce(new Error('Gemini error'));
+      mockLlmService.generateFunnelNameWithGroq.mockResolvedValueOnce('Groq Jollof Spot');
+
+      await service.createGeneration(USER_ID, BASE_DTO);
+
+      const saved = queryRunner.manager.save.mock.calls[0][1] as SavedFunnel;
+      expect(saved.funnel_name).toBe('Groq Jollof Spot');
+      expect(mockLlmService.generateFunnelNameWithGroq).toHaveBeenCalledWith('Casual jollof spot', 'Instagram');
+    });
+
+    it('falls back to default funnel name if both Gemini and Groq fail', async () => {
+      funnelAction.findByIdempotency.mockResolvedValue(null);
+      funnelAction.getLatestCompletedWizard.mockResolvedValue(COMPLETE_WIZARD as WizardSession);
+      mockLlmService.generateFunnelNameWithGemini.mockRejectedValueOnce(new Error('Gemini error'));
+      mockLlmService.generateFunnelNameWithGroq.mockRejectedValueOnce(new Error('Groq error'));
+
+      await service.createGeneration(USER_ID, BASE_DTO);
+
+      const saved = queryRunner.manager.save.mock.calls[0][1] as SavedFunnel;
+      expect(saved.funnel_name).toBe('My Funnel');
+    });
+
+    it('joins multiple discovery channels into a comma-separated string for the LLM', async () => {
+      funnelAction.findByIdempotency.mockResolvedValue(null);
+      funnelAction.getLatestCompletedWizard.mockResolvedValue({
+        ...COMPLETE_WIZARD,
+        answers: {
+          ...COMPLETE_WIZARD.answers,
+          step_3: { discovery_channel: ['Instagram', 'WhatsApp'] },
+        },
+      } as WizardSession);
+      mockLlmService.generateFunnelNameWithGemini.mockResolvedValueOnce('Jollof Spot');
+
+      await service.createGeneration(USER_ID, BASE_DTO);
+
+      expect(mockLlmService.generateFunnelNameWithGemini).toHaveBeenCalledWith(
+        'Casual jollof spot',
+        'Instagram, WhatsApp',
+      );
     });
 
     it('uses user profile fields for businessType and target_customer', async () => {
