@@ -1,5 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { UserRoleModelAction } from '../../../users/actions/user-role.action';
+import { UserRole } from '../../../users/enums/user-role.enum';
 import { AdminNotificationModelAction } from '../actions/admin-notification.action';
 import { AdminNotification } from '../entities/admin-notification.entity';
 import {
@@ -14,6 +16,8 @@ const OTHER_ADMIN_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const NOTIFICATION_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
 const mockNotificationAction = {
+  create: jest.fn(),
+  createMany: jest.fn(),
   listForAdminPaginated: jest.fn(),
   countUnread: jest.fn(),
   findOwnedById: jest.fn(),
@@ -25,6 +29,11 @@ const mockNotificationAction = {
   deleteOwnedByIds: jest.fn(),
   deleteAllForAdmin: jest.fn(),
   toggleStarred: jest.fn(),
+  riskFlaggedStageIds: jest.fn(),
+};
+
+const mockUserRoleModelAction = {
+  findAdminIds: jest.fn(),
 };
 
 const notification = (overrides: Partial<AdminNotification> = {}): AdminNotification =>
@@ -54,6 +63,7 @@ describe('AdminNotificationsService', () => {
       providers: [
         AdminNotificationsService,
         { provide: AdminNotificationModelAction, useValue: mockNotificationAction },
+        { provide: UserRoleModelAction, useValue: mockUserRoleModelAction },
       ],
     }).compile();
     service = module.get<AdminNotificationsService>(AdminNotificationsService);
@@ -283,4 +293,56 @@ describe('AdminNotificationsService', () => {
     });
   });
 
+  describe('createNotification', () => {
+    it('FR-9: inserts a notification with capped title and sender details', async () => {
+      mockNotificationAction.create.mockResolvedValue(notification());
+
+      await service.createNotification(
+        ADMIN_ID,
+        AdminNotificationType.MENTION,
+        'a'.repeat(200),
+        'You were mentioned',
+        { comment_id: 'c-1' },
+        { sender_name: 'Ada Obi' },
+      );
+
+      expect(mockNotificationAction.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          createPayload: expect.objectContaining({
+            admin_id: ADMIN_ID,
+            type: AdminNotificationType.MENTION,
+            title: 'a'.repeat(120),
+            sender_name: 'Ada Obi',
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('notifyAllAdmins', () => {
+    it('FR-9: fans the notification out to every admin and super admin', async () => {
+      mockUserRoleModelAction.findAdminIds.mockResolvedValue([ADMIN_ID, OTHER_ADMIN_ID]);
+      mockNotificationAction.createMany.mockImplementation((payloads: Partial<AdminNotification>[]) =>
+        Promise.resolve(payloads as AdminNotification[]),
+      );
+
+      const created = await service.notifyAllAdmins(AdminNotificationType.RISK, 'User stuck on a stage', 'Ada is stuck');
+
+      expect(created).toBe(2);
+      expect(mockUserRoleModelAction.findAdminIds).toHaveBeenCalledWith([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+      expect(mockNotificationAction.createMany).toHaveBeenCalledWith([
+        expect.objectContaining({ admin_id: ADMIN_ID, type: AdminNotificationType.RISK }),
+        expect.objectContaining({ admin_id: OTHER_ADMIN_ID, type: AdminNotificationType.RISK }),
+      ]);
+    });
+
+    it('creates nothing when no admins exist', async () => {
+      mockUserRoleModelAction.findAdminIds.mockResolvedValue([]);
+      mockNotificationAction.createMany.mockResolvedValue([]);
+
+      const created = await service.notifyAllAdmins(AdminNotificationType.FEEDBACK, 'Feedback', 'New feedback');
+
+      expect(created).toBe(0);
+    });
+  });
 });

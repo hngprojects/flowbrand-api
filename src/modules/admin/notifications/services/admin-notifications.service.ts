@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import * as SYS_MSG from '../../../../constants/system.messages';
+import { UserRoleModelAction } from '../../../users/actions/user-role.action';
+import { UserRole } from '../../../users/enums/user-role.enum';
 import { AdminNotificationModelAction } from '../actions/admin-notification.action';
 import { BulkSelectionDto } from '../dto/bulk-selection.dto';
 import { ListAdminNotificationsQueryDto } from '../dto/list-admin-notifications.query.dto';
@@ -16,13 +18,25 @@ import {
   AdminNotificationUpdateResponse,
 } from '../interfaces/admin-notification.interface';
 
+const TITLE_MAX = 120;
+const SENDER_NAME_MAX = 100;
 const DEFAULT_PAGE = 1;
 const DEFAULT_PER_PAGE = 20;
 const MAX_PER_PAGE = 50;
 
+const ADMIN_ROLES: UserRole[] = [UserRole.ADMIN, UserRole.SUPER_ADMIN];
+
+export interface AdminNotificationSender {
+  sender_name?: string | null;
+  sender_avatar_url?: string | null;
+}
+
 @Injectable()
 export class AdminNotificationsService {
-  constructor(private readonly notificationAction: AdminNotificationModelAction) {}
+  constructor(
+    private readonly notificationAction: AdminNotificationModelAction,
+    private readonly userRoleModelAction: UserRoleModelAction,
+  ) {}
 
   /** FR-2: paginated, filterable feed; meta.unread_count is always the unfiltered unread total. */
   async getFeed(adminId: string, query: ListAdminNotificationsQueryDto): Promise<AdminNotificationFeedResponse> {
@@ -113,6 +127,60 @@ export class AdminNotificationsService {
     }
 
     return this.mapToFeedItem(updated);
+  }
+
+  /** FR-9: creates one notification for one admin. */
+  async createNotification(
+    adminId: string,
+    type: AdminNotificationType,
+    title: string,
+    message: string,
+    metadata: Record<string, unknown> = {},
+    sender: AdminNotificationSender = {},
+  ): Promise<AdminNotification> {
+    return this.notificationAction.create({
+      createPayload: this.toCreatePayload(adminId, type, title, message, metadata, sender),
+      transactionOptions: { useTransaction: false },
+    });
+  }
+
+  /** FR-9: fans one platform event out to every active admin and super admin in a single INSERT. */
+  async notifyAllAdmins(
+    type: AdminNotificationType,
+    title: string,
+    message: string,
+    metadata: Record<string, unknown> = {},
+    sender: AdminNotificationSender = {},
+  ): Promise<number> {
+    const adminIds = await this.findAdminIds();
+    const created = await this.notificationAction.createMany(
+      adminIds.map((adminId) => this.toCreatePayload(adminId, type, title, message, metadata, sender)),
+    );
+    return created.length;
+  }
+
+  /** Distinct active admin/super admin user ids (deleted accounts are excluded). */
+  private async findAdminIds(): Promise<string[]> {
+    return this.userRoleModelAction.findAdminIds(ADMIN_ROLES);
+  }
+
+  private toCreatePayload(
+    adminId: string,
+    type: AdminNotificationType,
+    title: string,
+    message: string,
+    metadata: Record<string, unknown>,
+    sender: AdminNotificationSender,
+  ): Partial<AdminNotification> {
+    return {
+      admin_id: adminId,
+      type,
+      title: title.slice(0, TITLE_MAX),
+      message,
+      sender_name: sender.sender_name ? sender.sender_name.slice(0, SENDER_NAME_MAX) : null,
+      sender_avatar_url: sender.sender_avatar_url ?? null,
+      metadata,
+    };
   }
 
   /**

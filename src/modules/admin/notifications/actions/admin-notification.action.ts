@@ -155,4 +155,30 @@ export class AdminNotificationModelAction extends AbstractModelAction<AdminNotif
 
     return this.repository.findOne({ where: { id: notificationId, admin_id: adminId } });
   }
+
+  /** Single multi-row INSERT used when an event fans out to every admin (FR-9). */
+  async createMany(payloads: Partial<AdminNotification>[]): Promise<AdminNotification[]> {
+    if (payloads.length === 0) {
+      return [];
+    }
+
+    const entities = this.repository.create(payloads);
+    return this.repository.save(entities);
+  }
+
+  /** Stage ids among `stageIds` that already have a risk notification; one batched dedup query (FR-9). */
+  async riskFlaggedStageIds(stageIds: string[]): Promise<string[]> {
+    if (stageIds.length === 0) {
+      return [];
+    }
+
+    const rows: { stage_id: string }[] = await this.repository
+      .createQueryBuilder('notification')
+      .select("DISTINCT notification.metadata ->> 'stage_id'", 'stage_id')
+      .where('notification.type = :type', { type: AdminNotificationType.RISK })
+      .andWhere("notification.metadata ->> 'stage_id' IN (:...stageIds)", { stageIds })
+      .getRawMany();
+
+    return rows.map((row) => row.stage_id);
+  }
 }

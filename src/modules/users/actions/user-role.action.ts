@@ -31,4 +31,16 @@ export class UserRoleModelAction extends AbstractModelAction<UserRoleEntity> {
     if (!roles.length) return null;
     return roles.reduce((highest, row) => (ROLE_PRIORITY[row.role] > ROLE_PRIORITY[highest.role] ? row : highest)).role;
   }
+
+  /** Distinct user ids holding any of the given roles, excluding soft-deleted accounts. */
+  async findAdminIds(roles: UserRole[]): Promise<string[]> {
+    const rows: { user_id: string }[] = await this.repository
+      .createQueryBuilder('user_role')
+      .innerJoin('user_role.user', 'user', 'user.deleted_at IS NULL')
+      .select('DISTINCT user_role.user_id', 'user_id')
+      .where('user_role.role IN (:...roles)', { roles })
+      .getRawMany();
+
+    return rows.map((row) => row.user_id);
+  }
 }
