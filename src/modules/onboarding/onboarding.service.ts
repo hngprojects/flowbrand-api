@@ -105,8 +105,14 @@ export class OnboardingService {
     .filter(Boolean)
     .join('. ');
 
-  const discoveryChannel = (answers.step_3?.discovery_channel ?? '') as DiscoveryChannel;
-  const primaryGoal = OnboardingService.GOAL_MAP[discoveryChannel] ?? 'awareness';
+  const rawChannel = answers.step_3?.discovery_channel;
+  let primaryGoal = 'awareness';
+  if (Array.isArray(rawChannel)) {
+    const hasSales = rawChannel.some(ch => OnboardingService.GOAL_MAP[ch as DiscoveryChannel] === 'sales');
+    primaryGoal = hasSales ? 'sales' : 'awareness';
+  } else if (typeof rawChannel === 'string' && rawChannel.trim()) {
+    primaryGoal = OnboardingService.GOAL_MAP[rawChannel as DiscoveryChannel] ?? 'awareness';
+  }
 
   await this.dataSource.transaction(async (manager) => {
     await manager.update(User, userId, {
@@ -131,7 +137,9 @@ private validateAnswers(answers: WizardAnswers): void {
 
   if (!answers?.step_1?.business_description)        missingSteps.push('step_1');
   if (!answers?.step_2?.customer_tags?.type?.length && !answers?.step_2?.additional_notes?.trim()) missingSteps.push('step_2');
-  if (!answers?.step_3?.discovery_channel)           missingSteps.push('step_3');
+  const hasStep3 = answers?.step_3?.discovery_channel &&
+    (!Array.isArray(answers.step_3.discovery_channel) || answers.step_3.discovery_channel.length > 0);
+  if (!hasStep3)                                     missingSteps.push('step_3');
 
   if (missingSteps.length > 0) {
     throw new UnprocessableEntityException({

@@ -107,7 +107,7 @@ describe('FunnelGenerationProcessor', () => {
     mockFunnelAction.get.mockResolvedValue({
       id: 'funnel-uuid',
       status: FunnelStatus.GENERATING,
-      business_name: 'Test Bakery',
+      funnel_name: 'Test Bakery',
       business_context: businessContext,
     });
 
