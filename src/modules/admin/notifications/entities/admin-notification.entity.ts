@@ -4,6 +4,9 @@ import { User } from '../../../users/entities/user.entity';
 import { AdminNotificationType } from '../enums/admin-notification.enum';
 
 // Composite indexes back the feed filters: read tab, type tabs and starred tab (FR-1).
+// The migration also adds a partial unique index UQ_admin_notifications_risk_admin_stage
+// on (admin_id, metadata ->> 'stage_id') WHERE type = 'risk' (not expressible as a
+// decorator) so duplicate risk alerts are impossible even under concurrent scans.
 @Entity('admin_notifications')
 @Index('IDX_admin_notifications_admin_id_is_read', ['admin_id', 'is_read'])
 @Index('IDX_admin_notifications_admin_id_type', ['admin_id', 'type'])
