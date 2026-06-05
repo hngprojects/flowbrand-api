@@ -38,7 +38,7 @@ describe('ActivityListener', () => {
 
   const lastPayload = () => mockActivityAction.create.mock.calls[0][0].createPayload;
 
-  it('writes a funnel.generated row with funnel_id and businessName metadata', async () => {
+  it('writes a funnel.generated row with funnel_id and funnelName metadata', async () => {
     await listener.onFunnelGenerated(new FunnelGeneratedEvent('user-1', 'funnel-1', 'Acme'));
 
     expect(mockActivityAction.create).toHaveBeenCalledTimes(1);
@@ -49,7 +49,7 @@ describe('ActivityListener', () => {
         funnel_id: 'funnel-1',
         stage_id: null,
         task_id: null,
-        metadata: { businessName: 'Acme' },
+        metadata: { funnelName: 'Acme' },
       }),
     );
   });
