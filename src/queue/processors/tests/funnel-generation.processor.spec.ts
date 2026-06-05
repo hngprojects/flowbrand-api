@@ -107,7 +107,7 @@ describe('FunnelGenerationProcessor', () => {
     mockFunnelAction.get.mockResolvedValue({
       id: 'funnel-uuid',
       status: FunnelStatus.GENERATING,
-      business_name: 'Test Bakery',
+      funnel_name: 'Test Bakery',
       business_context: businessContext,
     });
 
@@ -516,7 +516,7 @@ describe('FunnelGenerationProcessor', () => {
 
       const [, payload] = (mockEventEmitter.emit as jest.Mock).mock.calls[0];
       expect(payload).toBeInstanceOf(FunnelGeneratedEvent);
-      expect(payload.businessName).toBe('Test Bakery');
+      expect(payload.funnelName).toBe('Test Bakery');
     });
 
 

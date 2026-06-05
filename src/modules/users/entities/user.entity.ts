@@ -11,6 +11,7 @@ import { BaseEntity } from '../../../common/entities/base.entity';
 import { UserRoleEntity } from './user-role.entity';
 import { AuthMetadata } from '../../auth/entities/auth-metadata.entity';
 import { UserSession } from './user-session.entity';
+import { UserPlan } from '../enums/user-plan.enum';
 
 @Entity('users')
 export class User extends BaseEntity {
@@ -27,6 +28,9 @@ export class User extends BaseEntity {
 
   @Column({ type: 'varchar', length: 100, nullable: true })
   country: string | null;
+
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  business_name: string | null;
 
   @Column({ type: 'boolean', default: false })
   is_verified: boolean;
@@ -54,6 +58,12 @@ export class User extends BaseEntity {
 
   @Column({ type: 'varchar', length: 100, nullable: true })
   primary_goal: string | null;
+
+  @Column({ type: 'varchar', length: 20, default: UserPlan.FREE })
+  plan: UserPlan;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  plan_activated_at: Date | null;
 
   @Exclude()
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz', nullable: true })

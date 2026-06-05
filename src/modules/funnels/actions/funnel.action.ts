@@ -81,6 +81,14 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
     return repo.findOne({ where: { id: funnelId, user_id: userId } });
   }
 
+  async updateFunnelName(funnelId: string, userId: string, funnelName: string): Promise<Funnel | null> {
+    const funnel = await this.funnelRepository.findOne({ where: { id: funnelId, user_id: userId } });
+    if (!funnel) return null;
+
+    funnel.funnel_name = funnelName;
+    return this.funnelRepository.save(funnel);
+  }
+
   async listForUserPaginated(userId: string, page: number, perPage: number): Promise<[Funnel[], number]> {
     return this.funnelRepository
       .createQueryBuilder('f')

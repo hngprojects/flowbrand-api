@@ -105,6 +105,7 @@ export class AuthService {
       email: dto.email,
       password: dto.password,
       fullName: dto.fullName,
+      businessName: dto.businessName,
       termsAccepted: true,
     });
     await this.sendOtp(user.email);

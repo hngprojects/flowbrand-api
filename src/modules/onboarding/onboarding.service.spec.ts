@@ -516,12 +516,14 @@ describe('OnboardingService — completeOnboarding', () => {
   });
 
   describe('primary_goal mapping for all DiscoveryChannel values', () => {
-    const cases: Array<{ channel: string; expected: string }> = [
+    const cases: Array<{ channel: string | string[]; expected: string }> = [
       { channel: 'Instagram',        expected: 'awareness' },
       { channel: 'Facebook',         expected: 'awareness' },
       { channel: 'TikTok',           expected: 'awareness' },
       { channel: 'Physical Location', expected: 'sales' },
       { channel: 'Others',           expected: 'awareness' },
+      { channel: ['Instagram', 'Facebook'], expected: 'awareness' },
+      { channel: ['Instagram', 'Physical Location'], expected: 'sales' },
     ];
 
     it.each(cases)(
@@ -642,7 +644,7 @@ describe('OnboardingService — saveStepAnswer (BE-008)', () => {
     mockSaveSessionAction.saveSession.mockResolvedValue(undefined);
 
     const result = await service.saveStepAnswer(USER_ID, {
-      session_id: SESSION_ID, step: 3, answer: { discovery_channel: 'Instagram' }
+      session_id: SESSION_ID, step: 3, answer: { discovery_channel: ['Instagram'] }
     } as any);
 
     expect(result.statusCode).toBe(HttpStatus.OK);
@@ -665,11 +667,11 @@ describe('OnboardingService — saveStepAnswer (BE-008)', () => {
     expect(result.data.stepsCompleted).toBe(1);
   });
 
-  it('AC-08: throws 422 when step 1 business_description exceeds 500 characters', async () => {
+  it('AC-08: throws 422 when step 1 business_description exceeds 2000 characters', async () => {
     mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession());
     await expect(
       service.saveStepAnswer(USER_ID, {
-        session_id: SESSION_ID, step: 1, answer: { business_description: 'x'.repeat(501) }
+        session_id: SESSION_ID, step: 1, answer: { business_description: 'x'.repeat(2001) }
       } as any)
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
@@ -710,11 +712,29 @@ describe('OnboardingService — saveStepAnswer (BE-008)', () => {
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 
-  it('AC-10: throws 422 when step 3 discovery_channel is invalid', async () => {
+  it('AC-10: throws 422 when step 3 discovery_channel is not an array', async () => {
     mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession());
     await expect(
       service.saveStepAnswer(USER_ID, {
-        session_id: SESSION_ID, step: 3, answer: { discovery_channel: 'Twitter' }
+        session_id: SESSION_ID, step: 3, answer: { discovery_channel: 'Instagram' }
+      } as any)
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('AC-10a: throws 422 when step 3 discovery_channel is empty array', async () => {
+    mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession());
+    await expect(
+      service.saveStepAnswer(USER_ID, {
+        session_id: SESSION_ID, step: 3, answer: { discovery_channel: [] }
+      } as any)
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('AC-10b: throws 422 when step 3 discovery_channel contains invalid channel', async () => {
+    mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession());
+    await expect(
+      service.saveStepAnswer(USER_ID, {
+        session_id: SESSION_ID, step: 3, answer: { discovery_channel: ['Twitter'] }
       } as any)
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });

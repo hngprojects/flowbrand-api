@@ -20,6 +20,7 @@ import {
   FeedbackSubmittedEvent,
   TaskCompletedEvent,
   TaskReopenedEvent,
+  FunnelRenamedEvent,
 } from '../../../common/events';
 import { emitSafely } from '../../../common/events/emit-safely';
 import { JOBS, QUEUES } from '../../../common/constants/queue.constants';
@@ -38,20 +39,23 @@ import { UploadDocumentStatus } from '../../upload/upload.types';
 import type { BusinessContext, GenerateFunnelJobPayload } from './../interfaces/generate-funnel-job.interface';
 import type {
   FunnelGenerationCreateResult,
+  FunnelRenameResult,
   FunnelStatusResult,
   StageCompletionResult,
   SubmitFeedbackResponse,
   TaskUpdateResult,
 } from './../interfaces/funnels.interfaces';
+import { RenameFunnelDto } from './../dto/rename-funnel.dto';
 import { StageTask, StageTaskStatus } from './../entities/stage-task.entity';
 import { UploadedDocument } from '../../upload/entities/uploaded-document.entity';
 import { StageFeedbackModelAction } from '../actions/stage-feedback.action';
 import { SubmitStageFeedbackDto } from '../dto/submit-stage-feedback.dto';
 import { StageFeedback } from '../entities/stage-feedback.entity';
+import { LlmService } from '../../../queue/interfaces/llm.service.interface';
 
 const STAGE_NAMES = ['Get Noticed', 'Spark Interest', 'Make First Sale', 'Bring Them Back'] as const;
 const QUEUE_DELAY_MS = 250;
-const DEFAULT_BUSINESS_NAME = 'My Business';
+const DEFAULT_FUNNEL_NAME = 'My Funnel';
 
 @Injectable()
 export class FunnelsService {
@@ -66,6 +70,7 @@ export class FunnelsService {
     private readonly dataSource: DataSource,
     private readonly feedbackAction: StageFeedbackModelAction,
     private readonly eventEmitter: EventEmitter2,
+    private readonly llmService: LlmService,
   ) {}
 
   normalizePagination(page?: number, perPage?: number) {
@@ -108,7 +113,7 @@ export class FunnelsService {
 
     const mapped = funnels.map((f) => ({
       funnelId: f.id,
-      businessName: f.business_name,
+      funnelName: f.funnel_name,
       creationPath: f.creation_path,
       status: f.status,
       createdAt: f.created_at,
@@ -157,7 +162,7 @@ export class FunnelsService {
 
     return {
       funnelId: funnel.id,
-      businessName: funnel.business_name,
+      funnelName: funnel.funnel_name,
       creationPath: funnel.creation_path,
       status: funnel.status,
       createdAt: funnel.created_at,
@@ -237,7 +242,7 @@ export class FunnelsService {
     }
 
     await this.checkRateLimit(userId);
-    const { businessName, businessContext } = await this.validateSourceAndDeriveContext(userId, dto);
+    const { funnelName, businessContext } = await this.validateSourceAndDeriveContext(userId, dto);
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -246,7 +251,7 @@ export class FunnelsService {
     try {
       const funnel = await queryRunner.manager.save(Funnel, {
         user_id: userId,
-        business_name: businessName,
+        funnel_name: funnelName,
         creation_path: dto.source,
         status: FunnelStatus.GENERATING,
         idempotency_key: dto.idempotency_key,
@@ -293,6 +298,40 @@ export class FunnelsService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  async renameFunnel(userId: string, funnelId: string, dto: RenameFunnelDto): Promise<FunnelRenameResult> {
+    const funnel = await this.funnelAction.findOwnedById(funnelId, userId);
+    if (!funnel) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
+
+    const trimmedName = dto.funnelName;
+    if (trimmedName === funnel.funnel_name) {
+      return this.toRenameResponse(funnel);
+    }
+
+    const oldName = funnel.funnel_name;
+    const updated = await this.funnelAction.updateFunnelName(funnelId, userId, trimmedName);
+    if (!updated) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
+
+    emitSafely(
+      this.eventEmitter,
+      this.logger,
+      APP_EVENTS.FUNNEL_RENAMED,
+      new FunnelRenamedEvent(userId, funnelId, oldName, trimmedName),
+    );
+
+    return this.toRenameResponse(updated);
+  }
+
+  private toRenameResponse(funnel: Funnel): FunnelRenameResult {
+    return {
+      id: funnel.id,
+      funnelName: funnel.funnel_name,
+      status: funnel.status,
+      creationPath: funnel.creation_path,
+      createdAt: funnel.created_at.toISOString(),
+      updatedAt: funnel.updated_at.toISOString(),
+    };
   }
 
   async getStatus(funnelId: string, userId: string): Promise<FunnelStatusResult> {
@@ -441,25 +480,55 @@ export class FunnelsService {
   private async validateSourceAndDeriveContext(
     userId: string,
     dto: CreateFunnelDto,
-  ): Promise<{ businessName: string; businessContext: BusinessContext }> {
+  ): Promise<{ funnelName: string; businessContext: BusinessContext }> {
     if (dto.source === FunnelCreationPath.WIZARD) {
       const session = await this.funnelAction.getLatestCompletedWizard(userId);
       if (!session) throw new UnprocessableEntityException(SYS_MSG.ONBOARDING_INCOMPLETE);
 
       const step1 = (session.answers?.step_1 ?? {}) as { business_description?: string; business_type?: string };
-      const step3 = (session.answers?.step_3 ?? {}) as { discovery_channel?: string };
+      const step3 = (session.answers?.step_3 ?? {}) as { discovery_channel?: string | string[] };
       const user = await this.funnelAction.getUserProfile(userId);
 
-      const businessName = this.coerceString(step1.business_description) || DEFAULT_BUSINESS_NAME;
+      const description = this.coerceString(step1.business_description);
+
+      let discoveryChannelStr = 'unknown';
+      const rawChannel = step3.discovery_channel;
+      if (Array.isArray(rawChannel)) {
+        discoveryChannelStr = rawChannel.join(', ');
+      } else if (typeof rawChannel === 'string' && rawChannel.trim()) {
+        discoveryChannelStr = rawChannel.trim();
+      }
+
+      let funnelName = DEFAULT_FUNNEL_NAME;
+      if (description) {
+        try {
+          funnelName = await this.llmService.generateFunnelNameWithGemini(description, discoveryChannelStr);
+        } catch (err) {
+          this.logger.warn({
+            message: 'Gemini funnel name generation failed, trying Groq',
+            error: (err as Error).message,
+          });
+          try {
+            funnelName = await this.llmService.generateFunnelNameWithGroq(description, discoveryChannelStr);
+          } catch (groqErr) {
+            this.logger.warn({
+              message: 'Groq funnel name generation failed, falling back to default',
+              error: (groqErr as Error).message,
+            });
+            funnelName = DEFAULT_FUNNEL_NAME;
+          }
+        }
+      }
+
       const businessType = this.coerceString(step1.business_type) || this.coerceString(user?.business_type) || 'unknown';
       const businessContext: BusinessContext = {
         businessType,
-        discoveryChannel: this.coerceString(step3.discovery_channel) || 'unknown',
-        business_name: businessName,
-        business_description: this.coerceString(step1.business_description) || '',
+        discoveryChannel: discoveryChannelStr,
+        business_name: funnelName,
+        business_description: description,
         target_customer: this.coerceString(user?.target_customer) || '',
       };
-      return { businessName, businessContext };
+      return { funnelName, businessContext };
     }
 
     const ids = dto.upload_ids ?? [];
@@ -477,15 +546,15 @@ export class FunnelsService {
       .filter(Boolean)
       .join('\n')
       .slice(0, 4000);
-    const businessName = this.deriveNameFromFiles(docs) || DEFAULT_BUSINESS_NAME;
+    const funnelName = this.deriveNameFromFiles(docs) || DEFAULT_FUNNEL_NAME;
     const businessContext: BusinessContext = {
       businessType: 'unknown',
       discoveryChannel: 'unknown',
-      business_name: businessName,
+      business_name: funnelName,
       business_description: parsedJoin,
       target_customer: '',
     };
-    return { businessName, businessContext };
+    return { funnelName, businessContext };
   }
 
   private coerceString(value: unknown): string {

@@ -26,6 +26,7 @@ const profileDataExample = {
   fullName: 'Jane Doe',
   email: 'jane@example.com',
   country: 'Nigeria',
+  businessName: 'Ben Clothing',
   avatarUrl: null,
   authProvider: 'local',
   isVerified: true,
@@ -125,8 +126,8 @@ export function UpdateProfileDocs() {
     ApiOperation({
       summary: "Update the authenticated user's profile",
       description:
-        'Accepts a partial body. Only `fullName` and `country` may be changed. ' +
-        '`fullName` is trimmed before validation — a whitespace-only string returns HTTP 422. ' +
+        'Accepts a partial body. Only `fullName`, `country` and `businessName` may be changed. ' +
+        '`fullName` and `businessName` are trimmed before validation — a whitespace-only string returns HTTP 422. ' +
         '`country` must be one of the allowed SSA countries (canonical casing). ' +
         'Sending `email` in the body returns HTTP 422. ' +
         'An empty body or unchanged values return HTTP 200 without a DB write.',
@@ -273,7 +274,7 @@ export function GetUserStateDocs() {
             onboarding: { status: 'complete' },
             activeFunnel: {
               funnelId: '550e8400-e29b-41d4-a716-446655440000',
-              businessName: 'My Business',
+              funnelName: 'My Funnel',
               status: 'active',
               createdAt: '2026-01-01T00:00:00.000Z',
               currentStage: {
@@ -301,7 +302,7 @@ export function GetUserStateDocs() {
             onboarding: { status: 'complete' },
             activeFunnel: {
               funnelId: '550e8400-e29b-41d4-a716-446655440000',
-              businessName: 'My Business',
+              funnelName: 'My Funnel',
               status: 'active',
               createdAt: '2026-01-01T00:00:00.000Z',
               currentStage: null,
@@ -321,7 +322,7 @@ export function GetUserStateDocs() {
             onboarding: { status: 'complete' },
             activeFunnel: {
               funnelId: '550e8400-e29b-41d4-a716-446655440000',
-              businessName: 'My Business',
+              funnelName: 'My Funnel',
               status: 'generating',
               createdAt: '2026-01-01T00:00:00.000Z',
               currentStage: null,
