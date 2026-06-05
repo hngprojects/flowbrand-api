@@ -202,6 +202,7 @@ export const FUNNEL_NOT_FOUND = 'Funnel not found.';
 export const FUNNEL_DELETED = 'Funnel deleted.';
 export const FUNNEL_CANNOT_DELETE_ONLY_ACTIVE =
   'You cannot delete your only active funnel. Create another strategy first.';
+export const FUNNEL_RENAMED_SUCCESSFULLY = 'Funnel renamed successfully.';
 export const FUNNEL_STATUS_RETRIEVED = 'Funnel status retrieved.';
 export const GENERATION_SERVICE_UNAVAILABLE =
   'Funnel generation service is temporarily unavailable. Please try again shortly.';

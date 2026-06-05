@@ -7,6 +7,7 @@ import {
   FunnelDeletedEvent,
   FunnelFailedEvent,
   FunnelGeneratedEvent,
+  FunnelRenamedEvent,
   PasswordChangedEvent,
   ProfileUpdatedEvent,
   StageCompletedEvent,
@@ -66,6 +67,16 @@ export class ActivityListener {
       event_type: APP_EVENTS.FUNNEL_DELETED,
       funnel_id: event.funnelId,
       metadata: { funnelName: event.funnelName },
+    });
+  }
+
+  @OnEvent(APP_EVENTS.FUNNEL_RENAMED)
+  async onFunnelRenamed(event: FunnelRenamedEvent): Promise<void> {
+    await this.persist({
+      user_id: event.userId,
+      event_type: APP_EVENTS.FUNNEL_RENAMED,
+      funnel_id: event.funnelId,
+      metadata: { oldName: event.oldName, newName: event.newName },
     });
   }
 

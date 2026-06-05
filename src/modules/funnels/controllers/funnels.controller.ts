@@ -1,4 +1,19 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UnprocessableEntityException,
+  ValidationError,
+  ValidationPipe,
+} from '@nestjs/common';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { CreateFunnelDto, FunnelIdParamDto } from '../dto/create-funnel.dto';
@@ -13,9 +28,11 @@ import {
   GetStageDetailDecorators,
   GetStagesSummaryDecorators,
   ListFunnelsDecorators,
+  RenameFunnelDecorators,
   SubmitFeedbackDocs,
   UpdateTaskStatusDecorators,
 } from '../docs/funnels-swagger.doc';
+import { RenameFunnelDto } from '../dto/rename-funnel.dto';
 import { SubmitStageFeedbackDto } from '../dto/submit-stage-feedback.dto';
 import { UpdateTaskStatusDto } from '../dto/update-task-status.dto';
 
@@ -51,6 +68,40 @@ export class FunnelsController {
   @HttpCode(HttpStatus.OK)
   async remove(@CurrentUser('userId') userId: string, @Param('id', ParseUUIDPipe) id: string) {
     return this.funnelsService.deleteFunnel(userId, id);
+  }
+
+  @RenameFunnelDecorators()
+  @Patch(':id/rename')
+  @HttpCode(HttpStatus.OK)
+  async rename(
+    @CurrentUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+        transformOptions: { enableImplicitConversion: false },
+        expectedType: RenameFunnelDto,
+        validationError: { target: false, value: false },
+        exceptionFactory: (errors: ValidationError[]) =>
+          new UnprocessableEntityException({
+            success: false,
+            statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+            error: 'UnprocessableEntityException',
+            message: SYS_MSG.VALIDATION_FAILED,
+            details: flattenRenameValidationErrors(errors),
+          }),
+      }),
+    )
+    dto: RenameFunnelDto,
+  ) {
+    const data = await this.funnelsService.renameFunnel(userId, id, dto);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.FUNNEL_RENAMED_SUCCESSFULLY,
+      data,
+    };
   }
 
   @GetStagesSummaryDecorators()
@@ -148,4 +199,16 @@ export class FunnelsController {
   ) {
     return this.funnelsService.submitFeedback(userId, funnelId, stageId, dto);
   }
+}
+
+function flattenRenameValidationErrors(errors: ValidationError[], parentPath = ''): string[] {
+  return errors.flatMap((error) => {
+    const currentPath = parentPath ? `${parentPath}.${error.property}` : error.property;
+    const messages = error.constraints
+      ? Object.values(error.constraints).map((message) => `${currentPath}: ${message}`)
+      : [];
+    const children = error.children?.length ? flattenRenameValidationErrors(error.children, currentPath) : [];
+
+    return [...messages, ...children];
+  });
 }
