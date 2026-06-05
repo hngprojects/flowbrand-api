@@ -137,6 +137,7 @@ const mockFullUser = {
   email: USER_EMAIL,
   full_name: 'Test User',
   country: 'Nigeria',
+  business_name: 'Ben Clothing',
   avatar_url: null,
   auth_provider: 'local',
   is_verified: true,
@@ -268,6 +269,32 @@ describe('UsersService', () => {
       expect(mockUserModelAction.findByEmail).toHaveBeenCalledWith(USER_EMAIL);
       expect(bcrypt.hash).toHaveBeenCalledWith('Password123!', 10);
       expect(result).toEqual(mockUser());
+    });
+
+    it('persists business_name when businessName is provided', async () => {
+      mockUserModelAction.findByEmail.mockResolvedValue(null);
+      mockUserModelAction.create.mockResolvedValue(mockUser());
+
+      await service.create({ ...createDto, businessName: 'Ben Clothing' });
+
+      expect(mockUserModelAction.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          createPayload: expect.objectContaining({ business_name: 'Ben Clothing' }),
+        }),
+      );
+    });
+
+    it('stores null business_name when businessName is omitted', async () => {
+      mockUserModelAction.findByEmail.mockResolvedValue(null);
+      mockUserModelAction.create.mockResolvedValue(mockUser());
+
+      await service.create(createDto);
+
+      expect(mockUserModelAction.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          createPayload: expect.objectContaining({ business_name: null }),
+        }),
+      );
     });
 
     it('throws 409 when email already exists', async () => {
@@ -858,6 +885,33 @@ describe('UsersService', () => {
       expect(result.country).toBe('Nigeria');
     });
 
+    it('updates business_name and returns updated profile', async () => {
+      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+      mockUserModelAction.update.mockResolvedValue({ ...mockFullUser, business_name: 'New Biz' });
+
+      const result = await service.updateProfile(USER_ID, { businessName: 'New Biz' });
+
+      expect(result.businessName).toBe('New Biz');
+      expect(mockUserModelAction.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          updatePayload: { business_name: 'New Biz' },
+        }),
+      );
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        APP_EVENTS.PROFILE_UPDATED,
+        expect.objectContaining({ userId: USER_ID, updatedFields: ['business_name'] }),
+      );
+    });
+
+    it('no DB write when businessName matches stored value', async () => {
+      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+
+      await service.updateProfile(USER_ID, { businessName: 'Ben Clothing' });
+
+      expect(mockUserModelAction.update).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
     it('throws 422 when email is present in body', async () => {
       mockUserModelAction.get.mockResolvedValue(mockFullUser);
 
@@ -961,6 +1015,7 @@ describe('UsersService', () => {
         id: USER_ID,
         fullName: 'Test User',
         email: USER_EMAIL,
+        businessName: 'Ben Clothing',
       });
     });
 
