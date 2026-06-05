@@ -68,13 +68,16 @@ export class TemplateService implements OnModuleInit {
       throw new Error(`No compiled template found for type: ${type}`);
     }
 
+    const frontendUrl = (process.env.FRONTEND_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+
     const body = compiled(payload);
     const html = this.baseLayout({
       ...payload,
       body,
       year: new Date().getFullYear(),
-      unsubscribeUrl: `${process.env.FRONTEND_URL ?? ''}/unsubscribe`,
-      privacyPolicyUrl: `${process.env.FRONTEND_URL ?? ''}/privacy-policy`,
+      dashboardUrl: `${frontendUrl}/dashboard`,
+      unsubscribeUrl: `${frontendUrl}/unsubscribe`,
+      privacyPolicyUrl: `${frontendUrl}/privacy-policy`,
     });
 
     const subject = this.compiledSubjects[type](payload);
