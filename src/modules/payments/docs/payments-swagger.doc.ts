@@ -1,5 +1,6 @@
 import { applyDecorators, HttpStatus } from '@nestjs/common';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
+import * as SYS_MSG from '../../../constants/system.messages';
 
 export function InitiatePaymentDocs() {
   return applyDecorators(
@@ -10,7 +11,7 @@ export function InitiatePaymentDocs() {
       schema: {
         example: {
           statusCode: 201,
-          message: 'Payment initiated successfully',
+          message: SYS_MSG.PAYMENT_INITIATED_SUCCESSFULLY,
           data: {
             reference: '550e8400-e29b-41d4-a716-446655440000',
             authorizationUrl: 'https://checkout.paystack.com/0peioxfhpn',

@@ -30,6 +30,17 @@ export interface WebhookEvent {
   data: Record<string, unknown>;
 }
 
+export interface InitiatePaymentResponse {
+  statusCode: number;
+  message: string;
+  data: {
+    reference: string;
+    authorizationUrl: string;
+    amount: number;
+    currency: string;
+  };
+}
+
 export interface PaymentProvider {
   initiatePayment(dto: InitiatePaymentDto, userId: string, email: string): Promise<InitiatePaymentResult>;
   verifyPayment(reference: string): Promise<VerifyPaymentResult>;

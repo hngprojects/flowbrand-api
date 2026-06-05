@@ -15,7 +15,7 @@ import { InitiatePaymentDocs } from './docs/payments-swagger.doc';
 import { PaymentPlan } from './enums/payment-plan.enum';
 import { PaymentType } from './enums/payment-type.enum';
 import { PaymentRateLimitGuard } from './guards/payment-rate-limit.guard';
-import { InitiatePaymentResult } from './interfaces/payment-provider.interface';
+import { InitiatePaymentResponse, InitiatePaymentResult } from './interfaces/payment-provider.interface';
 import { PaymentsService } from './payments.service';
 
 @ApiTags('Payments')
@@ -30,7 +30,7 @@ export class PaymentsController {
   async initiate(
     @CurrentUser('userId') userId: string,
     @CurrentUser('email') email: string,
-  ): Promise<{ statusCode: number; message: string; data: { reference: string; authorizationUrl: string; amount: number; currency: string } }> {
+  ): Promise<InitiatePaymentResponse> {
     // FR-2: plan guard enforced in PaymentRateLimitGuard before this method runs
     let result: InitiatePaymentResult;
     try {
