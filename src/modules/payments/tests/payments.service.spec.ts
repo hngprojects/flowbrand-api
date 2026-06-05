@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, InternalServerErrorException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
 import { DataSource, QueryFailedError } from 'typeorm';
@@ -285,7 +285,7 @@ describe('PaymentsService', () => {
       (env as { PAYMENT_PROVIDER: string }).PAYMENT_PROVIDER = 'mock';
     });
 
-    it('throws on known-but-unimplemented provider at construction time', () => {
+    it('throws InternalServerErrorException on known-but-unimplemented provider at construction time', () => {
       (env as { PAYMENT_PROVIDER: string }).PAYMENT_PROVIDER = 'flutterwave';
       expect(
         () =>
@@ -296,7 +296,7 @@ describe('PaymentsService', () => {
             PAYSTACK_ADAPTER_MOCK as PaystackPaymentAdapter,
             DATA_SOURCE_MOCK as unknown as DataSource,
           ),
-      ).toThrow('Payment provider is not yet implemented');
+      ).toThrow(InternalServerErrorException);
       (env as { PAYMENT_PROVIDER: string }).PAYMENT_PROVIDER = 'mock';
     });
   });

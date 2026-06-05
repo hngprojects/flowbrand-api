@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { DataSource, QueryFailedError } from 'typeorm';
 import { env } from '../../config/env';
@@ -49,7 +49,7 @@ export class PaymentsService {
       case 'paystack':
         return this.paystackAdapter;
       default:
-        throw new Error(`${SYS_MSG.PAYMENT_PROVIDER_NOT_IMPLEMENTED}: '${env.PAYMENT_PROVIDER}'`);
+        throw new InternalServerErrorException(`${SYS_MSG.PAYMENT_PROVIDER_NOT_IMPLEMENTED}: '${env.PAYMENT_PROVIDER}'`);
     }
   }
 
@@ -211,7 +211,11 @@ export class PaymentsService {
   }
 
   private resolveAmountKobo(dto: InitiatePaymentDto): number {
-    return dto.type === PaymentType.ONE_TIME ? PRICING.PRO_ONETIME_KOBO : PRICING.PRO_MONTHLY_KOBO;
+    if (dto.type !== PaymentType.ONE_TIME) {
+      // initiatePayment is only valid for one-time charges; subscription flows use initiateSubscription
+      throw new InternalServerErrorException(`initiatePayment called with unsupported payment type: ${dto.type}`);
+    }
+    return PRICING.PRO_ONETIME_KOBO;
   }
 
   // SEC-04: strip card fields from any jsonb metadata before storage
