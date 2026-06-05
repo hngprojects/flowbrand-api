@@ -1,7 +1,9 @@
 import { applyDecorators, HttpStatus } from '@nestjs/common';
 import {
   ApiAcceptedResponse,
+  ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiBody,
   ApiConflictResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -15,6 +17,7 @@ import {
   ApiUnprocessableEntityResponse,
   ApiCreatedResponse,
 } from '@nestjs/swagger';
+import { RenameFunnelDto } from '../dto/rename-funnel.dto';
 import * as SYS_MSG from '../../../constants/system.messages';
 
 // ============================================================================
@@ -31,7 +34,7 @@ export const funnelListExample = {
     funnels: [
       {
         funnelId: FUNNEL_ID_EXAMPLE,
-        businessName: 'Acme Studio',
+        funnelName: 'Acme Studio',
         creationPath: 'google-ads',
         status: 'active',
         createdAt: '2026-05-18T12:00:00.000Z',
@@ -54,7 +57,7 @@ export const funnelFullExample = {
   message: SYS_MSG.FUNNEL_RETRIEVED_SUCCESSFULLY,
   data: {
     funnelId: FUNNEL_ID_EXAMPLE,
-    businessName: 'Acme Studio',
+    funnelName: 'Acme Studio',
     creationPath: 'google-ads',
     status: 'active',
     createdAt: '2026-05-18T12:00:00.000Z',
@@ -463,6 +466,55 @@ export const feedbackNotCompleteExample = {
   message: SYS_MSG.FEEDBACK_STAGE_NOT_COMPLETE,
   timestamp: '2026-05-26T10:00:00.000Z',
 };
+
+export const renameFunnelSuccessExample = {
+  success: true,
+  statusCode: HttpStatus.OK,
+  message: SYS_MSG.FUNNEL_RENAMED_SUCCESSFULLY,
+  data: {
+    id: FUNNEL_ID_EXAMPLE,
+    funnelName: 'Jollof Spot Lagos',
+    status: 'active',
+    creationPath: 'wizard',
+    createdAt: '2026-05-18T12:00:00.000Z',
+    updatedAt: '2026-05-26T10:00:00.000Z',
+  },
+};
+
+export const renameFunnelValidationExample = (path: string) => ({
+  success: false,
+  statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+  error: 'UnprocessableEntityException',
+  message: SYS_MSG.VALIDATION_FAILED,
+  details: ['funnelName: funnelName must be longer than or equal to 1 characters'],
+  path,
+  timestamp: '2026-05-26T10:00:00.000Z',
+});
+
+export function RenameFunnelDecorators() {
+  const path = '/api/funnels/{id}/rename';
+  return applyDecorators(
+    ApiOperation({
+      summary: 'Rename a funnel',
+      description:
+        'Updates the display name (`funnel_name`) for an owned funnel. ' +
+        'Does not affect stages, tasks, or generated content. ' +
+        'Submitting the same name after trim returns 200 without a database write.',
+    }),
+    ApiBody({ type: RenameFunnelDto }),
+    ApiOkResponse({ description: 'Funnel renamed (or unchanged)', schema: { example: renameFunnelSuccessExample } }),
+    ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token', schema: { example: unauthorizedExample } }),
+    ApiBadRequestResponse({ description: 'Invalid funnel id (not a UUID)' }),
+    ApiNotFoundResponse({
+      description: 'Funnel not found or not owned by the authenticated user',
+      schema: { example: notFoundExample(path) },
+    }),
+    ApiUnprocessableEntityResponse({
+      description: 'Empty or whitespace-only name, or name longer than 255 characters',
+      schema: { example: renameFunnelValidationExample(path) },
+    }),
+  );
+}
 
 export function SubmitFeedbackDocs() {
   return applyDecorators(

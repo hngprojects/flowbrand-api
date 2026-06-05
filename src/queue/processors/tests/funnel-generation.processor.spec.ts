@@ -516,7 +516,7 @@ describe('FunnelGenerationProcessor', () => {
 
       const [, payload] = (mockEventEmitter.emit as jest.Mock).mock.calls[0];
       expect(payload).toBeInstanceOf(FunnelGeneratedEvent);
-      expect(payload.businessName).toBe('Test Bakery');
+      expect(payload.funnelName).toBe('Test Bakery');
     });
 
 

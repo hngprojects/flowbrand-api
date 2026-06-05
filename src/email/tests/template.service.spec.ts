@@ -12,7 +12,7 @@ const WAITLIST_HBS = `<p>Hi {{user.name}}</p><p>You are on the waitlist</p>`;
 const CONTACT_CONFIRMATION_HBS = `<p>Hi {{fullName}}</p><p>We've received your message</p>`;
 const CONTACT_ADMIN_HBS = `<p>New message from {{fullName}}</p><p>{{message}}</p>`;
 const PASSWORD_RESET_HBS = `<p>Hi {{fullName}}</p><p>Your reset code is {{otpCode}}</p>`;
-const FUNNEL_READY_HBS = `<p>Hi {{name}}</p><p>Your funnel for {{businessName}} is ready</p>`;
+const FUNNEL_READY_HBS = `<p>Hi {{name}}</p><p>Your funnel {{funnelName}} is ready</p>`;
 const STAGE_UNLOCKED_HBS = `<p>Hi {{name}}</p><p>{{stageName}} is now active</p>`;
 const STAGE_COMPLETED_HBS = `<p>Hi {{name}}</p><p>You completed {{stageName}}</p>`;
 const WEEKLY_DIGEST_HBS = `<p>Hi {{name}}</p><p>{{completedTasks}} of {{totalTasks}}</p>`;
@@ -95,7 +95,7 @@ describe('TemplateService', () => {
     });
 
     it('renders funnel-ready with name and business name', () => {
-      const { html, subject } = service.render('funnel-ready', { name: 'Ada', businessName: 'Acme' });
+      const { html, subject } = service.render('funnel-ready', { name: 'Ada', funnelName: 'Acme' });
 
       expect(html).toContain('Ada');
       expect(html).toContain('Acme');

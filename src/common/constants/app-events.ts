@@ -13,6 +13,7 @@ export const APP_EVENTS = {
   // Funnel lifecycle
   FUNNEL_GENERATED: 'funnel.generated',
   FUNNEL_FAILED: 'funnel.failed',
+  FUNNEL_RENAMED: 'funnel.renamed',
 
   // Stage progression
   STAGE_UNLOCKED: 'stage.unlocked',

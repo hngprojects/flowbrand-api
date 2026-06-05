@@ -3,7 +3,7 @@ export class FunnelGeneratedEvent {
   constructor(
     public readonly userId: string,
     public readonly funnelId: string,
-    public readonly businessName: string,
+    public readonly funnelName: string,
   ) {}
 }
 
@@ -11,6 +11,15 @@ export class FunnelFailedEvent {
   constructor(
     public readonly userId: string,
     public readonly funnelId: string,
+  ) {}
+}
+
+export class FunnelRenamedEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly funnelId: string,
+    public readonly oldName: string,
+    public readonly newName: string,
   ) {}
 }
 

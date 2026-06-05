@@ -109,7 +109,7 @@ export class NotificationListener {
       const prefs = await this.notificationsService.getNotificationPreferences(event.userId);
       if (prefs.email_funnel_ready) {
         await this.email(event.userId, (to, name) =>
-          this.emailService.sendFunnelReady(to, { name, businessName: event.businessName }, event.userId),
+          this.emailService.sendFunnelReady(to, { name, funnelName: event.funnelName }, event.userId),
         );
       }
     });
