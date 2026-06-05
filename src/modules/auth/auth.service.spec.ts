@@ -23,6 +23,7 @@ jest.mock('bcrypt');
 const mockUsersService = {
   findByEmail: jest.fn(),
   findById: jest.fn(),
+  create: jest.fn(),
   createGoogleAccount: jest.fn(),
   updateGoogleAccount: jest.fn(),
 };
@@ -108,6 +109,35 @@ describe('AuthService login lockout (BE-005)', () => {
     }).compile();
 
     service = module.get<AuthService>(AuthService);
+  });
+
+  describe('register', () => {
+    const REGISTER_DTO = {
+      email: 'new@example.com',
+      password: 'Password123!',
+      fullName: 'New User',
+      termsAccepted: true,
+    };
+
+    it('forwards businessName to UsersService.create when provided', async () => {
+      mockUsersService.create.mockResolvedValue({ ...TEST_USER, email: REGISTER_DTO.email });
+
+      await service.register({ ...REGISTER_DTO, businessName: 'Ben Clothing' });
+
+      expect(mockUsersService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ businessName: 'Ben Clothing' }),
+      );
+    });
+
+    it('forwards undefined businessName when omitted', async () => {
+      mockUsersService.create.mockResolvedValue({ ...TEST_USER, email: REGISTER_DTO.email });
+
+      await service.register(REGISTER_DTO);
+
+      expect(mockUsersService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ businessName: undefined }),
+      );
+    });
   });
 
   describe('locked account', () => {
