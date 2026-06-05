@@ -246,12 +246,12 @@ export class FunnelGenerationProcessor {
       return true;
     } catch (err) {
       await qr.rollbackTransaction();
-      const message = (err as Error).message;
-      if (message.includes('violates foreign key constraint')) {
+      const driverCode = (err as { driverError?: { code?: string } }).driverError?.code;
+      if (driverCode === '23503') {
         this.logger.warn({
           message: 'Funnel generation write skipped — funnel or stages no longer exist',
           funnelId,
-          error: message,
+          error: (err as Error).message,
         });
         return false;
       }
