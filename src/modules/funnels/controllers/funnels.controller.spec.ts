@@ -112,11 +112,11 @@ describe('FunnelsController - rename route', () => {
     SERVICE_MOCK.renameFunnel.mockResolvedValue(renameData);
 
     const result = await controller.rename('user-1', '22222222-2222-4222-8222-222222222222', {
-      business_name: 'Jollof Spot',
+      funnelName: 'Jollof Spot',
     });
 
     expect(SERVICE_MOCK.renameFunnel).toHaveBeenCalledWith('user-1', '22222222-2222-4222-8222-222222222222', {
-      business_name: 'Jollof Spot',
+      funnelName: 'Jollof Spot',
     });
     expect(result).toEqual({
       statusCode: HttpStatus.OK,

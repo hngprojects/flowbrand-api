@@ -629,7 +629,7 @@ describe('FunnelsService', () => {
         updated_at: updatedAt,
       } as Funnel);
 
-      const result = await service.renameFunnel(USER_ID, FUNNEL_ID, { business_name: 'New Name' });
+      const result = await service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'New Name' });
 
       expect(funnelAction.updateOwnedFunnelName).toHaveBeenCalledWith(FUNNEL_ID, 'New Name');
       expect(result).toEqual({
@@ -654,7 +654,7 @@ describe('FunnelsService', () => {
     it('AC-08: returns 200 without DB write or event when name is unchanged', async () => {
       funnelAction.findOwnedById.mockResolvedValue(baseFunnel);
 
-      const result = await service.renameFunnel(USER_ID, FUNNEL_ID, { business_name: 'Old Name' });
+      const result = await service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'Old Name' });
 
       expect(result.funnelName).toBe('Old Name');
       expect(funnelAction.updateOwnedFunnelName).not.toHaveBeenCalled();
@@ -664,10 +664,10 @@ describe('FunnelsService', () => {
     it('AC-06/AC-07: returns 404 when funnel is missing or owned by another user', async () => {
       funnelAction.findOwnedById.mockResolvedValue(null);
 
-      await expect(service.renameFunnel(USER_ID, FUNNEL_ID, { business_name: 'New' })).rejects.toThrow(
+      await expect(service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'New' })).rejects.toThrow(
         NotFoundException,
       );
-      await expect(service.renameFunnel(OTHER_USER_ID, FUNNEL_ID, { business_name: 'New' })).rejects.toThrow(
+      await expect(service.renameFunnel(OTHER_USER_ID, FUNNEL_ID, { funnelName: 'New' })).rejects.toThrow(
         NotFoundException,
       );
       expect(funnelAction.updateOwnedFunnelName).not.toHaveBeenCalled();
@@ -685,7 +685,7 @@ describe('FunnelsService', () => {
         updated_at: updatedAt,
       } as Funnel);
 
-      const result = await service.renameFunnel(USER_ID, FUNNEL_ID, { business_name: 'Generating Rename' });
+      const result = await service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'Generating Rename' });
 
       expect(result.status).toBe(FunnelStatus.GENERATING);
       expect(funnelAction.updateOwnedFunnelName).toHaveBeenCalled();
@@ -703,7 +703,7 @@ describe('FunnelsService', () => {
         updated_at: updatedAt,
       } as Funnel);
 
-      await service.renameFunnel(USER_ID, FUNNEL_ID, { business_name: 'Failed Rename' });
+      await service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'Failed Rename' });
 
       expect(funnelAction.updateOwnedFunnelName).toHaveBeenCalledWith(FUNNEL_ID, 'Failed Rename');
     });
@@ -719,7 +719,7 @@ describe('FunnelsService', () => {
         order.push('emit');
       });
 
-      await service.renameFunnel(USER_ID, FUNNEL_ID, { business_name: 'After' });
+      await service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'After' });
 
       expect(order).toEqual(['update', 'emit']);
     });

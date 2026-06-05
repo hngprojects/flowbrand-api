@@ -13,5 +13,5 @@ export class RenameFunnelDto {
   @Transform(({ value }: TransformFnParams): unknown => (typeof value === 'string' ? value.trim() : value))
   @MinLength(1)
   @MaxLength(255)
-  business_name: string;
+  funnelName: string;
 }

@@ -304,7 +304,7 @@ export class FunnelsService {
     const funnel = await this.funnelAction.findOwnedById(funnelId, userId);
     if (!funnel) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
 
-    const trimmedName = dto.business_name;
+    const trimmedName = dto.funnelName;
     if (trimmedName === funnel.funnel_name) {
       return this.toRenameResponse(funnel);
     }
