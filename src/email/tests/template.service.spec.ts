@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs/promises';
 import { TemplateService } from '../template.service';
 
@@ -12,16 +13,28 @@ const WAITLIST_HBS = `<p>Hi {{user.name}}</p><p>You are on the waitlist</p>`;
 const CONTACT_CONFIRMATION_HBS = `<p>Hi {{fullName}}</p><p>We've received your message</p>`;
 const CONTACT_ADMIN_HBS = `<p>New message from {{fullName}}</p><p>{{message}}</p>`;
 const PASSWORD_RESET_HBS = `<p>Hi {{fullName}}</p><p>Your reset code is {{otpCode}}</p>`;
-const FUNNEL_READY_HBS = `<p>Hi {{name}}</p><p>Your funnel {{funnelName}} is ready</p>`;
-const STAGE_UNLOCKED_HBS = `<p>Hi {{name}}</p><p>{{stageName}} is now active</p>`;
-const STAGE_COMPLETED_HBS = `<p>Hi {{name}}</p><p>You completed {{stageName}}</p>`;
+const FUNNEL_READY_HBS = `<p>Hi {{name}}</p><p>Your funnel for {{businessName}} is ready</p>`;
+const STAGE_UNLOCKED_HBS = `<p>Hi {{name}}</p><p><a href="{{dashboardUrl}}">SEIL</a> {{stageName}} is now active</p>`;
+const STAGE_COMPLETED_HBS = `<p>Hi {{name}}</p><p>You completed {{stageName}}</p><p>Open <a href="{{dashboardUrl}}">SEIL</a></p>`;
 const WEEKLY_DIGEST_HBS = `<p>Hi {{name}}</p><p>{{completedTasks}} of {{totalTasks}}</p>`;
 
 describe('TemplateService', () => {
   let service: TemplateService;
 
   function buildService(): Promise<TestingModule> {
-    return Test.createTestingModule({ providers: [TemplateService] }).compile();
+    return Test.createTestingModule({
+      providers: [
+        TemplateService,
+        { provide: ConfigService, 
+                  useValue: { 
+                    get: jest.fn().mockImplementation((key: string) => {
+                      if (key === 'app.frontendUrl') return 'http://localhost:3000';
+                      throw new Error(`Unexpected config key: ${key}`);
+                    })
+                  }
+        },
+      ],
+    }).compile();
   }
 
   describe('onModuleInit — happy path', () => {
@@ -87,7 +100,7 @@ describe('TemplateService', () => {
     });
 
     it('renders funnel-ready with name and business name', () => {
-      const { html, subject } = service.render('funnel-ready', { name: 'Ada', funnelName: 'Acme' });
+      const { html, subject } = service.render('funnel-ready', { name: 'Ada', businessName: 'Acme' });
 
       expect(html).toContain('Ada');
       expect(html).toContain('Acme');
@@ -98,6 +111,8 @@ describe('TemplateService', () => {
       const { html, subject } = service.render('stage-unlocked', { name: 'Ada', stageName: 'Interest' });
 
       expect(html).toContain('Interest');
+      expect(html).toContain('href="http://localhost:3000/dashboard"');
+      expect(html).toContain('>SEIL<');
       expect(subject).toBe('"Interest" is now active');
     });
 
@@ -105,6 +120,8 @@ describe('TemplateService', () => {
       const { html, subject } = service.render('stage-completed', { name: 'Ada', stageName: 'Awareness' });
 
       expect(html).toContain('Awareness');
+      expect(html).toContain('href="http://localhost:3000/dashboard"');
+      expect(html).toContain('>SEIL<');
       expect(subject).toBe('You completed "Awareness"');
     });
 
