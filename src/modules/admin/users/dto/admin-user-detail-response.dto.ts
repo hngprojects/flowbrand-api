@@ -9,7 +9,7 @@ export class AdminUserStrategyDto {
   id: string;
 
   @ApiProperty()
-  businessName: string;
+  funnelName: string;
 
   @ApiProperty()
   stageCount: number;

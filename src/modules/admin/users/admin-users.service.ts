@@ -145,7 +145,7 @@ export class AdminUsersService {
         plan: user.plan,
         country: user.country,
         createdAt: user.created_at,
-        lastActiveAt: null, // this will be enriched via auth_last_login_at if needed, but not required strictly by entity
+        lastActiveAt: null,
         status: statusIndicator,
       },
       informationProvided: {
@@ -155,7 +155,7 @@ export class AdminUsersService {
       },
       strategies: funnels.map(f => ({
         id: f.id,
-        businessName: f.funnel_name,
+        funnelName: f.funnel_name,
         stageCount: f.stage_count,
         createdAt: f.created_at,
         status: f.status,
