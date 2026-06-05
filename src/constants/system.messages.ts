@@ -310,3 +310,4 @@ export const PAYMENT_PRICE_ZERO_MISCONFIGURATION = (label: string, fallback: num
 export const PAYMENT_USER_ALREADY_PRO = 'You are already on the Pro plan';
 export const PAYMENT_INITIATED_SUCCESSFULLY = 'Payment initiated successfully';
 export const PAYMENT_RATE_LIMIT_EXCEEDED = 'Too many payment requests. Please try again later';
+export const SUBSCRIPTION_CANCEL_TOKEN_MISSING = 'Subscription cancel failed: provider did not return email token';
