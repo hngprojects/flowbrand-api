@@ -59,7 +59,7 @@ describe('PaystackPaymentAdapter', () => {
 
     it('returns authorizationUrl and reference from Paystack response', async () => {
       mockTransaction.initialize.mockResolvedValueOnce({
-        data: { authorization_url: 'https://paystack.com/pay/abc', reference: 'ref-123', access_code: 'ac_1' },
+        status: true, data: { authorization_url: 'https://paystack.com/pay/abc', reference: 'ref-123', access_code: 'ac_1' },
       });
 
       const result = await adapter.initiatePayment(dto, userId, email);
@@ -71,18 +71,18 @@ describe('PaystackPaymentAdapter', () => {
 
     it('passes correct amount_kobo for ONE_TIME plan (900000 kobo = ₦9,000)', async () => {
       mockTransaction.initialize.mockResolvedValueOnce({
-        data: { authorization_url: 'https://paystack.com/pay/abc', reference: 'ref-1', access_code: 'ac_1' },
+        status: true, data: { authorization_url: 'https://paystack.com/pay/abc', reference: 'ref-1', access_code: 'ac_1' },
       });
 
       await adapter.initiatePayment(dto, userId, email);
 
       const callArgs = mockTransaction.initialize.mock.calls[0][0];
-      expect(callArgs.amount).toBe(900000);
+      expect(callArgs.amount).toBe('900000');
     });
 
     it('generates a unique UUID reference for each call', async () => {
       mockTransaction.initialize.mockResolvedValue({
-        data: { authorization_url: 'u', reference: 'r', access_code: 'a' },
+        status: true, data: { authorization_url: 'u', reference: 'r', access_code: 'a' },
       });
 
       await adapter.initiatePayment(dto, userId, email);
@@ -97,13 +97,12 @@ describe('PaystackPaymentAdapter', () => {
 
     it('includes userId, plan, type in metadata — no PII beyond those fields (SEC-08)', async () => {
       mockTransaction.initialize.mockResolvedValueOnce({
-        data: { authorization_url: 'u', reference: 'r', access_code: 'a' },
+        status: true, data: { authorization_url: 'u', reference: 'r', access_code: 'a' },
       });
 
       await adapter.initiatePayment(dto, userId, email);
 
-      const raw = mockTransaction.initialize.mock.calls[0][0].metadata as string;
-      const meta = JSON.parse(raw) as Record<string, unknown>;
+      const meta = mockTransaction.initialize.mock.calls[0][0].metadata as Record<string, unknown>;
       expect(meta).toHaveProperty('userId', userId);
       expect(meta).toHaveProperty('plan', PaymentPlan.PRO);
       expect(meta).toHaveProperty('type', PaymentType.ONE_TIME);
@@ -117,12 +116,12 @@ describe('PaystackPaymentAdapter', () => {
     });
   });
 
-  // ─── verifyPayment ──────────────────────────────────────────────────────────
+  // ─── verifyPayment ─────────────────────────────────────────────────────────
 
   describe('verifyPayment', () => {
     it('maps status=success → PaymentStatus.SUCCESS', async () => {
       mockTransaction.verify.mockResolvedValueOnce({
-        data: { status: 'success', reference: 'ref-1', amount: 900000, currency: 'NGN', authorization: { last4: '4081', brand: 'visa' } },
+        status: true, data: { status: 'success', reference: 'ref-1', amount: 900000, currency: 'NGN', authorization: { last4: '4081', brand: 'visa' } },
       });
 
       const result = await adapter.verifyPayment('ref-1');
@@ -135,7 +134,7 @@ describe('PaystackPaymentAdapter', () => {
 
     it('maps status=failed → PaymentStatus.FAILED', async () => {
       mockTransaction.verify.mockResolvedValueOnce({
-        data: { status: 'failed', reference: 'ref-2', amount: 900000, currency: 'NGN' },
+        status: true, data: { status: 'failed', reference: 'ref-2', amount: 900000, currency: 'NGN' },
       });
 
       const result = await adapter.verifyPayment('ref-2');
@@ -144,7 +143,7 @@ describe('PaystackPaymentAdapter', () => {
 
     it('maps status=pending → PaymentStatus.PENDING', async () => {
       mockTransaction.verify.mockResolvedValueOnce({
-        data: { status: 'pending', reference: 'ref-3', amount: 300000, currency: 'NGN' },
+        status: true, data: { status: 'pending', reference: 'ref-3', amount: 300000, currency: 'NGN' },
       });
 
       const result = await adapter.verifyPayment('ref-3');
@@ -153,7 +152,7 @@ describe('PaystackPaymentAdapter', () => {
 
     it('maps status=reversed → PaymentStatus.REFUNDED', async () => {
       mockTransaction.verify.mockResolvedValueOnce({
-        data: { status: 'reversed', reference: 'ref-4', amount: 900000, currency: 'NGN' },
+        status: true, data: { status: 'reversed', reference: 'ref-4', amount: 900000, currency: 'NGN' },
       });
 
       const result = await adapter.verifyPayment('ref-4');
@@ -162,7 +161,7 @@ describe('PaystackPaymentAdapter', () => {
 
     it('maps unknown status → PaymentStatus.PENDING (safe default)', async () => {
       mockTransaction.verify.mockResolvedValueOnce({
-        data: { status: 'unknown_state', reference: 'ref-5', amount: 900000, currency: 'NGN' },
+        status: true, data: { status: 'unknown_state', reference: 'ref-5', amount: 900000, currency: 'NGN' },
       });
 
       const result = await adapter.verifyPayment('ref-5');
@@ -171,7 +170,7 @@ describe('PaystackPaymentAdapter', () => {
 
     it('normalises card brand to display name (visa → Visa)', async () => {
       mockTransaction.verify.mockResolvedValueOnce({
-        data: { status: 'success', reference: 'ref-6', amount: 900000, currency: 'NGN', authorization: { last4: '4081', brand: 'visa' } },
+        status: true, data: { status: 'success', reference: 'ref-6', amount: 900000, currency: 'NGN', authorization: { last4: '4081', brand: 'visa' } },
       });
 
       const result = await adapter.verifyPayment('ref-6');
@@ -181,12 +180,27 @@ describe('PaystackPaymentAdapter', () => {
 
     it('does not return card_number or cvv fields (SEC-02)', async () => {
       mockTransaction.verify.mockResolvedValueOnce({
-        data: { status: 'success', reference: 'ref-7', amount: 900000, currency: 'NGN', authorization: { last4: '0001', brand: 'mastercard', card_number: '5531886652142950', cvv: '564' } },
+        status: true,
+        data: {
+          status: 'success',
+          reference: 'ref-7',
+          amount: 900000,
+          currency: 'NGN',
+          authorization: { last4: '0001', brand: 'mastercard', card_number: '5531886652142950', cvv: '564' },
+        },
       });
 
       const result = await adapter.verifyPayment('ref-7');
       expect(result).not.toHaveProperty('card_number');
       expect(result).not.toHaveProperty('cvv');
+    });
+
+    it('throws PaymentFailedException when Paystack returns status=false', async () => {
+      mockTransaction.verify.mockResolvedValueOnce({
+        status: false, message: 'Invalid key', data: null,
+      });
+
+      await expect(adapter.verifyPayment('ref-bad')).rejects.toBeInstanceOf(PaymentFailedException);
     });
   });
 
@@ -198,7 +212,7 @@ describe('PaystackPaymentAdapter', () => {
 
     it('uses PAYSTACK_PRO_MONTHLY_PLAN_CODE for monthly billing', async () => {
       mockTransaction.initialize.mockResolvedValueOnce({
-        data: { authorization_url: 'u', access_code: 'ac_1', reference: 'r' },
+        status: true, data: { authorization_url: 'u', access_code: 'ac_1', reference: 'r' },
       });
 
       await adapter.initiateSubscription({ plan: PaymentPlan.PRO, billingCycle: BillingCycle.MONTHLY }, userId, email);
@@ -209,7 +223,7 @@ describe('PaystackPaymentAdapter', () => {
 
     it('uses PAYSTACK_PRO_ANNUAL_PLAN_CODE for annual billing', async () => {
       mockTransaction.initialize.mockResolvedValueOnce({
-        data: { authorization_url: 'u', access_code: 'ac_2', reference: 'r' },
+        status: true, data: { authorization_url: 'u', access_code: 'ac_2', reference: 'r' },
       });
 
       await adapter.initiateSubscription({ plan: PaymentPlan.PRO, billingCycle: BillingCycle.ANNUAL }, userId, email);
@@ -220,17 +234,17 @@ describe('PaystackPaymentAdapter', () => {
 
     it('passes amount=0 (plan defines the charge, not amount field)', async () => {
       mockTransaction.initialize.mockResolvedValueOnce({
-        data: { authorization_url: 'u', access_code: 'ac_1', reference: 'r' },
+        status: true, data: { authorization_url: 'u', access_code: 'ac_1', reference: 'r' },
       });
 
       await adapter.initiateSubscription({ plan: PaymentPlan.PRO, billingCycle: BillingCycle.MONTHLY }, userId, email);
 
-      expect(mockTransaction.initialize.mock.calls[0][0].amount).toBe(0);
+      expect(mockTransaction.initialize.mock.calls[0][0].amount).toBe('0');
     });
 
     it('returns access_code as subscriptionCode (not the real SUB_xxx — that arrives via webhook)', async () => {
       mockTransaction.initialize.mockResolvedValueOnce({
-        data: { authorization_url: 'https://paystack.com/pay/sub', access_code: 'ACCESS_CODE_123', reference: 'r' },
+        status: true, data: { authorization_url: 'https://paystack.com/pay/sub', access_code: 'ACCESS_CODE_123', reference: 'r' },
       });
 
       const result = await adapter.initiateSubscription({ plan: PaymentPlan.PRO, billingCycle: BillingCycle.MONTHLY }, userId, email);
@@ -246,13 +260,23 @@ describe('PaystackPaymentAdapter', () => {
         adapter.initiateSubscription({ plan: PaymentPlan.PRO, billingCycle: BillingCycle.MONTHLY }, userId, email),
       ).rejects.toBeInstanceOf(PaymentFailedException);
     });
+
+    it('throws PaymentFailedException when Paystack returns status=false', async () => {
+      mockTransaction.initialize.mockResolvedValueOnce({
+        status: false, message: 'Plan not found', data: null,
+      });
+
+      await expect(
+        adapter.initiateSubscription({ plan: PaymentPlan.PRO, billingCycle: BillingCycle.MONTHLY }, userId, email),
+      ).rejects.toBeInstanceOf(PaymentFailedException);
+    });
   });
 
   // ─── cancelSubscription ─────────────────────────────────────────────────────
 
   describe('cancelSubscription', () => {
     it('fetches email_token then disables the subscription (two-step Paystack flow)', async () => {
-      mockSubscription.fetch.mockResolvedValueOnce({ data: { email_token: 'tok_abc' } });
+      mockSubscription.fetch.mockResolvedValueOnce({ status: true, data: { email_token: 'tok_abc' } });
       mockSubscription.disable.mockResolvedValueOnce({ status: true });
 
       await adapter.cancelSubscription('SUB_test_123');
@@ -268,8 +292,15 @@ describe('PaystackPaymentAdapter', () => {
       expect(mockSubscription.disable).not.toHaveBeenCalled();
     });
 
+    it('throws PaymentFailedException when Paystack returns status=false on fetch (e.g. subscription not found)', async () => {
+      mockSubscription.fetch.mockResolvedValueOnce({ status: false, message: 'Subscription not found', data: null });
+
+      await expect(adapter.cancelSubscription('SUB_bad')).rejects.toBeInstanceOf(PaymentFailedException);
+      expect(mockSubscription.disable).not.toHaveBeenCalled();
+    });
+
     it('throws PaymentFailedException when disable step fails', async () => {
-      mockSubscription.fetch.mockResolvedValueOnce({ data: { email_token: 'tok_abc' } });
+      mockSubscription.fetch.mockResolvedValueOnce({ status: true, data: { email_token: 'tok_abc' } });
       mockSubscription.disable.mockRejectedValueOnce(new Error('Disable failed'));
 
       await expect(adapter.cancelSubscription('SUB_test_123')).rejects.toBeInstanceOf(PaymentFailedException);
