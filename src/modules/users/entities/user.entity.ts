@@ -28,6 +28,9 @@ export class User extends BaseEntity {
   @Column({ type: 'varchar', length: 100, nullable: true })
   country: string | null;
 
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  business_name: string | null;
+
   @Column({ type: 'boolean', default: false })
   is_verified: boolean;
 
