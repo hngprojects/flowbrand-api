@@ -118,6 +118,18 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /** Delete a lock key only if its stored value matches `token` (prevents a TTL-expired holder from deleting a later holder's lock). */
+  async releaseLock(key: string, token: string): Promise<void> {
+    try {
+      const current = await this.client.get(key);
+      if (current === token) {
+        await this.client.del(key);
+      }
+    } catch (err) {
+      this.logger.error(`releaseLock failed`, (err as Error).message);
+    }
+  }
+
   // in RedisService
   async getdel(key: string): Promise<string | null> {
     try{
