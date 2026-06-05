@@ -631,7 +631,7 @@ describe('FunnelsService', () => {
 
       const result = await service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'New Name' });
 
-      expect(funnelAction.updateFunnelName).toHaveBeenCalledWith(FUNNEL_ID, 'New Name');
+      expect(funnelAction.updateFunnelName).toHaveBeenCalledWith(FUNNEL_ID, USER_ID, 'New Name');
       expect(result).toEqual({
         id: FUNNEL_ID,
         funnelName: 'New Name',
@@ -705,7 +705,17 @@ describe('FunnelsService', () => {
 
       await service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'Failed Rename' });
 
-      expect(funnelAction.updateFunnelName).toHaveBeenCalledWith(FUNNEL_ID, 'Failed Rename');
+      expect(funnelAction.updateFunnelName).toHaveBeenCalledWith(FUNNEL_ID, USER_ID, 'Failed Rename');
+    });
+
+    it('returns 404 when funnel is deleted between ownership check and update', async () => {
+      funnelAction.findOwnedById.mockResolvedValue(baseFunnel);
+      funnelAction.updateFunnelName.mockResolvedValue(null);
+
+      await expect(service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'New Name' })).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
     });
 
     it('FR-7: emits FUNNEL_RENAMED only after update succeeds', async () => {

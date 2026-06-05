@@ -310,7 +310,8 @@ export class FunnelsService {
     }
 
     const oldName = funnel.funnel_name;
-    const updated = await this.funnelAction.updateFunnelName(funnelId, trimmedName);
+    const updated = await this.funnelAction.updateFunnelName(funnelId, userId, trimmedName);
+    if (!updated) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
 
     emitSafely(
       this.eventEmitter,
