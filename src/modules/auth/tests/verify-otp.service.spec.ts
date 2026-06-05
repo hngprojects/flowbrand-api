@@ -24,6 +24,7 @@ const mockRedisService = {
   expire: jest.fn(),
   setStrict: jest.fn(),
   del: jest.fn(),
+  releaseLock: jest.fn(),
   get: jest.fn(),
   set: jest.fn(),
   rateLimit: jest.fn(),
@@ -46,6 +47,7 @@ const mockAuthMetadataModelAction = {
   findByUserId: jest.fn(),
   updateByUserId: jest.fn(),
   createForUser: jest.fn(),
+  incrementFailedAttempts: jest.fn(),
 };
 
 const USER_ID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
@@ -156,13 +158,31 @@ describe('AuthService.verifyOtp (BE-004)', () => {
       expect(mockOtpTokenModelAction.findByUserAndType).not.toHaveBeenCalled();
     });
 
-    it('releases the lock even when verification fails', async () => {
+    it('releases the lock via compare-and-delete even when verification fails', async () => {
       mockUsersService.findByEmail.mockResolvedValue(UNVERIFIED_USER);
       mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(null);
 
       await service.verifyOtp(USER_EMAIL, OTP_CODE).catch(() => undefined);
 
-      expect(mockRedisService.del).toHaveBeenCalledWith(`otp:verify:lock:${USER_ID}`);
+      expect(mockRedisService.releaseLock).toHaveBeenCalledWith(
+        `otp:verify:lock:${USER_ID}`,
+        expect.any(String),
+      );
+    });
+
+    it('acquires the lock with a per-request token and 30-second TTL (M-3)', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(UNVERIFIED_USER);
+      mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(null);
+
+      await service.verifyOtp(USER_EMAIL, OTP_CODE).catch(() => undefined);
+
+      const [lockKey, lockToken, ttl] = mockRedisService.setNx.mock.calls.find(
+        ([k]: [string]) => k.includes('otp:verify:lock:'),
+      ) as [string, string, number];
+      expect(lockKey).toContain('otp:verify:lock:');
+      expect(typeof lockToken).toBe('string');
+      expect(lockToken).not.toBe('1');
+      expect(ttl).toBe(30);
     });
   });
 
