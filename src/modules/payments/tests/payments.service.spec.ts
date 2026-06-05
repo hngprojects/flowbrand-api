@@ -6,6 +6,7 @@ import { PaymentsService } from '../payments.service';
 import { PaymentModelAction } from '../actions/payment.model-action';
 import { SubscriptionModelAction } from '../actions/subscription.model-action';
 import { MockPaymentAdapter } from '../adapters/mock-payment.adapter';
+import { PaystackPaymentAdapter } from '../adapters/paystack-payment.adapter';
 import { BillingCycle } from '../enums/billing-cycle.enum';
 import { PaymentPlan } from '../enums/payment-plan.enum';
 import { PaymentType } from '../enums/payment-type.enum';
@@ -14,7 +15,13 @@ import { SubscriptionStatus } from '../enums/subscription-status.enum';
 import { env } from '../../../config/env';
 
 jest.mock('../../../config/env', () => ({
-  env: { PAYMENT_PROVIDER: 'mock', TEST_PAYMENT_OUTCOME: 'success' },
+  env: {
+    PAYMENT_PROVIDER: 'mock',
+    TEST_PAYMENT_OUTCOME: 'success',
+    PAYSTACK_SECRET_KEY: 'sk_test_placeholder',
+    PAYSTACK_PRO_MONTHLY_PLAN_CODE: 'PLN_monthly',
+    PAYSTACK_PRO_ANNUAL_PLAN_CODE: 'PLN_annual',
+  },
 }));
 
 jest.mock('../constants/pricing.constants', () => ({
@@ -37,6 +44,21 @@ const SUBSCRIPTION_ACTION_MOCK: Partial<SubscriptionModelAction> = {
   create: mockSubscriptionCreate,
   update: mockSubscriptionUpdate,
   find: mockSubscriptionFind,
+};
+
+const PAYSTACK_ADAPTER_MOCK: Partial<PaystackPaymentAdapter> = {
+  initiatePayment: jest.fn().mockResolvedValue({
+    reference: 'ps_ref_1',
+    authorizationUrl: 'https://paystack.com/pay/test',
+    provider: 'paystack',
+  }),
+  initiateSubscription: jest.fn().mockResolvedValue({
+    subscriptionCode: 'access_code_1',
+    authorizationUrl: 'https://paystack.com/pay/sub',
+    provider: 'paystack',
+  }),
+  cancelSubscription: jest.fn().mockResolvedValue(undefined),
+  verifyPayment: jest.fn().mockResolvedValue({ reference: 'ref', status: 'success', amount: 900000, currency: 'NGN' }),
 };
 
 const MOCK_ADAPTER_MOCK: Partial<MockPaymentAdapter> = {
@@ -72,6 +94,7 @@ describe('PaymentsService', () => {
         { provide: PaymentModelAction, useValue: PAYMENT_ACTION_MOCK },
         { provide: SubscriptionModelAction, useValue: SUBSCRIPTION_ACTION_MOCK },
         { provide: MockPaymentAdapter, useValue: MOCK_ADAPTER_MOCK },
+        { provide: PaystackPaymentAdapter, useValue: PAYSTACK_ADAPTER_MOCK },
         { provide: DataSource, useValue: DATA_SOURCE_MOCK },
       ],
     }).compile();
@@ -249,14 +272,28 @@ describe('PaymentsService', () => {
   });
 
   describe('resolveAdapter', () => {
-    it('throws on known-but-unimplemented provider at construction time', () => {
+    it('resolves PaystackPaymentAdapter when PAYMENT_PROVIDER=paystack', () => {
       (env as { PAYMENT_PROVIDER: string }).PAYMENT_PROVIDER = 'paystack';
+      const svc = new PaymentsService(
+        PAYMENT_ACTION_MOCK as PaymentModelAction,
+        SUBSCRIPTION_ACTION_MOCK as SubscriptionModelAction,
+        MOCK_ADAPTER_MOCK as MockPaymentAdapter,
+        PAYSTACK_ADAPTER_MOCK as PaystackPaymentAdapter,
+        DATA_SOURCE_MOCK as unknown as DataSource,
+      );
+      expect(svc).toBeDefined();
+      (env as { PAYMENT_PROVIDER: string }).PAYMENT_PROVIDER = 'mock';
+    });
+
+    it('throws on known-but-unimplemented provider at construction time', () => {
+      (env as { PAYMENT_PROVIDER: string }).PAYMENT_PROVIDER = 'flutterwave';
       expect(
         () =>
           new PaymentsService(
             PAYMENT_ACTION_MOCK as PaymentModelAction,
             SUBSCRIPTION_ACTION_MOCK as SubscriptionModelAction,
             MOCK_ADAPTER_MOCK as MockPaymentAdapter,
+            PAYSTACK_ADAPTER_MOCK as PaystackPaymentAdapter,
             DATA_SOURCE_MOCK as unknown as DataSource,
           ),
       ).toThrow('Payment provider is not yet implemented');
