@@ -172,7 +172,7 @@ export class PaymentsService {
         // Row exists — check if a prior completed attempt left a subscription code
          
         const { payload: subs } = await this.subscriptionModelAction.find({
-          findOptions: { user_id: userId, plan: dto.plan },
+          findOptions: { user_id: userId, plan: dto.plan, billing_cycle: dto.billingCycle },
           order: { created_at: 'DESC' },
           paginationPayload: { limit: 1, page: 1 },
           transactionOptions: { useTransaction: false },
