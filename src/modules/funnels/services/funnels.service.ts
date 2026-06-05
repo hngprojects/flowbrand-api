@@ -310,7 +310,7 @@ export class FunnelsService {
     }
 
     const oldName = funnel.funnel_name;
-    const updated = await this.funnelAction.updateOwnedFunnelName(funnelId, trimmedName);
+    const updated = await this.funnelAction.updateFunnelName(funnelId, trimmedName);
 
     emitSafely(
       this.eventEmitter,

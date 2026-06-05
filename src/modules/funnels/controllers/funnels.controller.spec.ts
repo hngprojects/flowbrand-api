@@ -1,4 +1,5 @@
-import { HttpStatus } from '@nestjs/common';
+import { HttpStatus, UnprocessableEntityException, ValidationError, ValidationPipe } from '@nestjs/common';
+import { RenameFunnelDto } from '../dto/rename-funnel.dto';
 import { Test, TestingModule } from '@nestjs/testing';
 import type { Response } from 'express';
 import * as SYS_MSG from '../../../constants/system.messages';
@@ -123,6 +124,43 @@ describe('FunnelsController - rename route', () => {
       message: SYS_MSG.FUNNEL_RENAMED_SUCCESSFULLY,
       data: renameData,
     });
+  });
+
+  it('AC-09: returns flattened string details on validation failure', async () => {
+    const pipe = new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: false },
+      expectedType: RenameFunnelDto,
+      validationError: { target: false, value: false },
+      exceptionFactory: (errors: ValidationError[]) =>
+        new UnprocessableEntityException({
+          success: false,
+          statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          error: 'UnprocessableEntityException',
+          message: SYS_MSG.VALIDATION_FAILED,
+          details: errors.flatMap((error) =>
+            error.constraints ? Object.values(error.constraints).map((m) => `${error.property}: ${m}`) : [],
+          ),
+        }),
+    });
+
+    try {
+      await pipe.transform(
+        { funnelName: '', extra_field: 'nope' },
+        { type: 'body', metatype: RenameFunnelDto, data: '' },
+      );
+      fail('Expected validation to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(UnprocessableEntityException);
+      const response = (error as UnprocessableEntityException).getResponse() as {
+        details: string[];
+      };
+      expect(Array.isArray(response.details)).toBe(true);
+      expect(response.details.every((item) => typeof item === 'string')).toBe(true);
+      expect(response.details.some((item) => item.includes('funnelName'))).toBe(true);
+    }
   });
 });
 

@@ -486,6 +486,7 @@ export const renameFunnelValidationExample = (path: string) => ({
   statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
   error: 'UnprocessableEntityException',
   message: SYS_MSG.VALIDATION_FAILED,
+  details: ['funnelName: funnelName must be longer than or equal to 1 characters'],
   path,
   timestamp: '2026-05-26T10:00:00.000Z',
 });

@@ -81,7 +81,7 @@ export class FunnelsController {
             statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
             error: 'UnprocessableEntityException',
             message: SYS_MSG.VALIDATION_FAILED,
-            details: errors,
+            details: flattenRenameValidationErrors(errors),
           }),
       }),
     )
@@ -190,4 +190,16 @@ export class FunnelsController {
   ) {
     return this.funnelsService.submitFeedback(userId, funnelId, stageId, dto);
   }
+}
+
+function flattenRenameValidationErrors(errors: ValidationError[], parentPath = ''): string[] {
+  return errors.flatMap((error) => {
+    const currentPath = parentPath ? `${parentPath}.${error.property}` : error.property;
+    const messages = error.constraints
+      ? Object.values(error.constraints).map((message) => `${currentPath}: ${message}`)
+      : [];
+    const children = error.children?.length ? flattenRenameValidationErrors(error.children, currentPath) : [];
+
+    return [...messages, ...children];
+  });
 }
