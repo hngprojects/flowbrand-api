@@ -172,7 +172,10 @@ export class PaystackPaymentAdapter implements PaymentProvider {
       if (!emailToken) {
         throw new PaymentFailedException(SYS_MSG.SUBSCRIPTION_CANCEL_TOKEN_MISSING);
       }
-      await this.client.subscription.disable({ code: subscriptionCode, token: emailToken });
+      const disableResponse = await this.client.subscription.disable({ code: subscriptionCode, token: emailToken });
+      if (!disableResponse.status) {
+        throw new PaymentFailedException(disableResponse.message ?? 'Paystack rejected the request');
+      }
     } catch (err: unknown) {
       throw err instanceof PaymentFailedException ? err : new PaymentFailedException((err as Error).message);
     }

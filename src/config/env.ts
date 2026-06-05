@@ -77,10 +77,18 @@ const envSchema = z.object({
   PAYSTACK_PRO_ANNUAL_PLAN_CODE: z.string().startsWith('PLN_').optional(),
 }).superRefine((data, ctx) => {
   if (data.PAYMENT_PROVIDER === 'paystack') {
-    const required = ['PAYSTACK_SECRET_KEY', 'PAYSTACK_PUBLIC_KEY', 'PAYSTACK_PRO_MONTHLY_PLAN_CODE', 'PAYSTACK_PRO_ANNUAL_PLAN_CODE'] as const;
-    for (const key of required) {
-      if (!data[key]) {
+    const requiredWithPrefix: { key: 'PAYSTACK_SECRET_KEY' | 'PAYSTACK_PUBLIC_KEY' | 'PAYSTACK_PRO_MONTHLY_PLAN_CODE' | 'PAYSTACK_PRO_ANNUAL_PLAN_CODE'; prefix: string }[] = [
+      { key: 'PAYSTACK_SECRET_KEY', prefix: 'sk_' },
+      { key: 'PAYSTACK_PUBLIC_KEY', prefix: 'pk_' },
+      { key: 'PAYSTACK_PRO_MONTHLY_PLAN_CODE', prefix: 'PLN_' },
+      { key: 'PAYSTACK_PRO_ANNUAL_PLAN_CODE', prefix: 'PLN_' },
+    ];
+    for (const { key, prefix } of requiredWithPrefix) {
+      const value = data[key];
+      if (!value) {
         ctx.addIssue({ code: 'custom', message: `${key} is required when PAYMENT_PROVIDER=paystack`, path: [key] });
+      } else if (value.length <= prefix.length || !/[a-zA-Z0-9]/.test(value.slice(prefix.length))) {
+        ctx.addIssue({ code: 'custom', message: `${key} must have a non-empty alphanumeric suffix after '${prefix}'`, path: [key] });
       }
     }
     // SEC-07: reject test keys in production — live users paying with test cards is a misconfiguration

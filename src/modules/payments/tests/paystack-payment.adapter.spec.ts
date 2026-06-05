@@ -186,7 +186,7 @@ describe('PaystackPaymentAdapter', () => {
           reference: 'ref-7',
           amount: 900000,
           currency: 'NGN',
-          authorization: { last4: '0001', brand: 'mastercard', card_number: '5531886652142950', cvv: '564' },
+          authorization: { last4: '0001', brand: 'mastercard', card_number: 'masked_test_pan', cvv: '***' },
         },
       });
 
