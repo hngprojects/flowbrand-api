@@ -93,7 +93,7 @@ describe('FunnelsService', () => {
       getLatestCompletedWizard: jest.fn(),
       getUploadedDocuments: jest.fn(),
       countActiveFunnelsExcluding: jest.fn(),
-      deleteOwnedFunnel: jest.fn().mockResolvedValue(undefined),
+      deleteFunnelById: jest.fn().mockResolvedValue(undefined),
       getUserProfile: jest.fn().mockResolvedValue({
         business_type: 'restaurant',
         target_customer: 'office workers',
@@ -704,7 +704,7 @@ describe('FunnelsService', () => {
 
       expect(result).toEqual({ statusCode: HttpStatus.OK, message: SYS_MSG.FUNNEL_DELETED });
       expect(funnelAction.countActiveFunnelsExcluding).toHaveBeenCalledWith(USER_ID, FUNNEL_ID);
-      expect(funnelAction.deleteOwnedFunnel).toHaveBeenCalledWith(FUNNEL_ID);
+      expect(funnelAction.deleteFunnelById).toHaveBeenCalledWith(FUNNEL_ID);
       expect(mockEventEmitter.emit).toHaveBeenCalledWith(
         APP_EVENTS.FUNNEL_DELETED,
         expect.any(FunnelDeletedEvent),
@@ -720,7 +720,7 @@ describe('FunnelsService', () => {
       funnelAction.countActiveFunnelsExcluding.mockResolvedValue(0);
 
       await expect(service.deleteFunnel(USER_ID, FUNNEL_ID)).rejects.toThrow(ConflictException);
-      expect(funnelAction.deleteOwnedFunnel).not.toHaveBeenCalled();
+      expect(funnelAction.deleteFunnelById).not.toHaveBeenCalled();
       expect(mockEventEmitter.emit).not.toHaveBeenCalled();
     });
 
@@ -733,7 +733,7 @@ describe('FunnelsService', () => {
       await service.deleteFunnel(USER_ID, FUNNEL_ID);
 
       expect(funnelAction.countActiveFunnelsExcluding).not.toHaveBeenCalled();
-      expect(funnelAction.deleteOwnedFunnel).toHaveBeenCalledWith(FUNNEL_ID);
+      expect(funnelAction.deleteFunnelById).toHaveBeenCalledWith(FUNNEL_ID);
     });
 
     it('AC-06: deletes generating funnel without active-funnel guard', async () => {
@@ -745,7 +745,7 @@ describe('FunnelsService', () => {
       await service.deleteFunnel(USER_ID, FUNNEL_ID);
 
       expect(funnelAction.countActiveFunnelsExcluding).not.toHaveBeenCalled();
-      expect(funnelAction.deleteOwnedFunnel).toHaveBeenCalledWith(FUNNEL_ID);
+      expect(funnelAction.deleteFunnelById).toHaveBeenCalledWith(FUNNEL_ID);
     });
 
     it('AC-07/AC-08: returns 404 when funnel is missing or not owned', async () => {
@@ -762,7 +762,7 @@ describe('FunnelsService', () => {
       mockEventEmitter.emit.mockImplementation(() => {
         order.push('emit');
       });
-      funnelAction.deleteOwnedFunnel.mockImplementation(async () => {
+      funnelAction.deleteFunnelById.mockImplementation(async () => {
         order.push('delete');
       });
 

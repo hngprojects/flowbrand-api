@@ -91,7 +91,7 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
     });
   }
 
-  async deleteOwnedFunnel(funnelId: string): Promise<void> {
+  async deleteFunnelById(funnelId: string): Promise<void> {
     await this.delete({
       identifierOptions: { id: funnelId },
       transactionOptions: { useTransaction: false },

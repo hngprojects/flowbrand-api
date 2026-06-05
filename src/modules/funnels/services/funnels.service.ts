@@ -339,7 +339,7 @@ export class FunnelsService {
       new FunnelDeletedEvent(userId, funnelId, funnel.funnel_name),
     );
 
-    await this.funnelAction.deleteOwnedFunnel(funnelId);
+    await this.funnelAction.deleteFunnelById(funnelId);
 
     return { statusCode: HttpStatus.OK, message: SYS_MSG.FUNNEL_DELETED };
   }
