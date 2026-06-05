@@ -35,7 +35,7 @@ export interface ContactAdminNotificationPayload {
 
 export interface FunnelReadyPayload {
   name: string;
-  businessName: string;
+  funnelName: string;
 }
 
 export interface StageUnlockedPayload {

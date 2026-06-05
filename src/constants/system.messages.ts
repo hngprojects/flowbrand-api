@@ -278,7 +278,6 @@ export const ADMIN_DASHBOARD_STATS_RETRIEVED = 'Admin dashboard stats retrieved 
 export const ADMIN_DASHBOARD_WEEKLY_OVERVIEW_RETRIEVED = 'Admin dashboard weekly overview retrieved successfully';
 export const ADMIN_DASHBOARD_USER_SEGMENTS_RETRIEVED = 'Admin dashboard user segments retrieved successfully';
 export const ADMIN_DASHBOARD_FUNNEL_PERFORMANCE_RETRIEVED = 'Admin dashboard funnel performance retrieved successfully';
-export const ADMIN_GLOBAL_SEARCH_SUCCESSFUL = 'Admin global search results retrieved successfully';
 // Admin teams
 export const TEAMS_RETRIEVED_SUCCESSFULLY   = 'Teams retrieved successfully';
 export const TEAM_CREATED_SUCCESSFULLY      = 'Team created successfully';
@@ -290,3 +289,25 @@ export const TEAM_INVITATION_NOT_FOUND      = 'Invitation not found or already p
 export const TEAM_INVITE_ALREADY_PENDING    = 'An invitation for this email is already pending';
 export const TEAM_ALREADY_MEMBER            = 'This user is already a team member.';
 export const TEAM_DELETED_SUCCESSFULLY      = 'Team deleted successfully';
+
+// Payment messages
+export const PAYMENT_FAILED = 'Payment could not be processed';
+export const PAYMENT_PROVIDER_NOT_IMPLEMENTED = 'Payment provider is not yet implemented';
+export const PAYMENT_ALREADY_INITIATED = 'A payment for this request is already in progress';
+export const SUBSCRIPTION_ALREADY_ACTIVE = 'An active subscription already exists for this user';
+
+// Admin users list
+export const ADMIN_USERS_LIST_RETRIEVED = 'Users retrieved successfully';
+export const ADMIN_GLOBAL_SEARCH_SUCCESSFUL = 'Admin global search results retrieved successfully';
+
+// Admin notifications
+export const ADMIN_NOTIFICATIONS_RETRIEVED = 'Admin notifications retrieved successfully';
+export const ADMIN_NOTIFICATION_NOT_FOUND = 'Notification not found';
+export const ADMIN_NOTIFICATION_MARKED_READ = 'Notification marked as read';
+export const ADMIN_NOTIFICATIONS_MARKED_READ = 'Notifications marked as read';
+export const ADMIN_NOTIFICATIONS_MARKED_UNREAD = 'Notifications marked as unread';
+export const ADMIN_NOTIFICATION_DELETED = 'Notification deleted successfully';
+export const ADMIN_NOTIFICATIONS_BULK_DELETED = 'Notifications deleted successfully';
+export const ADMIN_NOTIFICATION_STAR_TOGGLED = 'Notification star updated successfully';
+export const ADMIN_NOTIFICATION_BULK_SELECTION_REQUIRED = 'Provide either ids or all: true';
+export const ADMIN_NOTIFICATION_BULK_SELECTION_AMBIGUOUS = 'Provide either ids or all: true, not both';

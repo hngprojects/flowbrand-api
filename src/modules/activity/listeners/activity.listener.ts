@@ -45,7 +45,7 @@ export class ActivityListener {
       user_id: event.userId,
       event_type: APP_EVENTS.FUNNEL_GENERATED,
       funnel_id: event.funnelId,
-      metadata: { businessName: event.businessName },
+      metadata: { funnelName: event.funnelName },
     });
   }
 
