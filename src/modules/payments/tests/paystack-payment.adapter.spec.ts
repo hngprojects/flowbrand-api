@@ -3,6 +3,7 @@ import { UnauthorizedException } from '@nestjs/common';
 import { createHmac } from 'crypto';
 import { PaystackPaymentAdapter } from '../adapters/paystack-payment.adapter';
 import { PAYSTACK_CLIENT } from '../providers/paystack-client.provider';
+import { PaymentFailedException } from '../exceptions/payment-failed.exception';
 import { BillingCycle } from '../enums/billing-cycle.enum';
 import { PaymentPlan } from '../enums/payment-plan.enum';
 import { PaymentStatus } from '../enums/payment-status.enum';
@@ -112,7 +113,6 @@ describe('PaystackPaymentAdapter', () => {
     it('throws PaymentFailedException when Paystack SDK throws', async () => {
       mockTransaction.initialize.mockRejectedValueOnce(new Error('Bad Request'));
 
-      const { PaymentFailedException } = await import('../exceptions/payment-failed.exception');
       await expect(adapter.initiatePayment(dto, userId, email)).rejects.toBeInstanceOf(PaymentFailedException);
     });
   });
@@ -242,7 +242,6 @@ describe('PaystackPaymentAdapter', () => {
     it('throws PaymentFailedException when SDK throws', async () => {
       mockTransaction.initialize.mockRejectedValueOnce(new Error('SDK error'));
 
-      const { PaymentFailedException } = await import('../exceptions/payment-failed.exception');
       await expect(
         adapter.initiateSubscription({ plan: PaymentPlan.PRO, billingCycle: BillingCycle.MONTHLY }, userId, email),
       ).rejects.toBeInstanceOf(PaymentFailedException);
@@ -265,7 +264,6 @@ describe('PaystackPaymentAdapter', () => {
     it('throws PaymentFailedException when fetch step fails', async () => {
       mockSubscription.fetch.mockRejectedValueOnce(new Error('Not found'));
 
-      const { PaymentFailedException } = await import('../exceptions/payment-failed.exception');
       await expect(adapter.cancelSubscription('SUB_bad')).rejects.toBeInstanceOf(PaymentFailedException);
       expect(mockSubscription.disable).not.toHaveBeenCalled();
     });
@@ -274,7 +272,6 @@ describe('PaystackPaymentAdapter', () => {
       mockSubscription.fetch.mockResolvedValueOnce({ data: { email_token: 'tok_abc' } });
       mockSubscription.disable.mockRejectedValueOnce(new Error('Disable failed'));
 
-      const { PaymentFailedException } = await import('../exceptions/payment-failed.exception');
       await expect(adapter.cancelSubscription('SUB_test_123')).rejects.toBeInstanceOf(PaymentFailedException);
     });
   });

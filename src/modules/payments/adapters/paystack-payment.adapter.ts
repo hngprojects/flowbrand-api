@@ -1,9 +1,9 @@
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
-import Paystack from '@paystack/paystack-sdk';
 import { env } from '../../../config/env';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { PAYSTACK_CLIENT } from '../providers/paystack-client.provider';
+import type { IPaystackClient } from '../providers/paystack-client.provider';
 import { InitiatePaymentDto } from '../dto/initiate-payment.dto';
 import { InitiateSubscriptionDto } from '../dto/initiate-subscription.dto';
 import { BillingCycle } from '../enums/billing-cycle.enum';
@@ -64,7 +64,7 @@ function toPaymentStatus(paystackStatus: string): PaymentStatus {
 export class PaystackPaymentAdapter implements PaymentProvider {
   constructor(
     // SEC-01: secret key stays in PaystackClientProvider — never logged or returned in responses
-    @Inject(PAYSTACK_CLIENT) private readonly client: Paystack,
+    @Inject(PAYSTACK_CLIENT) private readonly client: IPaystackClient,
   ) {}
 
   /** Initializes a one-time or subscription payment checkout session. */
@@ -167,7 +167,7 @@ export class PaystackPaymentAdapter implements PaymentProvider {
    * Verifies the Paystack webhook HMAC-SHA512 signature then parses the event.
    * Routing and side effects belong in M4-BE-021 — this method only handles verification.
    */
-  async handleWebhookEvent(payload: unknown, signature: string): Promise<WebhookEvent> {
+  handleWebhookEvent(payload: unknown, signature: string): Promise<WebhookEvent> {
     const rawBody = payload instanceof Buffer ? payload : Buffer.from(JSON.stringify(payload));
 
     // SEC-03: timingSafeEqual prevents timing-attack signature comparison
@@ -182,16 +182,19 @@ export class PaystackPaymentAdapter implements PaymentProvider {
       receivedBuf.length !== expectedBuf.length ||
       !timingSafeEqual(receivedBuf, expectedBuf)
     ) {
-      throw new UnauthorizedException(SYS_MSG.WEBHOOK_SIGNATURE_INVALID);
+      return Promise.reject(new UnauthorizedException(SYS_MSG.WEBHOOK_SIGNATURE_INVALID));
     }
 
-    const parsed = JSON.parse(rawBody.toString()) as Record<string, unknown>;
-    const data = parsed.data as Record<string, unknown>;
-
-    return {
-      type: parsed.event as string,
-      reference: data.reference as string,
-      data,
-    };
+    try {
+      const parsed = JSON.parse(rawBody.toString()) as Record<string, unknown>;
+      const data = parsed.data as Record<string, unknown>;
+      return Promise.resolve({
+        type: parsed.event as string,
+        reference: data.reference as string,
+        data,
+      });
+    } catch (err: unknown) {
+      return Promise.reject(err instanceof Error ? err : new Error(String(err)));
+    }
   }
 }
