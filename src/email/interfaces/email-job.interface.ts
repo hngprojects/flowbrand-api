@@ -8,8 +8,7 @@ export type EmailType =
   | 'funnel-ready'
   | 'stage-unlocked'
   | 'stage-completed'
-  | 'weekly-digest'
-  | 'team-invite';
+  | 'weekly-digest';
 
 export interface OtpPayload {
   fullName: string;
@@ -35,7 +34,7 @@ export interface ContactAdminNotificationPayload {
 
 export interface FunnelReadyPayload {
   name: string;
-  funnelName: string;
+  businessName: string;
 }
 
 export interface StageUnlockedPayload {
@@ -55,13 +54,6 @@ export interface WeeklyDigestPayload {
   activeStageName: string | null;
 }
 
-export interface TeamInvitePayload {
-  inviteLink: string;
-  role: string;
-  teamName: string;
-  customMessage?: string;
-}
-
 export type EmailPayload =
   | OtpPayload
   | WaitlistPayload
@@ -69,8 +61,7 @@ export type EmailPayload =
   | FunnelReadyPayload
   | StageUnlockedPayload
   | StageCompletedPayload
-  | WeeklyDigestPayload
-  | TeamInvitePayload;
+  | WeeklyDigestPayload;
 
 interface BaseEmailJob {
   to: string;
@@ -88,5 +79,4 @@ export type EmailJob = BaseEmailJob &
     | { type: 'stage-unlocked'; payload: StageUnlockedPayload }
     | { type: 'stage-completed'; payload: StageCompletedPayload }
     | { type: 'weekly-digest'; payload: WeeklyDigestPayload }
-    | { type: 'team-invite'; payload: TeamInvitePayload; }
   );
