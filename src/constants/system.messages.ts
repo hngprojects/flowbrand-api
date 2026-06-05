@@ -288,7 +288,6 @@ export const PAYMENT_FAILED = 'Payment could not be processed';
 export const PAYMENT_PROVIDER_NOT_IMPLEMENTED = 'Payment provider is not yet implemented';
 export const PAYMENT_ALREADY_INITIATED = 'A payment for this request is already in progress';
 export const SUBSCRIPTION_ALREADY_ACTIVE = 'An active subscription already exists for this user';
-export const SUBSCRIPTION_CANCEL_TOKEN_MISSING = 'Subscription cancel failed: provider did not return email token';
 
 // Admin users list
 export const ADMIN_USERS_LIST_RETRIEVED = 'Users retrieved successfully';
@@ -314,6 +313,10 @@ export const PAYMENT_PRICE_NOT_SET = (label: string, fallback: number) =>
   `${label} not set — using placeholder ${fallback} kobo`;
 export const PAYMENT_PRICE_ZERO_MISCONFIGURATION = (label: string, fallback: number) =>
   `${label} is zero — treating as misconfiguration, using placeholder ${fallback} kobo`;
+export const PAYMENT_USER_ALREADY_PRO = 'You are already on the Pro plan';
+export const PAYMENT_INITIATED_SUCCESSFULLY = 'Payment initiated successfully';
+export const PAYMENT_RATE_LIMIT_EXCEEDED = 'Too many payment requests. Please try again later';
+export const SUBSCRIPTION_CANCEL_TOKEN_MISSING = 'Subscription cancel failed: provider did not return email token';
 
 // Admin Teams
 export const TEAMS_RETRIEVED_SUCCESSFULLY = 'Teams retrieved successfully';
