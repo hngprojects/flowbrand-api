@@ -35,5 +35,5 @@ export interface PaymentProvider {
   verifyPayment(reference: string): Promise<VerifyPaymentResult>;
   initiateSubscription(dto: InitiateSubscriptionDto, userId: string, email: string): Promise<InitiateSubscriptionResult>;
   cancelSubscription(subscriptionCode: string): Promise<void>;
-  handleWebhookEvent(payload: unknown, signature: string): Promise<WebhookEvent>;
+  handleWebhookEvent(payload: Buffer, signature: string): Promise<WebhookEvent>;
 }

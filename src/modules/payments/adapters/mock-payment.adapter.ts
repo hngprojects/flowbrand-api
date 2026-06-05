@@ -45,11 +45,11 @@ export class MockPaymentAdapter implements PaymentProvider {
     return Promise.resolve();
   }
 
-  handleWebhookEvent(payload: unknown, _signature: string): Promise<WebhookEvent> {
+  handleWebhookEvent(_payload: Buffer, _signature: string): Promise<WebhookEvent> {
     return Promise.resolve({
       type: 'mock.event',
       reference: 'mock_ref',
-      data: (payload !== null && typeof payload === 'object') ? (payload as Record<string, unknown>) : {},
+      data: {},
     });
   }
 }

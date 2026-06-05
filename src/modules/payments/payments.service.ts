@@ -130,9 +130,8 @@ export class PaymentsService {
       periodEnd.setMonth(periodEnd.getMonth() + 1);
     }
 
-    let subscription: Subscription;
     try {
-      subscription = await this.dataSource.transaction<Subscription>(async (manager) => {
+      await this.dataSource.transaction(async (manager) => {
          
         const sub: Subscription = await this.subscriptionModelAction.create({
           createPayload: {
@@ -191,11 +190,9 @@ export class PaymentsService {
 
     const result = await this.adapter.initiateSubscription(dto, userId, email);
 
-    await this.subscriptionModelAction.update({
-      identifierOptions: { id: subscription.id },
-      updatePayload: { provider_subscription_code: result.subscriptionCode },
-      transactionOptions: { useTransaction: false },
-    });
+    // provider_subscription_code is NOT set here — the real SUB_xxx code arrives
+    // via the subscription.create webhook (M4-BE-021). Storing access_code here
+    // would persist the wrong identifier.
 
     return result;
   }
@@ -206,7 +203,7 @@ export class PaymentsService {
   }
 
   /** Routes a raw webhook payload to the configured provider's parser. */
-  async handleWebhookEvent(payload: unknown, signature: string): Promise<WebhookEvent> {
+  async handleWebhookEvent(payload: Buffer, signature: string): Promise<WebhookEvent> {
     return this.adapter.handleWebhookEvent(payload, signature);
   }
 
