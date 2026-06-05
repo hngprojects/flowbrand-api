@@ -2,6 +2,7 @@ import * as crypto from 'crypto';
 import {
   Injectable,
   NotFoundException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { AdminTeamModelAction } from './actions/admin-team.action';
 import { TeamMembershipModelAction } from './actions/team-membership.action';
@@ -131,7 +132,13 @@ export class AdminTeamsService {
           expiresAt,
         );
 
-        const inviteLink = `${process.env.APP_URL}/accept-invite?token=${rawToken}`;
+        const appUrl = process.env.FRONTEND_URL;
+        
+        if (!appUrl) {
+          throw new InternalServerErrorException('FRONTEND_URL is not configured')
+        }
+
+        const inviteLink = `${appUrl}/accept-invite?token=${rawToken}`
 
         await this.emailService.sendTeamInvite(email, {
           inviteLink,
