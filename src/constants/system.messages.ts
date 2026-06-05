@@ -302,3 +302,7 @@ export const ADMIN_NOTIFICATION_STAR_TOGGLED = 'Notification star updated succes
 export const ADMIN_NOTIFICATION_BULK_SELECTION_REQUIRED = 'Provide either ids or all: true';
 export const ADMIN_NOTIFICATION_BULK_SELECTION_AMBIGUOUS = 'Provide either ids or all: true, not both';
 export const WEBHOOK_SIGNATURE_INVALID = 'Webhook signature verification failed';
+export const PAYMENT_PRICE_NOT_SET = (label: string, fallback: number) =>
+  `${label} not set — using placeholder ${fallback} kobo`;
+export const PAYMENT_PRICE_ZERO_MISCONFIGURATION = (label: string, fallback: number) =>
+  `${label} is zero — treating as misconfiguration, using placeholder ${fallback} kobo`;

@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { env } from '../../../config/env';
+import * as SYS_MSG from '../../../constants/system.messages';
 
 const logger = new Logger('PricingConstants');
 
@@ -7,12 +8,12 @@ const FALLBACK_KOBO = { ONETIME: 900000, MONTHLY: 300000, ANNUAL: 3200000 };
 
 function resolvePrice(value: number | undefined, fallback: number, label: string): number {
   if (value === undefined) {
-    logger.warn(`${label} not set — using placeholder ${fallback} kobo`);
+    logger.warn(SYS_MSG.PAYMENT_PRICE_NOT_SET(label, fallback));
     return fallback;
   }
   // EC-03: zero is a misconfiguration — never initiate a 0-amount payment
   if (value === 0) {
-    logger.error(`${label} is zero — treating as misconfiguration, using placeholder ${fallback} kobo`);
+    logger.error(SYS_MSG.PAYMENT_PRICE_ZERO_MISCONFIGURATION(label, fallback));
     return fallback;
   }
   return value;
