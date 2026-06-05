@@ -1,26 +1,29 @@
-import Paystack from '@paystack/paystack-sdk';
 import { env } from '../../../config/env';
 
 export const PAYSTACK_CLIENT = 'PAYSTACK_CLIENT';
 
-// Typed subset of the Paystack SDK surface used by PaystackPaymentAdapter.
-// The SDK's Paystack class is typed as [index: string]: any; this interface
-// pins the shapes we depend on so the adapter is fully type-safe.
+export interface PaystackResponse {
+  status: boolean;
+  message: string;
+  data: unknown;
+}
+
+// Typed subset of the Paystack API surface used by PaystackPaymentAdapter.
 export interface IPaystackTransaction {
   initialize(params: {
     email: string;
-    amount: number;
+    amount: string;
     reference?: string;
     plan?: string;
-    metadata?: string;
+    metadata?: string | Record<string, unknown>;
     channels?: string[];
-  }): Promise<{ data: unknown }>;
-  verify(params: { reference: string }): Promise<{ data: unknown }>;
+  }): Promise<PaystackResponse>;
+  verify(params: { reference: string }): Promise<PaystackResponse>;
 }
 
 export interface IPaystackSubscription {
-  fetch(params: { code: string }): Promise<{ data: unknown }>;
-  disable(params: { code: string; token: string }): Promise<{ data: unknown }>;
+  fetch(params: { code: string }): Promise<PaystackResponse>;
+  disable(params: { code: string; token: string }): Promise<PaystackResponse>;
 }
 
 export interface IPaystackClient {
@@ -28,8 +31,59 @@ export interface IPaystackClient {
   subscription: IPaystackSubscription;
 }
 
+const BASE = 'https://api.paystack.co';
+
+function createPaystackClient(secretKey: string): IPaystackClient {
+  const headers = {
+    Authorization: `Bearer ${secretKey}`,
+    'Content-Type': 'application/json',
+  };
+
+  async function parseJson(res: Response): Promise<PaystackResponse> {
+    return res.json().catch(() => {
+      throw new Error(`Paystack HTTP error ${res.status}`);
+    }) as Promise<PaystackResponse>;
+  }
+
+  return {
+    transaction: {
+      async initialize(params) {
+        const res = await fetch(`${BASE}/transaction/initialize`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(params),
+        });
+        return parseJson(res);
+      },
+      async verify(params) {
+        const res = await fetch(`${BASE}/transaction/verify/${encodeURIComponent(params.reference)}`, {
+          method: 'GET',
+          headers,
+        });
+        return parseJson(res);
+      },
+    },
+    subscription: {
+      async fetch(params) {
+        const res = await fetch(`${BASE}/subscription/${encodeURIComponent(params.code)}`, {
+          method: 'GET',
+          headers,
+        });
+        return parseJson(res);
+      },
+      async disable(params) {
+        const res = await fetch(`${BASE}/subscription/disable`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(params),
+        });
+        return parseJson(res);
+      },
+    },
+  };
+}
+
 export const PaystackClientProvider = {
   provide: PAYSTACK_CLIENT,
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unnecessary-type-assertion
-  useFactory: (): IPaystackClient => new Paystack(env.PAYSTACK_SECRET_KEY!) as unknown as IPaystackClient,
+  useFactory: (): IPaystackClient => createPaystackClient(env.PAYSTACK_SECRET_KEY!),
 };

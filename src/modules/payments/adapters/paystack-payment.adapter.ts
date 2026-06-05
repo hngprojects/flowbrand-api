@@ -1,4 +1,4 @@
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import { env } from '../../../config/env';
 import * as SYS_MSG from '../../../constants/system.messages';
@@ -62,10 +62,12 @@ function toPaymentStatus(paystackStatus: string): PaymentStatus {
 
 @Injectable()
 export class PaystackPaymentAdapter implements PaymentProvider {
+  private readonly logger = new Logger(PaystackPaymentAdapter.name);
+
   constructor(
     // SEC-01: secret key stays in PaystackClientProvider — never logged or returned in responses
     @Inject(PAYSTACK_CLIENT) private readonly client: IPaystackClient,
-  ) {}
+  ) { }
 
   /** Initializes a one-time or subscription payment checkout session. */
   async initiatePayment(dto: InitiatePaymentDto, userId: string, email: string): Promise<InitiatePaymentResult> {
@@ -74,11 +76,15 @@ export class PaystackPaymentAdapter implements PaymentProvider {
       const amountKobo = dto.type === PaymentType.ONE_TIME ? PRICING.PRO_ONETIME_KOBO : PRICING.PRO_MONTHLY_KOBO;
       const response = await this.client.transaction.initialize({
         email,
-        amount: amountKobo,
+        amount: String(amountKobo),
         reference,
-        metadata: JSON.stringify({ userId, plan: dto.plan, type: dto.type }),
+        metadata: { userId, plan: dto.plan, type: dto.type },
         channels: ['card', 'bank_transfer'],
       });
+
+      if (!response.status) {
+        throw new Error(response.message ?? 'Paystack rejected the request');
+      }
 
       const data = response.data as PaystackInitializeData;
       return {
@@ -87,6 +93,7 @@ export class PaystackPaymentAdapter implements PaymentProvider {
         provider: 'paystack',
       };
     } catch (err: unknown) {
+      this.logger.error({ message: 'initiatePayment failed', reason: (err as Error).message });
       throw new PaymentFailedException((err as Error).message);
     }
   }
@@ -95,6 +102,9 @@ export class PaystackPaymentAdapter implements PaymentProvider {
   async verifyPayment(reference: string): Promise<VerifyPaymentResult> {
     try {
       const response = await this.client.transaction.verify({ reference });
+      if (!response.status) {
+        throw new Error(response.message ?? 'Paystack rejected the request');
+      }
       const data = response.data as PaystackVerifyData;
 
       // SEC-02: store only last4 and brand — no full card data
@@ -130,11 +140,14 @@ export class PaystackPaymentAdapter implements PaymentProvider {
       const response = await this.client.transaction.initialize({
         email,
         // Paystack ignores amount when plan is set — plan defines the charge amount
-        amount: 0,
+        amount: '0',
         plan: planCode,
-        metadata: JSON.stringify({ userId, plan: dto.plan, billingCycle: dto.billingCycle }),
+        metadata: { userId, plan: dto.plan, billingCycle: dto.billingCycle },
       });
 
+      if (!response.status) {
+        throw new Error(response.message ?? 'Paystack rejected the request');
+      }
       const data = response.data as PaystackInitializeData;
       return {
         // access_code is the checkout session token — NOT the SUB_xxx subscription identifier.
@@ -152,14 +165,16 @@ export class PaystackPaymentAdapter implements PaymentProvider {
   async cancelSubscription(subscriptionCode: string): Promise<void> {
     try {
       const fetchResponse = await this.client.subscription.fetch({ code: subscriptionCode });
-      const fetchData = fetchResponse.data as PaystackSubscriptionFetchData;
-
-      await this.client.subscription.disable({
-        code: subscriptionCode,
-        token: fetchData.email_token,
-      });
+      if (!fetchResponse.status) {
+        throw new PaymentFailedException(fetchResponse.message ?? 'Paystack rejected the request');
+      }
+      const emailToken = (fetchResponse.data as PaystackSubscriptionFetchData)?.email_token;
+      if (!emailToken) {
+        throw new PaymentFailedException(SYS_MSG.SUBSCRIPTION_CANCEL_TOKEN_MISSING);
+      }
+      await this.client.subscription.disable({ code: subscriptionCode, token: emailToken });
     } catch (err: unknown) {
-      throw new PaymentFailedException((err as Error).message);
+      throw err instanceof PaymentFailedException ? err : new PaymentFailedException((err as Error).message);
     }
   }
 
@@ -167,8 +182,8 @@ export class PaystackPaymentAdapter implements PaymentProvider {
    * Verifies the Paystack webhook HMAC-SHA512 signature then parses the event.
    * Routing and side effects belong in M4-BE-021 — this method only handles verification.
    */
-  handleWebhookEvent(payload: unknown, signature: string): Promise<WebhookEvent> {
-    const rawBody = payload instanceof Buffer ? payload : Buffer.from(JSON.stringify(payload));
+  handleWebhookEvent(payload: Buffer, signature: string): Promise<WebhookEvent> {
+    const rawBody = payload;
 
     // SEC-03: timingSafeEqual prevents timing-attack signature comparison
     const expected = createHmac('sha512', env.PAYSTACK_SECRET_KEY!)
