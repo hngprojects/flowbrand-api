@@ -11,6 +11,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { appConfig } from './config/app.config';
 import { databaseConfig } from './config/database.config';
+import { emailConfig } from './config/email.config';
 import { env } from './config/env';
 import { jwtConfig } from './config/jwt.config';
 import { redisConfig } from './config/redis.config';
@@ -56,7 +57,7 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
     LoggerModule,
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, jwtConfig, redisConfig, llmConfig],
+      load: [appConfig, databaseConfig, jwtConfig, redisConfig, llmConfig, emailConfig],
     }),
     EventEmitterModule.forRoot({
       wildcard: true,

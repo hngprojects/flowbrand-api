@@ -7,6 +7,7 @@ import {
   Processor,
 } from '@nestjs/bull';
 import { Inject, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { Job } from 'bull';
 import { Resend } from 'resend';
 import { JOBS, QUEUES } from '../../common/constants/queue.constants';
@@ -18,12 +19,14 @@ import { TemplateService } from '../template.service';
 export class EmailProcessor {
   private readonly logger = new Logger(EmailProcessor.name);
   private readonly from: string;
+  private readonly DEFAULT_FROM_EMAIL = 'SEIL <noreply@seil.app>';
 
   constructor(
     private readonly templateService: TemplateService,
     @Inject('RESEND_CLIENT') private readonly resend: Resend,
+    private readonly config: ConfigService,
   ) {
-    this.from = process.env.EMAIL_FROM ?? 'SEIL <noreply@seil.app>';
+    this.from = this.config.get<string>('email.from') ?? this.DEFAULT_FROM_EMAIL;
   }
 
   @Process(JOBS.SEND_EMAIL)

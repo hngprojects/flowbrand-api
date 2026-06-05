@@ -292,7 +292,11 @@ export const SUBSCRIPTION_ALREADY_ACTIVE = 'An active subscription already exist
 // Admin users list
 export const ADMIN_USERS_LIST_RETRIEVED = 'Users retrieved successfully';
 export const ADMIN_GLOBAL_SEARCH_SUCCESSFUL = 'Admin global search results retrieved successfully';
-
+export const ADMIN_USER_PROFILE_RETRIEVED = 'User profile retrieved successfully';
+export const ADMIN_USER_STATUS_UPDATED = 'User status updated successfully';
+export const ADMIN_USER_DELETED = 'User account deleted successfully';
+export const ADMIN_USER_NOT_FOUND = 'User not found';
+export const ADMIN_CANNOT_DELETE_SELF = 'You cannot delete your own user account as an admin';
 // Admin notifications
 export const ADMIN_NOTIFICATIONS_RETRIEVED = 'Admin notifications retrieved successfully';
 export const ADMIN_NOTIFICATION_NOT_FOUND = 'Notification not found';
