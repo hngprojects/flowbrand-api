@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { env } from '../../../config/env';
+import { PaymentStatus } from '../enums/payment-status.enum';
 import { PaymentFailedException } from '../exceptions/payment-failed.exception';
 import {
   InitiatePaymentResult,
@@ -23,7 +24,7 @@ export class MockPaymentAdapter implements PaymentProvider {
   }
 
   verifyPayment(reference: string): Promise<VerifyPaymentResult> {
-    const status = env.TEST_PAYMENT_OUTCOME === 'pending' ? 'pending' : 'success';
+    const status = env.TEST_PAYMENT_OUTCOME === 'pending' ? PaymentStatus.PENDING : PaymentStatus.SUCCESS;
     return Promise.resolve({ reference, status, amount: 999900, currency: 'NGN' });
   }
 
