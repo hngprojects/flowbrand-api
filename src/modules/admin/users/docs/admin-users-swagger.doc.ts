@@ -137,7 +137,9 @@ export function GetAdminUsersDocs(): ReturnType<typeof applyDecorators> {
     }),
     ApiResponse({
       status: HttpStatus.BAD_REQUEST,
-      description: 'Invalid query parameter — unknown enum value for status or sortBy, non-integer or negative value for page or perPage. Note: perPage values above 50 are silently capped, not rejecte
+      description:
+        'Invalid query parameter — unknown enum value for status or sortBy, non-integer or negative value for page or perPage. ' +
+        'Note: perPage values above 50 are silently capped rather than rejected.',
       schema: {
         example: {
           success: false,
