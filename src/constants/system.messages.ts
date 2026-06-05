@@ -279,6 +279,12 @@ export const ADMIN_DASHBOARD_WEEKLY_OVERVIEW_RETRIEVED = 'Admin dashboard weekly
 export const ADMIN_DASHBOARD_USER_SEGMENTS_RETRIEVED = 'Admin dashboard user segments retrieved successfully';
 export const ADMIN_DASHBOARD_FUNNEL_PERFORMANCE_RETRIEVED = 'Admin dashboard funnel performance retrieved successfully';
 
+// Payment messages
+export const PAYMENT_FAILED = 'Payment could not be processed';
+export const PAYMENT_PROVIDER_NOT_IMPLEMENTED = 'Payment provider is not yet implemented';
+export const PAYMENT_ALREADY_INITIATED = 'A payment for this request is already in progress';
+export const SUBSCRIPTION_ALREADY_ACTIVE = 'An active subscription already exists for this user';
+
 // Admin users list
 export const ADMIN_USERS_LIST_RETRIEVED = 'Users retrieved successfully';
 export const ADMIN_GLOBAL_SEARCH_SUCCESSFUL = 'Admin global search results retrieved successfully';
