@@ -82,15 +82,11 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
   }
 
   async updateFunnelName(funnelId: string, userId: string, funnelName: string): Promise<Funnel | null> {
-    const result = await this.funnelRepository.update(
-      { id: funnelId, user_id: userId },
-      { funnel_name: funnelName },
-    );
-    if (!result.affected) {
-      return null;
-    }
+    const funnel = await this.funnelRepository.findOne({ where: { id: funnelId, user_id: userId } });
+    if (!funnel) return null;
 
-    return this.funnelRepository.findOne({ where: { id: funnelId, user_id: userId } });
+    funnel.funnel_name = funnelName;
+    return this.funnelRepository.save(funnel);
   }
 
   async listForUserPaginated(userId: string, page: number, perPage: number): Promise<[Funnel[], number]> {
