@@ -12,6 +12,7 @@ import { UserRoleEntity } from './user-role.entity';
 import { AuthMetadata } from '../../auth/entities/auth-metadata.entity';
 import { UserSession } from './user-session.entity';
 import { UserPlan } from '../enums/user-plan.enum';
+import { UserAccountStatus } from '../enums/user-account-status.enum';
 
 @Entity('users')
 export class User extends BaseEntity {
@@ -64,6 +65,13 @@ export class User extends BaseEntity {
 
   @Column({ type: 'timestamptz', nullable: true })
   plan_activated_at: Date | null;
+
+  @Column({
+    type: 'enum',
+    enum: UserAccountStatus,
+    default: UserAccountStatus.ACTIVE,
+  })
+  status: UserAccountStatus;
 
   @Exclude()
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz', nullable: true })

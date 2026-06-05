@@ -8,6 +8,12 @@ import { UsersService } from '../../../users/users.service';
 import { UserPlan } from '../../../users/enums/user-plan.enum';
 import { SortDir, UserSortBy, UserStatusFilter } from '../enums/admin-users-query.enum';
 import { GetAdminUsersQueryDto } from '../dto/get-admin-users-query.dto';
+import { UserSessionModelAction } from '../../../users/actions/user-session.action';
+import { AdminUserDetailAction } from '../actions/admin-user-detail.action';
+import { LogService } from '../../profile/services/log.service';
+import { RedisService } from '../../../redis/redis.service';
+import { getQueueToken } from '@nestjs/bull';
+import { ACCOUNT_DELETION_QUEUE } from '../../../users/processors/account-deletion.processor';
 
 // Dates relative to now — clearly within / outside the 30-day window regardless of when tests run
 const activeLoginAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);  // 10 days ago
@@ -29,6 +35,11 @@ const mockUserModelAction = { create: jest.fn() };
 const mockUserRoleModelAction = { create: jest.fn() };
 const mockDataSource = { transaction: jest.fn() };
 const mockAdminUsersListAction = { findUsersWithFilters: jest.fn() };
+const mockUserSessionModelAction = { revokeAllUserSessionsInDb: jest.fn() };
+const mockAdminUserDetailAction = { findUserWithDetails: jest.fn() };
+const mockLogService = { logAction: jest.fn() };
+const mockRedisService = { delByPattern: jest.fn() };
+const mockQueue = { add: jest.fn() };
 
 describe('AdminUsersService', () => {
   let service: AdminUsersService;
@@ -44,6 +55,11 @@ describe('AdminUsersService', () => {
         { provide: UserRoleModelAction, useValue: mockUserRoleModelAction },
         { provide: DataSource, useValue: mockDataSource },
         { provide: AdminUsersListAction, useValue: mockAdminUsersListAction },
+        { provide: UserSessionModelAction, useValue: mockUserSessionModelAction },
+        { provide: AdminUserDetailAction, useValue: mockAdminUserDetailAction },
+        { provide: LogService, useValue: mockLogService },
+        { provide: RedisService, useValue: mockRedisService },
+        { provide: getQueueToken(ACCOUNT_DELETION_QUEUE), useValue: mockQueue },
       ],
     }).compile();
 
