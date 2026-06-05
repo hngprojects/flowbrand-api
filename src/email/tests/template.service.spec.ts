@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs/promises';
 import { TemplateService } from '../template.service';
 
@@ -21,7 +22,12 @@ describe('TemplateService', () => {
   let service: TemplateService;
 
   function buildService(): Promise<TestingModule> {
-    return Test.createTestingModule({ providers: [TemplateService] }).compile();
+    return Test.createTestingModule({
+      providers: [
+        TemplateService,
+        { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('http://localhost:3000') } },
+      ],
+    }).compile();
   }
 
   describe('onModuleInit — happy path', () => {

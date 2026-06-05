@@ -29,6 +29,8 @@ const envSchema = z.object({
 
   CORS_ORIGIN: z.string().default('*'),
   SWAGGER_ENABLED: boolEnv.default(true),
+  FRONTEND_URL: z.string().url().default('http://localhost:3000'),
+  EMAIL_FROM: z.string().default('SEIL <noreply@seil.app>'),
 
   REDIS_HOST: z.string().default('localhost'),
   REDIS_PORT: z.coerce.number().int().positive().default(6379),
