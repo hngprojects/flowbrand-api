@@ -145,7 +145,7 @@ export class AdminUsersService {
         plan: user.plan,
         country: user.country,
         createdAt: user.created_at,
-        lastActiveAt: null,
+        lastActiveAt: user.auth_metadata?.last_login_at ?? null,
         status: statusIndicator,
       },
       informationProvided: {
@@ -176,10 +176,20 @@ export class AdminUsersService {
       throw new NotFoundException(SYS_MSG.ADMIN_USER_NOT_FOUND);
     }
 
+    if (user.deleted_at && status !== UserAccountStatus.ACTIVE) {
+      throw new ConflictException('Cannot change status of a deleted user unless reactivating');
+    }
+
+    if (status === UserAccountStatus.DELETED) {
+      return this.deleteUser(userId, adminId);
+    }
+
     const isActive = status === UserAccountStatus.ACTIVE;
+    const deletedAt = status === UserAccountStatus.ACTIVE ? null : user.deleted_at;
+
     await this.userModelAction.update({
       identifierOptions: { id: userId },
-      updatePayload: { status, is_active: isActive },
+      updatePayload: { status, is_active: isActive, deleted_at: deletedAt },
       transactionOptions: { useTransaction: false },
     });
 
@@ -228,23 +238,27 @@ export class AdminUsersService {
       await queryRunner.commitTransaction();
       committed = true;
 
-      if (revokedSessionIds.length > 0) {
-        await this.redisService.delByPattern(`sess:${userId}:*`);
+      try {
+        if (revokedSessionIds.length > 0) {
+          await this.redisService.delByPattern(`sess:${userId}:*`);
+        }
+
+        await this.accountDeletionQueue.add('hard-delete', { userId, email: user.email }, { delay: 30 * 24 * 60 * 60 * 1000 });
+
+        await this.logService.logAction({
+          admin_id: adminId,
+          action_type: AdminProfileActionType.ADMIN_ACCOUNT_DELETED,
+          status: 'success',
+          metadata: { targetUserId: userId },
+        });
+      } catch (err) {
+        console.error('Post-commit deletion tasks failed:', err);
       }
-
-      await this.accountDeletionQueue.add('hard-delete', { userId, email: user.email }, { delay: 30 * 24 * 60 * 60 * 1000 });
-
-      await this.logService.logAction({
-        admin_id: adminId,
-        action_type: AdminProfileActionType.ADMIN_ACCOUNT_DELETED,
-        status: 'success',
-        metadata: { targetUserId: userId },
-      });
     } catch {
       if (!committed) {
         await queryRunner.rollbackTransaction();
+        throw new InternalServerErrorException(SYS_MSG.ACCOUNT_DELETION_FAILED);
       }
-      throw new InternalServerErrorException(SYS_MSG.ACCOUNT_DELETION_FAILED);
     } finally {
       await queryRunner.release();
     }

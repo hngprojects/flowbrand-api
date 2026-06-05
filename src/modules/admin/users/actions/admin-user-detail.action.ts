@@ -23,6 +23,7 @@ export class AdminUserDetailAction {
     const user = await manager.findOne(User, {
       where: { id: userId },
       withDeleted: true,
+      relations: ['auth_metadata'],
     });
 
     if (!user) {

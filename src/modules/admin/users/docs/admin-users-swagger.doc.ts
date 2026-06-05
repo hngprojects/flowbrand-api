@@ -7,6 +7,8 @@ import {
   ApiOperation,
   ApiResponse,
   ApiUnauthorizedResponse,
+  getSchemaPath,
+  ApiExtraModels,
 } from '@nestjs/swagger';
 import * as SYS_MSG from '../../../../constants/system.messages';
 import { CreateAdminDto } from '../dto/create-admin.dto';
@@ -156,6 +158,7 @@ export function GetAdminUsersDocs(): ReturnType<typeof applyDecorators> {
 
 export function GetAdminUserDocs(): ReturnType<typeof applyDecorators> {
   return applyDecorators(
+    ApiExtraModels(AdminUserDetailResponseDto),
     ApiBearerAuth('JWT'),
     ApiOperation({
       summary: 'Get admin user profile details',
@@ -165,7 +168,13 @@ export function GetAdminUserDocs(): ReturnType<typeof applyDecorators> {
     }),
     ApiOkResponse({
       description: 'User profile retrieved successfully',
-      type: AdminUserDetailResponseDto,
+      schema: {
+        properties: {
+          statusCode: { type: 'number', example: HttpStatus.OK },
+          message: { type: 'string', example: SYS_MSG.ADMIN_USER_PROFILE_RETRIEVED },
+          data: { $ref: getSchemaPath(AdminUserDetailResponseDto) }
+        }
+      }
     }),
     ApiResponse({
       status: HttpStatus.NOT_FOUND,

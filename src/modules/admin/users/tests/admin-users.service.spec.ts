@@ -43,6 +43,7 @@ const mockDataSource = {
 };
 
 const CREATED_USER = { id: 'user-uuid-1', email: 'jane@example.com' };
+const MOCK_DB_USER = { id: 'user-1', constructor: {}, email: 'user@example.com' };
 
 const CREATE_ADMIN_DTO = {
   full_name: 'Jane Admin',
@@ -219,12 +220,16 @@ describe('AdminUsersService', () => {
     });
 
     it('soft deletes user and revokes sessions', async () => {
-      mockUserModelAction.findById = jest.fn().mockResolvedValue({ id: 'user-1', constructor: {} });
+      mockUserModelAction.findById = jest.fn().mockResolvedValue(MOCK_DB_USER);
       mockUserSessionModelAction.revokeAllUserSessionsInDb.mockResolvedValue(['session-1']);
       await service.deleteUser('user-1', 'admin-2');
       expect(mockQueryRunner.manager.update).toHaveBeenCalled();
-      expect(mockRedisService.delByPattern).toHaveBeenCalled();
-      expect(mockQueue.add).toHaveBeenCalled();
+      expect(mockRedisService.delByPattern).toHaveBeenCalledWith('sess:user-1:*');
+      expect(mockQueue.add).toHaveBeenCalledWith(
+        'hard-delete',
+        { userId: 'user-1', email: 'user@example.com' },
+        { delay: 30 * 24 * 60 * 60 * 1000 }
+      );
       expect(mockLogService.logAction).toHaveBeenCalled();
     });
   });
