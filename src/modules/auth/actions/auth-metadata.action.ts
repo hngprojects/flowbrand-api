@@ -38,8 +38,14 @@ export class AuthMetadataModelAction extends AbstractModelAction<AuthMetadata> {
   }
 
   async incrementFailedAttempts(userId: string): Promise<number> {
-    await this.repository.increment({ user_id: userId }, 'failed_attempts', 1);
-    const updated = await this.findByUserId(userId);
-    return updated?.failed_attempts ?? 1;
+    const result = await this.repository
+      .createQueryBuilder()
+      .update()
+      .set({ failed_attempts: () => 'failed_attempts + 1' })
+      .where('user_id = :userId', { userId })
+      .returning('failed_attempts')
+      .execute();
+    const rows = result.raw as { failed_attempts: number }[];
+    return rows[0]?.failed_attempts ?? 1;
   }
 }

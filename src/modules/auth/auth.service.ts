@@ -76,6 +76,7 @@ export class AuthService {
     findByUserId(userId: string): Promise<AuthMetadata | null>;
     updateByUserId(userId: string, payload: Partial<AuthMetadata>): Promise<AuthMetadata | null>;
     createForUser(payload: Partial<AuthMetadata>): Promise<AuthMetadata>;
+    incrementFailedAttempts(userId: string): Promise<number>;
   } {
     return this.authMetadataModelAction;
   }
@@ -129,7 +130,7 @@ export class AuthService {
     const passwordMatches = await bcrypt.compare(dto.password, user.password_hash);
 
     if (!passwordMatches) {
-      await this.recordFailedLogin(user.id, metadata);
+      await this.recordFailedLogin(user.id);
       throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_CREDENTIALS);
     }
 
@@ -333,7 +334,8 @@ export class AuthService {
     }
 
     const lockKey = `otp:verify:lock:${user.id}`;
-    const lockAcquired = await this.redisService.setNx(lockKey, '1', 10);
+    const lockToken = crypto.randomUUID();
+    const lockAcquired = await this.redisService.setNx(lockKey, lockToken, 30);
     if (!lockAcquired) {
       throw new BadRequestException(SYS_MSG.OTP_INVALID);
     }
@@ -369,7 +371,7 @@ export class AuthService {
       const verifiedUser = await this.usersService.markVerified(user.id);
       return this.issueTokens(verifiedUser);
     } finally {
-      await this.redisService.del(lockKey);
+      await this.redisService.releaseLock(lockKey, lockToken);
     }
   }
 
@@ -493,7 +495,8 @@ export class AuthService {
     }
 
     const lockKey = `password-reset:verify:lock:${user.id}`;
-    const lockAcquired = await this.redisService.setNx(lockKey, '1', 10);
+    const lockToken = crypto.randomUUID();
+    const lockAcquired = await this.redisService.setNx(lockKey, lockToken, 30);
     if (!lockAcquired) {
       throw new BadRequestException(SYS_MSG.PASSWORD_RESET_INVALID_OTP);
     }
@@ -538,7 +541,7 @@ export class AuthService {
 
       return { reset_token };
     } finally {
-      await this.redisService.del(lockKey);
+      await this.redisService.releaseLock(lockKey, lockToken);
     }
   }
 
@@ -722,12 +725,21 @@ export class AuthService {
   private async ensureAuthMetadata(userId: string): Promise<AuthMetadata> {
     const existing = await this.authMetadataAction.findByUserId(userId);
     if (existing) return existing;
-    return this.authMetadataAction.createForUser({
-      user_id: userId,
-      failed_attempts: 0,
-      locked_until: null,
-      last_login_at: null,
-    });
+
+    try {
+      return await this.authMetadataAction.createForUser({
+        user_id: userId,
+        failed_attempts: 0,
+        locked_until: null,
+        last_login_at: null,
+      });
+    } catch (error) {
+      if (this.isUniqueEmailConflict(error)) {
+        const concurrent = await this.authMetadataAction.findByUserId(userId);
+        if (concurrent) return concurrent;
+      }
+      throw error;
+    }
   }
 
   private throwIfLocked(metadata: AuthMetadata): void {
@@ -736,17 +748,14 @@ export class AuthService {
     }
   }
 
-  private async recordFailedLogin(userId: string, metadata: AuthMetadata): Promise<void> {
-    const nextAttempts = metadata.failed_attempts + 1;
-    const shouldLock = nextAttempts >= MAX_FAILED_LOGIN_ATTEMPTS;
-    const lockedUntil = shouldLock ? new Date(Date.now() + ACCOUNT_LOCK_DURATION_MS) : metadata.locked_until;
-
-    await this.authMetadataAction.updateByUserId(userId, {
-      failed_attempts: nextAttempts,
-      locked_until: lockedUntil,
-    });
+  private async recordFailedLogin(userId: string): Promise<void> {
+    const newCount = await this.authMetadataAction.incrementFailedAttempts(userId);
+    const shouldLock = newCount >= MAX_FAILED_LOGIN_ATTEMPTS;
 
     if (shouldLock) {
+      await this.authMetadataAction.updateByUserId(userId, {
+        locked_until: new Date(Date.now() + ACCOUNT_LOCK_DURATION_MS),
+      });
       throw new HttpException(SYS_MSG.AUTH_TOO_MANY_FAILED_ATTEMPTS, HttpStatus.LOCKED);
     }
   }

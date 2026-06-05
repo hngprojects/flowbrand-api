@@ -1,17 +1,28 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, ForbiddenException, InternalServerErrorException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
+import { InjectQueue } from '@nestjs/bull';
+import type { Queue } from 'bull';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { UserModelAction } from '../../users/actions/user.action';
 import { UserRoleModelAction } from '../../users/actions/user-role.action';
+import { UserSessionModelAction } from '../../users/actions/user-session.action';
 import { UsersService } from '../../users/users.service';
 import { UserPlan } from '../../users/enums/user-plan.enum';
+import { UserAccountStatus } from '../../users/enums/user-account-status.enum';
+import { User } from '../../users/entities/user.entity';
+import { ACCOUNT_DELETION_QUEUE } from '../../users/processors/account-deletion.processor';
+import { RedisService } from '../../redis/redis.service';
+import { LogService } from '../profile/services/log.service';
+import { AdminProfileActionType } from '../profile/enums/admin-profile-action-type.enum';
 import { ACTIVE_WINDOW_DAYS, AdminUsersListAction } from './actions/admin-users-list.action';
+import { AdminUserDetailAction } from './actions/admin-user-detail.action';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { GetAdminUsersQueryDto } from './dto/get-admin-users-query.dto';
+import { AdminUserDetailResponseDto } from './dto/admin-user-detail-response.dto';
 import { SortDir, UserSortBy, UserStatusFilter } from './enums/admin-users-query.enum';
-import { AdminUserItem } from './interfaces/admin-user-item.interface';
 import { AdminUsersListResponse } from './interfaces/admin-users-list-response.interface';
+import { AdminUserItem } from './interfaces/admin-user-item.interface';
 
 const MAX_PER_PAGE = 50;
 const DEFAULT_PAGE = 1;
@@ -23,8 +34,14 @@ export class AdminUsersService {
     private readonly usersService: UsersService,
     private readonly userModelAction: UserModelAction,
     private readonly userRoleModelAction: UserRoleModelAction,
+    private readonly userSessionModelAction: UserSessionModelAction,
     private readonly dataSource: DataSource,
     private readonly adminUsersListAction: AdminUsersListAction,
+    private readonly adminUserDetailAction: AdminUserDetailAction,
+    private readonly logService: LogService,
+    private readonly redisService: RedisService,
+    @InjectQueue(ACCOUNT_DELETION_QUEUE)
+    private readonly accountDeletionQueue: Queue,
   ) {}
 
   /** Creates a new admin or super-admin account and assigns the specified role. */
@@ -108,6 +125,144 @@ export class AdminUsersService {
         has_next: page * perPage < total,
       },
     };
+  }
+
+  async getUserProfile(userId: string): Promise<AdminUserDetailResponseDto> {
+    const { user, funnels, documents } = await this.adminUserDetailAction.findUserWithDetails(userId);
+
+    if (!user) {
+      throw new NotFoundException(SYS_MSG.ADMIN_USER_NOT_FOUND);
+    }
+
+    let statusIndicator: UserAccountStatus | 'deleted' = user.status;
+    if (user.deleted_at) {
+      statusIndicator = 'deleted';
+    }
+
+    return {
+      profile: {
+        fullName: user.full_name,
+        email: user.email,
+        plan: user.plan,
+        country: user.country,
+        createdAt: user.created_at,
+        lastActiveAt: user.auth_metadata?.last_login_at ?? null,
+        status: statusIndicator,
+      },
+      informationProvided: {
+        businessType: user.business_type,
+        targetCustomer: user.target_customer,
+        primaryGoal: user.primary_goal,
+      },
+      strategies: funnels.map(f => ({
+        id: f.id,
+        funnelName: f.funnel_name,
+        stageCount: f.stage_count,
+        createdAt: f.created_at,
+        status: f.status,
+      })),
+      documents: documents.map(d => ({
+        id: d.id,
+        fileName: d.file_name,
+        fileSizeBytes: d.file_size_bytes,
+        uploadedAt: d.created_at,
+        status: d.status,
+      })),
+    };
+  }
+
+  async updateUserStatus(userId: string, status: UserAccountStatus, adminId: string): Promise<void> {
+    const user = await this.userModelAction.findById(userId);
+    if (!user) {
+      throw new NotFoundException(SYS_MSG.ADMIN_USER_NOT_FOUND);
+    }
+
+    if (user.deleted_at && status !== UserAccountStatus.ACTIVE) {
+      throw new ConflictException('Cannot change status of a deleted user unless reactivating');
+    }
+
+    if (status === UserAccountStatus.DELETED) {
+      return this.deleteUser(userId, adminId);
+    }
+
+    const isActive = status === UserAccountStatus.ACTIVE;
+    const deletedAt = status === UserAccountStatus.ACTIVE ? null : user.deleted_at;
+
+    await this.userModelAction.update({
+      identifierOptions: { id: userId },
+      updatePayload: { status, is_active: isActive, deleted_at: deletedAt },
+      transactionOptions: { useTransaction: false },
+    });
+
+    await this.logService.logAction({
+      admin_id: adminId,
+      action_type: AdminProfileActionType.ADMIN_STATUS_CHANGE,
+      status: 'success',
+      metadata: { targetUserId: userId, newStatus: status },
+    });
+  }
+
+  async deleteUser(userId: string, adminId: string): Promise<void> {
+    if (userId === adminId) {
+      throw new ForbiddenException(SYS_MSG.ADMIN_CANNOT_DELETE_SELF);
+    }
+
+    const user = await this.userModelAction.findById(userId);
+    if (!user) {
+      throw new NotFoundException(SYS_MSG.ADMIN_USER_NOT_FOUND);
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    let committed = false;
+
+    try {
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+
+      const now = new Date();
+      await queryRunner.manager.update(
+        User,
+        userId,
+        {
+          deleted_at: now,
+          is_active: false,
+          status: UserAccountStatus.DELETED,
+          ...(user.auth_provider === 'google' ? { provider_user_id: null } : {}),
+        }
+      );
+
+      const revokedSessionIds = await this.userSessionModelAction.revokeAllUserSessionsInDb(
+        userId,
+        queryRunner.manager,
+      );
+
+      await queryRunner.commitTransaction();
+      committed = true;
+
+      try {
+        if (revokedSessionIds.length > 0) {
+          await this.redisService.delByPattern(`sess:${userId}:*`);
+        }
+
+        await this.accountDeletionQueue.add('hard-delete', { userId, email: user.email }, { delay: 30 * 24 * 60 * 60 * 1000 });
+
+        await this.logService.logAction({
+          admin_id: adminId,
+          action_type: AdminProfileActionType.ADMIN_ACCOUNT_DELETED,
+          status: 'success',
+          metadata: { targetUserId: userId },
+        });
+      } catch (err) {
+        console.error('Post-commit deletion tasks failed:', err);
+      }
+    } catch {
+      if (!committed) {
+        await queryRunner.rollbackTransaction();
+        throw new InternalServerErrorException(SYS_MSG.ACCOUNT_DELETION_FAILED);
+      }
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   private isUniqueEmailConflict(error: unknown): boolean {

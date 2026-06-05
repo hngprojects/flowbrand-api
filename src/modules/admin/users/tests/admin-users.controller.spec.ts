@@ -30,6 +30,9 @@ const MOCK_LIST_RESPONSE = {
 const mockAdminUsersService = {
   createAdmin: jest.fn(),
   listUsers: jest.fn(),
+  getUserProfile: jest.fn(),
+  updateUserStatus: jest.fn(),
+  deleteUser: jest.fn(),
 };
 
 describe('AdminUsersController', () => {
@@ -145,6 +148,50 @@ describe('AdminUsersController', () => {
       await controller.createAdmin(CREATE_ADMIN_DTO);
 
       expect(service.listUsers).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getUserProfile', () => {
+    it('calls service.getUserProfile and returns profile data', async () => {
+      const mockProfile = { profile: {}, strategies: [], documents: [], informationProvided: {} };
+      (service.getUserProfile as jest.Mock).mockResolvedValueOnce(mockProfile);
+
+      const result = await controller.getUserProfile('user-1');
+
+      expect(service.getUserProfile).toHaveBeenCalledWith('user-1');
+      expect(result).toEqual({
+        statusCode: HttpStatus.OK,
+        message: SYS_MSG.ADMIN_USER_PROFILE_RETRIEVED,
+        data: mockProfile,
+      });
+    });
+  });
+
+  describe('updateUserStatus', () => {
+    it('calls service.updateUserStatus and returns success message', async () => {
+      (service.updateUserStatus as jest.Mock).mockResolvedValueOnce(undefined);
+
+      const result = await controller.updateUserStatus('user-1', { status: 'suspended' } as any, 'admin-1');
+
+      expect(service.updateUserStatus).toHaveBeenCalledWith('user-1', 'suspended', 'admin-1');
+      expect(result).toEqual({
+        statusCode: HttpStatus.OK,
+        message: SYS_MSG.ADMIN_USER_STATUS_UPDATED,
+      });
+    });
+  });
+
+  describe('deleteUser', () => {
+    it('calls service.deleteUser and returns success message', async () => {
+      (service.deleteUser as jest.Mock).mockResolvedValueOnce(undefined);
+
+      const result = await controller.deleteUser('user-1', 'admin-1');
+
+      expect(service.deleteUser).toHaveBeenCalledWith('user-1', 'admin-1');
+      expect(result).toEqual({
+        statusCode: HttpStatus.OK,
+        message: SYS_MSG.ADMIN_USER_DELETED,
+      });
     });
   });
 });
