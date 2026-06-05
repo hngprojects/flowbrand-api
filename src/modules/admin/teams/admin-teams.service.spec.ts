@@ -319,15 +319,32 @@ describe('AdminTeamsService', () => {
     });
 
     it('stores SHA-256 hash — never the raw token — SEC-02', async () => {
+      // Set APP_URL for the test
+      process.env.APP_URL = 'https://app.seil.io';
+      
       await service.inviteMembers(teamId, { emails: ['a@example.com'], role: 'member' }, invitedBy);
 
       const [, , , , tokenHash] = mockInvitationAction.createInvitation.mock.calls[0];
       const [, payload] = mockEmailService.sendTeamInvite.mock.calls[0];
-      const rawToken = new URL(payload.inviteLink).searchParams.get('token')!;
+      
+      // Extract token from URL (handle both with and without APP_URL)
+      let rawToken: string;
+      if (payload.inviteLink && payload.inviteLink.includes('token=')) {
+        const url = new URL(payload.inviteLink);
+        rawToken = url.searchParams.get('token')!;
+      } else {
+        // Fallback for when URL is invalid
+        rawToken = payload.inviteLink.split('token=')[1];
+      }
+      
       const expectedHash = crypto.createHash('sha256').update(rawToken).digest('hex');
 
-       expect(tokenHash).toBe(expectedHash);
-       expect(tokenHash).not.toBe(rawToken);
+      expect(tokenHash).toBe(expectedHash);
+      expect(tokenHash).toHaveLength(64);
+      expect(tokenHash).toMatch(/^[a-f0-9]{64}$/);
+      
+      // Clean up
+      delete process.env.APP_URL;
     });
 
     it('builds invite link from APP_URL env — SEC-03', async () => {
