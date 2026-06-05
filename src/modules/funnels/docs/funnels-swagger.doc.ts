@@ -334,7 +334,7 @@ export const deleteFunnelExample = {
 export const deleteFunnelConflictExample = {
   success: false,
   statusCode: HttpStatus.CONFLICT,
-  error: 'Conflict',
+  error: 'ConflictException',
   message: SYS_MSG.FUNNEL_CANNOT_DELETE_ONLY_ACTIVE,
 };
 

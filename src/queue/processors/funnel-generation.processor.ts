@@ -52,6 +52,15 @@ export class FunnelGenerationProcessor {
     // EC-05: skip if already completed (idempotency guard against duplicate delivery)
     const funnel = await this.funnelAction.get({ identifierOptions: { id: funnelId } });
     if (!funnel) {
+      if (job.attemptsMade === 0) {
+        this.logger.warn({
+          message: 'Funnel not found — DB commit may still be in flight; will retry',
+          funnelId,
+          jobId: job.id,
+        });
+        throw new Error(`Funnel ${funnelId} not found — DB commit may still be in flight`);
+      }
+
       this.logger.warn({
         message: 'Funnel not found — likely deleted during generation; aborting job',
         funnelId,
@@ -103,6 +112,16 @@ export class FunnelGenerationProcessor {
 
     this.logger.log({ message: 'Funnel generation complete', funnelId, jobId: job.id });
     emitSafely(this.eventEmitter, this.logger, APP_EVENTS.FUNNEL_GENERATED, new FunnelGeneratedEvent(userId, funnelId, funnel.funnel_name));
+  }
+
+  private isForeignKeyViolation(err: unknown): boolean {
+    if (!(err instanceof QueryFailedError)) {
+      return false;
+    }
+
+    const queryError = err as QueryFailedError & { driverError?: { code?: string }; code?: string };
+    const code = queryError.driverError?.code ?? queryError.code;
+    return code === '23503';
   }
 
   private async tryAiGeneration(ctx: BusinessContext): Promise<LlmStageData[] | null> {
@@ -207,8 +226,8 @@ export class FunnelGenerationProcessor {
       const stages = await qr.manager.find(FunnelStage, { where: { funnel_id: funnelId } });
       if (stages.length === 0) {
         const funnelExists = await qr.manager.findOne(Funnel, { where: { id: funnelId } });
-        await qr.rollbackTransaction();
         if (!funnelExists) {
+          await qr.rollbackTransaction();
           return false;
         }
         throw new Error(`Funnel ${funnelId} has no stages — generation cannot complete`);
@@ -249,11 +268,10 @@ export class FunnelGenerationProcessor {
       await qr.commitTransaction();
       return true;
     } catch (err) {
-      await qr.rollbackTransaction();
-      if (
-        err instanceof QueryFailedError &&
-        (err as QueryFailedError & { driverError?: { code?: string } }).driverError?.code === '23503'
-      ) {
+      if (qr.isTransactionActive) {
+        await qr.rollbackTransaction();
+      }
+      if (this.isForeignKeyViolation(err)) {
         this.logger.warn({
           message: 'Funnel generation write skipped — funnel or stages no longer exist',
           funnelId,

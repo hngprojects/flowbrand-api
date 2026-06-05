@@ -1,4 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
+import * as SYS_MSG from '../../../constants/system.messages';
 import { Test, TestingModule } from '@nestjs/testing';
 import type { Response } from 'express';
 import { FunnelsController } from '../controllers/funnels.controller';
@@ -102,7 +103,7 @@ describe('FunnelsController - delete funnel route', () => {
   it('delegates to deleteFunnel and returns structured 200 payload', async () => {
     SERVICE_MOCK.deleteFunnel.mockResolvedValue({
       statusCode: HttpStatus.OK,
-      message: 'Funnel deleted.',
+      message: SYS_MSG.FUNNEL_DELETED,
     });
 
     const result = await controller.remove('user-1', '22222222-2222-4222-8222-222222222222');
@@ -113,7 +114,7 @@ describe('FunnelsController - delete funnel route', () => {
     );
     expect(result).toEqual({
       statusCode: HttpStatus.OK,
-      message: 'Funnel deleted.',
+      message: SYS_MSG.FUNNEL_DELETED,
     });
   });
 });

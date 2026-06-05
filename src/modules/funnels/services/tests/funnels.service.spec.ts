@@ -77,6 +77,7 @@ describe('FunnelsService', () => {
     commitTransaction: jest.Mock;
     rollbackTransaction: jest.Mock;
     release: jest.Mock;
+    isTransactionActive: boolean;
     manager: { save: jest.Mock; create: jest.Mock };
   };
   let dataSource: { createQueryRunner: jest.Mock };
@@ -125,6 +126,7 @@ describe('FunnelsService', () => {
       commitTransaction: jest.fn().mockResolvedValue(undefined),
       rollbackTransaction: jest.fn().mockResolvedValue(undefined),
       release: jest.fn().mockResolvedValue(undefined),
+      isTransactionActive: true,
       manager: {
         save: jest
           .fn()
@@ -703,8 +705,8 @@ describe('FunnelsService', () => {
       const result = await service.deleteFunnel(USER_ID, FUNNEL_ID);
 
       expect(result).toEqual({ statusCode: HttpStatus.OK, message: SYS_MSG.FUNNEL_DELETED });
-      expect(funnelAction.countActiveFunnelsExcluding).toHaveBeenCalledWith(USER_ID, FUNNEL_ID);
-      expect(funnelAction.deleteFunnelById).toHaveBeenCalledWith(FUNNEL_ID, USER_ID);
+      expect(funnelAction.countActiveFunnelsExcluding).toHaveBeenCalledWith(USER_ID, FUNNEL_ID, expect.anything());
+      expect(funnelAction.deleteFunnelById).toHaveBeenCalledWith(FUNNEL_ID, USER_ID, expect.anything());
       expect(mockEventEmitter.emit).toHaveBeenCalledWith(
         APP_EVENTS.FUNNEL_DELETED,
         expect.any(FunnelDeletedEvent),
@@ -733,7 +735,7 @@ describe('FunnelsService', () => {
       await service.deleteFunnel(USER_ID, FUNNEL_ID);
 
       expect(funnelAction.countActiveFunnelsExcluding).not.toHaveBeenCalled();
-      expect(funnelAction.deleteFunnelById).toHaveBeenCalledWith(FUNNEL_ID, USER_ID);
+      expect(funnelAction.deleteFunnelById).toHaveBeenCalledWith(FUNNEL_ID, USER_ID, expect.anything());
     });
 
     it('AC-06: deletes generating funnel without active-funnel guard', async () => {
@@ -745,7 +747,7 @@ describe('FunnelsService', () => {
       await service.deleteFunnel(USER_ID, FUNNEL_ID);
 
       expect(funnelAction.countActiveFunnelsExcluding).not.toHaveBeenCalled();
-      expect(funnelAction.deleteFunnelById).toHaveBeenCalledWith(FUNNEL_ID, USER_ID);
+      expect(funnelAction.deleteFunnelById).toHaveBeenCalledWith(FUNNEL_ID, USER_ID, expect.anything());
     });
 
     it('returns 404 when funnel is deleted between ownership check and delete', async () => {
@@ -764,7 +766,7 @@ describe('FunnelsService', () => {
       await expect(service.deleteFunnel(OTHER_USER_ID, FUNNEL_ID)).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it('FR-7/EC-04: emits only after hard delete succeeds', async () => {
+    it('FR-7/EC-04: emits only after hard delete and transaction commit succeed', async () => {
       const order: string[] = [];
       funnelAction.findOwnedById.mockResolvedValue(activeFunnel);
       funnelAction.countActiveFunnelsExcluding.mockResolvedValue(1);
@@ -772,13 +774,16 @@ describe('FunnelsService', () => {
         order.push('delete');
         return true;
       });
+      queryRunner.commitTransaction.mockImplementation(async () => {
+        order.push('commit');
+      });
       mockEventEmitter.emit.mockImplementation(() => {
         order.push('emit');
       });
 
       await service.deleteFunnel(USER_ID, FUNNEL_ID);
 
-      expect(order).toEqual(['delete', 'emit']);
+      expect(order).toEqual(['delete', 'commit', 'emit']);
     });
   });
 });

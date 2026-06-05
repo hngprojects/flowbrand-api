@@ -322,28 +322,47 @@ export class FunnelsService {
     userId: string,
     funnelId: string,
   ): Promise<{ statusCode: HttpStatus; message: string }> {
-    const funnel = await this.funnelAction.findOwnedById(funnelId, userId);
-    if (!funnel) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    if (funnel.status === FunnelStatus.ACTIVE) {
-      const remainingActive = await this.funnelAction.countActiveFunnelsExcluding(userId, funnelId);
-      if (remainingActive === 0) {
-        throw new ConflictException(SYS_MSG.FUNNEL_CANNOT_DELETE_ONLY_ACTIVE);
+    try {
+      const funnel = await this.funnelAction.findOwnedById(funnelId, userId, queryRunner.manager, true);
+      if (!funnel) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
+
+      if (funnel.status === FunnelStatus.ACTIVE) {
+        const remainingActive = await this.funnelAction.countActiveFunnelsExcluding(
+          userId,
+          funnelId,
+          queryRunner.manager,
+        );
+        if (remainingActive === 0) {
+          throw new ConflictException(SYS_MSG.FUNNEL_CANNOT_DELETE_ONLY_ACTIVE);
+        }
       }
+
+      const funnelName = funnel.funnel_name;
+      const deleted = await this.funnelAction.deleteFunnelById(funnelId, userId, queryRunner.manager);
+      if (!deleted) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
+
+      await queryRunner.commitTransaction();
+
+      emitSafely(
+        this.eventEmitter,
+        this.logger,
+        APP_EVENTS.FUNNEL_DELETED,
+        new FunnelDeletedEvent(userId, funnelId, funnelName),
+      );
+
+      return { statusCode: HttpStatus.OK, message: SYS_MSG.FUNNEL_DELETED };
+    } catch (err) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+      throw err;
+    } finally {
+      await queryRunner.release();
     }
-
-    const funnelName = funnel.funnel_name;
-    const deleted = await this.funnelAction.deleteFunnelById(funnelId, userId);
-    if (!deleted) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
-
-    emitSafely(
-      this.eventEmitter,
-      this.logger,
-      APP_EVENTS.FUNNEL_DELETED,
-      new FunnelDeletedEvent(userId, funnelId, funnelName),
-    );
-
-    return { statusCode: HttpStatus.OK, message: SYS_MSG.FUNNEL_DELETED };
   }
 
   async completeStage(

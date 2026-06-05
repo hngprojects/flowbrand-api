@@ -76,13 +76,26 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
     });
   }
 
-  async findOwnedById(funnelId: string, userId: string, manager?: EntityManager): Promise<Funnel | null> {
+  async findOwnedById(
+    funnelId: string,
+    userId: string,
+    manager?: EntityManager,
+    forUpdate = false,
+  ): Promise<Funnel | null> {
     const repo = manager ? manager.getRepository(Funnel) : this.funnelRepository;
-    return repo.findOne({ where: { id: funnelId, user_id: userId } });
+    return repo.findOne({
+      where: { id: funnelId, user_id: userId },
+      ...(forUpdate && manager ? { lock: { mode: 'pessimistic_write' } } : {}),
+    });
   }
 
-  async countActiveFunnelsExcluding(userId: string, excludeFunnelId: string): Promise<number> {
-    return this.funnelRepository.count({
+  async countActiveFunnelsExcluding(
+    userId: string,
+    excludeFunnelId: string,
+    manager?: EntityManager,
+  ): Promise<number> {
+    const repo = manager ? manager.getRepository(Funnel) : this.funnelRepository;
+    return repo.count({
       where: {
         user_id: userId,
         status: FunnelStatus.ACTIVE,
@@ -91,8 +104,9 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
     });
   }
 
-  async deleteFunnelById(funnelId: string, userId: string): Promise<boolean> {
-    const result = await this.funnelRepository.delete({ id: funnelId, user_id: userId });
+  async deleteFunnelById(funnelId: string, userId: string, manager?: EntityManager): Promise<boolean> {
+    const repo = manager ? manager.getRepository(Funnel) : this.funnelRepository;
+    const result = await repo.delete({ id: funnelId, user_id: userId });
     return (result.affected ?? 0) > 0;
   }
 
