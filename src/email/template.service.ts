@@ -25,7 +25,6 @@ export class TemplateService implements OnModuleInit {
   private readonly logger = new Logger(TemplateService.name);
   private baseLayout: CompiledTemplate;
   private readonly templates = new Map<EmailType, CompiledTemplate>();
-  private readonly DEFAULT_FRONTEND_URL = 'http://localhost:3000';
 
   constructor(private readonly config: ConfigService) {}
 
@@ -72,7 +71,10 @@ export class TemplateService implements OnModuleInit {
       throw new Error(`No compiled template found for type: ${type}`);
     }
 
-    const frontendUrl = this.config.get<string>('app.frontendUrl') ?? this.DEFAULT_FRONTEND_URL;
+    const frontendUrl = this.config.get<string>('app.frontendUrl');
+    if (!frontendUrl) {
+      throw new Error('Missing app.frontendUrl configuration');
+    }
     const templateContext = {
       ...payload,
       dashboardUrl: `${frontendUrl}/dashboard`,
