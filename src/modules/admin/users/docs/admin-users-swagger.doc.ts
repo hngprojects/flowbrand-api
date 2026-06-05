@@ -139,7 +139,9 @@ export function GetAdminUsersDocs(): ReturnType<typeof applyDecorators> {
     }),
     ApiResponse({
       status: HttpStatus.BAD_REQUEST,
-      description: 'Invalid query parameter — unknown enum value for status or sortBy, non-integer or negative value for page or perPage. Note: perPage values above 50 are silently capped, not rejecte
+      description:
+        'Invalid query parameter — unknown enum value for status or sortBy, non-integer or negative value for page or perPage. ' +
+        'Note: perPage values above 50 are silently capped, not rejected.',
       schema: {
         example: {
           success: false,
@@ -157,7 +159,9 @@ export function GetAdminUserDocs(): ReturnType<typeof applyDecorators> {
     ApiBearerAuth('JWT'),
     ApiOperation({
       summary: 'Get admin user profile details',
-      description: 'Returns the full profile for an individual user including their personal details, all funnels, uploaded documents, and generated strategies. Soft-deleted users are returned with a 
+      description:
+        'Returns the full profile for an individual user including their personal details, all funnels, ' +
+        'uploaded documents, and generated strategies. Soft-deleted users are returned with a deleted status indicator.',
     }),
     ApiOkResponse({
       description: 'User profile retrieved successfully',

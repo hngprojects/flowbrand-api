@@ -172,7 +172,18 @@ describe('AdminUsersService', () => {
 
     it('maps and returns user details properly', async () => {
       mockAdminUserDetailAction.findUserWithDetails.mockResolvedValue({
-        user: { full_name: 'Test', email: 'test@test.com', plan: 'free', country: 'US', created_at: new Date(), status: 'active', deleted_at: null, business_type: 'biz', target_customer: 'target', pri
+        user: {
+          full_name: 'Test',
+          email: 'test@test.com',
+          plan: 'free',
+          country: 'US',
+          created_at: new Date(),
+          status: 'active',
+          deleted_at: null,
+          business_type: 'biz',
+          target_customer: 'target',
+          primary_goal: 'sales'
+        },
         funnels: [{ id: 'f1', funnel_name: 'F1', stage_count: 2, created_at: new Date(), status: 'generating' }],
         documents: [],
       });
