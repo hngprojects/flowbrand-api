@@ -6,6 +6,7 @@ import * as SYS_MSG from '../../constants/system.messages';
 import { PaymentModelAction } from './actions/payment.model-action';
 import { SubscriptionModelAction } from './actions/subscription.model-action';
 import { MockPaymentAdapter } from './adapters/mock-payment.adapter';
+import { PaystackPaymentAdapter } from './adapters/paystack-payment.adapter';
 import { PRICING } from './constants/pricing.constants';
 import { BillingCycle } from './enums/billing-cycle.enum';
 import { PaymentStatus } from './enums/payment-status.enum';
@@ -32,6 +33,7 @@ export class PaymentsService {
     private readonly paymentModelAction: PaymentModelAction,
     private readonly subscriptionModelAction: SubscriptionModelAction,
     private readonly mockAdapter: MockPaymentAdapter,
+    private readonly paystackAdapter: PaystackPaymentAdapter,
     private readonly dataSource: DataSource,
   ) {
     this.adapter = this.resolveAdapter();
@@ -44,6 +46,8 @@ export class PaymentsService {
     switch (env.PAYMENT_PROVIDER) {
       case 'mock':
         return this.mockAdapter;
+      case 'paystack':
+        return this.paystackAdapter;
       default:
         throw new Error(`${SYS_MSG.PAYMENT_PROVIDER_NOT_IMPLEMENTED}: '${env.PAYMENT_PROVIDER}'`);
     }
