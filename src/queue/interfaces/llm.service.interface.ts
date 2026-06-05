@@ -20,12 +20,12 @@ export class NullLlmService extends LlmService {
     return Promise.reject(new Error('LLM not configured — awaiting BE-304'));
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   generateFunnelNameWithGemini(_description: string, _discoveryChannel: string): Promise<string> {
     return Promise.reject(new Error('LLM not configured — awaiting BE-304'));
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   generateFunnelNameWithGroq(_description: string, _discoveryChannel: string): Promise<string> {
     return Promise.reject(new Error('LLM not configured — awaiting BE-304'));
   }

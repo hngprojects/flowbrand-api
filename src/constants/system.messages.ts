@@ -314,3 +314,15 @@ export const PAYMENT_PRICE_NOT_SET = (label: string, fallback: number) =>
   `${label} not set — using placeholder ${fallback} kobo`;
 export const PAYMENT_PRICE_ZERO_MISCONFIGURATION = (label: string, fallback: number) =>
   `${label} is zero — treating as misconfiguration, using placeholder ${fallback} kobo`;
+
+// Admin Teams
+export const TEAMS_RETRIEVED_SUCCESSFULLY = 'Teams retrieved successfully';
+export const TEAM_CREATED_SUCCESSFULLY = 'Team created successfully';
+export const TEAM_DELETED_SUCCESSFULLY = 'Team deleted successfully';
+export const TEAM_NOT_FOUND = 'Team not found';
+export const TEAM_INVITES_DISPATCHED = 'Invitations processed';
+export const TEAM_INVITATIONS_RETRIEVED = 'Invitations retrieved successfully';
+export const TEAM_INVITATION_REVOKED = 'Invitation revoked successfully';
+export const TEAM_INVITATION_NOT_FOUND = 'Invitation not found or already processed';
+export const TEAM_INVITE_ALREADY_PENDING = 'An invitation for this email is already pending';
+export const TEAM_ALREADY_MEMBER = 'This user is already a team member.';
