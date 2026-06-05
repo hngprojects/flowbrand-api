@@ -1,5 +1,6 @@
 import { InitiatePaymentDto } from '../dto/initiate-payment.dto';
 import { InitiateSubscriptionDto } from '../dto/initiate-subscription.dto';
+import { BillingCycle } from '../enums/billing-cycle.enum';
 import { PaymentStatus } from '../enums/payment-status.enum';
 
 export interface InitiatePaymentResult {
@@ -28,6 +29,17 @@ export interface WebhookEvent {
   type: string;
   reference: string;
   data: Record<string, unknown>;
+}
+
+export interface InitiateSubscriptionResponse {
+  statusCode: number;
+  message: string;
+  data: {
+    authorizationUrl: string;
+    amount: number;
+    currency: string;
+    billingCycle: BillingCycle;
+  };
 }
 
 export interface InitiatePaymentResponse {
