@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -21,6 +22,7 @@ import {
   CompleteStageDecorators,
   CreateFunnelDocs,
   FunnelControllerDecorators,
+  DeleteFunnelDecorators,
   GetFunnelDecorators,
   GetFunnelStatusDocs,
   GetStageDetailDecorators,
@@ -59,6 +61,13 @@ export class FunnelsController {
       message: SYS_MSG.FUNNEL_RETRIEVED_SUCCESSFULLY,
       data,
     };
+  }
+
+  @DeleteFunnelDecorators()
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  async remove(@CurrentUser('userId') userId: string, @Param('id', ParseUUIDPipe) id: string) {
+    return this.funnelsService.deleteFunnel(userId, id);
   }
 
   @RenameFunnelDecorators()
