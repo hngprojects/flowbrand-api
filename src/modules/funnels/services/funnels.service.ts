@@ -20,6 +20,7 @@ import {
   FeedbackSubmittedEvent,
   TaskCompletedEvent,
   TaskReopenedEvent,
+  FunnelRenamedEvent,
 } from '../../../common/events';
 import { emitSafely } from '../../../common/events/emit-safely';
 import { JOBS, QUEUES } from '../../../common/constants/queue.constants';
@@ -38,11 +39,13 @@ import { UploadDocumentStatus } from '../../upload/upload.types';
 import type { BusinessContext, GenerateFunnelJobPayload } from './../interfaces/generate-funnel-job.interface';
 import type {
   FunnelGenerationCreateResult,
+  FunnelRenameResult,
   FunnelStatusResult,
   StageCompletionResult,
   SubmitFeedbackResponse,
   TaskUpdateResult,
 } from './../interfaces/funnels.interfaces';
+import { RenameFunnelDto } from './../dto/rename-funnel.dto';
 import { StageTask, StageTaskStatus } from './../entities/stage-task.entity';
 import { UploadedDocument } from '../../upload/entities/uploaded-document.entity';
 import { StageFeedbackModelAction } from '../actions/stage-feedback.action';
@@ -295,6 +298,39 @@ export class FunnelsService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  async renameFunnel(userId: string, funnelId: string, dto: RenameFunnelDto): Promise<FunnelRenameResult> {
+    const funnel = await this.funnelAction.findOwnedById(funnelId, userId);
+    if (!funnel) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
+
+    const trimmedName = dto.business_name;
+    if (trimmedName === funnel.funnel_name) {
+      return this.toRenameResponse(funnel);
+    }
+
+    const oldName = funnel.funnel_name;
+    const updated = await this.funnelAction.updateOwnedFunnelName(funnelId, trimmedName);
+
+    emitSafely(
+      this.eventEmitter,
+      this.logger,
+      APP_EVENTS.FUNNEL_RENAMED,
+      new FunnelRenamedEvent(userId, funnelId, oldName, trimmedName),
+    );
+
+    return this.toRenameResponse(updated);
+  }
+
+  private toRenameResponse(funnel: Funnel): FunnelRenameResult {
+    return {
+      id: funnel.id,
+      funnelName: funnel.funnel_name,
+      status: funnel.status,
+      creationPath: funnel.creation_path,
+      createdAt: funnel.created_at.toISOString(),
+      updatedAt: funnel.updated_at.toISOString(),
+    };
   }
 
   async getStatus(funnelId: string, userId: string): Promise<FunnelStatusResult> {

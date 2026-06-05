@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import type { Response } from 'express';
+import * as SYS_MSG from '../../../constants/system.messages';
 import { FunnelsController } from '../controllers/funnels.controller';
 import { FunnelsService } from '../services/funnels.service';
 import { StageStatus } from '../enums/stage-status.enum';
@@ -14,6 +15,7 @@ const SERVICE_MOCK = {
   getStatus: jest.fn(),
   completeStage: jest.fn(),
   submitFeedback: jest.fn(),
+  renameFunnel: jest.fn(),
 };
 
 
@@ -81,6 +83,46 @@ describe('FunnelsController - stage completion route', () => {
 
     expect(SERVICE_MOCK.completeStage).toHaveBeenCalledWith('funnel-1', 'stage-1', 'user-1');
     expect(result).toEqual(expect.objectContaining({ statusCode: HttpStatus.OK }));
+  });
+});
+
+describe('FunnelsController - rename route', () => {
+  let controller: FunnelsController;
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [FunnelsController],
+      providers: [{ provide: FunnelsService, useValue: SERVICE_MOCK }],
+    }).compile();
+
+    controller = module.get(FunnelsController);
+  });
+
+  it('AC-01: delegates to renameFunnel and returns structured 200 payload', async () => {
+    const renameData = {
+      id: '22222222-2222-4222-8222-222222222222',
+      funnelName: 'Jollof Spot',
+      status: 'active',
+      creationPath: 'wizard',
+      createdAt: '2026-05-18T12:00:00.000Z',
+      updatedAt: '2026-05-26T10:00:00.000Z',
+    };
+    SERVICE_MOCK.renameFunnel.mockResolvedValue(renameData);
+
+    const result = await controller.rename('user-1', '22222222-2222-4222-8222-222222222222', {
+      business_name: 'Jollof Spot',
+    });
+
+    expect(SERVICE_MOCK.renameFunnel).toHaveBeenCalledWith('user-1', '22222222-2222-4222-8222-222222222222', {
+      business_name: 'Jollof Spot',
+    });
+    expect(result).toEqual({
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.FUNNEL_RENAMED_SUCCESSFULLY,
+      data: renameData,
+    });
   });
 });
 

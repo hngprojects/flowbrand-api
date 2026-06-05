@@ -199,6 +199,7 @@ export const FUNNEL_GENERATION_STARTED = 'Funnel generation started.';
 export const FUNNEL_ALREADY_EXISTS = 'Funnel already exists.';
 export const GENERATION_IN_PROGRESS = 'A funnel is already being generated for your account.';
 export const FUNNEL_NOT_FOUND = 'Funnel not found.';
+export const FUNNEL_RENAMED_SUCCESSFULLY = 'Funnel renamed successfully.';
 export const FUNNEL_STATUS_RETRIEVED = 'Funnel status retrieved.';
 export const GENERATION_SERVICE_UNAVAILABLE =
   'Funnel generation service is temporarily unavailable. Please try again shortly.';

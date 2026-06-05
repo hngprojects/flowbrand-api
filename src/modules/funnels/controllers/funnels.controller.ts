@@ -1,4 +1,18 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UnprocessableEntityException,
+  ValidationError,
+  ValidationPipe,
+} from '@nestjs/common';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { CreateFunnelDto, FunnelIdParamDto } from '../dto/create-funnel.dto';
@@ -12,9 +26,11 @@ import {
   GetStageDetailDecorators,
   GetStagesSummaryDecorators,
   ListFunnelsDecorators,
+  RenameFunnelDecorators,
   SubmitFeedbackDocs,
   UpdateTaskStatusDecorators,
 } from '../docs/funnels-swagger.doc';
+import { RenameFunnelDto } from '../dto/rename-funnel.dto';
 import { SubmitStageFeedbackDto } from '../dto/submit-stage-feedback.dto';
 import { UpdateTaskStatusDto } from '../dto/update-task-status.dto';
 
@@ -41,6 +57,40 @@ export class FunnelsController {
     return {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.FUNNEL_RETRIEVED_SUCCESSFULLY,
+      data,
+    };
+  }
+
+  @RenameFunnelDecorators()
+  @Patch(':id/rename')
+  @HttpCode(HttpStatus.OK)
+  async rename(
+    @CurrentUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+        transformOptions: { enableImplicitConversion: false },
+        expectedType: RenameFunnelDto,
+        validationError: { target: false, value: false },
+        exceptionFactory: (errors: ValidationError[]) =>
+          new UnprocessableEntityException({
+            success: false,
+            statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+            error: 'UnprocessableEntityException',
+            message: SYS_MSG.VALIDATION_FAILED,
+            details: errors,
+          }),
+      }),
+    )
+    dto: RenameFunnelDto,
+  ) {
+    const data = await this.funnelsService.renameFunnel(userId, id, dto);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.FUNNEL_RENAMED_SUCCESSFULLY,
       data,
     };
   }
