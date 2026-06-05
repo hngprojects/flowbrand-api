@@ -27,6 +27,10 @@ export class PaymentRateLimitGuard implements CanActivate {
       throw new ConflictException(SYS_MSG.PAYMENT_USER_ALREADY_PRO);
     }
 
+    // TRADE-OFF: RedisService.rateLimit returns { exceeded: false } on Redis failure,
+    // so a Redis outage silently disables this guard. Chosen over fail-closed (blocking
+    // all payments on Redis down) — acceptable given payments have their own idempotency
+    // guard in PaymentsService and provider-level duplicate detection.
     const { exceeded } = await this.redisService.rateLimit(
       `ratelimit:payment-initiate:${userId}`,
       5,
