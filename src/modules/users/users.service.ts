@@ -105,6 +105,7 @@ export class UsersService {
           termsAccepted: dto.termsAccepted ?? false,
           password_hash: passwordHash,
           full_name: dto.fullName,
+          business_name: dto.businessName ?? null,
           roles: [
             {
               role: dto.role ?? UserRole.USER,
@@ -344,6 +345,7 @@ export class UsersService {
       fullName: user.full_name,
       email: user.email,
       country: user.country,
+      businessName: user.business_name,
       avatarUrl,
       authProvider: user.auth_provider,
       isVerified: user.is_verified,
@@ -524,7 +526,7 @@ export class UsersService {
       }
     }
 
-    const changedFields: Array<'full_name' | 'country'> = [];
+    const changedFields: Array<'full_name' | 'country' | 'business_name'> = [];
     const updatePayload: Partial<User> = {};
 
     if (dto.fullName !== undefined && dto.fullName !== user.full_name) {
@@ -535,6 +537,11 @@ export class UsersService {
     if (normalisedCountry !== undefined && normalisedCountry !== user.country) {
       updatePayload.country = normalisedCountry;
       changedFields.push('country');
+    }
+
+    if (dto.businessName !== undefined && dto.businessName !== user.business_name) {
+      updatePayload.business_name = dto.businessName;
+      changedFields.push('business_name');
     }
 
     if (Object.keys(updatePayload).length === 0) {
