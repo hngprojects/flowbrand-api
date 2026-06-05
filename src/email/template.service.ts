@@ -69,13 +69,16 @@ export class TemplateService implements OnModuleInit {
     }
 
     const frontendUrl = (process.env.FRONTEND_URL ?? 'http://localhost:3000').replace(/\/$/, '');
-
-    const body = compiled(payload);
-    const html = this.baseLayout({
+    const templateContext = {
       ...payload,
+      dashboardUrl: `${frontendUrl}/dashboard`,
+    };
+
+    const body = compiled(templateContext);
+    const html = this.baseLayout({
+      ...templateContext,
       body,
       year: new Date().getFullYear(),
-      dashboardUrl: `${frontendUrl}/dashboard`,
       unsubscribeUrl: `${frontendUrl}/unsubscribe`,
       privacyPolicyUrl: `${frontendUrl}/privacy-policy`,
     });

@@ -13,8 +13,8 @@ const CONTACT_CONFIRMATION_HBS = `<p>Hi {{fullName}}</p><p>We've received your m
 const CONTACT_ADMIN_HBS = `<p>New message from {{fullName}}</p><p>{{message}}</p>`;
 const PASSWORD_RESET_HBS = `<p>Hi {{fullName}}</p><p>Your reset code is {{otpCode}}</p>`;
 const FUNNEL_READY_HBS = `<p>Hi {{name}}</p><p>Your funnel for {{businessName}} is ready</p>`;
-const STAGE_UNLOCKED_HBS = `<p>Hi {{name}}</p><p>{{stageName}} is now active</p>`;
-const STAGE_COMPLETED_HBS = `<p>Hi {{name}}</p><p>You completed {{stageName}}</p>`;
+const STAGE_UNLOCKED_HBS = `<p>Hi {{name}}</p><p><a href="{{dashboardUrl}}">SEIL</a> {{stageName}} is now active</p>`;
+const STAGE_COMPLETED_HBS = `<p>Hi {{name}}</p><p>You completed {{stageName}}</p><p>Open <a href="{{dashboardUrl}}">SEIL</a></p>`;
 const WEEKLY_DIGEST_HBS = `<p>Hi {{name}}</p><p>{{completedTasks}} of {{totalTasks}}</p>`;
 
 describe('TemplateService', () => {
@@ -98,6 +98,7 @@ describe('TemplateService', () => {
       const { html, subject } = service.render('stage-unlocked', { name: 'Ada', stageName: 'Interest' });
 
       expect(html).toContain('Interest');
+      expect(html).toContain('/dashboard');
       expect(subject).toBe('"Interest" is now active');
     });
 
@@ -105,6 +106,7 @@ describe('TemplateService', () => {
       const { html, subject } = service.render('stage-completed', { name: 'Ada', stageName: 'Awareness' });
 
       expect(html).toContain('Awareness');
+      expect(html).toContain('/dashboard');
       expect(subject).toBe('You completed "Awareness"');
     });
 
