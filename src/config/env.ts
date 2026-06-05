@@ -75,6 +75,12 @@ const envSchema = z.object({
       return v;
     }),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+
+  PAYMENT_PROVIDER: z.enum(['mock', 'paystack', 'flutterwave', 'stripe']),
+  TEST_PAYMENT_OUTCOME: z.enum(['success', 'failure', 'pending']).default('success'),
+  PRO_PLAN_PRICE_ONETIME_KOBO: z.coerce.number().int().positive().optional(),
+  PRO_PLAN_PRICE_MONTHLY_KOBO: z.coerce.number().int().positive().optional(),
+  PRO_PLAN_PRICE_ANNUAL_KOBO: z.coerce.number().int().positive().optional(),
 });
 
 const result = envSchema.safeParse(process.env);

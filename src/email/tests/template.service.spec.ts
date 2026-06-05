@@ -100,7 +100,7 @@ describe('TemplateService', () => {
     });
 
     it('renders funnel-ready with name and business name', () => {
-      const { html, subject } = service.render('funnel-ready', { name: 'Ada', businessName: 'Acme' });
+      const { html, subject } = service.render('funnel-ready', { name: 'Ada', funnelName: 'Acme' });
 
       expect(html).toContain('Ada');
       expect(html).toContain('Acme');
