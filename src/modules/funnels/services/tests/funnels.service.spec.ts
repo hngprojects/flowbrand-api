@@ -24,6 +24,7 @@ import { Funnel } from '../.././entities/funnel.entity';
 import { FunnelStage } from '../.././entities/funnel-stage.entity';
 import { FunnelCreationPath } from '../.././enums/funnel-creation-path.enum';
 import { FunnelStatus } from '../.././enums/funnel-status.enum';
+import { FunnelRenamedEvent } from '../../../../common/events/events';
 import { FunnelsService } from '.././funnels.service';
 import { Logger } from '@nestjs/common';
 import { StageFeedbackModelAction } from '../../actions/stage-feedback.action';
@@ -87,6 +88,7 @@ describe('FunnelsService', () => {
     funnelAction = {
       findByIdempotency: jest.fn(),
       findOwnedById: jest.fn(),
+      updateFunnelName: jest.fn(),
       listForUserPaginated: jest.fn(),
       getLatestCompletedWizard: jest.fn(),
       getUploadedDocuments: jest.fn(),
@@ -602,6 +604,134 @@ describe('FunnelsService', () => {
       await expect(service.submitFeedback(USER_ID, FUNNEL_ID, 'stage-1', { comment: 'Great' })).rejects.toThrow(
         UnprocessableEntityException,
       );
+    });
+  });
+
+  describe('renameFunnel', () => {
+    const createdAt = new Date('2026-05-18T12:00:00.000Z');
+    const updatedAt = new Date('2026-05-26T10:00:00.000Z');
+
+    const baseFunnel = {
+      id: FUNNEL_ID,
+      user_id: USER_ID,
+      funnel_name: 'Old Name',
+      status: FunnelStatus.ACTIVE,
+      creation_path: FunnelCreationPath.WIZARD,
+      created_at: createdAt,
+      updated_at: createdAt,
+    } as Funnel;
+
+    it('AC-01: updates funnel_name and returns camelCase payload', async () => {
+      funnelAction.findOwnedById.mockResolvedValue(baseFunnel);
+      funnelAction.updateFunnelName.mockResolvedValue({
+        ...baseFunnel,
+        funnel_name: 'New Name',
+        updated_at: updatedAt,
+      } as Funnel);
+
+      const result = await service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'New Name' });
+
+      expect(funnelAction.updateFunnelName).toHaveBeenCalledWith(FUNNEL_ID, USER_ID, 'New Name');
+      expect(result).toEqual({
+        id: FUNNEL_ID,
+        funnelName: 'New Name',
+        status: FunnelStatus.ACTIVE,
+        creationPath: FunnelCreationPath.WIZARD,
+        createdAt: createdAt.toISOString(),
+        updatedAt: updatedAt.toISOString(),
+      });
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        APP_EVENTS.FUNNEL_RENAMED,
+        expect.any(FunnelRenamedEvent),
+      );
+      const event = mockEventEmitter.emit.mock.calls[0][1] as FunnelRenamedEvent;
+      expect(event.userId).toBe(USER_ID);
+      expect(event.funnelId).toBe(FUNNEL_ID);
+      expect(event.oldName).toBe('Old Name');
+      expect(event.newName).toBe('New Name');
+    });
+
+    it('AC-08: returns 200 without DB write or event when name is unchanged', async () => {
+      funnelAction.findOwnedById.mockResolvedValue(baseFunnel);
+
+      const result = await service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'Old Name' });
+
+      expect(result.funnelName).toBe('Old Name');
+      expect(funnelAction.updateFunnelName).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('AC-06/AC-07: returns 404 when funnel is missing or owned by another user', async () => {
+      funnelAction.findOwnedById.mockResolvedValue(null);
+
+      await expect(service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'New' })).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.renameFunnel(OTHER_USER_ID, FUNNEL_ID, { funnelName: 'New' })).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(funnelAction.updateFunnelName).not.toHaveBeenCalled();
+    });
+
+    it('EC-01: allows rename while funnel status is generating', async () => {
+      funnelAction.findOwnedById.mockResolvedValue({
+        ...baseFunnel,
+        status: FunnelStatus.GENERATING,
+      } as Funnel);
+      funnelAction.updateFunnelName.mockResolvedValue({
+        ...baseFunnel,
+        status: FunnelStatus.GENERATING,
+        funnel_name: 'Generating Rename',
+        updated_at: updatedAt,
+      } as Funnel);
+
+      const result = await service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'Generating Rename' });
+
+      expect(result.status).toBe(FunnelStatus.GENERATING);
+      expect(funnelAction.updateFunnelName).toHaveBeenCalled();
+    });
+
+    it('allows rename when funnel status is failed', async () => {
+      funnelAction.findOwnedById.mockResolvedValue({
+        ...baseFunnel,
+        status: FunnelStatus.FAILED,
+      } as Funnel);
+      funnelAction.updateFunnelName.mockResolvedValue({
+        ...baseFunnel,
+        status: FunnelStatus.FAILED,
+        funnel_name: 'Failed Rename',
+        updated_at: updatedAt,
+      } as Funnel);
+
+      await service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'Failed Rename' });
+
+      expect(funnelAction.updateFunnelName).toHaveBeenCalledWith(FUNNEL_ID, USER_ID, 'Failed Rename');
+    });
+
+    it('returns 404 when funnel is deleted between ownership check and update', async () => {
+      funnelAction.findOwnedById.mockResolvedValue(baseFunnel);
+      funnelAction.updateFunnelName.mockResolvedValue(null);
+
+      await expect(service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'New Name' })).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('FR-7: emits FUNNEL_RENAMED only after update succeeds', async () => {
+      const order: string[] = [];
+      funnelAction.findOwnedById.mockResolvedValue(baseFunnel);
+      funnelAction.updateFunnelName.mockImplementation(async () => {
+        order.push('update');
+        return { ...baseFunnel, funnel_name: 'After', updated_at: updatedAt } as Funnel;
+      });
+      mockEventEmitter.emit.mockImplementation(() => {
+        order.push('emit');
+      });
+
+      await service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'After' });
+
+      expect(order).toEqual(['update', 'emit']);
     });
   });
 
