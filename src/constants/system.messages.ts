@@ -317,3 +317,15 @@ export const PAYMENT_USER_ALREADY_PRO = 'You are already on the Pro plan';
 export const PAYMENT_INITIATED_SUCCESSFULLY = 'Payment initiated successfully';
 export const PAYMENT_RATE_LIMIT_EXCEEDED = 'Too many payment requests. Please try again later';
 export const SUBSCRIPTION_CANCEL_TOKEN_MISSING = 'Subscription cancel failed: provider did not return email token';
+
+// Admin Teams
+export const TEAMS_RETRIEVED_SUCCESSFULLY = 'Teams retrieved successfully';
+export const TEAM_CREATED_SUCCESSFULLY = 'Team created successfully';
+export const TEAM_DELETED_SUCCESSFULLY = 'Team deleted successfully';
+export const TEAM_NOT_FOUND = 'Team not found';
+export const TEAM_INVITES_DISPATCHED = 'Invitations processed';
+export const TEAM_INVITATIONS_RETRIEVED = 'Invitations retrieved successfully';
+export const TEAM_INVITATION_REVOKED = 'Invitation revoked successfully';
+export const TEAM_INVITATION_NOT_FOUND = 'Invitation not found or already processed';
+export const TEAM_INVITE_ALREADY_PENDING = 'An invitation for this email is already pending';
+export const TEAM_ALREADY_MEMBER = 'This user is already a team member.';
