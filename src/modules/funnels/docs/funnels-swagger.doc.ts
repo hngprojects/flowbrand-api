@@ -34,7 +34,7 @@ export const funnelListExample = {
     funnels: [
       {
         funnelId: FUNNEL_ID_EXAMPLE,
-        businessName: 'Acme Studio',
+        funnelName: 'Acme Studio',
         creationPath: 'google-ads',
         status: 'active',
         createdAt: '2026-05-18T12:00:00.000Z',
@@ -57,7 +57,7 @@ export const funnelFullExample = {
   message: SYS_MSG.FUNNEL_RETRIEVED_SUCCESSFULLY,
   data: {
     funnelId: FUNNEL_ID_EXAMPLE,
-    businessName: 'Acme Studio',
+    funnelName: 'Acme Studio',
     creationPath: 'google-ads',
     status: 'active',
     createdAt: '2026-05-18T12:00:00.000Z',

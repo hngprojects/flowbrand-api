@@ -1,4 +1,4 @@
-import { BadRequestException, Module, ValidationPipe } from '@nestjs/common';
+import { BadRequestException, MiddlewareConsumer, Module, NestModule, ValidationPipe } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
@@ -36,6 +36,8 @@ import { AppController } from './app.controller';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { LastActiveMiddleware } from './common/middleware/last-active.middleware';
 
 function collectValidationErrors(errors: ValidationError[], parentPath = ''): string[] {
   return errors.flatMap((error) => {
@@ -92,6 +94,7 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
     ActivityModule,
     TasksModule,
     AdminModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [
@@ -119,4 +122,8 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(LastActiveMiddleware).forRoutes('*');
+  }
+}
