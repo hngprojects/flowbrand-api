@@ -285,7 +285,6 @@ export const PAYMENT_FAILED = 'Payment could not be processed';
 export const PAYMENT_PROVIDER_NOT_IMPLEMENTED = 'Payment provider is not yet implemented';
 export const PAYMENT_ALREADY_INITIATED = 'A payment for this request is already in progress';
 export const SUBSCRIPTION_ALREADY_ACTIVE = 'An active subscription already exists for this user';
-export const SUBSCRIPTION_CANCEL_TOKEN_MISSING = 'Subscription cancel failed: provider did not return email token';
 
 // Admin users list
 export const ADMIN_USERS_LIST_RETRIEVED = 'Users retrieved successfully';
