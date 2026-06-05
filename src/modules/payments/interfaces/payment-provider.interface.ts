@@ -1,5 +1,6 @@
 import { InitiatePaymentDto } from '../dto/initiate-payment.dto';
 import { InitiateSubscriptionDto } from '../dto/initiate-subscription.dto';
+import { PaymentStatus } from '../enums/payment-status.enum';
 
 export interface InitiatePaymentResult {
   reference: string;
@@ -9,7 +10,7 @@ export interface InitiatePaymentResult {
 
 export interface VerifyPaymentResult {
   reference: string;
-  status: 'success' | 'pending' | 'failed';
+  status: PaymentStatus;
   /** Amount in the smallest currency unit (kobo for NGN). Always an integer. */
   amount: number;
   currency: string;

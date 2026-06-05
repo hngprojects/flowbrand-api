@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class CreatePaymentTables1780524650621 implements MigrationInterface {
-    name = 'CreatePaymentTables1780524650621'
+export class CreatePaymentTables1780524813543 implements MigrationInterface {
+    name = 'CreatePaymentTables1780524813543'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`ALTER TABLE "notification_preferences" DROP CONSTRAINT "FK_notification_preferences_user_id"`);
