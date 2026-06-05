@@ -19,7 +19,7 @@ export class AdminUserDetailAction {
   }> {
     const manager = this.dataSource.manager;
 
-    // 1. Fetch user (including soft deleted)
+    // Fetch user (including soft deleted)
     const user = await manager.findOne(User, {
       where: { id: userId },
       withDeleted: true,
@@ -29,7 +29,7 @@ export class AdminUserDetailAction {
       return { user: null, funnels: [], documents: [] };
     }
 
-    // 2. Fetch funnels with stage count
+    // Fetch funnels with stage count
     const funnelsQuery = manager.createQueryBuilder(Funnel, 'f')
       .leftJoin('f.stages', 's')
       .select([
@@ -44,7 +44,13 @@ export class AdminUserDetailAction {
 
     const rawFunnels = await funnelsQuery.getRawMany();
     
-    const funnels = rawFunnels.map(row => ({
+    const funnels = rawFunnels.map((row: {
+      f_id: string;
+      f_funnel_name: string;
+      f_status: string;
+      f_created_at: Date;
+      stage_count: string;
+    }) => ({
       id: row.f_id,
       funnel_name: row.f_funnel_name,
       status: row.f_status,
@@ -52,7 +58,7 @@ export class AdminUserDetailAction {
       stage_count: parseInt(row.stage_count, 10) || 0,
     })) as (Funnel & { stage_count: number })[];
 
-    // 3. Fetch documents
+    // Fetch documents
     const documents = await manager.find(UploadedDocument, {
       where: { user_id: userId },
       order: { created_at: 'DESC' },
