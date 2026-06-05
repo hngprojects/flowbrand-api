@@ -4,8 +4,10 @@ import { APP_EVENTS, AppEvent } from '../../../common/constants/app-events';
 import {
   AccountDeletedEvent,
   FeedbackSubmittedEvent,
+  FunnelDeletedEvent,
   FunnelFailedEvent,
   FunnelGeneratedEvent,
+  FunnelRenamedEvent,
   PasswordChangedEvent,
   ProfileUpdatedEvent,
   StageCompletedEvent,
@@ -45,7 +47,7 @@ export class ActivityListener {
       user_id: event.userId,
       event_type: APP_EVENTS.FUNNEL_GENERATED,
       funnel_id: event.funnelId,
-      metadata: { businessName: event.businessName },
+      metadata: { funnelName: event.funnelName },
     });
   }
 
@@ -55,6 +57,26 @@ export class ActivityListener {
       user_id: event.userId,
       event_type: APP_EVENTS.FUNNEL_FAILED,
       funnel_id: event.funnelId,
+    });
+  }
+
+  @OnEvent(APP_EVENTS.FUNNEL_DELETED)
+  async onFunnelDeleted(event: FunnelDeletedEvent): Promise<void> {
+    await this.persist({
+      user_id: event.userId,
+      event_type: APP_EVENTS.FUNNEL_DELETED,
+      funnel_id: event.funnelId,
+      metadata: { funnelName: event.funnelName },
+    });
+  }
+
+  @OnEvent(APP_EVENTS.FUNNEL_RENAMED)
+  async onFunnelRenamed(event: FunnelRenamedEvent): Promise<void> {
+    await this.persist({
+      user_id: event.userId,
+      event_type: APP_EVENTS.FUNNEL_RENAMED,
+      funnel_id: event.funnelId,
+      metadata: { oldName: event.oldName, newName: event.newName },
     });
   }
 
