@@ -100,7 +100,7 @@ describe('TemplateService', () => {
     });
 
     it('renders funnel-ready with name and business name', () => {
-      const { html, subject } = service.render('funnel-ready', { name: 'Ada', funnelName: 'Acme' });
+      const { html, subject } = service.render('funnel-ready', { name: 'Ada', businessName: 'Acme' });
 
       expect(html).toContain('Ada');
       expect(html).toContain('Acme');
@@ -111,7 +111,8 @@ describe('TemplateService', () => {
       const { html, subject } = service.render('stage-unlocked', { name: 'Ada', stageName: 'Interest' });
 
       expect(html).toContain('Interest');
-      expect(html).toContain('/dashboard');
+      expect(html).toContain('href="http://localhost:3000/dashboard"');
+      expect(html).toContain('>SEIL<');
       expect(subject).toBe('"Interest" is now active');
     });
 
@@ -119,7 +120,8 @@ describe('TemplateService', () => {
       const { html, subject } = service.render('stage-completed', { name: 'Ada', stageName: 'Awareness' });
 
       expect(html).toContain('Awareness');
-      expect(html).toContain('/dashboard');
+      expect(html).toContain('href="http://localhost:3000/dashboard"');
+      expect(html).toContain('>SEIL<');
       expect(subject).toBe('You completed "Awareness"');
     });
 
