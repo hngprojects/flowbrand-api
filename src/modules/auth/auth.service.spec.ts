@@ -42,6 +42,7 @@ const mockAuthMetadataModelAction = {
   findByUserId: jest.fn(),
   updateByUserId: jest.fn(),
   createForUser: jest.fn(),
+  incrementFailedAttempts: jest.fn(),
 };
 const mockOtpTokenModelAction = {
   replaceToken: jest.fn(),
@@ -86,6 +87,7 @@ describe('AuthService login lockout (BE-005)', () => {
     });
     mockUserSessionModelAction.updateById.mockResolvedValue(null);
     mockAuthMetadataModelAction.updateByUserId.mockResolvedValue(null);
+    mockAuthMetadataModelAction.incrementFailedAttempts.mockResolvedValue(1);
     mockRedisService.setStrict.mockResolvedValue(undefined);
     mockRedisService.del.mockResolvedValue(undefined);
 
@@ -181,28 +183,28 @@ describe('AuthService login lockout (BE-005)', () => {
   });
 
   describe('failed login tracking', () => {
-    it('increments failed_attempts on wrong password and throws 401', async () => {
+    it('atomically increments failed_attempts on wrong password and throws 401', async () => {
       mockUsersService.findByEmail.mockResolvedValue(TEST_USER);
-      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata({ failed_attempts: 2 }));
+      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata());
+      mockAuthMetadataModelAction.incrementFailedAttempts.mockResolvedValue(3);
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
       await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(UnauthorizedException);
 
-      expect(mockAuthMetadataModelAction.updateByUserId).toHaveBeenCalledWith(
-        TEST_USER.id,
-        expect.objectContaining({
-          failed_attempts: 3,
-          locked_until: null,
-        }),
+      expect(mockAuthMetadataModelAction.incrementFailedAttempts).toHaveBeenCalledWith(TEST_USER.id);
+      expect(mockAuthMetadataModelAction.updateByUserId).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ locked_until: expect.any(Date) }),
       );
     });
 
-    it('locks the account on the 5th consecutive failed attempt and throws 423', async () => {
+    it('locks the account when atomic increment reaches threshold and throws 423', async () => {
       mockUsersService.findByEmail.mockResolvedValue(TEST_USER);
-      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata({ failed_attempts: 4 }));
+      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata());
+      mockAuthMetadataModelAction.incrementFailedAttempts.mockResolvedValue(5);
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
-      expect.assertions(5);
+      expect.assertions(4);
       try {
         await service.login(LOGIN_DTO);
       } catch (err) {
@@ -214,18 +216,14 @@ describe('AuthService login lockout (BE-005)', () => {
 
       expect(mockAuthMetadataModelAction.updateByUserId).toHaveBeenCalledWith(
         TEST_USER.id,
-        expect.objectContaining({ failed_attempts: 5 }),
+        expect.objectContaining({ locked_until: expect.any(Date) }),
       );
-      const [, lockPayload] = mockAuthMetadataModelAction.updateByUserId.mock.calls[0] as [
-        string,
-        { locked_until: unknown },
-      ];
-      expect(lockPayload.locked_until).toBeInstanceOf(Date);
     });
 
     it('sets locked_until ~1 hour in the future on lock', async () => {
       mockUsersService.findByEmail.mockResolvedValue(TEST_USER);
-      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata({ failed_attempts: 4 }));
+      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata());
+      mockAuthMetadataModelAction.incrementFailedAttempts.mockResolvedValue(5);
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
       const before = Date.now();
@@ -290,6 +288,55 @@ describe('AuthService login lockout (BE-005)', () => {
           failed_attempts: 0,
           locked_until: null,
         }),
+      );
+    });
+  });
+
+  describe('M-1: ensureAuthMetadata concurrent first-login guard', () => {
+    it('returns the row created by a concurrent request on unique-constraint collision', async () => {
+      const concurrentMeta = buildMetadata();
+      mockAuthMetadataModelAction.findByUserId
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(concurrentMeta);
+      mockAuthMetadataModelAction.createForUser.mockRejectedValueOnce({
+        driverError: { code: '23505' },
+      });
+      mockAuthMetadataModelAction.incrementFailedAttempts.mockResolvedValue(1);
+      mockUsersService.findByEmail.mockResolvedValue(TEST_USER);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      // login fails on password but ensureAuthMetadata must not throw
+      await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(mockAuthMetadataModelAction.createForUser).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('M-2: atomic failed_attempts increment', () => {
+    it('does not set locked_until when increment count is below threshold', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(TEST_USER);
+      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata());
+      mockAuthMetadataModelAction.incrementFailedAttempts.mockResolvedValue(2);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(mockAuthMetadataModelAction.updateByUserId).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ locked_until: expect.any(Date) }),
+      );
+    });
+
+    it('sets locked_until and throws 423 when increment reaches threshold', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(TEST_USER);
+      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata());
+      mockAuthMetadataModelAction.incrementFailedAttempts.mockResolvedValue(5);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      await expect(service.login(LOGIN_DTO)).rejects.toMatchObject({ status: HttpStatus.LOCKED });
+
+      expect(mockAuthMetadataModelAction.updateByUserId).toHaveBeenCalledWith(
+        TEST_USER.id,
+        expect.objectContaining({ locked_until: expect.any(Date) }),
       );
     });
   });
@@ -517,6 +564,7 @@ describe('AuthService - Password Reset Flow (BE-012)', () => {
     expire: jest.fn(),
     rateLimit: jest.fn(),
     del: jest.fn(),
+    releaseLock: jest.fn(),
     set: jest.fn(),
     get: jest.fn(),
     getdel: jest.fn(),
@@ -536,6 +584,7 @@ describe('AuthService - Password Reset Flow (BE-012)', () => {
     findByUserId: jest.fn(),
     updateByUserId: jest.fn(),
     createForUser: jest.fn(),
+    incrementFailedAttempts: jest.fn(),
   };
 
   const mockOtpTokenModelAction = {
@@ -701,6 +750,21 @@ describe('AuthService - Password Reset Flow (BE-012)', () => {
       await service.verifyResetOtp(USER_EMAIL, OTP_CODE);
 
       expect(mockOtpTokenModelAction.delete).toHaveBeenCalled();
+    });
+
+    it('acquires the lock with a per-request token and 30-second TTL (M-3)', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(validUser);
+      mockOtpTokenModelAction.findByUserAndType.mockResolvedValue(validOtpToken);
+
+      await service.verifyResetOtp(USER_EMAIL, OTP_CODE);
+
+      const [lockKey, lockToken, ttl] = mockRedisService.setNx.mock.calls.find(
+        ([k]: [string]) => k.includes('password-reset:verify:lock:'),
+      ) as [string, string, number];
+      expect(lockKey).toContain('password-reset:verify:lock:');
+      expect(typeof lockToken).toBe('string');
+      expect(lockToken).not.toBe('1');
+      expect(ttl).toBe(30);
     });
   });
 

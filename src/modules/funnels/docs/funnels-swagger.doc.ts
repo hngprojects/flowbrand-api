@@ -326,6 +326,37 @@ export function GetFunnelDecorators() {
   );
 }
 
+export const deleteFunnelExample = {
+  success: true,
+  statusCode: HttpStatus.OK,
+  message: SYS_MSG.FUNNEL_DELETED,
+  data: null,
+};
+
+export const deleteFunnelConflictExample = {
+  success: false,
+  statusCode: HttpStatus.CONFLICT,
+  error: 'ConflictException',
+  message: SYS_MSG.FUNNEL_CANNOT_DELETE_ONLY_ACTIVE,
+};
+
+export function DeleteFunnelDecorators() {
+  return applyDecorators(
+    ApiOperation({ summary: 'Delete a funnel permanently' }),
+    ApiOkResponse({ description: 'Funnel deleted', schema: { example: deleteFunnelExample } }),
+    ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token', schema: { example: unauthorizedExample } }),
+    ApiBadRequestResponse({ description: 'Invalid funnel id (not a UUID)' }),
+    ApiNotFoundResponse({
+      description: 'Funnel not found or not owned by the authenticated user',
+      schema: { example: notFoundExample('/api/funnels/{id}') },
+    }),
+    ApiConflictResponse({
+      description: 'Cannot delete the only active funnel for the user',
+      schema: { example: deleteFunnelConflictExample },
+    }),
+  );
+}
+
 export function GetStagesSummaryDecorators() {
   return applyDecorators(
     ApiOperation({ summary: 'Get funnel stages summary' }),
