@@ -308,3 +308,15 @@ export const ADMIN_NOTIFICATIONS_BULK_DELETED = 'Notifications deleted successfu
 export const ADMIN_NOTIFICATION_STAR_TOGGLED = 'Notification star updated successfully';
 export const ADMIN_NOTIFICATION_BULK_SELECTION_REQUIRED = 'Provide either ids or all: true';
 export const ADMIN_NOTIFICATION_BULK_SELECTION_AMBIGUOUS = 'Provide either ids or all: true, not both';
+
+// Admin Teams
+export const TEAMS_RETRIEVED_SUCCESSFULLY   = 'Teams retrieved successfully';
+export const TEAM_CREATED_SUCCESSFULLY      = 'Team created successfully';
+export const TEAM_DELETED_SUCCESSFULLY = 'Team deleted successfully';
+export const TEAM_NOT_FOUND                 = 'Team not found';
+export const TEAM_INVITES_DISPATCHED        = 'Invitations processed';
+export const TEAM_INVITATIONS_RETRIEVED     = 'Invitations retrieved successfully';
+export const TEAM_INVITATION_REVOKED        = 'Invitation revoked successfully';
+export const TEAM_INVITATION_NOT_FOUND      = 'Invitation not found or already processed';
+export const TEAM_INVITE_ALREADY_PENDING    = 'An invitation for this email is already pending';
+export const TEAM_ALREADY_MEMBER           = 'This user is already a team member.';
