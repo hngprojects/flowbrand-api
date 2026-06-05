@@ -3,9 +3,11 @@ import { NestFactory, Reflector } from '@nestjs/core';
 import { ClassSerializerInterceptor } from '@nestjs/common';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
+import express, { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { env } from './config/env';
+import { PAYSTACK_WEBHOOK_IPS } from './modules/payments/constants/paystack-webhook.constants';
 import { setupSwagger } from './modules/auth/docs/auth-swagger.doc';
 import { PinoLoggerService } from './common/logger/pino-logger.service';
 
@@ -23,10 +25,36 @@ process.on('uncaughtException', (error) => {
 });
 
 async function bootstrap() {
+  // bodyParser: false — we register our own JSON middleware so the verify callback
+  // can attach req.rawBody for webhook HMAC-SHA512 verification (SEC-04).
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
+    bodyParser: false,
   });
-  
+
+  const httpAdapter = app.getHttpAdapter();
+
+  httpAdapter.use(
+    express.json({
+      verify: (req: Request & { rawBody?: Buffer }, _res: Response, buf: Buffer) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
+  httpAdapter.use(express.urlencoded({ extended: true }));
+
+  // IP allowlist — reject non-Paystack source IPs before HMAC check (SEC-06).
+  // HMAC (SEC-03) is the authoritative guard; this is defence-in-depth.
+  httpAdapter.use('/api/payments/webhook', (req: Request, res: Response, next: NextFunction) => {
+    const ip = req.ip ?? req.socket.remoteAddress ?? '';
+    if (!PAYSTACK_WEBHOOK_IPS.has(ip)) {
+      bootstrapLogger.warn(`Webhook request from unknown IP rejected before HMAC check: ${ip}`);
+      res.status(403).json({ message: 'Forbidden' });
+      return;
+    }
+    next();
+  });
+
   const pinoLogger = app.get(PinoLoggerService);
   app.useLogger(pinoLogger);
 

@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { DataSource, QueryFailedError } from 'typeorm';
 import { env } from '../../config/env';
@@ -6,6 +6,7 @@ import * as SYS_MSG from '../../constants/system.messages';
 import { PaymentModelAction } from './actions/payment.model-action';
 import { SubscriptionModelAction } from './actions/subscription.model-action';
 import { MockPaymentAdapter } from './adapters/mock-payment.adapter';
+import { PaystackPaymentAdapter } from './adapters/paystack-payment.adapter';
 import { PRICING } from './constants/pricing.constants';
 import { BillingCycle } from './enums/billing-cycle.enum';
 import { PaymentStatus } from './enums/payment-status.enum';
@@ -32,6 +33,7 @@ export class PaymentsService {
     private readonly paymentModelAction: PaymentModelAction,
     private readonly subscriptionModelAction: SubscriptionModelAction,
     private readonly mockAdapter: MockPaymentAdapter,
+    private readonly paystackAdapter: PaystackPaymentAdapter,
     private readonly dataSource: DataSource,
   ) {
     this.adapter = this.resolveAdapter();
@@ -44,8 +46,10 @@ export class PaymentsService {
     switch (env.PAYMENT_PROVIDER) {
       case 'mock':
         return this.mockAdapter;
+      case 'paystack':
+        return this.paystackAdapter;
       default:
-        throw new Error(`${SYS_MSG.PAYMENT_PROVIDER_NOT_IMPLEMENTED}: '${env.PAYMENT_PROVIDER}'`);
+        throw new InternalServerErrorException(`${SYS_MSG.PAYMENT_PROVIDER_NOT_IMPLEMENTED}: '${env.PAYMENT_PROVIDER}'`);
     }
   }
 
@@ -168,7 +172,7 @@ export class PaymentsService {
         // Row exists — check if a prior completed attempt left a subscription code
          
         const { payload: subs } = await this.subscriptionModelAction.find({
-          findOptions: { user_id: userId, plan: dto.plan },
+          findOptions: { user_id: userId, plan: dto.plan, billing_cycle: dto.billingCycle },
           order: { created_at: 'DESC' },
           paginationPayload: { limit: 1, page: 1 },
           transactionOptions: { useTransaction: false },
@@ -207,7 +211,11 @@ export class PaymentsService {
   }
 
   private resolveAmountKobo(dto: InitiatePaymentDto): number {
-    return dto.type === PaymentType.ONE_TIME ? PRICING.PRO_ONETIME_KOBO : PRICING.PRO_MONTHLY_KOBO;
+    if (dto.type !== PaymentType.ONE_TIME) {
+      // initiatePayment is only valid for one-time charges; subscription flows use initiateSubscription
+      throw new InternalServerErrorException(`initiatePayment called with unsupported payment type: ${dto.type}`);
+    }
+    return PRICING.PRO_ONETIME_KOBO;
   }
 
   // SEC-04: strip card fields from any jsonb metadata before storage

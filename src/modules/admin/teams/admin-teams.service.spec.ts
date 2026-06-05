@@ -14,7 +14,7 @@ import type { AdminTeam } from './entities/admin-team.entity';
 import type { TeamInvitation } from './entities/team-invitation.entity';
 import type { PaginationDto } from '../../users/dto/pagination.dto';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers
 
 const makeTeam = (overrides: Partial<AdminTeam> = {}): AdminTeam =>
   ({
@@ -43,7 +43,7 @@ const makeInvitation = (overrides: Partial<TeamInvitation> = {}): TeamInvitation
     ...overrides,
   }) as TeamInvitation;
 
-// ─── Mocks ────────────────────────────────────────────────────────────────────
+// ─── Mocks ─
 
 const mockAdminTeamAction = {
   findActiveTeamsPaginated: jest.fn(),
@@ -75,7 +75,7 @@ const mockLogger = {
   warn: jest.fn(),
 };
 
-// ─── Suite ────────────────────────────────────────────────────────────────────
+// ─── Suite ─
 
 describe('AdminTeamsService', () => {
   let service: AdminTeamsService;
@@ -97,7 +97,7 @@ describe('AdminTeamsService', () => {
 
   afterEach(() => jest.clearAllMocks());
 
-  // ─── findAll ──────────────────────────────────────────────────────────────
+  // ─── findAll ───────────────────────────────────────────────────────────
 
   describe('findAll', () => {
     const pagination: PaginationDto = { page: 1, limit: 20 };
@@ -154,7 +154,7 @@ describe('AdminTeamsService', () => {
     });
   });
 
-  // ─── create ───────────────────────────────────────────────────────────────
+  // ─── create
 
   describe('create', () => {
     it('creates a team and returns it', async () => {
@@ -199,7 +199,7 @@ describe('AdminTeamsService', () => {
     });
   });
 
-  // ─── softDelete ───────────────────────────────────────────────────────────
+  // ─── softDelete ──────────────────────────────────────────────────────────
 
   describe('softDelete', () => {
     it('soft-deletes an active team', async () => {
@@ -321,12 +321,12 @@ describe('AdminTeamsService', () => {
     it('stores SHA-256 hash — never the raw token — SEC-02', async () => {
       // Set APP_URL for the test
       process.env.APP_URL = 'https://app.seil.io';
-      
+
       await service.inviteMembers(teamId, { emails: ['a@example.com'], role: 'member' }, invitedBy);
 
       const [, , , , tokenHash] = mockInvitationAction.createInvitation.mock.calls[0];
       const [, payload] = mockEmailService.sendTeamInvite.mock.calls[0];
-      
+
       // Extract token from URL (handle both with and without APP_URL)
       let rawToken: string;
       if (payload.inviteLink && payload.inviteLink.includes('token=')) {
@@ -336,13 +336,13 @@ describe('AdminTeamsService', () => {
         // Fallback for when URL is invalid
         rawToken = payload.inviteLink.split('token=')[1];
       }
-      
+
       const expectedHash = crypto.createHash('sha256').update(rawToken).digest('hex');
 
       expect(tokenHash).toBe(expectedHash);
       expect(tokenHash).toHaveLength(64);
       expect(tokenHash).toMatch(/^[a-f0-9]{64}$/);
-      
+
       // Clean up
       delete process.env.APP_URL;
     });

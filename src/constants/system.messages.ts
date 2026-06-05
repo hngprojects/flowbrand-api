@@ -288,6 +288,7 @@ export const PAYMENT_FAILED = 'Payment could not be processed';
 export const PAYMENT_PROVIDER_NOT_IMPLEMENTED = 'Payment provider is not yet implemented';
 export const PAYMENT_ALREADY_INITIATED = 'A payment for this request is already in progress';
 export const SUBSCRIPTION_ALREADY_ACTIVE = 'An active subscription already exists for this user';
+export const SUBSCRIPTION_CANCEL_TOKEN_MISSING = 'Subscription cancel failed: provider did not return email token';
 
 // Admin users list
 export const ADMIN_USERS_LIST_RETRIEVED = 'Users retrieved successfully';
@@ -308,15 +309,20 @@ export const ADMIN_NOTIFICATIONS_BULK_DELETED = 'Notifications deleted successfu
 export const ADMIN_NOTIFICATION_STAR_TOGGLED = 'Notification star updated successfully';
 export const ADMIN_NOTIFICATION_BULK_SELECTION_REQUIRED = 'Provide either ids or all: true';
 export const ADMIN_NOTIFICATION_BULK_SELECTION_AMBIGUOUS = 'Provide either ids or all: true, not both';
+export const WEBHOOK_SIGNATURE_INVALID = 'Webhook signature verification failed';
+export const PAYMENT_PRICE_NOT_SET = (label: string, fallback: number) =>
+  `${label} not set — using placeholder ${fallback} kobo`;
+export const PAYMENT_PRICE_ZERO_MISCONFIGURATION = (label: string, fallback: number) =>
+  `${label} is zero — treating as misconfiguration, using placeholder ${fallback} kobo`;
 
 // Admin Teams
-export const TEAMS_RETRIEVED_SUCCESSFULLY   = 'Teams retrieved successfully';
-export const TEAM_CREATED_SUCCESSFULLY      = 'Team created successfully';
+export const TEAMS_RETRIEVED_SUCCESSFULLY = 'Teams retrieved successfully';
+export const TEAM_CREATED_SUCCESSFULLY = 'Team created successfully';
 export const TEAM_DELETED_SUCCESSFULLY = 'Team deleted successfully';
-export const TEAM_NOT_FOUND                 = 'Team not found';
-export const TEAM_INVITES_DISPATCHED        = 'Invitations processed';
-export const TEAM_INVITATIONS_RETRIEVED     = 'Invitations retrieved successfully';
-export const TEAM_INVITATION_REVOKED        = 'Invitation revoked successfully';
-export const TEAM_INVITATION_NOT_FOUND      = 'Invitation not found or already processed';
-export const TEAM_INVITE_ALREADY_PENDING    = 'An invitation for this email is already pending';
-export const TEAM_ALREADY_MEMBER           = 'This user is already a team member.';
+export const TEAM_NOT_FOUND = 'Team not found';
+export const TEAM_INVITES_DISPATCHED = 'Invitations processed';
+export const TEAM_INVITATIONS_RETRIEVED = 'Invitations retrieved successfully';
+export const TEAM_INVITATION_REVOKED = 'Invitation revoked successfully';
+export const TEAM_INVITATION_NOT_FOUND = 'Invitation not found or already processed';
+export const TEAM_INVITE_ALREADY_PENDING = 'An invitation for this email is already pending';
+export const TEAM_ALREADY_MEMBER = 'This user is already a team member.';
