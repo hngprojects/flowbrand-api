@@ -85,7 +85,8 @@ export const PostStepDocs = () =>
       summary: 'Save a step answer in the onboarding wizard',
       description:
         'Saves the answer for a specific wizard step. ' +
-        'Each step has a different answer schema. ' +
+        'Each step has a different answer schema — use the step examples dropdown. ' +
+        'Step 3 requires `answer.discovery_channel` as a non-empty string array (not a single string). ' +
         'Calling the same step again overwrites the previous answer. ' +
         'Returns the full updated session.',
     }),
@@ -128,12 +129,16 @@ export const PostStepDocs = () =>
           },
         },
         step3: {
-          summary: 'Step 3: Discovery Channel',
+          summary: 'Step 3: Discovery Channel (array — at least one)',
+          description:
+            'discovery_channel must be a non-empty array of enum values. ' +
+            'Allowed: Instagram, Facebook, TikTok, Physical Location, Others. ' +
+            'A single string (e.g. "TikTok") returns 422.',
           value: {
             session_id: '550e8400-e29b-41d4-a716-446655440001',
             step: 3,
             answer: {
-              discovery_channel: 'TikTok',
+              discovery_channel: ['TikTok'],
             },
           },
         },
@@ -174,7 +179,8 @@ export const PostStepDocs = () =>
       description: 'Onboarding already complete.',
     }),
     ApiUnprocessableEntityResponse({
-      description: 'Answer validation failed.',
+      description:
+        'Answer validation failed (e.g. step 3 discovery_channel must be a non-empty array of allowed channels).',
       schema: {
         example: {
           success: false,
@@ -182,7 +188,8 @@ export const PostStepDocs = () =>
           error: 'UnprocessableEntityException',
           message: 'Validation failed',
           fields: {
-            business_description: 'must be shorter than or equal to 500 characters',
+            discovery_channel:
+              'discovery_channel must be an array; each value must be one of: Instagram, Facebook, TikTok, Physical Location, Others',
           },
         },
       },

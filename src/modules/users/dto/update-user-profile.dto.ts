@@ -44,6 +44,21 @@ export class UpdateUserProfileDto {
   fullName?: string;
 
   @ApiPropertyOptional({
+    example: 'Ben Clothing',
+    minLength: 1,
+    maxLength: 150,
+    description: 'Business name. Leading/trailing whitespace is trimmed automatically.',
+  })
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @MinLength(1)
+  @MaxLength(150)
+  businessName?: string;
+
+  @ApiPropertyOptional({
     example: 'Nigeria',
     enum: ALLOWED_SSA_COUNTRIES,
     description: 'Country — must be an allowed SSA country in canonical casing.',
