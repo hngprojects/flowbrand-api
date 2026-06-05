@@ -20,7 +20,7 @@ import { AdminUsersListAction } from '../actions/admin-users-list.action';
 jest.mock('bcrypt');
 
 const mockUsersService = { findByEmail: jest.fn() };
-const mockUserModelAction = { create: jest.fn() };
+const mockUserModelAction = { create: jest.fn(), findById: jest.fn(), update: jest.fn() };
 const mockUserRoleModelAction = { create: jest.fn() };
 const mockUserSessionModelAction = { revokeAllUserSessionsInDb: jest.fn() };
 const mockAdminUserDetailAction = { findUserWithDetails: jest.fn() };

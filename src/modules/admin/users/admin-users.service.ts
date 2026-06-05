@@ -20,6 +20,8 @@ import { CreateAdminDto } from './dto/create-admin.dto';
 import { GetAdminUsersQueryDto } from './dto/get-admin-users-query.dto';
 import { AdminUserDetailResponseDto } from './dto/admin-user-detail-response.dto';
 import { SortDir, UserSortBy, UserStatusFilter } from './enums/admin-users-query.enum';
+import { AdminUsersListResponse } from './interfaces/admin-users-list-response.interface';
+import { AdminUserItem } from './interfaces/admin-user-item.interface';
 
 const MAX_PER_PAGE = 50;
 const DEFAULT_PAGE = 1;
@@ -238,7 +240,7 @@ export class AdminUsersService {
         status: 'success',
         metadata: { targetUserId: userId },
       });
-    } catch (error) {
+    } catch {
       if (!committed) {
         await queryRunner.rollbackTransaction();
       }
