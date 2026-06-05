@@ -36,6 +36,7 @@ import { AppController } from './app.controller';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 import { LastActiveMiddleware } from './common/middleware/last-active.middleware';
 
 function collectValidationErrors(errors: ValidationError[], parentPath = ''): string[] {
@@ -93,6 +94,7 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
     ActivityModule,
     TasksModule,
     AdminModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [
