@@ -1,8 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import Paystack from '@paystack/paystack-sdk';
 import { env } from '../../../config/env';
 import * as SYS_MSG from '../../../constants/system.messages';
+import { PAYSTACK_CLIENT } from '../providers/paystack-client.provider';
 import { InitiatePaymentDto } from '../dto/initiate-payment.dto';
 import { InitiateSubscriptionDto } from '../dto/initiate-subscription.dto';
 import { BillingCycle } from '../enums/billing-cycle.enum';
@@ -61,12 +62,10 @@ function toPaymentStatus(paystackStatus: string): PaymentStatus {
 
 @Injectable()
 export class PaystackPaymentAdapter implements PaymentProvider {
-  private readonly client: Paystack;
-
-  constructor() {
-    // SEC-01: secret key injected from env — never logged or returned in responses
-    this.client = new Paystack(env.PAYSTACK_SECRET_KEY!);
-  }
+  constructor(
+    // SEC-01: secret key stays in PaystackClientProvider — never logged or returned in responses
+    @Inject(PAYSTACK_CLIENT) private readonly client: Paystack,
+  ) {}
 
   /** Initializes a one-time or subscription payment checkout session. */
   async initiatePayment(dto: InitiatePaymentDto, userId: string, email: string): Promise<InitiatePaymentResult> {

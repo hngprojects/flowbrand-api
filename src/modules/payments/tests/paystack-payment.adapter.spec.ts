@@ -1,6 +1,8 @@
+import { Test } from '@nestjs/testing';
 import { UnauthorizedException } from '@nestjs/common';
 import { createHmac } from 'crypto';
 import { PaystackPaymentAdapter } from '../adapters/paystack-payment.adapter';
+import { PAYSTACK_CLIENT } from '../providers/paystack-client.provider';
 import { BillingCycle } from '../enums/billing-cycle.enum';
 import { PaymentPlan } from '../enums/payment-plan.enum';
 import { PaymentStatus } from '../enums/payment-status.enum';
@@ -31,19 +33,20 @@ const mockSubscription = {
   disable: jest.fn(),
 };
 
-jest.mock('@paystack/paystack-sdk', () => {
-  return jest.fn().mockImplementation(() => ({
-    transaction: mockTransaction,
-    subscription: mockSubscription,
-  }));
-});
+const mockPaystackClient = { transaction: mockTransaction, subscription: mockSubscription };
 
 describe('PaystackPaymentAdapter', () => {
   let adapter: PaystackPaymentAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
-    adapter = new PaystackPaymentAdapter();
+    const module = await Test.createTestingModule({
+      providers: [
+        PaystackPaymentAdapter,
+        { provide: PAYSTACK_CLIENT, useValue: mockPaystackClient },
+      ],
+    }).compile();
+    adapter = module.get(PaystackPaymentAdapter);
   });
 
   // ─── initiatePayment ────────────────────────────────────────────────────────
