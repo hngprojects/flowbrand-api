@@ -20,8 +20,8 @@ export class AdminTeam extends BaseEntity {
   })
   status: TeamStatus;
  
-  @Column({ type: 'uuid' })
-  created_by: string;
+  @Column({ type: 'uuid', nullable: true })
+  created_by: string | null;
  
   @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'created_by' })

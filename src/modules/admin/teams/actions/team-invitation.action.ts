@@ -15,8 +15,9 @@ export class TeamInvitationModelAction extends AbstractModelAction<TeamInvitatio
   }
 
   async findPendingByEmailAndTeam(email: string, teamId: string): Promise<TeamInvitation | null> {
+    const normalizedEmail= email.trim().toLowerCase();
     return this.repository.findOne({
-      where: { email, team_id: teamId, status: InviteStatus.PENDING },
+      where: { email: normalizedEmail, team_id: teamId, status: InviteStatus.PENDING },
     });
   }
 
@@ -36,9 +37,10 @@ export class TeamInvitationModelAction extends AbstractModelAction<TeamInvitatio
     tokenHash: string,
     expiresAt: Date,
   ): Promise<TeamInvitation> {
+    const normalizedEmail = email.trim().toLowerCase()
     const invitation = this.repository.create({
       team_id: teamId,
-      email,
+      email: normalizedEmail,
       role,
       invited_by: invitedBy,
       token_hash: tokenHash,

@@ -71,7 +71,11 @@ export class AdminTeamsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     await this.adminTeamsService.softDelete(teamId, user.userId);
-    return { success: true };
+    return { 
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.TEAM_DELETED_SUCCESSFULLY,
+      data: { success: true }, 
+    };
   }
 
   @Post(':teamId/invite')
@@ -113,6 +117,7 @@ export class AdminTeamsController {
     return {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.TEAM_INVITATION_REVOKED,
+      data: { success: true },
     };
   }
 }

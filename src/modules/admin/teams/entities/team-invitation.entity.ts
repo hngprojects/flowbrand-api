@@ -16,8 +16,8 @@ export class TeamInvitation extends BaseEntity {
   @Column({ type: 'varchar', length: 20 })
   role: string;
 
-  @Column({ type: 'uuid' })
-  invited_by: string;
+  @Column({ type: 'uuid', nullable: true })
+  invited_by: string | null;
 
   @Column({ type: 'text' })
   token_hash: string;

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsEmail, IsString, IsOptional, MinLength, ArrayMinSize, ArrayMaxSize } from 'class-validator';
+import { IsArray, IsEmail, IsString, IsOptional, MinLength, MaxLength, ArrayMinSize, ArrayMaxSize } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class InviteMembersDto {
@@ -18,10 +18,12 @@ export class InviteMembersDto {
   @ApiProperty({ description: 'Role for invited members', example: 'member', default: 'member' })
   @IsString()
   @MinLength(1)
+  // TODO: Validate role against allowed values
   role: string;
 
   @ApiProperty({ description: 'Custom message to include in invite email', required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(1000)
   message?: string;
 }

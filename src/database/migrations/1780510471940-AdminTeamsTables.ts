@@ -15,7 +15,7 @@ export class AdminTeamsTables1780510471940 implements MigrationInterface {
         "name"        character varying(100) NOT NULL,
         "description" text,
         "status"      "public"."admin_teams_status_enum" NOT NULL DEFAULT 'active',
-        "created_by"  uuid                NOT NULL,
+        "created_by"  uuid,
         CONSTRAINT "PK_admin_teams" PRIMARY KEY ("id")
       )
     `);
@@ -64,7 +64,7 @@ export class AdminTeamsTables1780510471940 implements MigrationInterface {
         "team_id"     uuid                NOT NULL,
         "email"       character varying(255) NOT NULL,
         "role"        character varying(20) NOT NULL,
-        "invited_by"  uuid                NOT NULL,
+        "invited_by"  uuid,
         "token_hash"  text                NOT NULL,
         "status"      "public"."team_invitations_status_enum" NOT NULL DEFAULT 'pending',
         "expires_at"  TIMESTAMP WITH TIME ZONE NOT NULL,

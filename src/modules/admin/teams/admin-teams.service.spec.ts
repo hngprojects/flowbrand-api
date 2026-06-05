@@ -1,3 +1,4 @@
+import * as crypto from 'crypto';
 import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AdminTeamsService } from './admin-teams.service';
@@ -247,7 +248,7 @@ describe('AdminTeamsService', () => {
       mockInvitationAction.findPendingByEmailAndTeam.mockResolvedValue(null);
       mockMembershipAction.isUserMemberOfTeam.mockResolvedValue(false);
       mockInvitationAction.createInvitation.mockResolvedValue(makeInvitation());
-      mockEmailService.sendTeamInvite.mockResolvedValue(undefined);
+      mockEmailService.sendTeamInvite.mockResolvedValue('job-123');
     });
 
     it('throws NotFoundException when team does not exist', async () => {
@@ -321,10 +322,12 @@ describe('AdminTeamsService', () => {
       await service.inviteMembers(teamId, { emails: ['a@example.com'], role: 'member' }, invitedBy);
 
       const [, , , , tokenHash] = mockInvitationAction.createInvitation.mock.calls[0];
-      // SHA-256 hex is always 64 chars
-      expect(tokenHash).toHaveLength(64);
-      // Must not be the raw token (which is 64 hex chars of randomBytes(32), so same length — verify it's a hash)
-      expect(tokenHash).toMatch(/^[a-f0-9]{64}$/);
+      const [, payload] = mockEmailService.sendTeamInvite.mock.calls[0];
+      const rawToken = new URL(payload.inviteLink).searchParams.get('token')!;
+      const expectedHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+       expect(tokenHash).toBe(expectedHash);
+       expect(tokenHash).not.toBe(rawToken);
     });
 
     it('builds invite link from APP_URL env — SEC-03', async () => {
