@@ -30,7 +30,16 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().default('*'),
   SWAGGER_ENABLED: boolEnv.default(true),
   FRONTEND_URL: z.string().url().default('http://localhost:3000'),
-  EMAIL_FROM: z.string().default('SEIL <noreply@seil.app>'),
+  EMAIL_FROM: z.string()
+    .default('SEIL <noreply@seil.app>')
+    .refine(
+      (val) => {
+        // Simple check: either plain email or "Name <email>" format
+        const emailRegex = /^(?:[^<]+<)?([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)>?$/;
+        return emailRegex.test(val.trim());
+      },
+      { message: 'EMAIL_FROM must be a valid email or "Display Name <email>" format' }
+    ),
 
   REDIS_HOST: z.string().default('localhost'),
   REDIS_PORT: z.coerce.number().int().positive().default(6379),

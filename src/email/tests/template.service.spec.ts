@@ -25,7 +25,14 @@ describe('TemplateService', () => {
     return Test.createTestingModule({
       providers: [
         TemplateService,
-        { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('http://localhost:3000') } },
+        { provide: ConfigService, 
+                  useValue: { 
+                    get: jest.fn().mockImplementation((key: string) => {
+                      if (key === 'app.frontendUrl') return 'http://localhost:3000';
+                      throw new Error(`Unexpected config key: ${key}`);
+                    })
+                  }
+        },
       ],
     }).compile();
   }
