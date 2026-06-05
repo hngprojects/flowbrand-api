@@ -10,6 +10,7 @@ import { UserSessionModelAction } from '../../users/actions/user-session.action'
 import { UsersService } from '../../users/users.service';
 import { UserPlan } from '../../users/enums/user-plan.enum';
 import { UserAccountStatus } from '../../users/enums/user-account-status.enum';
+import { User } from '../../users/entities/user.entity';
 import { ACCOUNT_DELETION_QUEUE } from '../../users/processors/account-deletion.processor';
 import { RedisService } from '../../redis/redis.service';
 import { LogService } from '../profile/services/log.service';
@@ -220,7 +221,7 @@ export class AdminUsersService {
 
       const now = new Date();
       await queryRunner.manager.update(
-        user.constructor,
+        User,
         userId,
         {
           deleted_at: now,
