@@ -279,3 +279,15 @@ export const ADMIN_DASHBOARD_WEEKLY_OVERVIEW_RETRIEVED = 'Admin dashboard weekly
 export const ADMIN_DASHBOARD_USER_SEGMENTS_RETRIEVED = 'Admin dashboard user segments retrieved successfully';
 export const ADMIN_DASHBOARD_FUNNEL_PERFORMANCE_RETRIEVED = 'Admin dashboard funnel performance retrieved successfully';
 export const ADMIN_GLOBAL_SEARCH_SUCCESSFUL = 'Admin global search results retrieved successfully';
+
+// Admin notifications
+export const ADMIN_NOTIFICATIONS_RETRIEVED = 'Admin notifications retrieved successfully';
+export const ADMIN_NOTIFICATION_NOT_FOUND = 'Notification not found';
+export const ADMIN_NOTIFICATION_MARKED_READ = 'Notification marked as read';
+export const ADMIN_NOTIFICATIONS_MARKED_READ = 'Notifications marked as read';
+export const ADMIN_NOTIFICATIONS_MARKED_UNREAD = 'Notifications marked as unread';
+export const ADMIN_NOTIFICATION_DELETED = 'Notification deleted successfully';
+export const ADMIN_NOTIFICATIONS_BULK_DELETED = 'Notifications deleted successfully';
+export const ADMIN_NOTIFICATION_STAR_TOGGLED = 'Notification star updated successfully';
+export const ADMIN_NOTIFICATION_BULK_SELECTION_REQUIRED = 'Provide either ids or all: true';
+export const ADMIN_NOTIFICATION_BULK_SELECTION_AMBIGUOUS = 'Provide either ids or all: true, not both';
