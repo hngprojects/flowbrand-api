@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { env } from '../../../config/env';
 import { PaymentStatus } from '../enums/payment-status.enum';
 import { PaymentFailedException } from '../exceptions/payment-failed.exception';
+import { InitiatePaymentDto } from '../dto/initiate-payment.dto';
+import { InitiateSubscriptionDto } from '../dto/initiate-subscription.dto';
 import {
   InitiatePaymentResult,
   InitiateSubscriptionResult,
@@ -12,7 +14,7 @@ import {
 
 @Injectable()
 export class MockPaymentAdapter implements PaymentProvider {
-  initiatePayment(): Promise<InitiatePaymentResult> {
+  initiatePayment(_dto: InitiatePaymentDto, _userId: string, _email: string): Promise<InitiatePaymentResult> {
     if (env.TEST_PAYMENT_OUTCOME === 'failure') {
       return Promise.reject(new PaymentFailedException('mock failure'));
     }
@@ -28,7 +30,7 @@ export class MockPaymentAdapter implements PaymentProvider {
     return Promise.resolve({ reference, status, amount: 999900, currency: 'NGN' });
   }
 
-  initiateSubscription(): Promise<InitiateSubscriptionResult> {
+  initiateSubscription(_dto: InitiateSubscriptionDto, _userId: string, _email: string): Promise<InitiateSubscriptionResult> {
     if (env.TEST_PAYMENT_OUTCOME === 'failure') {
       return Promise.reject(new PaymentFailedException('mock failure'));
     }
@@ -39,11 +41,11 @@ export class MockPaymentAdapter implements PaymentProvider {
     });
   }
 
-  cancelSubscription(): Promise<void> {
+  cancelSubscription(_subscriptionCode: string): Promise<void> {
     return Promise.resolve();
   }
 
-  handleWebhookEvent(payload: unknown): Promise<WebhookEvent> {
+  handleWebhookEvent(payload: unknown, _signature: string): Promise<WebhookEvent> {
     return Promise.resolve({
       type: 'mock.event',
       reference: 'mock_ref',
