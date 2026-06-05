@@ -1,7 +1,7 @@
 import { AbstractModelAction } from '@hng-sdk/orm';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository, QueryDeepPartialEntity, In } from 'typeorm';
+import { EntityManager, Repository, QueryDeepPartialEntity, In, Not } from 'typeorm';
 import { Funnel } from '../entities/funnel.entity';
 import { FunnelStage } from '../entities/funnel-stage.entity';
 import { StageTask } from '../entities/stage-task.entity';
@@ -76,9 +76,38 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
     });
   }
 
-  async findOwnedById(funnelId: string, userId: string, manager?: EntityManager): Promise<Funnel | null> {
+  async findOwnedById(
+    funnelId: string,
+    userId: string,
+    manager?: EntityManager,
+    forUpdate = false,
+  ): Promise<Funnel | null> {
     const repo = manager ? manager.getRepository(Funnel) : this.funnelRepository;
-    return repo.findOne({ where: { id: funnelId, user_id: userId } });
+    return repo.findOne({
+      where: { id: funnelId, user_id: userId },
+      ...(forUpdate && manager ? { lock: { mode: 'pessimistic_write' } } : {}),
+    });
+  }
+
+  async countActiveFunnelsExcluding(
+    userId: string,
+    excludeFunnelId: string,
+    manager?: EntityManager,
+  ): Promise<number> {
+    const repo = manager ? manager.getRepository(Funnel) : this.funnelRepository;
+    return repo.count({
+      where: {
+        user_id: userId,
+        status: FunnelStatus.ACTIVE,
+        id: Not(excludeFunnelId),
+      },
+    });
+  }
+
+  async deleteFunnelById(funnelId: string, userId: string, manager?: EntityManager): Promise<boolean> {
+    const repo = manager ? manager.getRepository(Funnel) : this.funnelRepository;
+    const result = await repo.delete({ id: funnelId, user_id: userId });
+    return (result.affected ?? 0) > 0;
   }
 
   async updateFunnelName(funnelId: string, userId: string, funnelName: string): Promise<Funnel | null> {

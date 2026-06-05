@@ -1,10 +1,10 @@
 import { HttpStatus, UnprocessableEntityException, ValidationError, ValidationPipe } from '@nestjs/common';
-import { RenameFunnelDto } from '../dto/rename-funnel.dto';
 import { Test, TestingModule } from '@nestjs/testing';
 import type { Response } from 'express';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { FunnelsController } from '../controllers/funnels.controller';
 import { FunnelsService } from '../services/funnels.service';
+import { RenameFunnelDto } from '../dto/rename-funnel.dto';
 import { StageStatus } from '../enums/stage-status.enum';
 
 const SERVICE_MOCK = {
@@ -16,6 +16,7 @@ const SERVICE_MOCK = {
   getStatus: jest.fn(),
   completeStage: jest.fn(),
   submitFeedback: jest.fn(),
+  deleteFunnel: jest.fn(),
   renameFunnel: jest.fn(),
 };
 
@@ -84,6 +85,39 @@ describe('FunnelsController - stage completion route', () => {
 
     expect(SERVICE_MOCK.completeStage).toHaveBeenCalledWith('funnel-1', 'stage-1', 'user-1');
     expect(result).toEqual(expect.objectContaining({ statusCode: HttpStatus.OK }));
+  });
+});
+
+describe('FunnelsController - delete funnel route', () => {
+  let controller: FunnelsController;
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [FunnelsController],
+      providers: [{ provide: FunnelsService, useValue: SERVICE_MOCK }],
+    }).compile();
+
+    controller = module.get(FunnelsController);
+  });
+
+  it('delegates to deleteFunnel and returns structured 200 payload', async () => {
+    SERVICE_MOCK.deleteFunnel.mockResolvedValue({
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.FUNNEL_DELETED,
+    });
+
+    const result = await controller.remove('user-1', '22222222-2222-4222-8222-222222222222');
+
+    expect(SERVICE_MOCK.deleteFunnel).toHaveBeenCalledWith(
+      'user-1',
+      '22222222-2222-4222-8222-222222222222',
+    );
+    expect(result).toEqual({
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.FUNNEL_DELETED,
+    });
   });
 });
 
