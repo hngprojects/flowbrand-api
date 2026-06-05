@@ -7,15 +7,39 @@ import { UserModelAction } from '../../../users/actions/user.action';
 import { UserRoleModelAction } from '../../../users/actions/user-role.action';
 import { UsersService } from '../../../users/users.service';
 import { UserRole } from '../../../users/enums/user-role.enum';
+import { UserAccountStatus } from '../../../users/enums/user-account-status.enum';
 import * as SYS_MSG from '../../../../constants/system.messages';
+import { UserSessionModelAction } from '../../../users/actions/user-session.action';
+import { AdminUserDetailAction } from '../actions/admin-user-detail.action';
+import { LogService } from '../../profile/services/log.service';
+import { RedisService } from '../../../redis/redis.service';
+import { getQueueToken } from '@nestjs/bull';
+import { ACCOUNT_DELETION_QUEUE } from '../../../users/processors/account-deletion.processor';
+import { AdminUsersListAction } from '../actions/admin-users-list.action';
 
 jest.mock('bcrypt');
 
 const mockUsersService = { findByEmail: jest.fn() };
 const mockUserModelAction = { create: jest.fn() };
 const mockUserRoleModelAction = { create: jest.fn() };
+const mockUserSessionModelAction = { revokeAllUserSessionsInDb: jest.fn() };
+const mockAdminUserDetailAction = { findUserWithDetails: jest.fn() };
+const mockLogService = { logAction: jest.fn() };
+const mockRedisService = { delByPattern: jest.fn() };
+const mockQueue = { add: jest.fn() };
+
+const mockQueryRunner = {
+  connect: jest.fn(),
+  startTransaction: jest.fn(),
+  commitTransaction: jest.fn(),
+  rollbackTransaction: jest.fn(),
+  release: jest.fn(),
+  manager: { update: jest.fn() },
+};
+
 const mockDataSource = {
   transaction: jest.fn().mockImplementation((cb: (m: unknown) => Promise<unknown>) => cb({})),
+  createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
 };
 
 const CREATED_USER = { id: 'user-uuid-1', email: 'jane@example.com' };
@@ -40,6 +64,12 @@ describe('AdminUsersService', () => {
         { provide: UsersService, useValue: mockUsersService },
         { provide: UserModelAction, useValue: mockUserModelAction },
         { provide: UserRoleModelAction, useValue: mockUserRoleModelAction },
+        { provide: UserSessionModelAction, useValue: mockUserSessionModelAction },
+        { provide: AdminUserDetailAction, useValue: mockAdminUserDetailAction },
+        { provide: AdminUsersListAction, useValue: {} },
+        { provide: LogService, useValue: mockLogService },
+        { provide: RedisService, useValue: mockRedisService },
+        { provide: getQueueToken(ACCOUNT_DELETION_QUEUE), useValue: mockQueue },
         { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
@@ -131,6 +161,60 @@ describe('AdminUsersService', () => {
 
       await expect(service.createAdmin(CREATE_ADMIN_DTO)).rejects.toThrow();
       expect(mockUserRoleModelAction.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getUserProfile', () => {
+    it('throws 404 if user not found', async () => {
+      mockAdminUserDetailAction.findUserWithDetails.mockResolvedValue({ user: null });
+      await expect(service.getUserProfile('user-1')).rejects.toThrow(SYS_MSG.ADMIN_USER_NOT_FOUND);
+    });
+
+    it('maps and returns user details properly', async () => {
+      mockAdminUserDetailAction.findUserWithDetails.mockResolvedValue({
+        user: { full_name: 'Test', email: 'test@test.com', plan: 'free', country: 'US', created_at: new Date(), status: 'active', deleted_at: null, business_type: 'biz', target_customer: 'target', pri
+        funnels: [{ id: 'f1', funnel_name: 'F1', stage_count: 2, created_at: new Date(), status: 'generating' }],
+        documents: [],
+      });
+      const result = await service.getUserProfile('user-1');
+      expect(result.profile.fullName).toBe('Test');
+      expect(result.strategies.length).toBe(1);
+    });
+  });
+
+  describe('updateUserStatus', () => {
+    it('throws 404 if user not found', async () => {
+      mockUserModelAction.findById = jest.fn().mockResolvedValue(null);
+      await expect(service.updateUserStatus('user-1', UserAccountStatus.SUSPENDED, 'admin-1')).rejects.toThrow(SYS_MSG.ADMIN_USER_NOT_FOUND);
+    });
+
+    it('updates user status and logs action', async () => {
+      mockUserModelAction.findById = jest.fn().mockResolvedValue({ id: 'user-1' });
+      mockUserModelAction.update = jest.fn().mockResolvedValue(true);
+      await service.updateUserStatus('user-1', UserAccountStatus.SUSPENDED, 'admin-1');
+      expect(mockUserModelAction.update).toHaveBeenCalled();
+      expect(mockLogService.logAction).toHaveBeenCalled();
+    });
+  });
+
+  describe('deleteUser', () => {
+    it('throws forbidden if admin deletes self', async () => {
+      await expect(service.deleteUser('admin-1', 'admin-1')).rejects.toThrow(SYS_MSG.ADMIN_CANNOT_DELETE_SELF);
+    });
+
+    it('throws 404 if user not found', async () => {
+      mockUserModelAction.findById = jest.fn().mockResolvedValue(null);
+      await expect(service.deleteUser('user-1', 'admin-2')).rejects.toThrow(SYS_MSG.ADMIN_USER_NOT_FOUND);
+    });
+
+    it('soft deletes user and revokes sessions', async () => {
+      mockUserModelAction.findById = jest.fn().mockResolvedValue({ id: 'user-1', constructor: {} });
+      mockUserSessionModelAction.revokeAllUserSessionsInDb.mockResolvedValue(['session-1']);
+      await service.deleteUser('user-1', 'admin-2');
+      expect(mockQueryRunner.manager.update).toHaveBeenCalled();
+      expect(mockRedisService.delByPattern).toHaveBeenCalled();
+      expect(mockQueue.add).toHaveBeenCalled();
+      expect(mockLogService.logAction).toHaveBeenCalled();
     });
   });
 });
