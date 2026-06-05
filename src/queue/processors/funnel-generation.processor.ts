@@ -3,7 +3,7 @@ import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Job } from 'bull';
-import { DataSource } from 'typeorm';
+import { DataSource, QueryFailedError } from 'typeorm';
 import { APP_EVENTS } from '../../common/constants/app-events';
 import { emitSafely, FunnelFailedEvent, FunnelGeneratedEvent } from '../../common/events';
 import { JOBS, QUEUES } from '../../common/constants/queue.constants';
@@ -206,8 +206,12 @@ export class FunnelGenerationProcessor {
     try {
       const stages = await qr.manager.find(FunnelStage, { where: { funnel_id: funnelId } });
       if (stages.length === 0) {
+        const funnelExists = await qr.manager.findOne(Funnel, { where: { id: funnelId } });
         await qr.rollbackTransaction();
-        return false;
+        if (!funnelExists) {
+          return false;
+        }
+        throw new Error(`Funnel ${funnelId} has no stages — generation cannot complete`);
       }
       const stageMap = new Map(stages.map((s) => [s.position, s]));
 
@@ -246,8 +250,10 @@ export class FunnelGenerationProcessor {
       return true;
     } catch (err) {
       await qr.rollbackTransaction();
-      const driverCode = (err as { driverError?: { code?: string } }).driverError?.code;
-      if (driverCode === '23503') {
+      if (
+        err instanceof QueryFailedError &&
+        (err as QueryFailedError & { driverError?: { code?: string } }).driverError?.code === '23503'
+      ) {
         this.logger.warn({
           message: 'Funnel generation write skipped — funnel or stages no longer exist',
           funnelId,

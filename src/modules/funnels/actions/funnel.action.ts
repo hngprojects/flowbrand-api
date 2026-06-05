@@ -91,11 +91,9 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
     });
   }
 
-  async deleteFunnelById(funnelId: string): Promise<void> {
-    await this.delete({
-      identifierOptions: { id: funnelId },
-      transactionOptions: { useTransaction: false },
-    });
+  async deleteFunnelById(funnelId: string, userId: string): Promise<boolean> {
+    const result = await this.funnelRepository.delete({ id: funnelId, user_id: userId });
+    return (result.affected ?? 0) > 0;
   }
 
   async listForUserPaginated(userId: string, page: number, perPage: number): Promise<[Funnel[], number]> {

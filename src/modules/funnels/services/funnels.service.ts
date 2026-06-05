@@ -332,14 +332,16 @@ export class FunnelsService {
       }
     }
 
+    const funnelName = funnel.funnel_name;
+    const deleted = await this.funnelAction.deleteFunnelById(funnelId, userId);
+    if (!deleted) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
+
     emitSafely(
       this.eventEmitter,
       this.logger,
       APP_EVENTS.FUNNEL_DELETED,
-      new FunnelDeletedEvent(userId, funnelId, funnel.funnel_name),
+      new FunnelDeletedEvent(userId, funnelId, funnelName),
     );
-
-    await this.funnelAction.deleteFunnelById(funnelId);
 
     return { statusCode: HttpStatus.OK, message: SYS_MSG.FUNNEL_DELETED };
   }
