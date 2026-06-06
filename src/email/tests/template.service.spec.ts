@@ -18,6 +18,7 @@ const STAGE_COMPLETED_HBS = `<p>Hi {{name}}</p><p>You completed {{stageName}}</p
 const WEEKLY_DIGEST_HBS = `<p>Hi {{name}}</p><p>{{completedTasks}} of {{totalTasks}}</p>`;
 const TEAM_INVITE_HBS = `<p>Hi {{inviteeName}}</p><p>You have been invited to {{teamName}}</p><p><a href="{{inviteUrl}}">Join</a></p>`;
 
+
 describe('TemplateService', () => {
   let service: TemplateService;
 
