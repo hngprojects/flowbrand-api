@@ -3,19 +3,26 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   HttpException,
   HttpStatus,
+  Logger,
   ParseUUIDPipe,
   Post,
   Query,
+  Req,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
+import { Request } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import * as SYS_MSG from '../../constants/system.messages';
 import { PRICING } from './constants/pricing.constants';
-import { InitiatePaymentDocs, InitiateSubscriptionDocs, VerifyPaymentDocs } from './docs/payments-swagger.doc';
+import { InitiatePaymentDocs, InitiateSubscriptionDocs, VerifyPaymentDocs, WebhookDocs } from './docs/payments-swagger.doc';
 import { InitiateSubscriptionRequestDto } from './dto/initiate-subscription-request.dto';
 import { BillingCycle } from './enums/billing-cycle.enum';
 import { PaymentPlan } from './enums/payment-plan.enum';
@@ -34,6 +41,8 @@ import { PaymentsService } from './payments.service';
 @ApiTags('Payments')
 @Controller('payments')
 export class PaymentsController {
+  private readonly logger = new Logger(PaymentsController.name);
+
   constructor(private readonly paymentsService: PaymentsService) {}
 
   @Post('initiate')
@@ -82,6 +91,27 @@ export class PaymentsController {
       message: SYS_MSG.PAYMENT_VERIFIED_SUCCESSFULLY,
       data: result,
     };
+  }
+
+  @Post('webhook')
+  @Public()
+  @SkipThrottle()
+  @HttpCode(HttpStatus.OK)
+  @WebhookDocs()
+  async webhook(
+    @Req() req: Request & { rawBody?: Buffer },
+    @Headers('x-paystack-signature') signature: string,
+  ): Promise<{ received: boolean }> {
+    const rawBody = req.rawBody ?? Buffer.alloc(0);
+
+    try {
+      await this.paymentsService.processWebhookEvent(rawBody, signature);
+    } catch (err: unknown) {
+      if (err instanceof UnauthorizedException) throw err;
+      this.logger.error({ message: 'Unexpected webhook error', error: (err as Error).message });
+    }
+
+    return { received: true };
   }
 
   @Post('subscriptions/initiate')
