@@ -339,6 +339,8 @@ export class AdminDashboardAction {
     const ninetyDaysAgo = new Date(now);
     ninetyDaysAgo.setDate(now.getDate() - 90);
 
+    // All bands use ">= lower AND < upper" so each boundary timestamp
+    // falls into exactly one bucket with no double-counting.
     const lessThan1Week = await this.dataSource
       .createQueryBuilder(User, 'user')
       .where('user.created_at > :date', { date: sevenDaysAgo })
@@ -346,7 +348,7 @@ export class AdminDashboardAction {
 
     const oneToFourWeeks = await this.dataSource
       .createQueryBuilder(User, 'user')
-      .where('user.created_at BETWEEN :from AND :to', {
+      .where('user.created_at >= :from AND user.created_at <= :to', {
         from: twentyEightDaysAgo,
         to: sevenDaysAgo,
       })
@@ -354,7 +356,7 @@ export class AdminDashboardAction {
 
     const oneToThreeMonths = await this.dataSource
       .createQueryBuilder(User, 'user')
-      .where('user.created_at BETWEEN :from AND :to', {
+      .where('user.created_at >= :from AND user.created_at < :to', {
         from: ninetyDaysAgo,
         to: twentyEightDaysAgo,
       })
