@@ -282,6 +282,8 @@ export const ADMIN_DASHBOARD_STATS_RETRIEVED = 'Admin dashboard stats retrieved 
 export const ADMIN_DASHBOARD_WEEKLY_OVERVIEW_RETRIEVED = 'Admin dashboard weekly overview retrieved successfully';
 export const ADMIN_DASHBOARD_USER_SEGMENTS_RETRIEVED = 'Admin dashboard user segments retrieved successfully';
 export const ADMIN_DASHBOARD_FUNNEL_PERFORMANCE_RETRIEVED = 'Admin dashboard funnel performance retrieved successfully';
+export const ADMIN_DASHBOARD_USER_STAGES_RETRIEVED = 'Admin dashboard user stages retrieved successfully';
+export const ADMIN_DASHBOARD_USER_RETENTION_RETRIEVED = 'Admin dashboard user retention retrieved successfully';
 
 // Payment messages
 export const PAYMENT_FAILED = 'Payment could not be processed';
