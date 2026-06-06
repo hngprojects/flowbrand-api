@@ -29,6 +29,7 @@ export const APP_EVENTS = {
 
   // Payments
   PLAN_UPGRADED: 'plan.upgraded',
+  SUBSCRIPTION_CANCELLED: 'subscription.cancelled',
 
   // User account
   // Emission deferred — wired in AuthService once ActivityLogListener ships.

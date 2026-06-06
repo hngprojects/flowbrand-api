@@ -86,6 +86,14 @@ export class FeedbackSubmittedEvent {
 }
 
 // Payments
+export class SubscriptionCancelledEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly subscriptionId: string,
+    public readonly accessUntil: Date,
+  ) {}
+}
+
 export class PlanUpgradedEvent {
   constructor(
     public readonly userId: string,
