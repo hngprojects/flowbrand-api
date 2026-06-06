@@ -169,6 +169,7 @@ export class PaymentsService {
     }
 
     if (gatewayResult.status === PaymentStatus.SUCCESS) {
+      let activated = false;
       await this.dataSource.transaction(async (manager) => {
         await this.paymentModelAction.update({
           identifierOptions: { id: payment.id },
@@ -182,17 +183,20 @@ export class PaymentsService {
         });
 
         if (payment.payment_type === PaymentType.ONE_TIME) {
-          await this.activateProSubscription(userId, manager);
+          activated = await this.activateProSubscription(userId, manager);
         } else {
-          await this.activateSubscriptionPayment(userId, manager);
+          activated = await this.activateSubscriptionPayment(userId, manager);
         }
       });
 
-      // Emit AFTER transaction commits (CONTRIBUTING.md domain event rule)
-      this.eventEmitter.emit(
-        APP_EVENTS.PLAN_UPGRADED,
-        new PlanUpgradedEvent(userId, PaymentPlan.PRO, reference),
-      );
+      // Emit AFTER transaction commits (CONTRIBUTING.md domain event rule).
+      // Skip emit if SUBSCRIPTION path found no PENDING row — Pro access not confirmed.
+      if (activated) {
+        this.eventEmitter.emit(
+          APP_EVENTS.PLAN_UPGRADED,
+          new PlanUpgradedEvent(userId, PaymentPlan.PRO, reference),
+        );
+      }
 
       return this.buildResponse(PaymentStatus.SUCCESS, reference, {
         ...payment,
@@ -231,8 +235,9 @@ export class PaymentsService {
       return true;
     } catch (err: unknown) {
       if (err instanceof QueryFailedError && (err as { code?: string }).code === '23505') {
+        // Pro access already exists via a concurrent path — still true, event should still fire
         this.logger.warn({ message: 'Pro subscription already active — idempotent skip', userId });
-        return false;
+        return true;
       }
       throw err;
     }
@@ -247,11 +252,20 @@ export class PaymentsService {
       this.logger.warn({ message: 'No PENDING subscription row found to activate', userId });
       return false;
     }
+    const sub = pending[0];
+    const now = new Date();
+    const periodEnd = new Date(now);
+    if (sub.billing_cycle === BillingCycle.ANNUAL) {
+      periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+    } else {
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+    }
     await this.subscriptionModelAction.update({
-      identifierOptions: { id: pending[0].id },
+      identifierOptions: { id: sub.id },
       updatePayload: {
         status: SubscriptionStatus.ACTIVE,
-        current_period_start: new Date(),
+        current_period_start: now,
+        current_period_end: periodEnd,
       },
       transactionOptions: { useTransaction: true, transaction: manager },
     });
@@ -293,7 +307,7 @@ export class PaymentsService {
       periodEnd.setMonth(periodEnd.getMonth() + 1);
     }
 
-    let paymentId: string;
+    let paymentId = '';
     try {
       const payment: Payment = await this.dataSource.transaction(async (manager) => {
         const sub: Subscription = await this.subscriptionModelAction.create({
@@ -338,8 +352,17 @@ export class PaymentsService {
         });
         const existing: Subscription | undefined = subs[0];
         if (existing?.provider_subscription_code) {
-          // Prior attempt fully succeeded — idempotent return
-          return { reference: '', subscriptionCode: existing.provider_subscription_code, authorizationUrl: '', provider: env.PAYMENT_PROVIDER };
+          // Look up the payment row for this subscription to recover its provider_reference.
+          // The frontend needs the reference to call GET /verify and confirm the charge.
+          const priorPayment = await this.paymentModelAction.get({
+            identifierOptions: { subscription_id: existing.id },
+          });
+          return {
+            reference: priorPayment?.provider_reference ?? '',
+            subscriptionCode: existing.provider_subscription_code,
+            authorizationUrl: '',
+            provider: env.PAYMENT_PROVIDER,
+          };
         }
         // Subscription exists but has no code — prior attempt failed after DB write but before provider update.
         // 409 is correct: the in-flight subscription must be resolved before creating another.

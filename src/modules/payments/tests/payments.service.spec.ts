@@ -236,9 +236,12 @@ describe('PaymentsService', () => {
         payload: [{ id: 's-1', provider_subscription_code: 'sub_prior' }],
         paginationMeta: {},
       });
+      // The payment row linked to this subscription carries the reference the FE needs for /verify
+      mockPaymentGet.mockResolvedValueOnce({ id: 'p-1', provider_reference: 'prior-ref-uuid', subscription_id: 's-1' });
 
       const result = await service.initiateSubscription(userId, email, dto);
       expect(result.subscriptionCode).toBe('sub_prior');
+      expect(result.reference).toBe('prior-ref-uuid');
       expect(MOCK_ADAPTER_MOCK.initiateSubscription).not.toHaveBeenCalled();
     });
 
