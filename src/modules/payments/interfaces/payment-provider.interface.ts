@@ -54,6 +54,16 @@ export interface InitiatePaymentResponse {
   };
 }
 
+export interface PaymentVerifyResponse {
+  status: PaymentStatus;
+  reference: string;
+  plan?: string;
+  amount?: number;
+  currency?: string;
+  cardLast4?: string;
+  cardBrand?: string;
+}
+
 export interface PaymentProvider {
   initiatePayment(dto: InitiatePaymentDto, userId: string, email: string): Promise<InitiatePaymentResult>;
   verifyPayment(reference: string): Promise<VerifyPaymentResult>;
