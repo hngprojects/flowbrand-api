@@ -1,4 +1,5 @@
 export interface StageTaskData {
+  name: string;
   taskText: string;
 }
 

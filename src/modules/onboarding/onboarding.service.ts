@@ -49,17 +49,6 @@ export class OnboardingService {
         expiresAt,
       );
 
-    if (result.status === 'already_complete') {
-      return {
-        statusCode: HttpStatus.OK,
-        message: SYS_MSG.ONBOARDING_ALREADY_COMPLETE,
-        data: { 
-          status: WizardStatus.COMPLETE, 
-          redirect: { to: 'funnel_generation' } 
-        },
-      };
-    }
-
     const created = result.status === 'created';
 
     return {

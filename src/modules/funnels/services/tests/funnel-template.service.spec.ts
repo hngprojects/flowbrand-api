@@ -258,6 +258,7 @@ describe('FunnelTemplateService - getTemplate', () => {
         expect(typeof stage.actionPrompt).toBe('string');
         expect(Array.isArray(stage.tasks)).toBe(true);
         for (const task of stage.tasks) {
+          expect(typeof task.name).toBe('string');
           expect(typeof task.taskText).toBe('string');
           expect(task.taskText.length).toBeGreaterThan(0);
         }
@@ -353,7 +354,7 @@ function serializeAllText(stages: ReadonlyArray<{
   channel: string;
   explanation: string;
   actionPrompt: string;
-  tasks: ReadonlyArray<{ taskText: string }>;
+  tasks: ReadonlyArray<{ name: string; taskText: string }>;
 }>): string {
   return stages
     .map((s) => [s.channel, s.explanation, s.actionPrompt, ...s.tasks.map((t) => t.taskText)].join('\n'))

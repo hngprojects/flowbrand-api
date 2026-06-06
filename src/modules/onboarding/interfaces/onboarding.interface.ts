@@ -24,7 +24,6 @@ export interface OnboardingStartResult {
 
 /** Internal outcome from atomic start-session DB resolution. */
 export type WizardStartResolveResult =
-  | { status: 'already_complete' }
   | { status: 'active'; session: WizardSession }
   | { status: 'created'; session: WizardSession };
 
