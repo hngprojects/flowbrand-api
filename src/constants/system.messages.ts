@@ -299,6 +299,9 @@ export const ADMIN_USER_STATUS_UPDATED = 'User status updated successfully';
 export const ADMIN_USER_DELETED = 'User account deleted successfully';
 export const ADMIN_USER_NOT_FOUND = 'User not found';
 export const ADMIN_CANNOT_DELETE_SELF = 'You cannot delete your own user account as an admin';
+// Admin logs
+export const ADMIN_LOGS_RETRIEVED = 'Admin logs retrieved successfully';
+export const ADMIN_LOGS_INVALID_DATE_RANGE = 'date_from must be earlier than or equal to date_to';
 // Admin notifications
 export const ADMIN_NOTIFICATIONS_RETRIEVED = 'Admin notifications retrieved successfully';
 export const ADMIN_NOTIFICATION_NOT_FOUND = 'Notification not found';
