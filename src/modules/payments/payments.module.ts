@@ -17,6 +17,6 @@ import { PaymentsService } from './payments.service';
   imports: [TypeOrmModule.forFeature([Payment, Subscription]), RedisModule],
   controllers: [PaymentsController],
   providers: [PaymentModelAction, SubscriptionModelAction, MockPaymentAdapter, PaystackClientProvider, PaystackPaymentAdapter, PaymentRateLimitGuard, SubscriptionRateLimitGuard, PaymentsService],
-  exports: [PaymentsService],
+  exports: [PaymentsService, PaymentModelAction],
 })
 export class PaymentsModule {}
