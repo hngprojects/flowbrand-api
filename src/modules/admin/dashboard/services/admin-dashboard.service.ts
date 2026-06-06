@@ -2,11 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { AdminDashboardAction } from '../actions/admin-dashboard.action';
 import { RedisService } from '../../../redis/redis.service';
 import { redisKeys } from '../../../../constants/redis-keys';
-import { 
-  DashboardStats, 
-  WeeklyOverviewItem, 
-  UserSegmentItem, 
-  FunnelPerformanceItem 
+import {
+  DashboardStats,
+  FunnelPerformanceItem,
+  RetentionBandItem,
+  UserSegmentItem,
+  UserStageItem,
+  WeeklyOverviewItem,
 } from '../interfaces/admin-dashboard.interface';
 
 @Injectable()
@@ -40,19 +42,29 @@ export class AdminDashboardService {
     return data;
   }
 
-  /** Returns headline platform KPIs, serving from a 5-minute Redis cache on hit. */
+  /** Returns headline platform KPIs (including plan distribution), serving from a 5-minute Redis cache on hit. */
   async getStats(): Promise<DashboardStats> {
     return this.getCachedOrFetch<DashboardStats>(
       redisKeys.adminDashboardStats(),
-      () => this.adminDashboardAction.getDashboardStats()
+      () => this.adminDashboardAction.getDashboardStats(),
     );
   }
 
-  /** Returns 7 daily data points charting new users and funnels over the last week. */
-  async getWeeklyOverview(): Promise<WeeklyOverviewItem[]> {
+  /**
+   * Returns daily or weekly chart data.
+   *
+   * @param period `'7d'` — 7 daily buckets (default). `'12w'` — 12 ISO-week buckets.
+   * Each period variant is cached under its own Redis key so they do not evict each other.
+   */
+  async getWeeklyOverview(period: '7d' | '12w' = '7d'): Promise<WeeklyOverviewItem[]> {
+    const cacheKey =
+      period === '12w'
+        ? redisKeys.adminDashboardWeeklyOverview12w()
+        : redisKeys.adminDashboardWeeklyOverview7d();
+
     return this.getCachedOrFetch<WeeklyOverviewItem[]>(
-      redisKeys.adminDashboardWeeklyOverview(),
-      () => this.adminDashboardAction.getWeeklyOverview()
+      cacheKey,
+      () => this.adminDashboardAction.getWeeklyOverview(period),
     );
   }
 
@@ -60,7 +72,7 @@ export class AdminDashboardService {
   async getUserSegments(): Promise<UserSegmentItem[]> {
     return this.getCachedOrFetch<UserSegmentItem[]>(
       redisKeys.adminDashboardUserSegments(),
-      () => this.adminDashboardAction.getUserSegments()
+      () => this.adminDashboardAction.getUserSegments(),
     );
   }
 
@@ -68,7 +80,23 @@ export class AdminDashboardService {
   async getFunnelPerformance(): Promise<FunnelPerformanceItem[]> {
     return this.getCachedOrFetch<FunnelPerformanceItem[]>(
       redisKeys.adminDashboardFunnelPerformance(),
-      () => this.adminDashboardAction.getFunnelPerformance()
+      () => this.adminDashboardAction.getFunnelPerformance(),
+    );
+  }
+
+  /** Returns lifecycle stage counts from signed-up through to stage 3 active, served from a 5-minute Redis cache. */
+  async getUserStages(): Promise<UserStageItem[]> {
+    return this.getCachedOrFetch<UserStageItem[]>(
+      redisKeys.adminDashboardUserStages(),
+      () => this.adminDashboardAction.getUserStages(),
+    );
+  }
+
+  /** Returns four retention cohort bands bucketed by account age, served from a 5-minute Redis cache. */
+  async getUserRetention(): Promise<RetentionBandItem[]> {
+    return this.getCachedOrFetch<RetentionBandItem[]>(
+      redisKeys.adminDashboardUserRetention(),
+      () => this.adminDashboardAction.getUserRetention(),
     );
   }
 }
