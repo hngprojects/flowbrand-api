@@ -1,7 +1,7 @@
 import { Logger, UnauthorizedException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
-import { DataSource, QueryFailedError } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { APP_EVENTS } from '../../../common/constants/app-events';
 import { PlanUpgradedEvent } from '../../../common/events/events';
 import * as SYS_MSG from '../../../constants/system.messages';
@@ -36,7 +36,7 @@ const mockPaymentGet = jest.fn();
 const mockPaymentUpdate = jest.fn().mockResolvedValue(undefined);
 const mockSubscriptionCreate = jest.fn().mockResolvedValue({ id: 'sub-1' });
 const mockSubscriptionUpdate = jest.fn().mockResolvedValue(undefined);
-const mockSubscriptionList = jest.fn();
+const mockSubscriptionList = jest.fn().mockResolvedValue({ payload: [], paginationMeta: {} });
 const mockSubscriptionFind = jest.fn().mockResolvedValue({ payload: [], paginationMeta: {} });
 const mockEmit = jest.fn();
 const mockTransaction = jest
@@ -88,6 +88,7 @@ describe('PaymentsService — processWebhookEvent', () => {
   afterEach(() => {
     jest.clearAllMocks();
     mockSubscriptionCreate.mockResolvedValue({ id: 'sub-1' });
+    mockSubscriptionList.mockResolvedValue({ payload: [], paginationMeta: {} });
     mockSubscriptionFind.mockResolvedValue({ payload: [], paginationMeta: {} });
   });
 
@@ -250,7 +251,7 @@ describe('PaymentsService — processWebhookEvent', () => {
     expect(updatePayload).not.toHaveProperty('status');
   });
 
-  // AC-11 — concurrent activation race: create throws 23505, event still emits
+  // AC-11 — concurrent activation race: pre-check finds existing subscription, skips INSERT, event still emits
   it('handles concurrent activation race on charge.success — event still emits', async () => {
     mockPaymentGet.mockResolvedValueOnce({
       id: 'p-1',
@@ -260,14 +261,14 @@ describe('PaymentsService — processWebhookEvent', () => {
       amount_kobo: 900000,
       provider_reference: REF,
     });
-    const pgError = Object.assign(new QueryFailedError('', [], new Error()), { code: '23505' });
-    mockSubscriptionCreate.mockRejectedValueOnce(pgError);
+    mockSubscriptionList.mockResolvedValueOnce({ payload: [{ id: 'sub-existing' }], paginationMeta: {} });
     jest
       .spyOn(service, 'handleWebhookEvent')
       .mockResolvedValueOnce({ type: 'charge.success', reference: REF, data: {} });
 
     await service.processWebhookEvent(Buffer.from('{}'), 'sig');
 
+    expect(mockSubscriptionCreate).not.toHaveBeenCalled();
     expect(mockEmit).toHaveBeenCalledWith(APP_EVENTS.PLAN_UPGRADED, expect.any(PlanUpgradedEvent));
   });
 
