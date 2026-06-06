@@ -220,15 +220,19 @@ export class PaymentsService {
   }
 
   private async activateProSubscription(userId: string, manager: EntityManager): Promise<boolean> {
+    const periodStart = new Date();
+    const periodEnd = new Date(periodStart);
+    periodEnd.setMonth(periodEnd.getMonth() + 1);
+
     try {
       await this.subscriptionModelAction.create({
         createPayload: {
           user_id: userId,
           plan: PaymentPlan.PRO,
-          billing_cycle: BillingCycle.LIFETIME,
+          billing_cycle: BillingCycle.MONTHLY,
           status: SubscriptionStatus.ACTIVE,
-          current_period_start: new Date(),
-          current_period_end: new Date('9999-12-31'),
+          current_period_start: periodStart,
+          current_period_end: periodEnd,
         },
         transactionOptions: { useTransaction: true, transaction: manager },
       });
