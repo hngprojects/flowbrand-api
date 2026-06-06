@@ -1,4 +1,5 @@
 import { StageStatus } from '../../../funnels/enums/stage-status.enum';
+import { UserPlan } from '../../../users/enums/user-plan.enum';
 
 export interface PlanDistribution {
   free: number;
@@ -68,6 +69,6 @@ export interface GroupedStageAccumulator {
 }
 
 export interface PlanCountResult {
-  plan: string;
+  plan: UserPlan;
   count: string;
 }
