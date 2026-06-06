@@ -628,6 +628,15 @@ export class PaymentsService {
       updatePayload: { status: PaymentStatus.FAILED },
       transactionOptions: { useTransaction: false },
     });
+
+    this.eventEmitter.emit(
+      APP_EVENTS.PAYMENT_FAILED,
+      new PaymentFailedEvent(
+        payment.user_id,
+        event.reference,
+        typeof event.data.message === 'string' ? event.data.message : SYS_MSG.PAYMENT_FAILED,
+      ),
+    );
   }
 
   // event.reference is data.subscription_code for subscription events (adapter mapping, DC-3)
