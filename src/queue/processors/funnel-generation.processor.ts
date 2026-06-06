@@ -186,6 +186,9 @@ export class FunnelGenerationProcessor {
         throw new Error(`Stage ${stage.position}: tasks must be an array`);
       }
       for (const task of stage.tasks) {
+        if (!task.name || typeof task.name !== 'string') {
+          throw new Error(`Stage ${stage.position}: task missing name`);
+        }
         if (!task.taskText || typeof task.taskText !== 'string') {
           throw new Error(`Stage ${stage.position}: task missing taskText`);
         }
@@ -251,7 +254,7 @@ export class FunnelGenerationProcessor {
           qr.manager.create(StageTask, {
             stage_id: stage.id,
             task_text: t.taskText,
-            name: t.taskText.slice(0, 80),
+            name: t.name.slice(0, 80),
             position: taskIdx + 1,
             is_complete: false,
             completed_at: null,

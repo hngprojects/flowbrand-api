@@ -1,10 +1,17 @@
 import { StageStatus } from '../../../funnels/enums/stage-status.enum';
+import { UserPlan } from '../../../users/enums/user-plan.enum';
+
+export interface PlanDistribution {
+  free: number;
+  pro: number;
+}
 
 export interface DashboardStats {
   totalUsers: number;
   activeUsers: number;
   totalFunnelsGenerated: number;
   funnelsThisWeek: number;
+  planDistribution: PlanDistribution;
 }
 
 export interface WeeklyOverviewItem {
@@ -23,6 +30,18 @@ export interface FunnelPerformanceItem {
   stagePosition: number;
   stageName: string;
   completionRate: number;
+}
+
+export interface UserStageItem {
+  stage: string;
+  label: string;
+  count: number;
+}
+
+export interface RetentionBandItem {
+  band: string;
+  label: string;
+  count: number;
 }
 
 export interface CountResult {
@@ -47,4 +66,9 @@ export interface GroupedStageAccumulator {
   name: string;
   total: number;
   completed: number;
+}
+
+export interface PlanCountResult {
+  plan: UserPlan;
+  count: string;
 }

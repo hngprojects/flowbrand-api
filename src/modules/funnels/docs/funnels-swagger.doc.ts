@@ -72,7 +72,15 @@ export const funnelFullExample = {
         completedAt: '2026-05-17T13:00:00.000Z',
         explanation: 'Understand the target audience.',
         actionPrompt: 'Review the lead magnet.',
-        tasks: [{ id: 'task-1', position: 1, name: 'Define ICP', status: 'complete' }],
+        tasks: [
+          {
+            id: 'task-1',
+            position: 1,
+            name: 'Define ICP',
+            description: 'Create a 1-page document outlining your ideal customer profile including their demographics, pain points, and goals.',
+            status: 'complete',
+          },
+        ],
         tasksTotal: 1,
         tasksComplete: 1,
       },
@@ -113,7 +121,15 @@ export const funnelStageDetailExample = {
     completedAt: null,
     explanation: 'Validate demand before moving on.',
     actionPrompt: 'Contact the first five leads.',
-    tasks: [{ id: 'task-2', position: 1, name: 'Send outreach', status: 'pending' }],
+    tasks: [
+      {
+        id: 'task-2',
+        position: 1,
+        name: 'Send outreach',
+        description: 'Draft a personalized outreach message and send it to the first 5 leads on your list.',
+        status: 'pending',
+      },
+    ],
     tasksTotal: 1,
     tasksComplete: 0,
   },
@@ -397,6 +413,7 @@ export const taskUpdateSuccessExample = {
   data: {
     taskId: '550e8400-e29b-41d4-a716-446655440020',
     name: 'Define ICP',
+    description: 'Create a 1-page document outlining your ideal customer profile.',
     status: 'complete',
     isComplete: true,
     completedAt: '2026-05-26T10:00:00.000Z',
@@ -411,6 +428,7 @@ export const taskUpdateIdempotentExample = {
   data: {
     taskId: '550e8400-e29b-41d4-a716-446655440020',
     name: 'Define ICP',
+    description: 'Create a 1-page document outlining your ideal customer profile.',
     status: 'pending',
     isComplete: false,
     completedAt: null,
