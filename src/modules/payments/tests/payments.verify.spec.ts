@@ -293,7 +293,7 @@ describe('PaymentsService — resolvePayment', () => {
 
   // ─── EC-02: idempotency guard ─────────────────────────────────────────────────
 
-  it('ONE_TIME: idempotent skip when ACTIVE LIFETIME subscription already exists (EC-02)', async () => {
+  it('ONE_TIME: idempotent skip when ACTIVE subscription already exists (EC-02)', async () => {
     mockPaymentGet.mockResolvedValueOnce({
       id: 'p-1', user_id: USER_ID, status: PaymentStatus.PENDING,
       provider_reference: REF, amount_kobo: 900000, payment_type: PaymentType.ONE_TIME,
@@ -301,9 +301,9 @@ describe('PaymentsService — resolvePayment', () => {
     jest.spyOn(service, 'verifyPayment').mockResolvedValueOnce({
       reference: REF, status: PaymentStatus.SUCCESS, amount: 900000, currency: 'NGN',
     });
-    // Pre-check finds ACTIVE LIFETIME — already done, skip both INSERT and UPDATE
+    // Pre-check finds ACTIVE subscription — already done, skip both INSERT and UPDATE
     mockSubscriptionList.mockResolvedValueOnce({
-      payload: [{ id: 'sub-existing', status: SubscriptionStatus.ACTIVE, billing_cycle: BillingCycle.LIFETIME }],
+      payload: [{ id: 'sub-existing', status: SubscriptionStatus.ACTIVE, billing_cycle: BillingCycle.MONTHLY }],
       paginationMeta: {},
     });
 
@@ -312,11 +312,11 @@ describe('PaymentsService — resolvePayment', () => {
     expect(mockSubscriptionCreate).not.toHaveBeenCalled();
     expect(mockSubscriptionUpdate).not.toHaveBeenCalled();
     expect(result.status).toBe(PaymentStatus.SUCCESS);
-    // LIFETIME plan already active — PLAN_UPGRADED event still fires
+    // Pro plan already active — PLAN_UPGRADED event still fires
     expect(mockEmit).toHaveBeenCalledWith(APP_EVENTS.PLAN_UPGRADED, expect.any(PlanUpgradedEvent));
   });
 
-  it('ONE_TIME: upgrades PENDING subscription to ACTIVE LIFETIME when pre-check finds existing PENDING row (EC-02b)', async () => {
+  it('ONE_TIME: upgrades PENDING subscription to ACTIVE MONTHLY when pre-check finds existing PENDING row (EC-02b)', async () => {
     mockPaymentGet.mockResolvedValueOnce({
       id: 'p-1', user_id: USER_ID, status: PaymentStatus.PENDING,
       provider_reference: REF, amount_kobo: 900000, payment_type: PaymentType.ONE_TIME,
@@ -338,7 +338,7 @@ describe('PaymentsService — resolvePayment', () => {
         identifierOptions: { id: 'sub-pending' },
         updatePayload: expect.objectContaining({
           plan: PaymentPlan.PRO,
-          billing_cycle: BillingCycle.LIFETIME,
+          billing_cycle: BillingCycle.MONTHLY,
           status: SubscriptionStatus.ACTIVE,
         }),
       }),
