@@ -101,7 +101,7 @@ export class PaymentsController {
   async webhook(
     @Req() req: Request & { rawBody?: Buffer },
     @Headers('x-paystack-signature') signature: string,
-  ): Promise<{ received: boolean }> {
+  ): Promise<{ statusCode: number; message: string; data: { received: boolean } }> {
     const rawBody = req.rawBody ?? Buffer.alloc(0);
 
     try {
@@ -111,7 +111,11 @@ export class PaymentsController {
       this.logger.error({ message: 'Unexpected webhook error', error: (err as Error).message });
     }
 
-    return { received: true };
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.WEBHOOK_RECEIVED,
+      data: { received: true },
+    };
   }
 
   @Post('subscriptions/initiate')

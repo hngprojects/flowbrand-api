@@ -312,6 +312,7 @@ export const ADMIN_NOTIFICATION_STAR_TOGGLED = 'Notification star updated succes
 export const ADMIN_NOTIFICATION_BULK_SELECTION_REQUIRED = 'Provide either ids or all: true';
 export const ADMIN_NOTIFICATION_BULK_SELECTION_AMBIGUOUS = 'Provide either ids or all: true, not both';
 export const WEBHOOK_SIGNATURE_INVALID = 'Webhook signature verification failed';
+export const WEBHOOK_RECEIVED = 'Webhook received';
 export const WEBHOOK_PROCESSING_ERROR = 'Webhook processing failed';
 export const NOTIFICATION_PLAN_UPGRADED_TITLE = "You're now on Pro";
 export const NOTIFICATION_PLAN_UPGRADED_BODY = 'Full access unlocked. Enjoy all SEIL features.';

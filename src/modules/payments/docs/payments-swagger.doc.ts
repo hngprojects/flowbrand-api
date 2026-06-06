@@ -98,7 +98,7 @@ export function WebhookDocs() {
     ApiResponse({
       status: HttpStatus.OK,
       description: 'Event acknowledged. Always returned after signature verification passes.',
-      schema: { example: { received: true } },
+      schema: { example: { statusCode: 200, message: 'Webhook received', data: { received: true } } },
     }),
     ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Invalid or missing webhook signature.' }),
     ApiExcludeEndpoint(false),
