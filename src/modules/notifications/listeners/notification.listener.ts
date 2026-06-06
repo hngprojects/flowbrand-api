@@ -3,7 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { APP_EVENTS } from '../../../common/constants/app-events';
 import {
   FunnelGeneratedEvent,
-  PaymentFailedEvent, // Added
+  PaymentFailedEvent,
   PlanUpgradedEvent,
   StageCompletedEvent,
   StageUnlockedEvent,
@@ -13,7 +13,7 @@ import {
 import * as SYS_MSG from '../../../constants/system.messages';
 import { EmailService } from '../../../email/email.service';
 import { StageTaskModelAction } from '../../funnels/actions/stage-task.action';
-import { PaymentModelAction } from '../../payments/actions/payment.model-action'; // Added
+import { PaymentModelAction } from '../../payments/actions/payment.model-action';
 import { UserModelAction } from '../../users/actions/user.action';
 import { NotificationModelAction } from '../actions/notification.action';
 import { NotificationsService } from '../notifications.service';
@@ -39,7 +39,7 @@ export class NotificationListener {
     private readonly emailService: EmailService,
     private readonly taskAction: StageTaskModelAction,
     private readonly userAction: UserModelAction,
-    private readonly paymentModelAction: PaymentModelAction, // Added
+    private readonly paymentModelAction: PaymentModelAction,
   ) {}
 
   @OnEvent(APP_EVENTS.STAGE_COMPLETED)
@@ -134,7 +134,8 @@ export class NotificationListener {
         return;
       }
       if (!payment.amount_kobo) {
-        this.logger.warn({ message: 'Payment amount is 0 or null', reference: event.reference });
+        this.logger.warn({ message: 'Payment amount is 0 or null — skipping email', reference: event.reference });
+        return;
       }
       if (!payment.paid_at) {
         this.logger.warn({ message: 'Payment paid_at is null', reference: event.reference });
@@ -217,6 +218,14 @@ export class NotificationListener {
   @OnEvent(APP_EVENTS.PAYMENT_FAILED)
   async onPaymentFailed(event: PaymentFailedEvent): Promise<void> {
     await this.safely('payment.failed', event.userId, async () => {
+      await this.notificationsService.createNotification(
+        event.userId,
+        'payment_failed',
+        SYS_MSG.NOTIFICATION_PAYMENT_FAILED_TITLE,
+        SYS_MSG.NOTIFICATION_PAYMENT_FAILED_BODY,
+        { reference: event.reference },
+      );
+
       await this.email(event.userId, (to, name) =>
         this.emailService.sendPaymentFailed(to, { name, failureReason: event.failureReason }, event.userId),
       );
