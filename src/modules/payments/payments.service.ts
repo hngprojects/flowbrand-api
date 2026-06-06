@@ -220,31 +220,38 @@ export class PaymentsService {
   }
 
   private async activateProSubscription(userId: string, manager: EntityManager): Promise<boolean> {
+    // Pre-check before INSERT: the partial unique index covers PENDING + ACTIVE, so a failed
+    // INSERT inside an open transaction aborts the whole transaction even if the error is caught
+    // at the application level. Checking first avoids that aborted-transaction problem.
+    const { payload: existing } = await this.subscriptionModelAction.list({
+      filterRecordOptions: [
+        { user_id: userId, status: SubscriptionStatus.ACTIVE },
+        { user_id: userId, status: SubscriptionStatus.PENDING },
+      ],
+      paginationPayload: { page: 1, limit: 1 },
+    });
+
+    if (existing.length > 0) {
+      this.logger.warn({ message: 'Pro subscription already active — idempotent skip', userId });
+      return true;
+    }
+
     const periodStart = new Date();
     const periodEnd = new Date(periodStart);
     periodEnd.setMonth(periodEnd.getMonth() + 1);
 
-    try {
-      await this.subscriptionModelAction.create({
-        createPayload: {
-          user_id: userId,
-          plan: PaymentPlan.PRO,
-          billing_cycle: BillingCycle.MONTHLY,
-          status: SubscriptionStatus.ACTIVE,
-          current_period_start: periodStart,
-          current_period_end: periodEnd,
-        },
-        transactionOptions: { useTransaction: true, transaction: manager },
-      });
-      return true;
-    } catch (err: unknown) {
-      if (err instanceof QueryFailedError && (err as { code?: string }).code === '23505') {
-        // Pro access already exists via a concurrent path — still true, event should still fire
-        this.logger.warn({ message: 'Pro subscription already active — idempotent skip', userId });
-        return true;
-      }
-      throw err;
-    }
+    await this.subscriptionModelAction.create({
+      createPayload: {
+        user_id: userId,
+        plan: PaymentPlan.PRO,
+        billing_cycle: BillingCycle.MONTHLY,
+        status: SubscriptionStatus.ACTIVE,
+        current_period_start: periodStart,
+        current_period_end: periodEnd,
+      },
+      transactionOptions: { useTransaction: true, transaction: manager },
+    });
+    return true;
   }
 
   private async activateSubscriptionPayment(userId: string, manager: EntityManager): Promise<boolean> {
