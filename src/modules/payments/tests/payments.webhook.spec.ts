@@ -252,7 +252,7 @@ describe('PaymentsService — processWebhookEvent', () => {
     expect(updatePayload).not.toHaveProperty('status');
   });
 
-  // AC-11 — concurrent activation race: second request finds ACTIVE LIFETIME, skips both INSERT and UPDATE
+  // AC-11 — concurrent activation race: second request finds ACTIVE subscription, skips both INSERT and UPDATE
   it('handles concurrent activation race on charge.success — idempotent skip, event still emits', async () => {
     mockPaymentGet.mockResolvedValueOnce({
       id: 'p-1',
@@ -262,9 +262,9 @@ describe('PaymentsService — processWebhookEvent', () => {
       amount_kobo: 900000,
       provider_reference: REF,
     });
-    // First request already created ACTIVE LIFETIME; second request finds it and skips
+    // First request already created ACTIVE subscription; second request finds it and skips
     mockSubscriptionList.mockResolvedValueOnce({
-      payload: [{ id: 'sub-existing', status: SubscriptionStatus.ACTIVE, billing_cycle: BillingCycle.LIFETIME }],
+      payload: [{ id: 'sub-existing', status: SubscriptionStatus.ACTIVE, billing_cycle: BillingCycle.MONTHLY }],
       paginationMeta: {},
     });
     jest
