@@ -2,10 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { APP_EVENTS } from '../../../common/constants/app-events';
 import {
+  AccountDeletedEvent,
   FunnelGeneratedEvent,
   StageCompletedEvent,
   StageUnlockedEvent,
   TaskCompletedEvent,
+  UserSignedUpEvent,
 } from '../../../common/events/events';
 import { EmailService } from '../../../email/email.service';
 import { StageTaskModelAction } from '../../funnels/actions/stage-task.action';
@@ -137,6 +139,24 @@ export class NotificationListener {
         'You are 50% through your funnel',
         "Keep going - you're halfway there.",
         { funnelId: event.funnelId },
+      );
+    });
+  }
+
+  @OnEvent(APP_EVENTS.USER_SIGNED_UP)
+  async onUserSignedUp(event: UserSignedUpEvent): Promise<void> {
+    await this.safely('user.signed_up', event.userId, async () => {
+      await this.email(event.userId, (to, name) =>
+        this.emailService.sendWelcome(to, { name }, event.userId),
+      );
+    });
+  }
+
+  @OnEvent(APP_EVENTS.ACCOUNT_DELETED)
+  async onAccountDeleted(event: AccountDeletedEvent): Promise<void> {
+    await this.safely('user.account_deleted', event.userId, async () => {
+      await this.email(event.userId, (to, name) =>
+        this.emailService.sendDeleteAccount(to, { name }, event.userId),
       );
     });
   }

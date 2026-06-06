@@ -1,10 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
 import {
+  AccountDeletedEvent,
   FunnelGeneratedEvent,
   StageCompletedEvent,
   StageUnlockedEvent,
   TaskCompletedEvent,
+  UserSignedUpEvent,
 } from '../../../common/events/events';
 import { EmailService } from '../../../email/email.service';
 import { StageTaskModelAction } from '../../funnels/actions/stage-task.action';
@@ -35,6 +37,8 @@ describe('NotificationListener', () => {
     sendStageCompleted: jest.fn(),
     sendStageUnlocked: jest.fn(),
     sendFunnelReady: jest.fn(),
+    sendWelcome: jest.fn(),
+    sendDeleteAccount: jest.fn(),
   };
   const taskAction = { getFunnelTaskProgress: jest.fn() };
   const userAction = { findById: jest.fn() };
@@ -193,5 +197,61 @@ describe('NotificationListener', () => {
     expect(loggerSpy).toHaveBeenCalled();
 
     loggerSpy.mockRestore();
+  });
+
+  describe('onUserSignedUp', () => {
+    const userSignedUp = () => new UserSignedUpEvent('user-1');
+
+    it('sends welcome email to the registered user', async () => {
+      await listener.onUserSignedUp(userSignedUp());
+
+      expect(emailService.sendWelcome).toHaveBeenCalledWith(
+        'ada@seil.app',
+        { name: 'Ada' },
+        'user-1',
+      );
+    });
+
+    it('does not throw when sendWelcome rejects', async () => {
+      emailService.sendWelcome.mockRejectedValueOnce(new Error('queue down'));
+
+      await expect(listener.onUserSignedUp(userSignedUp())).resolves.toBeUndefined();
+    });
+
+    it('skips send when user cannot be resolved', async () => {
+      userAction.findById.mockResolvedValueOnce(null);
+
+      await listener.onUserSignedUp(userSignedUp());
+
+      expect(emailService.sendWelcome).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('onAccountDeleted', () => {
+    const accountDeleted = () => new AccountDeletedEvent('user-1');
+
+    it('sends delete-account email to the user', async () => {
+      await listener.onAccountDeleted(accountDeleted());
+
+      expect(emailService.sendDeleteAccount).toHaveBeenCalledWith(
+        'ada@seil.app',
+        { name: 'Ada' },
+        'user-1',
+      );
+    });
+
+    it('does not throw when sendDeleteAccount rejects', async () => {
+      emailService.sendDeleteAccount.mockRejectedValueOnce(new Error('queue down'));
+
+      await expect(listener.onAccountDeleted(accountDeleted())).resolves.toBeUndefined();
+    });
+
+    it('skips send when user cannot be resolved', async () => {
+      userAction.findById.mockResolvedValueOnce(null);
+
+      await listener.onAccountDeleted(accountDeleted());
+
+      expect(emailService.sendDeleteAccount).not.toHaveBeenCalled();
+    });
   });
 });
