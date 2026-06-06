@@ -1,5 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
 import { EmailProcessor } from '../processors/email.processor';
 import { TemplateService } from '../template.service';
 
@@ -38,14 +37,6 @@ describe('EmailProcessor.handleSendEmail', () => {
         EmailProcessor,
         { provide: TemplateService, useValue: mockTemplateService },
         { provide: 'RESEND_CLIENT', useValue: mockResend },
-        { provide: ConfigService, 
-          useValue: { 
-            get: jest.fn().mockImplementation((key: string) => {
-              if (key === 'email.from') return 'SEIL <noreply@seil.app>';
-              throw new Error(`Unexpected config key: ${key}`);
-            })
-          }
-        },
       ],
     }).compile();
 
@@ -69,6 +60,7 @@ describe('EmailProcessor.handleSendEmail', () => {
       expect(mockResend.emails.send).toHaveBeenCalledWith(
         expect.objectContaining({
           to: 'ada@test.com',
+          from: 'SEIL <noreply@seil.app>',
           subject: 'Your SEIL verification code',
           html: '<p>code: 123456</p>',
         }),

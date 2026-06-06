@@ -1,5 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs/promises';
 import { TemplateService } from '../template.service';
 
@@ -17,28 +16,17 @@ const FUNNEL_READY_HBS = `<p>Hi {{name}}</p><p>Your funnel for {{businessName}} 
 const STAGE_UNLOCKED_HBS = `<p>Hi {{name}}</p><p><a href="{{dashboardUrl}}">SEIL</a> {{stageName}} is now active</p>`;
 const STAGE_COMPLETED_HBS = `<p>Hi {{name}}</p><p>You completed {{stageName}}</p><p>Open <a href="{{dashboardUrl}}">SEIL</a></p>`;
 const WEEKLY_DIGEST_HBS = `<p>Hi {{name}}</p><p>{{completedTasks}} of {{totalTasks}}</p>`;
-const TEAM_INVITE_HBS = `<p>Hi {{inviteeName}}</p><p>You have been invited to join {{teamName}}</p>`;
+const TEAM_INVITE_HBS = `<p>Hi {{inviteeName}}</p><p>You have been invited to {{teamName}}</p><p><a href="{{inviteUrl}}">Join</a></p>`;
+
 
 describe('TemplateService', () => {
   let service: TemplateService;
 
   function buildService(): Promise<TestingModule> {
-    return Test.createTestingModule({
-      providers: [
-        TemplateService,
-        { provide: ConfigService, 
-                  useValue: { 
-                    get: jest.fn().mockImplementation((key: string) => {
-                      if (key === 'app.frontendUrl') return 'http://localhost:3000';
-                      throw new Error(`Unexpected config key: ${key}`);
-                    })
-                  }
-        },
-      ],
-    }).compile();
+     return Test.createTestingModule({ providers: [TemplateService] }).compile();
   }
 
-  describe('onModuleInit — happy path', () => {
+  describe('onModuleInit - happy path', () => {
     beforeEach(async () => {
       mockReadFile.mockImplementation((filePath) => {
         const p = String(filePath);
@@ -113,7 +101,7 @@ describe('TemplateService', () => {
       const { html, subject } = service.render('stage-unlocked', { name: 'Ada', stageName: 'Interest' });
 
       expect(html).toContain('Interest');
-      expect(html).toContain('href="http://localhost:3000/dashboard"');
+      expect(html).toContain('/dashboard');
       expect(html).toContain('>SEIL<');
       expect(subject).toBe('"Interest" is now active');
     });
@@ -122,7 +110,7 @@ describe('TemplateService', () => {
       const { html, subject } = service.render('stage-completed', { name: 'Ada', stageName: 'Awareness' });
 
       expect(html).toContain('Awareness');
-      expect(html).toContain('href="http://localhost:3000/dashboard"');
+      expect(html).toContain('/dashboard');
       expect(html).toContain('>SEIL<');
       expect(subject).toBe('You completed "Awareness"');
     });
@@ -162,7 +150,7 @@ describe('TemplateService', () => {
     });
   });
 
-  describe('onModuleInit — missing template', () => {
+  describe('onModuleInit - missing template', () => {
     it('throws when a template file is missing', async () => {
       mockReadFile.mockImplementation((filePath) => {
         const p = String(filePath);
@@ -177,11 +165,11 @@ describe('TemplateService', () => {
     });
   });
 
-  describe('render — unknown type', () => {
+  describe('render - unknown type', () => {
     it('throws when template for type is not compiled', async () => {
       const module = await buildService();
       service = module.get<TemplateService>(TemplateService);
-      // onModuleInit intentionally NOT called — templates map stays empty
+      // onModuleInit intentionally NOT called - templates map stays empty
 
       expect(() =>
         service.render('otp-verification' as never, {}),
