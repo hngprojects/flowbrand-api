@@ -7,5 +7,4 @@ export const appConfig = registerAs('app', () => ({
   corsOrigin: env.CORS_ORIGIN,
   swaggerEnabled: env.SWAGGER_ENABLED,
   contactAdminEmail: env.CONTACT_ADMIN_EMAIL,
-  frontendUrl: env.FRONTEND_URL.replace(/\/$/, ''),
 }));
