@@ -1,5 +1,4 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs/promises';
 import * as Handlebars from 'handlebars';
 import * as path from 'path';
@@ -26,8 +25,6 @@ export class TemplateService implements OnModuleInit {
   private readonly logger = new Logger(TemplateService.name);
   private baseLayout: CompiledTemplate;
   private readonly templates = new Map<EmailType, CompiledTemplate>();
-
-  constructor(private readonly config: ConfigService) {}
 
   private readonly SUBJECTS: Record<EmailType, string> = {
     'otp-verification': 'Your SEIL verification code',
@@ -73,10 +70,7 @@ export class TemplateService implements OnModuleInit {
       throw new Error(`No compiled template found for type: ${type}`);
     }
 
-    const frontendUrl = this.config.get<string>('app.frontendUrl');
-    if (!frontendUrl) {
-      throw new Error('Missing app.frontendUrl configuration');
-    }
+    const frontendUrl = (process.env.FRONTEND_URL ?? 'http://localhost:3000').replace(/\/$/, '');
     const templateContext = {
       ...payload,
       dashboardUrl: `${frontendUrl}/dashboard`,
