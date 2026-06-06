@@ -28,10 +28,12 @@ import { PaymentStatus } from './enums/payment-status.enum';
 import { PaymentType } from './enums/payment-type.enum';
 import { SubscriptionStatus } from './enums/subscription-status.enum';
 import {
+  CancelSubscriptionResponse,
   InitiatePaymentResult,
   InitiateSubscriptionResult,
   PaymentProvider,
   PaymentVerifyResponse,
+  SubscriptionResponse,
   VerifyPaymentResult,
   WebhookEvent,
 } from './interfaces/payment-provider.interface';
@@ -39,22 +41,6 @@ import { InitiatePaymentDto } from './dto/initiate-payment.dto';
 import { InitiateSubscriptionDto } from './dto/initiate-subscription.dto';
 import { Payment } from './entities/payment.entity';
 import { Subscription } from './entities/subscription.entity';
-
-export interface SubscriptionResponse {
-  subscriptionId: string;
-  plan: string;
-  billingCycle: string;
-  status: string;
-  currentPeriodStart: string;
-  currentPeriodEnd: string;
-  cancelledAt: string | null;
-  downgradeAt: string | null;
-}
-
-export interface CancelSubscriptionResponse {
-  cancelledAt: string;
-  accessUntil: string;
-}
 
 @Injectable()
 export class PaymentsService {

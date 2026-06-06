@@ -31,13 +31,15 @@ import { PaymentType } from './enums/payment-type.enum';
 import { PaymentRateLimitGuard } from './guards/payment-rate-limit.guard';
 import { SubscriptionRateLimitGuard } from './guards/subscription-rate-limit.guard';
 import {
+  CancelSubscriptionResponse,
   InitiatePaymentResponse,
   InitiatePaymentResult,
   InitiateSubscriptionResponse,
   InitiateSubscriptionResult,
   PaymentVerifyResponse,
+  SubscriptionResponse,
 } from './interfaces/payment-provider.interface';
-import { CancelSubscriptionResponse, PaymentsService, SubscriptionResponse } from './payments.service';
+import { PaymentsService } from './payments.service';
 
 @ApiTags('Payments')
 @Controller('payments')

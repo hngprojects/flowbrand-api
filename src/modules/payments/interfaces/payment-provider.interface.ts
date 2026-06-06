@@ -64,6 +64,22 @@ export interface PaymentVerifyResponse {
   cardBrand?: string;
 }
 
+export interface SubscriptionResponse {
+  subscriptionId: string;
+  plan: string;
+  billingCycle: string;
+  status: string;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  cancelledAt: string | null;
+  downgradeAt: string | null;
+}
+
+export interface CancelSubscriptionResponse {
+  cancelledAt: string;
+  accessUntil: string;
+}
+
 export interface PaymentProvider {
   initiatePayment(dto: InitiatePaymentDto, userId: string, email: string): Promise<InitiatePaymentResult>;
   verifyPayment(reference: string): Promise<VerifyPaymentResult>;
