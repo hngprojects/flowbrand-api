@@ -1,8 +1,11 @@
 import * as crypto from 'crypto';
+import * as bcrypt from 'bcrypt';
 import {
   Injectable,
   NotFoundException,
   InternalServerErrorException,
+  BadRequestException, 
+  ForbiddenException,
 } from '@nestjs/common';
 import { AdminTeamModelAction } from './actions/admin-team.action';
 import { TeamMembershipModelAction } from './actions/team-membership.action';
@@ -13,6 +16,15 @@ import { EmailService } from '../../../email/email.service';
 import { PinoLoggerService } from '../../../common/logger/pino-logger.service';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { PaginationDto } from '../../users/dto/pagination.dto';
+import { AcceptInviteDto } from './dto/accept-invite.dto';
+import { InviteStatus } from './enums/invite-status.enum';
+import { UserRole } from '../../users/enums/user-role.enum';
+import { UserModelAction } from '../../users/actions/user.action';
+import { UserRoleModelAction } from '../../users/actions/user-role.action';
+import { UserSessionModelAction } from '../../users/actions/user-session.action';
+import { RedisService } from '../../redis/redis.service';
+import { AdminAuthService } from '../auth/admin-auth.service';
+import { redisKeys } from '../../../constants/redis-keys';
 
 export interface InviteResult {
   email: string;
@@ -20,12 +32,27 @@ export interface InviteResult {
   reason?: string;
 }
 
+// Maps role strings (stored in team_invitations.role) to UserRole enum values.
+// TODO: confirm final mapping with team once role taxonomy is finalised (BE-ADM-606).
+const ROLE_PRIORITY: Record<UserRole, number> = {
+  [UserRole.SUPER_ADMIN]: 2,
+  [UserRole.ADMIN]: 1,
+  [UserRole.USER]: 0,
+};
+
+const BCRYPT_INVITE_ROUNDS = 12;
+
 @Injectable()
 export class AdminTeamsService {
   constructor(
     private readonly adminTeamModelAction: AdminTeamModelAction,
     private readonly teamMembershipModelAction: TeamMembershipModelAction,
     private readonly teamInvitationModelAction: TeamInvitationModelAction,
+    private readonly userModelAction: UserModelAction,
+    private readonly userRoleModelAction: UserRoleModelAction,
+    private readonly userSessionModelAction: UserSessionModelAction,
+    private readonly redisService: RedisService,
+    private readonly adminAuthService: AdminAuthService,
     private readonly emailService: EmailService,
     private readonly logger: PinoLoggerService,
   ) {}
@@ -196,5 +223,101 @@ export class AdminTeamsService {
       inviteId,
       email: invite.email,
     });
+  }
+
+  async acceptInvite(dto: AcceptInviteDto) {
+    const tokenHash = crypto.createHash('sha256').update(dto.token).digest('hex');
+    const invitation = await this.teamInvitationModelAction.findByTokenHash(tokenHash);
+
+    if (!invitation) {
+      throw new BadRequestException(SYS_MSG.INVITE_TOKEN_INVALID);
+    }
+
+    if (
+      invitation.status === InviteStatus.ACCEPTED ||
+      invitation.status === InviteStatus.REVOKED
+    ) {
+      throw new BadRequestException(SYS_MSG.INVITE_ALREADY_USED);
+    }
+
+    if (invitation.expires_at < new Date()) {
+      throw new BadRequestException(SYS_MSG.INVITE_EXPIRED);
+    }
+
+    let user = await this.userModelAction.findByEmail(invitation.email);
+
+    if (!user) {
+      const passwordHash = await bcrypt.hash(dto.password, BCRYPT_INVITE_ROUNDS);
+
+      user = await this.userModelAction.create({
+        createPayload: {
+          email: invitation.email,
+          full_name: dto.full_name,
+          password_hash: passwordHash,
+          is_verified: true,   // invited users skip OTP verification
+          is_active: true,
+          termsAccepted: true,
+          roles: [],  
+        },
+        transactionOptions: { useTransaction: false },
+      });
+
+      this.logger.info('admin.team.invite.user_created', {
+        userId: user.id,
+        email: invitation.email,
+        teamId: invitation.team_id,
+      });
+    } else {
+      this.logger.info('admin.team.invite.user_linked', {
+        userId: user.id,
+        email: invitation.email,
+        teamId: invitation.team_id,
+      });
+    }
+
+    const inviteRole = invitation.role as UserRole;
+    const currentRole = await this.userRoleModelAction.resolveHighestRole(user.id);
+
+    if (!currentRole || ROLE_PRIORITY[inviteRole] > ROLE_PRIORITY[currentRole]) {
+      await this.userRoleModelAction.create({
+        createPayload: { user_id: user.id, role: inviteRole },
+        transactionOptions: { useTransaction: false },
+      });
+
+      this.logger.info('admin.team.invite.role_assigned', {
+        userId: user.id,
+        role: inviteRole,
+      });
+    }
+
+    await this.teamMembershipModelAction.createMembership(
+      invitation.team_id,
+      user.id,
+      invitation.role,
+    );
+
+    await this.teamInvitationModelAction.markAccepted(invitation.id);
+
+    const tokens = await this.adminAuthService.issueTokensForInvite(
+      user.id,
+      user.email,
+      inviteRole,
+    );
+
+    this.logger.info('admin.team.invite.accepted', {
+      userId: user.id,
+      teamId: invitation.team_id,
+      inviteId: invitation.id,
+    });
+
+    return {
+      accessToken: tokens.accessToken,
+      user: {
+        id: user.id,
+        full_name: user.full_name,
+        email: user.email,
+        role: inviteRole,
+      },
+    };
   }
 }
