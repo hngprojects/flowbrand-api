@@ -36,4 +36,16 @@ export class AuthMetadataModelAction extends AbstractModelAction<AuthMetadata> {
       transactionOptions: { useTransaction: false },
     });
   }
+
+  async incrementFailedAttempts(userId: string): Promise<number> {
+    const result = await this.repository
+      .createQueryBuilder()
+      .update()
+      .set({ failed_attempts: () => 'failed_attempts + 1' })
+      .where('user_id = :userId', { userId })
+      .returning('failed_attempts')
+      .execute();
+    const rows = result.raw as { failed_attempts: number }[];
+    return rows[0]?.failed_attempts ?? 1;
+  }
 }

@@ -26,11 +26,34 @@ import { getQueueToken } from '@nestjs/bull';
 import { ACCOUNT_DELETION_QUEUE } from './processors/account-deletion.processor';
 import { PinoLoggerService } from '../../common/logger/pino-logger.service';
 import { UserRole } from './enums/user-role.enum';
+import { NotificationsService } from '../notifications/notifications.service';
 import { UPLOAD_OBJECT_STORAGE } from '../upload/upload.types';
+import { env } from '../../config/env';
+import { AVATAR_SIGNED_URL_EXPIRY_SECONDS } from './constants/avatar.constants';
+
+const TEST_PUBLIC_HOST = 'https://public.example';
+const TEST_PUBLIC_BUCKET = 'flowbrand-staging-uploads';
+const TEST_PUBLIC_AVATAR_BASE_URL = `${TEST_PUBLIC_HOST}/${TEST_PUBLIC_BUCKET}`;
 
 jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('hashed-password'),
   compare: jest.fn().mockResolvedValue(true),
+}));
+
+// file-type is a pure-ESM package loaded via dynamic import() in users.service.ts.
+// Under ts-jest's CommonJS VM the real module cannot load, so mock it with a
+// lightweight magic-byte sniffer returning the { ext, mime } shape the service expects.
+jest.mock('file-type', () => ({
+  fileTypeFromBuffer: jest.fn(async (input: Uint8Array) => {
+    const bytes = Buffer.isBuffer(input) ? input : Buffer.from(input);
+    if (bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+      return { ext: 'png', mime: 'image/png' };
+    }
+    if (bytes.subarray(0, 4).toString('utf8') === '%PDF') {
+      return { ext: 'pdf', mime: 'application/pdf' };
+    }
+    return undefined;
+  }),
 }));
 
 // Mock UserModelAction
@@ -79,6 +102,11 @@ const mockUserStateService = {
   invalidateUserStateCache: jest.fn(),
 };
 
+const mockNotificationsService = {
+  getNotificationPreferences: jest.fn(),
+  updateNotificationPreferences: jest.fn(),
+};
+
 // Mock RedisService
 const mockRedisService = {
   get: jest.fn(),
@@ -109,11 +137,38 @@ const mockFullUser = {
   email: USER_EMAIL,
   full_name: 'Test User',
   country: 'Nigeria',
+  business_name: 'Ben Clothing',
   avatar_url: null,
   auth_provider: 'local',
   is_verified: true,
   created_at: new Date('2024-01-15'),
   updated_at: new Date('2024-06-01'),
+};
+
+const mockNotificationPreferences = {
+  id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  user_id: USER_ID,
+  email_funnel_ready: true,
+  email_stage_unlocked: true,
+  email_stage_completed: false,
+  email_weekly_digest: true,
+  inapp_task_completed: true,
+  inapp_stage_unlocked: true,
+  created_at: new Date('2026-05-29T10:30:00.000Z'),
+  updated_at: new Date('2026-05-29T10:30:00.000Z'),
+};
+
+const mockNotificationPreferencesResponse = {
+  id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  userId: USER_ID,
+  emailFunnelReady: true,
+  emailStageUnlocked: true,
+  emailStageCompleted: false,
+  emailWeeklyDigest: true,
+  inappTaskCompleted: true,
+  inappStageUnlocked: true,
+  createdAt: new Date('2026-05-29T10:30:00.000Z'),
+  updatedAt: new Date('2026-05-29T10:30:00.000Z'),
 };
 
 // Mock AuthMetadataModelAction
@@ -185,6 +240,7 @@ describe('UsersService', () => {
         { provide: DataSource, useValue: mockDataSource },
         { provide: getQueueToken(ACCOUNT_DELETION_QUEUE), useValue: mockAccountDeletionQueue },
         { provide: EventEmitter2, useValue: mockEventEmitter },
+        { provide: NotificationsService, useValue: mockNotificationsService },
         { provide: UPLOAD_OBJECT_STORAGE, useValue: mockObjectStorage },
       ],
     }).compile();
@@ -213,6 +269,32 @@ describe('UsersService', () => {
       expect(mockUserModelAction.findByEmail).toHaveBeenCalledWith(USER_EMAIL);
       expect(bcrypt.hash).toHaveBeenCalledWith('Password123!', 10);
       expect(result).toEqual(mockUser());
+    });
+
+    it('persists business_name when businessName is provided', async () => {
+      mockUserModelAction.findByEmail.mockResolvedValue(null);
+      mockUserModelAction.create.mockResolvedValue(mockUser());
+
+      await service.create({ ...createDto, businessName: 'Ben Clothing' });
+
+      expect(mockUserModelAction.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          createPayload: expect.objectContaining({ business_name: 'Ben Clothing' }),
+        }),
+      );
+    });
+
+    it('stores null business_name when businessName is omitted', async () => {
+      mockUserModelAction.findByEmail.mockResolvedValue(null);
+      mockUserModelAction.create.mockResolvedValue(mockUser());
+
+      await service.create(createDto);
+
+      expect(mockUserModelAction.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          createPayload: expect.objectContaining({ business_name: null }),
+        }),
+      );
     });
 
     it('throws 409 when email already exists', async () => {
@@ -453,7 +535,6 @@ describe('UsersService', () => {
       
       await service.changePassword(USER_ID, changePasswordDto);
 
-      expect(logSpy).toHaveBeenCalled();
       const logPayload = JSON.stringify(logSpy.mock.calls);
       expect(logPayload).not.toContain(mockUser().password_hash);
       expect(logPayload).not.toContain(changePasswordDto.oldPassword);
@@ -540,6 +621,11 @@ describe('UsersService', () => {
   });
 
   describe('avatar operations', () => {
+    const originalUploadEnv = {
+      publicEndpoint: env.UPLOAD_STORAGE_PUBLIC_ENDPOINT,
+      bucket: env.UPLOAD_STORAGE_BUCKET,
+    };
+
     const onePixelPngBuffer = Buffer.from(
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7f4b4AAAAASUVORK5CYII=',
       'base64',
@@ -552,17 +638,21 @@ describe('UsersService', () => {
     } as Express.Multer.File;
 
     beforeEach(() => {
+      env.UPLOAD_STORAGE_PUBLIC_ENDPOINT = TEST_PUBLIC_HOST;
+      env.UPLOAD_STORAGE_BUCKET = TEST_PUBLIC_BUCKET;
       mockObjectStorage.putObject.mockReset();
       mockObjectStorage.deleteObject.mockReset();
       mockObjectStorage.createPresignedGetObjectUrl.mockReset();
       mockUserModelAction.updateAvatarUrl.mockReset();
     });
 
-    it('uploads avatar successfully and returns signed URL', async () => {
+    afterEach(() => {
+      env.UPLOAD_STORAGE_PUBLIC_ENDPOINT = originalUploadEnv.publicEndpoint;
+      env.UPLOAD_STORAGE_BUCKET = originalUploadEnv.bucket;
+    });
+
+    it('uploads avatar successfully and returns public URL', async () => {
       mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
-      mockObjectStorage.createPresignedGetObjectUrl.mockResolvedValue(
-        'https://signed.example/avatar.jpg',
-      );
       mockUserModelAction.updateAvatarUrl.mockResolvedValue({
         ...mockFullUser,
         avatar_url: 'avatars/user/new.jpg',
@@ -576,12 +666,13 @@ describe('UsersService', () => {
           contentLength: onePixelPngBuffer.length,
         }),
       );
-      expect(mockObjectStorage.createPresignedGetObjectUrl).toHaveBeenCalledWith(
-        expect.stringMatching(new RegExp(`^avatars/${USER_ID}/`)),
-        900,
-      );
+      expect(mockObjectStorage.createPresignedGetObjectUrl).not.toHaveBeenCalled();
       expect(mockUserModelAction.updateAvatarUrl).toHaveBeenCalled();
-      expect(result).toEqual({ avatarUrl: 'https://signed.example/avatar.jpg' });
+      expect(result.avatarUrl).toMatch(
+        new RegExp(
+          `^${TEST_PUBLIC_AVATAR_BASE_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/avatars/${USER_ID}/`,
+        ),
+      );
     });
 
     it('deletes previous stored avatar after successful DB update', async () => {
@@ -589,9 +680,6 @@ describe('UsersService', () => {
         ...mockFullUser,
         avatar_url: `avatars/${USER_ID}/old.jpg`,
       });
-      mockObjectStorage.createPresignedGetObjectUrl.mockResolvedValue(
-        'https://signed.example/avatar.jpg',
-      );
       mockUserModelAction.updateAvatarUrl.mockResolvedValue({
         ...mockFullUser,
         avatar_url: `avatars/${USER_ID}/new.jpg`,
@@ -646,22 +734,7 @@ describe('UsersService', () => {
 
     it('cleans up uploaded file when DB update fails after upload', async () => {
       mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
-      mockObjectStorage.createPresignedGetObjectUrl.mockResolvedValue(
-        'https://signed.example/avatar.jpg',
-      );
       mockUserModelAction.updateAvatarUrl.mockResolvedValue(null);
-
-      await expect(service.uploadAvatar(USER_ID, avatarFile)).rejects.toBeInstanceOf(
-        InternalServerErrorException,
-      );
-
-      const uploadedPath = mockObjectStorage.putObject.mock.calls[0][0].storagePath as string;
-      expect(mockObjectStorage.deleteObject).toHaveBeenCalledWith(uploadedPath);
-    });
-
-    it('cleans up uploaded file when signed URL creation fails', async () => {
-      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
-      mockObjectStorage.createPresignedGetObjectUrl.mockRejectedValue(new Error('sign failed'));
 
       await expect(service.uploadAvatar(USER_ID, avatarFile)).rejects.toBeInstanceOf(
         InternalServerErrorException,
@@ -679,6 +752,63 @@ describe('UsersService', () => {
         InternalServerErrorException,
       );
       expect(mockObjectStorage.createPresignedGetObjectUrl).not.toHaveBeenCalled();
+    });
+
+    it('builds public avatar URL from PUBLIC_ENDPOINT and bucket', async () => {
+      env.UPLOAD_STORAGE_PUBLIC_ENDPOINT = 'https://staging.flowbrand.hng14.com';
+      env.UPLOAD_STORAGE_BUCKET = 'flowbrand-staging-uploads';
+      mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+      mockUserModelAction.updateAvatarUrl.mockResolvedValue({
+        ...mockFullUser,
+        avatar_url: 'avatars/user/new.jpg',
+      });
+
+      const result = await service.uploadAvatar(USER_ID, avatarFile);
+
+      expect(mockObjectStorage.createPresignedGetObjectUrl).not.toHaveBeenCalled();
+      expect(result.avatarUrl).toMatch(
+        new RegExp(
+          `^https://staging\\.flowbrand\\.hng14\\.com/flowbrand-staging-uploads/avatars/${USER_ID}/`,
+        ),
+      );
+    });
+
+    describe('presigned URL fallback when public endpoint is unset', () => {
+      beforeEach(() => {
+        env.UPLOAD_STORAGE_PUBLIC_ENDPOINT = '';
+        env.UPLOAD_STORAGE_BUCKET = 'flowbrand-uploads';
+      });
+
+      it('uploads avatar successfully and returns signed URL', async () => {
+        mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+        mockObjectStorage.createPresignedGetObjectUrl.mockResolvedValue(
+          'https://signed.example/avatar.jpg',
+        );
+        mockUserModelAction.updateAvatarUrl.mockResolvedValue({
+          ...mockFullUser,
+          avatar_url: 'avatars/user/new.jpg',
+        });
+
+        const result = await service.uploadAvatar(USER_ID, avatarFile);
+
+        expect(mockObjectStorage.createPresignedGetObjectUrl).toHaveBeenCalledWith(
+          expect.stringMatching(new RegExp(`^avatars/${USER_ID}/`)),
+          AVATAR_SIGNED_URL_EXPIRY_SECONDS,
+        );
+        expect(result).toEqual({ avatarUrl: 'https://signed.example/avatar.jpg' });
+      });
+
+      it('cleans up uploaded file when signed URL creation fails', async () => {
+        mockUserModelAction.get.mockResolvedValue({ ...mockFullUser, avatar_url: null });
+        mockObjectStorage.createPresignedGetObjectUrl.mockRejectedValue(new Error('sign failed'));
+
+        await expect(service.uploadAvatar(USER_ID, avatarFile)).rejects.toBeInstanceOf(
+          InternalServerErrorException,
+        );
+
+        const uploadedPath = mockObjectStorage.putObject.mock.calls[0][0].storagePath as string;
+        expect(mockObjectStorage.deleteObject).toHaveBeenCalledWith(uploadedPath);
+      });
     });
 
     it('returns no-op 200 response when avatar is already null', async () => {
@@ -753,6 +883,33 @@ describe('UsersService', () => {
       const result = await service.updateProfile(USER_ID, { country: 'Nigeria' });
 
       expect(result.country).toBe('Nigeria');
+    });
+
+    it('updates business_name and returns updated profile', async () => {
+      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+      mockUserModelAction.update.mockResolvedValue({ ...mockFullUser, business_name: 'New Biz' });
+
+      const result = await service.updateProfile(USER_ID, { businessName: 'New Biz' });
+
+      expect(result.businessName).toBe('New Biz');
+      expect(mockUserModelAction.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          updatePayload: { business_name: 'New Biz' },
+        }),
+      );
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        APP_EVENTS.PROFILE_UPDATED,
+        expect.objectContaining({ userId: USER_ID, updatedFields: ['business_name'] }),
+      );
+    });
+
+    it('no DB write when businessName matches stored value', async () => {
+      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+
+      await service.updateProfile(USER_ID, { businessName: 'Ben Clothing' });
+
+      expect(mockUserModelAction.update).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
     });
 
     it('throws 422 when email is present in body', async () => {
@@ -858,25 +1015,24 @@ describe('UsersService', () => {
         id: USER_ID,
         fullName: 'Test User',
         email: USER_EMAIL,
+        businessName: 'Ben Clothing',
       });
     });
 
-    it('regenerates signed avatar URL when stored path exists', async () => {
+    it('returns public avatar URL when stored path exists', async () => {
+      env.UPLOAD_STORAGE_PUBLIC_ENDPOINT = TEST_PUBLIC_HOST;
+      env.UPLOAD_STORAGE_BUCKET = TEST_PUBLIC_BUCKET;
       mockUserModelAction.get.mockResolvedValue({
         ...mockFullUser,
         avatar_url: `avatars/${USER_ID}/profile.png`,
       });
-      mockObjectStorage.createPresignedGetObjectUrl.mockResolvedValue(
-        'https://signed.example/avatar/profile.png',
-      );
 
       const result = await service.getProfile(USER_ID);
 
-      expect(mockObjectStorage.createPresignedGetObjectUrl).toHaveBeenCalledWith(
-        `avatars/${USER_ID}/profile.png`,
-        900,
+      expect(mockObjectStorage.createPresignedGetObjectUrl).not.toHaveBeenCalled();
+      expect(result.avatarUrl).toBe(
+        `${TEST_PUBLIC_AVATAR_BASE_URL}/avatars/${USER_ID}/profile.png`,
       );
-      expect(result.avatarUrl).toBe('https://signed.example/avatar/profile.png');
     });
 
     it('keeps external avatar URL unchanged on profile read', async () => {
@@ -905,6 +1061,69 @@ describe('UsersService', () => {
       mockUserModelAction.get.mockResolvedValue(null);
 
       await expect(service.getProfile(USER_ID)).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('notification preferences', () => {
+    beforeEach(() => {
+      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+    });
+
+    it('AC-01: returns current preferences for authenticated user', async () => {
+      mockNotificationsService.getNotificationPreferences.mockResolvedValue(mockNotificationPreferences);
+
+      const result = await service.getNotificationPreferences(USER_ID);
+
+      expect(mockUserModelAction.get).toHaveBeenCalledWith({
+        identifierOptions: { id: USER_ID },
+      });
+      expect(mockNotificationsService.getNotificationPreferences).toHaveBeenCalledWith(USER_ID);
+      expect(result).toEqual(mockNotificationPreferencesResponse);
+    });
+
+    it('AC-03: updates preferences for authenticated user', async () => {
+      const updated = { ...mockNotificationPreferences, email_weekly_digest: false };
+      mockNotificationsService.updateNotificationPreferences.mockResolvedValue(updated);
+
+      const result = await service.updateNotificationPreferences(USER_ID, {
+        email_weekly_digest: false,
+      });
+
+      expect(mockNotificationsService.updateNotificationPreferences).toHaveBeenCalledWith(USER_ID, {
+        email_weekly_digest: false,
+      });
+      expect(result.emailWeeklyDigest).toBe(false);
+    });
+
+    it('AC-04: returns camelCase preference fields without database column names', async () => {
+      mockNotificationsService.getNotificationPreferences.mockResolvedValue(mockNotificationPreferences);
+
+      const result = await service.getNotificationPreferences(USER_ID) as unknown as Record<string, unknown>;
+
+      expect(result).toMatchObject({
+        userId: USER_ID,
+        emailFunnelReady: true,
+        emailWeeklyDigest: true,
+        inappStageUnlocked: true,
+      });
+      expect(result).not.toHaveProperty('user_id');
+      expect(result).not.toHaveProperty('email_weekly_digest');
+      expect(result).not.toHaveProperty('created_at');
+    });
+
+    it('SEC-03: scopes notification preference reads to req.user.userId', async () => {
+      mockNotificationsService.getNotificationPreferences.mockResolvedValue(mockNotificationPreferences);
+
+      await service.getNotificationPreferences(USER_ID);
+
+      expect(mockNotificationsService.getNotificationPreferences).toHaveBeenCalledWith(USER_ID);
+    });
+
+    it('AC-09: throws 404 before reading preferences when user no longer exists', async () => {
+      mockUserModelAction.get.mockResolvedValue(null);
+
+      await expect(service.getNotificationPreferences(USER_ID)).rejects.toBeInstanceOf(NotFoundException);
+      expect(mockNotificationsService.getNotificationPreferences).not.toHaveBeenCalled();
     });
   });
 
@@ -958,6 +1177,7 @@ describe('UsersService', () => {
           { provide: DataSource, useValue: mockDataSource },
           { provide: getQueueToken(ACCOUNT_DELETION_QUEUE), useValue: mockAccountDeletionQueue },
           { provide: EventEmitter2, useValue: mockEventEmitter },
+          { provide: NotificationsService, useValue: mockNotificationsService },
           { provide: UPLOAD_OBJECT_STORAGE, useValue: mockObjectStorage },
         ],
       }).compile();

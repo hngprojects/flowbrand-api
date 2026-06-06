@@ -41,6 +41,8 @@ const envSchema = z.object({
   UPLOAD_STORAGE_SECRET_KEY: z.string().default(''),
   UPLOAD_STORAGE_BUCKET: z.string().default(''),
   UPLOAD_STORAGE_REGION: z.string().default(''),
+  /** Public host for browser-readable object URLs (no trailing slash). Combined with bucket + storage path. */
+  UPLOAD_STORAGE_PUBLIC_ENDPOINT: z.string().default(''),
 
   GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required'),
   GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
@@ -62,6 +64,38 @@ const envSchema = z.object({
       return v;
     }),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+
+  PAYMENT_PROVIDER: z.enum(['mock', 'paystack', 'flutterwave', 'stripe']),
+  TEST_PAYMENT_OUTCOME: z.enum(['success', 'failure', 'pending']).default('success'),
+  PRO_PLAN_PRICE_ONETIME_KOBO: z.coerce.number().int().positive().optional(),
+  PRO_PLAN_PRICE_MONTHLY_KOBO: z.coerce.number().int().positive().optional(),
+  PRO_PLAN_PRICE_ANNUAL_KOBO: z.coerce.number().int().positive().optional(),
+
+  PAYSTACK_SECRET_KEY: z.string().startsWith('sk_').optional(),
+  PAYSTACK_PUBLIC_KEY: z.string().startsWith('pk_').optional(),
+  PAYSTACK_PRO_MONTHLY_PLAN_CODE: z.string().startsWith('PLN_').optional(),
+  PAYSTACK_PRO_ANNUAL_PLAN_CODE: z.string().startsWith('PLN_').optional(),
+}).superRefine((data, ctx) => {
+  if (data.PAYMENT_PROVIDER === 'paystack') {
+    const requiredWithPrefix: { key: 'PAYSTACK_SECRET_KEY' | 'PAYSTACK_PUBLIC_KEY' | 'PAYSTACK_PRO_MONTHLY_PLAN_CODE' | 'PAYSTACK_PRO_ANNUAL_PLAN_CODE'; prefix: string }[] = [
+      { key: 'PAYSTACK_SECRET_KEY', prefix: 'sk_' },
+      { key: 'PAYSTACK_PUBLIC_KEY', prefix: 'pk_' },
+      { key: 'PAYSTACK_PRO_MONTHLY_PLAN_CODE', prefix: 'PLN_' },
+      { key: 'PAYSTACK_PRO_ANNUAL_PLAN_CODE', prefix: 'PLN_' },
+    ];
+    for (const { key, prefix } of requiredWithPrefix) {
+      const value = data[key];
+      if (!value) {
+        ctx.addIssue({ code: 'custom', message: `${key} is required when PAYMENT_PROVIDER=paystack`, path: [key] });
+      } else if (value.length <= prefix.length || !/[a-zA-Z0-9]/.test(value.slice(prefix.length))) {
+        ctx.addIssue({ code: 'custom', message: `${key} must have a non-empty alphanumeric suffix after '${prefix}'`, path: [key] });
+      }
+    }
+    // SEC-07: reject test keys in production — live users paying with test cards is a misconfiguration
+    if (data.NODE_ENV === 'production' && data.PAYSTACK_SECRET_KEY?.startsWith('sk_test_')) {
+      ctx.addIssue({ code: 'custom', message: 'PAYSTACK_SECRET_KEY must be a live key in production', path: ['PAYSTACK_SECRET_KEY'] });
+    }
+  }
 });
 
 const result = envSchema.safeParse(process.env);

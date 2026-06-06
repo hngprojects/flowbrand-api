@@ -1,8 +1,9 @@
-import { BadRequestException, Module, ValidationPipe } from '@nestjs/common';
+import { BadRequestException, MiddlewareConsumer, Module, NestModule, ValidationPipe } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { CustomThrottlerGuard } from './common/guards/throttler.guard';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import type { ValidationError } from 'class-validator';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -32,6 +33,11 @@ import { ActivityModule } from './modules/activity/activity.module';
 import { LoggerModule } from './common/logger/logger.module';
 import { llmConfig } from './config/llm.config';
 import { AppController } from './app.controller';
+import { ScheduleModule } from '@nestjs/schedule';
+import { TasksModule } from './modules/tasks/tasks.module';
+import { AdminModule } from './modules/admin/admin.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { LastActiveMiddleware } from './common/middleware/last-active.middleware';
 
 function collectValidationErrors(errors: ValidationError[], parentPath = ''): string[] {
   return errors.flatMap((error) => {
@@ -70,6 +76,7 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
         limit: 100,
       },
     ]),
+    ScheduleModule.forRoot(),
     HealthModule,
     UsersModule,
     AuthModule,
@@ -85,6 +92,9 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
     ContactModule,
     NotificationsModule,
     ActivityModule,
+    TasksModule,
+    AdminModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [
@@ -105,11 +115,15 @@ function collectValidationErrors(errors: ValidationError[], parentPath = ''): st
           }),
       }),
     },
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: CustomThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(LastActiveMiddleware).forRoutes('*');
+  }
+}

@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { StageStatus } from '../enums/stage-status.enum';
 import { FunnelStatus } from '../enums/funnel-status.enum';
+import { FunnelCreationPath } from '../enums/funnel-creation-path.enum';
 import type { FunnelStage } from '../entities/funnel-stage.entity';
 
 export interface FunnelGenerationCreateResult {
@@ -50,8 +51,18 @@ export interface SubmitFeedbackResponse {
 export interface TaskUpdateResult {
   taskId: string;
   name: string;
+  description: string;
   status: 'pending' | 'complete';
   isComplete: boolean;
   completedAt: string | null;
   position: number;
+}
+
+export interface FunnelRenameResult {
+  id: string;
+  funnelName: string;
+  status: FunnelStatus;
+  creationPath: FunnelCreationPath;
+  createdAt: string;
+  updatedAt: string;
 }

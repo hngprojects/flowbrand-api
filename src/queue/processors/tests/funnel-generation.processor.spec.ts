@@ -2,6 +2,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import type { Job } from 'bull';
+import { QueryFailedError } from 'typeorm';
 import { APP_EVENTS } from '../../../common/constants/app-events';
 import { FunnelFailedEvent, FunnelGeneratedEvent } from '../../../common/events';
 import { FunnelModelAction } from '../../../modules/funnels/actions/funnel.action';
@@ -25,9 +26,11 @@ const mockQueryRunner = {
   commitTransaction: jest.fn().mockResolvedValue(undefined),
   rollbackTransaction: jest.fn().mockResolvedValue(undefined),
   release: jest.fn().mockResolvedValue(undefined),
+  isTransactionActive: true,
   manager: {
-    update: jest.fn().mockResolvedValue(undefined),
+    update: jest.fn().mockResolvedValue({ affected: 1 }),
     find: jest.fn(),
+    findOne: jest.fn(),
     create: jest.fn((_, data) => data),
     save: jest.fn().mockResolvedValue(undefined),
   },
@@ -74,7 +77,7 @@ function makeValidStageData(): LlmStageData[] {
     channel: 'Instagram',
     explanation: `Explanation for stage ${position}`,
     actionPrompt: `Action for stage ${position}`,
-    tasks: [{ taskText: `Task A for stage ${position}` }, { taskText: `Task B for stage ${position}` }],
+    tasks: [{ name: `Name A`, taskText: `Task A for stage ${position}` }, { name: `Name B`, taskText: `Task B for stage ${position}` }, { name: `Name C`, taskText: `Task C for stage ${position}` }],
   }));
 }
 
@@ -107,7 +110,7 @@ describe('FunnelGenerationProcessor', () => {
     mockFunnelAction.get.mockResolvedValue({
       id: 'funnel-uuid',
       status: FunnelStatus.GENERATING,
-      business_name: 'Test Bakery',
+      funnel_name: 'Test Bakery',
       business_context: businessContext,
     });
 
@@ -349,18 +352,58 @@ describe('FunnelGenerationProcessor', () => {
   });
 
 
-  // EC-06: Funnel not found throws so Bull retries
-
-
-  describe('EC-06 — Funnel not found', () => {
-    it('throws so Bull retries instead of silently completing the job', async () => {
+  describe('EC-01 — Funnel deleted during generation', () => {
+    it('retries on first attempt when funnel row is missing at job start', async () => {
       mockFunnelAction.get.mockResolvedValue(null);
 
-
-      await expect(processor.handleGenerateFunnel(makeJob())).rejects.toThrow(/not found/);
-
+      await expect(processor.handleGenerateFunnel(makeJob({ attemptsMade: 0 }))).rejects.toThrow(
+        /DB commit may still be in flight/,
+      );
 
       expect(mockLlmService.generateWithGemini).not.toHaveBeenCalled();
+      expect(mockQueryRunner.startTransaction).not.toHaveBeenCalled();
+    });
+
+    it('aborts quietly on later attempts when funnel row is gone at job start', async () => {
+      mockFunnelAction.get.mockResolvedValue(null);
+
+      await expect(processor.handleGenerateFunnel(makeJob({ attemptsMade: 1 }))).resolves.toBeUndefined();
+
+      expect(mockLlmService.generateWithGemini).not.toHaveBeenCalled();
+      expect(mockQueryRunner.startTransaction).not.toHaveBeenCalled();
+    });
+
+    it('aborts quietly on FK violation during writeFunnelData', async () => {
+      mockLlmService.generateWithGemini.mockResolvedValue(makeValidStageData());
+      const fkError = Object.assign(new QueryFailedError('', [], new Error('FK violation')), {
+        driverError: { code: '23503' },
+      });
+      mockQueryRunner.manager.save.mockRejectedValueOnce(fkError);
+
+      await expect(processor.handleGenerateFunnel(makeJob())).resolves.toBeUndefined();
+
+      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalledTimes(1);
+      expect(mockEventEmitter.emit).not.toHaveBeenCalledWith(APP_EVENTS.FUNNEL_GENERATED, expect.anything());
+    });
+
+    it('throws when funnel exists but no stages are found', async () => {
+      mockLlmService.generateWithGemini.mockResolvedValue(makeValidStageData());
+      mockQueryRunner.manager.find.mockResolvedValueOnce([]);
+      mockQueryRunner.manager.findOne.mockResolvedValueOnce({ id: 'funnel-uuid' });
+
+      await expect(processor.handleGenerateFunnel(makeJob())).rejects.toThrow(/has no stages/);
+
+      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('aborts quietly when funnel is removed before writeFunnelData', async () => {
+      mockFunnelAction.get
+        .mockResolvedValueOnce({ id: 'funnel-uuid', status: FunnelStatus.GENERATING, funnel_name: 'Biz' })
+        .mockResolvedValueOnce(null);
+      mockLlmService.generateWithGemini.mockResolvedValue(makeValidStageData());
+
+      await expect(processor.handleGenerateFunnel(makeJob())).resolves.toBeUndefined();
+
       expect(mockQueryRunner.startTransaction).not.toHaveBeenCalled();
     });
   });
@@ -516,7 +559,7 @@ describe('FunnelGenerationProcessor', () => {
 
       const [, payload] = (mockEventEmitter.emit as jest.Mock).mock.calls[0];
       expect(payload).toBeInstanceOf(FunnelGeneratedEvent);
-      expect(payload.businessName).toBe('Test Bakery');
+      expect(payload.funnelName).toBe('Test Bakery');
     });
 
 

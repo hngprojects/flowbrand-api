@@ -13,6 +13,11 @@ const EMAIL_TYPES: EmailType[] = [
   'waitlist',
   'contact-confirmation',
   'contact-admin-notification',
+  'funnel-ready',
+  'stage-unlocked',
+  'stage-completed',
+  'weekly-digest',
+  'team-invite',
 ];
 
 @Injectable()
@@ -28,6 +33,11 @@ export class TemplateService implements OnModuleInit {
     'waitlist': 'You are on the waitlist',
     'contact-confirmation': "We've received your message",
     'contact-admin-notification': 'New contact form submission from {{fullName}}',
+    'funnel-ready': 'Your funnel is ready',
+    'stage-unlocked': '"{{stageName}}" is now active',
+    'stage-completed': 'You completed "{{stageName}}"',
+    'weekly-digest': 'Your weekly SEIL progress',
+    'team-invite': "You've been invited to '{{teamName}}'",
   };
 
   private compiledSubjects: Record<EmailType, Handlebars.TemplateDelegate>;
@@ -60,13 +70,19 @@ export class TemplateService implements OnModuleInit {
       throw new Error(`No compiled template found for type: ${type}`);
     }
 
-    const body = compiled(payload);
-    const html = this.baseLayout({
+    const frontendUrl = (process.env.FRONTEND_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+    const templateContext = {
       ...payload,
+      dashboardUrl: `${frontendUrl}/dashboard`,
+    };
+
+    const body = compiled(templateContext);
+    const html = this.baseLayout({
+      ...templateContext,
       body,
       year: new Date().getFullYear(),
-      unsubscribeUrl: `${process.env.FRONTEND_URL ?? ''}/unsubscribe`,
-      privacyPolicyUrl: `${process.env.FRONTEND_URL ?? ''}/privacy-policy`,
+      unsubscribeUrl: `${frontendUrl}/unsubscribe`,
+      privacyPolicyUrl: `${frontendUrl}/privacy-policy`,
     });
 
     const subject = this.compiledSubjects[type](payload);

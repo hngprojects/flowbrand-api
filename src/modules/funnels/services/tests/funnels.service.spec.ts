@@ -13,6 +13,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import { JOBS, QUEUES } from '../../../../common/constants/queue.constants';
 import { APP_EVENTS } from '../../../../common/constants/app-events';
+import { FunnelDeletedEvent } from '../../../../common/events/events';
+import * as SYS_MSG from '../../../../constants/system.messages';
 import { WizardSession } from '../../../onboarding/entities/wizzard-session.entity';
 import { WizardStatus } from '../../../onboarding/enums/wizzard-status.enum';
 import { RedisService } from '../../../redis/redis.service';
@@ -24,10 +26,12 @@ import { Funnel } from '../.././entities/funnel.entity';
 import { FunnelStage } from '../.././entities/funnel-stage.entity';
 import { FunnelCreationPath } from '../.././enums/funnel-creation-path.enum';
 import { FunnelStatus } from '../.././enums/funnel-status.enum';
+import { FunnelRenamedEvent } from '../../../../common/events/events';
 import { FunnelsService } from '.././funnels.service';
 import { Logger } from '@nestjs/common';
 import { StageFeedbackModelAction } from '../../actions/stage-feedback.action';
 import { StageFeedback } from '../../entities/stage-feedback.entity';
+import { LlmService } from '../../../../queue/interfaces/llm.service.interface';
 
 const USER_ID = '00000000-0000-4000-8000-0000000000a1';
 const OTHER_USER_ID = '00000000-0000-4000-8000-0000000000b2';
@@ -39,16 +43,19 @@ const BASE_DTO = {
   idempotency_key: IDEMPOTENCY_KEY,
 };
 
+const mockLlmService = {
+  generateFunnelNameWithGemini: jest.fn(),
+  generateFunnelNameWithGroq: jest.fn(),
+};
+
 const COMPLETE_WIZARD: Partial<WizardSession> = {
   id: 'wsess-1',
   user_id: USER_ID,
   status: WizardStatus.COMPLETE,
   answers: {
-    business_name: 'Mama Adunni Kitchen',
-    business_type: 'restaurant',
-    discovery_channel: 'Instagram',
-    business_description: 'Casual jollof spot',
-    target_customer: 'office workers',
+    step_1: { business_description: 'Casual jollof spot' },
+    step_2: { customer_tags: { type: ['office workers'] }, additional_notes: '' },
+    step_3: { discovery_channel: 'Instagram' },
   },
 };
 
@@ -71,6 +78,7 @@ describe('FunnelsService', () => {
     commitTransaction: jest.Mock;
     rollbackTransaction: jest.Mock;
     release: jest.Mock;
+    isTransactionActive: boolean;
     manager: { save: jest.Mock; create: jest.Mock };
   };
   let dataSource: { createQueryRunner: jest.Mock };
@@ -83,9 +91,16 @@ describe('FunnelsService', () => {
     funnelAction = {
       findByIdempotency: jest.fn(),
       findOwnedById: jest.fn(),
+      updateFunnelName: jest.fn(),
       listForUserPaginated: jest.fn(),
       getLatestCompletedWizard: jest.fn(),
       getUploadedDocuments: jest.fn(),
+      countActiveFunnelsExcluding: jest.fn(),
+      deleteFunnelById: jest.fn().mockResolvedValue(true),
+      getUserProfile: jest.fn().mockResolvedValue({
+        business_type: 'restaurant',
+        target_customer: 'office workers',
+      }),
     } as unknown as jest.Mocked<FunnelModelAction>;
 
     // Mock the Stage action
@@ -113,6 +128,7 @@ describe('FunnelsService', () => {
       commitTransaction: jest.fn().mockResolvedValue(undefined),
       rollbackTransaction: jest.fn().mockResolvedValue(undefined),
       release: jest.fn().mockResolvedValue(undefined),
+      isTransactionActive: true,
       manager: {
         save: jest
           .fn()
@@ -122,6 +138,9 @@ describe('FunnelsService', () => {
       },
     };
     dataSource = { createQueryRunner: jest.fn().mockReturnValue(queryRunner) };
+
+    mockLlmService.generateFunnelNameWithGemini.mockImplementation(async (desc: string) => desc);
+    mockLlmService.generateFunnelNameWithGroq.mockImplementation(async (desc: string) => desc);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -134,6 +153,7 @@ describe('FunnelsService', () => {
         { provide: DataSource, useValue: dataSource },
         { provide: StageFeedbackModelAction, useValue: feedbackAction },
         { provide: EventEmitter2, useValue: mockEventEmitter },
+        { provide: LlmService, useValue: mockLlmService },
       ],
     }).compile();
 
@@ -340,7 +360,7 @@ describe('FunnelsService', () => {
     it('listForUser caps per_page at 20 and returns summaries with task counts', async () => {
       const sampleFunnel: any = {
         id: 'f1',
-        business_name: 'B',
+        funnel_name: 'B',
         creation_path: 'cp',
         status: 'active',
         created_at: new Date(),
@@ -355,7 +375,7 @@ describe('FunnelsService', () => {
       expect(res.funnels.length).toBe(1);
       expect(res.funnels[0]).toMatchObject({
         funnelId: 'f1',
-        businessName: 'B',
+        funnelName: 'B',
         creationPath: 'cp',
         status: 'active',
       });
@@ -590,6 +610,310 @@ describe('FunnelsService', () => {
       await expect(service.submitFeedback(USER_ID, FUNNEL_ID, 'stage-1', { comment: 'Great' })).rejects.toThrow(
         UnprocessableEntityException,
       );
+    });
+  });
+
+  describe('renameFunnel', () => {
+    const createdAt = new Date('2026-05-18T12:00:00.000Z');
+    const updatedAt = new Date('2026-05-26T10:00:00.000Z');
+
+    const baseFunnel = {
+      id: FUNNEL_ID,
+      user_id: USER_ID,
+      funnel_name: 'Old Name',
+      status: FunnelStatus.ACTIVE,
+      creation_path: FunnelCreationPath.WIZARD,
+      created_at: createdAt,
+      updated_at: createdAt,
+    } as Funnel;
+
+    it('AC-01: updates funnel_name and returns camelCase payload', async () => {
+      funnelAction.findOwnedById.mockResolvedValue(baseFunnel);
+      funnelAction.updateFunnelName.mockResolvedValue({
+        ...baseFunnel,
+        funnel_name: 'New Name',
+        updated_at: updatedAt,
+      } as Funnel);
+
+      const result = await service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'New Name' });
+
+      expect(funnelAction.updateFunnelName).toHaveBeenCalledWith(FUNNEL_ID, USER_ID, 'New Name');
+      expect(result).toEqual({
+        id: FUNNEL_ID,
+        funnelName: 'New Name',
+        status: FunnelStatus.ACTIVE,
+        creationPath: FunnelCreationPath.WIZARD,
+        createdAt: createdAt.toISOString(),
+        updatedAt: updatedAt.toISOString(),
+      });
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        APP_EVENTS.FUNNEL_RENAMED,
+        expect.any(FunnelRenamedEvent),
+      );
+      const event = mockEventEmitter.emit.mock.calls[0][1] as FunnelRenamedEvent;
+      expect(event.userId).toBe(USER_ID);
+      expect(event.funnelId).toBe(FUNNEL_ID);
+      expect(event.oldName).toBe('Old Name');
+      expect(event.newName).toBe('New Name');
+    });
+
+    it('AC-08: returns 200 without DB write or event when name is unchanged', async () => {
+      funnelAction.findOwnedById.mockResolvedValue(baseFunnel);
+
+      const result = await service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'Old Name' });
+
+      expect(result.funnelName).toBe('Old Name');
+      expect(funnelAction.updateFunnelName).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('AC-06/AC-07: returns 404 when funnel is missing or owned by another user', async () => {
+      funnelAction.findOwnedById.mockResolvedValue(null);
+
+      await expect(service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'New' })).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.renameFunnel(OTHER_USER_ID, FUNNEL_ID, { funnelName: 'New' })).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(funnelAction.updateFunnelName).not.toHaveBeenCalled();
+    });
+
+    it('EC-01: allows rename while funnel status is generating', async () => {
+      funnelAction.findOwnedById.mockResolvedValue({
+        ...baseFunnel,
+        status: FunnelStatus.GENERATING,
+      } as Funnel);
+      funnelAction.updateFunnelName.mockResolvedValue({
+        ...baseFunnel,
+        status: FunnelStatus.GENERATING,
+        funnel_name: 'Generating Rename',
+        updated_at: updatedAt,
+      } as Funnel);
+
+      const result = await service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'Generating Rename' });
+
+      expect(result.status).toBe(FunnelStatus.GENERATING);
+      expect(funnelAction.updateFunnelName).toHaveBeenCalled();
+    });
+
+    it('allows rename when funnel status is failed', async () => {
+      funnelAction.findOwnedById.mockResolvedValue({
+        ...baseFunnel,
+        status: FunnelStatus.FAILED,
+      } as Funnel);
+      funnelAction.updateFunnelName.mockResolvedValue({
+        ...baseFunnel,
+        status: FunnelStatus.FAILED,
+        funnel_name: 'Failed Rename',
+        updated_at: updatedAt,
+      } as Funnel);
+
+      await service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'Failed Rename' });
+
+      expect(funnelAction.updateFunnelName).toHaveBeenCalledWith(FUNNEL_ID, USER_ID, 'Failed Rename');
+    });
+
+    it('returns 404 when funnel is deleted between ownership check and update', async () => {
+      funnelAction.findOwnedById.mockResolvedValue(baseFunnel);
+      funnelAction.updateFunnelName.mockResolvedValue(null);
+
+      await expect(service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'New Name' })).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('FR-7: emits FUNNEL_RENAMED only after update succeeds', async () => {
+      const order: string[] = [];
+      funnelAction.findOwnedById.mockResolvedValue(baseFunnel);
+      funnelAction.updateFunnelName.mockImplementation(async () => {
+        order.push('update');
+        return { ...baseFunnel, funnel_name: 'After', updated_at: updatedAt } as Funnel;
+      });
+      mockEventEmitter.emit.mockImplementation(() => {
+        order.push('emit');
+      });
+
+      await service.renameFunnel(USER_ID, FUNNEL_ID, { funnelName: 'After' });
+
+      expect(order).toEqual(['update', 'emit']);
+    });
+  });
+
+  describe('wizard context derivation', () => {
+    type SavedFunnel = {
+      funnel_name: string;
+      business_context: { businessType: string; business_description: string; target_customer: string };
+    };
+
+    it('uses step_1.business_description to generate funnel_name', async () => {
+      funnelAction.findByIdempotency.mockResolvedValue(null);
+      funnelAction.getLatestCompletedWizard.mockResolvedValue(COMPLETE_WIZARD as WizardSession);
+      mockLlmService.generateFunnelNameWithGemini.mockResolvedValueOnce('Jollof Spot');
+
+      await service.createGeneration(USER_ID, BASE_DTO);
+
+      const saved = queryRunner.manager.save.mock.calls[0][1] as SavedFunnel;
+      expect(saved.funnel_name).toBe('Jollof Spot');
+      expect(saved.business_context.business_description).toBe('Casual jollof spot');
+      expect(mockLlmService.generateFunnelNameWithGemini).toHaveBeenCalledWith('Casual jollof spot', 'Instagram');
+    });
+
+    it('falls back to Groq if Gemini funnel name generation fails', async () => {
+      funnelAction.findByIdempotency.mockResolvedValue(null);
+      funnelAction.getLatestCompletedWizard.mockResolvedValue(COMPLETE_WIZARD as WizardSession);
+      mockLlmService.generateFunnelNameWithGemini.mockRejectedValueOnce(new Error('Gemini error'));
+      mockLlmService.generateFunnelNameWithGroq.mockResolvedValueOnce('Groq Jollof Spot');
+
+      await service.createGeneration(USER_ID, BASE_DTO);
+
+      const saved = queryRunner.manager.save.mock.calls[0][1] as SavedFunnel;
+      expect(saved.funnel_name).toBe('Groq Jollof Spot');
+      expect(mockLlmService.generateFunnelNameWithGroq).toHaveBeenCalledWith('Casual jollof spot', 'Instagram');
+    });
+
+    it('falls back to default funnel name if both Gemini and Groq fail', async () => {
+      funnelAction.findByIdempotency.mockResolvedValue(null);
+      funnelAction.getLatestCompletedWizard.mockResolvedValue(COMPLETE_WIZARD as WizardSession);
+      mockLlmService.generateFunnelNameWithGemini.mockRejectedValueOnce(new Error('Gemini error'));
+      mockLlmService.generateFunnelNameWithGroq.mockRejectedValueOnce(new Error('Groq error'));
+
+      await service.createGeneration(USER_ID, BASE_DTO);
+
+      const saved = queryRunner.manager.save.mock.calls[0][1] as SavedFunnel;
+      expect(saved.funnel_name).toBe('My Funnel');
+    });
+
+    it('joins multiple discovery channels into a comma-separated string for the LLM', async () => {
+      funnelAction.findByIdempotency.mockResolvedValue(null);
+      funnelAction.getLatestCompletedWizard.mockResolvedValue({
+        ...COMPLETE_WIZARD,
+        answers: {
+          ...COMPLETE_WIZARD.answers,
+          step_3: { discovery_channel: ['Instagram', 'WhatsApp'] },
+        },
+      } as WizardSession);
+      mockLlmService.generateFunnelNameWithGemini.mockResolvedValueOnce('Jollof Spot');
+
+      await service.createGeneration(USER_ID, BASE_DTO);
+
+      expect(mockLlmService.generateFunnelNameWithGemini).toHaveBeenCalledWith(
+        'Casual jollof spot',
+        'Instagram, WhatsApp',
+      );
+    });
+
+    it('uses user profile fields for businessType and target_customer', async () => {
+      funnelAction.findByIdempotency.mockResolvedValue(null);
+      funnelAction.getLatestCompletedWizard.mockResolvedValue(COMPLETE_WIZARD as WizardSession);
+      funnelAction.getUserProfile.mockResolvedValue({
+        business_type: 'restaurant',
+        target_customer: 'office workers',
+      });
+
+      await service.createGeneration(USER_ID, BASE_DTO);
+
+      const saved = queryRunner.manager.save.mock.calls[0][1] as SavedFunnel;
+      expect(saved.business_context.businessType).toBe('restaurant');
+      expect(saved.business_context.target_customer).toBe('office workers');
+    });
+  });
+
+  describe('deleteFunnel', () => {
+    const activeFunnel = {
+      id: FUNNEL_ID,
+      user_id: USER_ID,
+      status: FunnelStatus.ACTIVE,
+      funnel_name: 'Acme Studio',
+    } as Funnel;
+
+    it('AC-01: deletes owned active funnel when another active funnel remains', async () => {
+      funnelAction.findOwnedById.mockResolvedValue(activeFunnel);
+      funnelAction.countActiveFunnelsExcluding.mockResolvedValue(1);
+
+      const result = await service.deleteFunnel(USER_ID, FUNNEL_ID);
+
+      expect(result).toEqual({ statusCode: HttpStatus.OK, message: SYS_MSG.FUNNEL_DELETED });
+      expect(funnelAction.countActiveFunnelsExcluding).toHaveBeenCalledWith(USER_ID, FUNNEL_ID, expect.anything());
+      expect(funnelAction.deleteFunnelById).toHaveBeenCalledWith(FUNNEL_ID, USER_ID, expect.anything());
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        APP_EVENTS.FUNNEL_DELETED,
+        expect.any(FunnelDeletedEvent),
+      );
+      const event = mockEventEmitter.emit.mock.calls[0][1] as FunnelDeletedEvent;
+      expect(event.userId).toBe(USER_ID);
+      expect(event.funnelId).toBe(FUNNEL_ID);
+      expect(event.funnelName).toBe('Acme Studio');
+    });
+
+    it('AC-04: rejects deleting the only active funnel with 409 message', async () => {
+      funnelAction.findOwnedById.mockResolvedValue(activeFunnel);
+      funnelAction.countActiveFunnelsExcluding.mockResolvedValue(0);
+
+      await expect(service.deleteFunnel(USER_ID, FUNNEL_ID)).rejects.toThrow(ConflictException);
+      expect(funnelAction.deleteFunnelById).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('AC-05: deletes failed funnel without active-funnel guard', async () => {
+      funnelAction.findOwnedById.mockResolvedValue({
+        ...activeFunnel,
+        status: FunnelStatus.FAILED,
+      } as Funnel);
+
+      await service.deleteFunnel(USER_ID, FUNNEL_ID);
+
+      expect(funnelAction.countActiveFunnelsExcluding).not.toHaveBeenCalled();
+      expect(funnelAction.deleteFunnelById).toHaveBeenCalledWith(FUNNEL_ID, USER_ID, expect.anything());
+    });
+
+    it('AC-06: deletes generating funnel without active-funnel guard', async () => {
+      funnelAction.findOwnedById.mockResolvedValue({
+        ...activeFunnel,
+        status: FunnelStatus.GENERATING,
+      } as Funnel);
+
+      await service.deleteFunnel(USER_ID, FUNNEL_ID);
+
+      expect(funnelAction.countActiveFunnelsExcluding).not.toHaveBeenCalled();
+      expect(funnelAction.deleteFunnelById).toHaveBeenCalledWith(FUNNEL_ID, USER_ID, expect.anything());
+    });
+
+    it('returns 404 when funnel is deleted between ownership check and delete', async () => {
+      funnelAction.findOwnedById.mockResolvedValue(activeFunnel);
+      funnelAction.countActiveFunnelsExcluding.mockResolvedValue(1);
+      funnelAction.deleteFunnelById.mockResolvedValue(false);
+
+      await expect(service.deleteFunnel(USER_ID, FUNNEL_ID)).rejects.toThrow(NotFoundException);
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('AC-07/AC-08: returns 404 when funnel is missing or not owned', async () => {
+      funnelAction.findOwnedById.mockResolvedValue(null);
+
+      await expect(service.deleteFunnel(USER_ID, FUNNEL_ID)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.deleteFunnel(OTHER_USER_ID, FUNNEL_ID)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('FR-7/EC-04: emits only after hard delete and transaction commit succeed', async () => {
+      const order: string[] = [];
+      funnelAction.findOwnedById.mockResolvedValue(activeFunnel);
+      funnelAction.countActiveFunnelsExcluding.mockResolvedValue(1);
+      funnelAction.deleteFunnelById.mockImplementation(async () => {
+        order.push('delete');
+        return true;
+      });
+      queryRunner.commitTransaction.mockImplementation(async () => {
+        order.push('commit');
+      });
+      mockEventEmitter.emit.mockImplementation(() => {
+        order.push('emit');
+      });
+
+      await service.deleteFunnel(USER_ID, FUNNEL_ID);
+
+      expect(order).toEqual(['delete', 'commit', 'emit']);
     });
   });
 });

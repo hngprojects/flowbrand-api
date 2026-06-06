@@ -71,4 +71,33 @@ export class UploadedDocumentModelAction extends AbstractModelAction<UploadedDoc
       .andWhere('percent_complete < :percent', { percent })
       .execute();
   }
+
+    async findStuckUploads(olderThanMs: number): Promise<{ id: string; user_id: string }[]> {
+    const threshold = new Date(Date.now() - olderThanMs);
+    return this.uploadedDocumentRepository
+      .createQueryBuilder('u')
+      .select(['u.id', 'u.user_id'])
+      .where('u.status IN (:...statuses)', { 
+        statuses: [UploadDocumentStatus.PARSING, UploadDocumentStatus.UPLOADING] 
+      })
+      .andWhere('u.created_at < :threshold', { threshold })
+      .getMany();
+  }
+
+    async markUploadsFailed(ids: string[], failureReason: string): Promise<void> {
+    if (ids.length === 0) return;
+    await this.uploadedDocumentRepository
+      .createQueryBuilder()
+      .update(UploadedDocument)
+      .set({ 
+        status: UploadDocumentStatus.FAILED, 
+        percent_complete: 0,
+        failure_reason: failureReason
+      })
+      .whereInIds(ids)
+      .andWhere('status IN (:...statuses)', { 
+        statuses: [UploadDocumentStatus.PARSING, UploadDocumentStatus.UPLOADING] 
+      })
+      .execute();
+  }
 }

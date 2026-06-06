@@ -91,17 +91,23 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
     service = module.get<OnboardingService>(OnboardingService);
   });
 
-  it('returns 200 with completed status and redirect when already complete', async () => {
+  it('creates a new IN_PROGRESS session after a prior completion (re-entry allowed)', async () => {
+    const newSession = buildSession({
+      id: 'new-session-id',
+      user_id: USER_A,
+      status: WizardStatus.IN_PROGRESS,
+      steps_completed: 0,
+      answers: {},
+    });
     mockWizardSessionModelAction.resolveStartWizardSession.mockResolvedValue({
-      status: 'already_complete',
+      status: 'created',
+      session: newSession,
     });
     const result = await service.startWizardSession(USER_A);
-    expect(result.statusCode).toBe(HttpStatus.OK);
-    expect(result.message).toBe(SYS_MSG.ONBOARDING_ALREADY_COMPLETE);
-    expect(result.data).toEqual({
-      status: WizardStatus.COMPLETE,
-      redirect: { to: 'funnel_generation' }
-    });
+    expect(result.statusCode).toBe(HttpStatus.CREATED);
+    expect(result.message).toBe(SYS_MSG.ONBOARDING_SESSION_STARTED);
+    expect(result.data.sessionId).toBe('new-session-id');
+    expect(result.data.status).toBe(WizardStatus.IN_PROGRESS);
   });
 
   it('returns existing active in-progress session with camelCase fields (idempotent)', async () => {
@@ -179,11 +185,14 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
     ).toHaveBeenCalledWith(USER_A, expect.any(Date), expect.any(Date));
   });
 
-  it('isolates users: completed for user A does not block user B', async () => {
+  it('isolates users: sessions for user A and user B are independent', async () => {
     mockWizardSessionModelAction.resolveStartWizardSession.mockImplementation(
       async (userId: string) => {
         if (userId === USER_A) {
-          return { status: 'already_complete' };
+          return {
+            status: 'created',
+            session: buildSession({ id: 'new-for-a', user_id: USER_A }),
+          };
         }
         return {
           status: 'created',
@@ -193,12 +202,13 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
     );
 
     const resultA = await service.startWizardSession(USER_A);
-    expect(resultA.statusCode).toBe(HttpStatus.OK);
-    expect(resultA.data.status).toBe(WizardStatus.COMPLETE);
+    expect(resultA.statusCode).toBe(HttpStatus.CREATED);
+    expect(resultA.data.userId).toBe(USER_A);
+    expect(resultA.data.status).toBe(WizardStatus.IN_PROGRESS);
 
-    const result = await service.startWizardSession(USER_B);
-    expect(result.statusCode).toBe(HttpStatus.CREATED);
-    expect(result.data.userId).toBe(USER_B);
+    const resultB = await service.startWizardSession(USER_B);
+    expect(resultB.statusCode).toBe(HttpStatus.CREATED);
+    expect(resultB.data.userId).toBe(USER_B);
   });
 
   it('delegates to atomic resolveStartWizardSession', async () => {
@@ -514,6 +524,35 @@ describe('OnboardingService — completeOnboarding', () => {
       service.completeOnboarding(USER_ID, SESSION_ID),
     ).rejects.toThrow('DB failure');
   });
+
+  describe('primary_goal mapping for all DiscoveryChannel values', () => {
+    const cases: Array<{ channel: string | string[]; expected: string }> = [
+      { channel: 'Instagram',        expected: 'awareness' },
+      { channel: 'Facebook',         expected: 'awareness' },
+      { channel: 'TikTok',           expected: 'awareness' },
+      { channel: 'Physical Location', expected: 'sales' },
+      { channel: 'Others',           expected: 'awareness' },
+      { channel: ['Instagram', 'Facebook'], expected: 'awareness' },
+      { channel: ['Instagram', 'Physical Location'], expected: 'sales' },
+    ];
+
+    it.each(cases)(
+      'writes primary_goal "$expected" for discovery_channel "$channel"',
+      async ({ channel, expected }) => {
+        mockWizardSessionModelAction.findSessionById.mockResolvedValue({
+          ...validSession,
+          answers: { ...validAnswers, step_3: { discovery_channel: channel } },
+        });
+
+        await service.completeOnboarding(USER_ID, SESSION_ID);
+
+        const userUpdateCall = mockManager.update.mock.calls.find(
+          (call: unknown[]) => call[1] === USER_ID,
+        );
+        expect(userUpdateCall![2]).toMatchObject({ primary_goal: expected });
+      },
+    );
+  });
 });
 
 describe('OnboardingService — saveStepAnswer (BE-008)', () => {
@@ -615,7 +654,7 @@ describe('OnboardingService — saveStepAnswer (BE-008)', () => {
     mockSaveSessionAction.saveSession.mockResolvedValue(undefined);
 
     const result = await service.saveStepAnswer(USER_ID, {
-      session_id: SESSION_ID, step: 3, answer: { discovery_channel: 'Instagram' }
+      session_id: SESSION_ID, step: 3, answer: { discovery_channel: ['Instagram'] }
     } as any);
 
     expect(result.statusCode).toBe(HttpStatus.OK);
@@ -638,17 +677,19 @@ describe('OnboardingService — saveStepAnswer (BE-008)', () => {
     expect(result.data.stepsCompleted).toBe(1);
   });
 
-  it('AC-08: throws 422 when step 1 business_description exceeds 500 characters', async () => {
+  it('AC-08: throws 422 when step 1 business_description exceeds 2000 characters', async () => {
     mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession());
     await expect(
       service.saveStepAnswer(USER_ID, {
-        session_id: SESSION_ID, step: 1, answer: { business_description: 'x'.repeat(501) }
+        session_id: SESSION_ID, step: 1, answer: { business_description: 'x'.repeat(2001) }
       } as any)
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 
-  it('AC-09: throws 422 when step 2 customer_tags.type is empty array', async () => {
-    mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession());
+  it('AC-09: throws 422 when step 2 has no tags and no additional_notes', async () => {
+    mockSaveSessionAction.findSessionById.mockResolvedValue(
+      buildSession({ steps_completed: 1, answers: { step_1: { business_description: 'test' } } }),
+    );
     await expect(
       service.saveStepAnswer(USER_ID, {
         session_id: SESSION_ID, step: 2, answer: { customer_tags: { type: [] } }
@@ -656,11 +697,54 @@ describe('OnboardingService — saveStepAnswer (BE-008)', () => {
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 
-  it('AC-10: throws 422 when step 3 discovery_channel is invalid', async () => {
+  it('AC-09a: accepts step 2 with additional_notes only (no tags selected)', async () => {
+    mockSaveSessionAction.findSessionById.mockResolvedValue(
+      buildSession({ steps_completed: 1, answers: { step_1: { business_description: 'test' } } }),
+    );
+    const result = await service.saveStepAnswer(USER_ID, {
+      session_id: SESSION_ID,
+      step: 2,
+      answer: { customer_tags: {}, additional_notes: 'They are people who want to make their lives easier' },
+    } as any);
+    expect(result.statusCode).toBe(200);
+  });
+
+  it('AC-09b: throws 422 when step 2 has empty tags and blank additional_notes', async () => {
+    mockSaveSessionAction.findSessionById.mockResolvedValue(
+      buildSession({ steps_completed: 1, answers: { step_1: { business_description: 'test' } } }),
+    );
+    await expect(
+      service.saveStepAnswer(USER_ID, {
+        session_id: SESSION_ID,
+        step: 2,
+        answer: { customer_tags: { type: [] }, additional_notes: '   ' },
+      } as any)
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('AC-10: throws 422 when step 3 discovery_channel is not an array', async () => {
     mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession());
     await expect(
       service.saveStepAnswer(USER_ID, {
-        session_id: SESSION_ID, step: 3, answer: { discovery_channel: 'Twitter' }
+        session_id: SESSION_ID, step: 3, answer: { discovery_channel: 'Instagram' }
+      } as any)
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('AC-10a: throws 422 when step 3 discovery_channel is empty array', async () => {
+    mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession());
+    await expect(
+      service.saveStepAnswer(USER_ID, {
+        session_id: SESSION_ID, step: 3, answer: { discovery_channel: [] }
+      } as any)
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('AC-10b: throws 422 when step 3 discovery_channel contains invalid channel', async () => {
+    mockSaveSessionAction.findSessionById.mockResolvedValue(buildSession());
+    await expect(
+      service.saveStepAnswer(USER_ID, {
+        session_id: SESSION_ID, step: 3, answer: { discovery_channel: ['Twitter'] }
       } as any)
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });

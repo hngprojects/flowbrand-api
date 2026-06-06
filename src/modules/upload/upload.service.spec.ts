@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  HttpException,
   HttpStatus,
   NotFoundException,
   UnprocessableEntityException,
@@ -9,6 +10,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import * as fs from 'node:fs';
 import { QUEUES } from '../../common/constants/queue.constants';
 import * as SYS_MSG from '../../constants/system.messages';
+import { RedisService } from '../redis/redis.service';
 import { MAX_UPLOAD_BYTES, UPLOAD_PROGRESS } from './constants/upload.constants';
 import { UploadedDocument } from './entities/uploaded-document.entity';
 import { UploadedDocumentModelAction } from './actions/uploaded-document.action';
@@ -61,6 +63,8 @@ const mockObjectStorage: jest.Mocked<ObjectStorage> = {
   deleteObject: jest.fn(),
   createPresignedGetObjectUrl: jest.fn(),
 };
+
+const mockRedisService = { rateLimit: jest.fn() };
 
 function buildRow(
   overrides: Partial<UploadedDocument> = {},
@@ -115,6 +119,7 @@ describe('UploadService', () => {
       Promise.resolve(row),
     );
     mockUploadedDocumentAction.updateProgress.mockResolvedValue(undefined);
+    mockRedisService.rateLimit.mockResolvedValue({ exceeded: false, count: 1 });
     mockObjectStorage.putObject.mockResolvedValue(undefined);
     mockObjectStorage.deleteObject.mockResolvedValue(undefined);
     mockObjectStorage.getObject.mockResolvedValue(
@@ -158,6 +163,7 @@ describe('UploadService', () => {
           useValue: mockDocumentTextExtractor,
         },
         { provide: UPLOAD_OBJECT_STORAGE, useValue: mockObjectStorage },
+        { provide: RedisService, useValue: mockRedisService },
       ],
     }).compile();
 
@@ -165,6 +171,18 @@ describe('UploadService', () => {
   });
 
   describe('handleUpload', () => {
+    it('RL-01: throws 429 when per-user upload rate limit is exceeded', async () => {
+      mockRedisService.rateLimit.mockResolvedValue({ exceeded: true, count: 21 });
+      // Rate limit fires after file-presence check, so a non-empty array is required.
+      const files = [mockPdfFile()];
+
+      await expect(service.handleUpload(USER_ID, files)).rejects.toThrow(HttpException);
+      await expect(service.handleUpload(USER_ID, files)).rejects.toMatchObject({
+        message: SYS_MSG.UPLOAD_RATE_LIMIT_EXCEEDED,
+        status: HttpStatus.TOO_MANY_REQUESTS,
+      });
+    });
+
     it('AC-01: rejects when no files are provided', async () => {
       // Arrange
       const noFiles = undefined;

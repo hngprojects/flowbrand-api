@@ -1,7 +1,7 @@
 import { AbstractModelAction } from '@hng-sdk/orm';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository, QueryDeepPartialEntity, In } from 'typeorm';
+import { EntityManager, Repository, QueryDeepPartialEntity, In, Not } from 'typeorm';
 import { Funnel } from '../entities/funnel.entity';
 import { FunnelStage } from '../entities/funnel-stage.entity';
 import { StageTask } from '../entities/stage-task.entity';
@@ -9,6 +9,9 @@ import { StageStatus } from '../enums/stage-status.enum';
 import { WizardSession } from '../../onboarding/entities/wizzard-session.entity';
 import { WizardStatus } from '../../onboarding/enums/wizzard-status.enum';
 import { UploadedDocument } from '../../upload/entities/uploaded-document.entity';
+import { FunnelStatus } from '../../../modules/funnels/enums/funnel-status.enum';
+import { User } from '../../users/entities/user.entity';
+
 
 @Injectable()
 export class FunnelModelAction extends AbstractModelAction<Funnel> {
@@ -73,9 +76,46 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
     });
   }
 
-  async findOwnedById(funnelId: string, userId: string, manager?: EntityManager): Promise<Funnel | null> {
+  async findOwnedById(
+    funnelId: string,
+    userId: string,
+    manager?: EntityManager,
+    forUpdate = false,
+  ): Promise<Funnel | null> {
     const repo = manager ? manager.getRepository(Funnel) : this.funnelRepository;
-    return repo.findOne({ where: { id: funnelId, user_id: userId } });
+    return repo.findOne({
+      where: { id: funnelId, user_id: userId },
+      ...(forUpdate && manager ? { lock: { mode: 'pessimistic_write' } } : {}),
+    });
+  }
+
+  async countActiveFunnelsExcluding(
+    userId: string,
+    excludeFunnelId: string,
+    manager?: EntityManager,
+  ): Promise<number> {
+    const repo = manager ? manager.getRepository(Funnel) : this.funnelRepository;
+    return repo.count({
+      where: {
+        user_id: userId,
+        status: FunnelStatus.ACTIVE,
+        id: Not(excludeFunnelId),
+      },
+    });
+  }
+
+  async deleteFunnelById(funnelId: string, userId: string, manager?: EntityManager): Promise<boolean> {
+    const repo = manager ? manager.getRepository(Funnel) : this.funnelRepository;
+    const result = await repo.delete({ id: funnelId, user_id: userId });
+    return (result.affected ?? 0) > 0;
+  }
+
+  async updateFunnelName(funnelId: string, userId: string, funnelName: string): Promise<Funnel | null> {
+    const funnel = await this.funnelRepository.findOne({ where: { id: funnelId, user_id: userId } });
+    if (!funnel) return null;
+
+    funnel.funnel_name = funnelName;
+    return this.funnelRepository.save(funnel);
   }
 
   async listForUserPaginated(userId: string, page: number, perPage: number): Promise<[Funnel[], number]> {
@@ -113,9 +153,37 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
       .getOne();
   }
 
+  async getUserProfile(userId: string): Promise<{ business_type: string | null; target_customer: string | null } | null> {
+    return this.manager.getRepository(User).findOne({
+      where: { id: userId },
+      select: { business_type: true, target_customer: true },
+    });
+  }
+
   async getUploadedDocuments(userId: string, ids: string[]): Promise<UploadedDocument[]> {
     return this.manager.getRepository(UploadedDocument).find({
       where: { id: In(ids), user_id: userId },
     });
+  }
+
+    async findStuckFunnels(olderThanMs: number): Promise<{ id: string; user_id: string }[]> {
+    const threshold = new Date(Date.now() - olderThanMs);
+    return this.funnelRepository
+      .createQueryBuilder('f')
+      .select(['f.id', 'f.user_id'])
+      .where('f.status = :status', { status: FunnelStatus.GENERATING })
+      .andWhere('f.created_at < :threshold', { threshold })
+      .getMany();
+  }
+
+    async markFunnelsFailed(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    await this.funnelRepository
+      .createQueryBuilder()
+      .update(Funnel)
+      .set({ status: FunnelStatus.FAILED })
+      .whereInIds(ids)
+      .andWhere('status = :status', { status: FunnelStatus.GENERATING }) 
+      .execute();
   }
 }

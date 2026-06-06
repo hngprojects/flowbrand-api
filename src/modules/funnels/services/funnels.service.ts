@@ -20,6 +20,8 @@ import {
   FeedbackSubmittedEvent,
   TaskCompletedEvent,
   TaskReopenedEvent,
+  FunnelDeletedEvent,
+  FunnelRenamedEvent,
 } from '../../../common/events';
 import { emitSafely } from '../../../common/events/emit-safely';
 import { JOBS, QUEUES } from '../../../common/constants/queue.constants';
@@ -38,20 +40,23 @@ import { UploadDocumentStatus } from '../../upload/upload.types';
 import type { BusinessContext, GenerateFunnelJobPayload } from './../interfaces/generate-funnel-job.interface';
 import type {
   FunnelGenerationCreateResult,
+  FunnelRenameResult,
   FunnelStatusResult,
   StageCompletionResult,
   SubmitFeedbackResponse,
   TaskUpdateResult,
 } from './../interfaces/funnels.interfaces';
+import { RenameFunnelDto } from './../dto/rename-funnel.dto';
 import { StageTask, StageTaskStatus } from './../entities/stage-task.entity';
 import { UploadedDocument } from '../../upload/entities/uploaded-document.entity';
 import { StageFeedbackModelAction } from '../actions/stage-feedback.action';
 import { SubmitStageFeedbackDto } from '../dto/submit-stage-feedback.dto';
 import { StageFeedback } from '../entities/stage-feedback.entity';
+import { LlmService } from '../../../queue/interfaces/llm.service.interface';
 
 const STAGE_NAMES = ['Get Noticed', 'Spark Interest', 'Make First Sale', 'Bring Them Back'] as const;
 const QUEUE_DELAY_MS = 250;
-const DEFAULT_BUSINESS_NAME = 'My Business';
+const DEFAULT_FUNNEL_NAME = 'My Funnel';
 
 @Injectable()
 export class FunnelsService {
@@ -66,6 +71,7 @@ export class FunnelsService {
     private readonly dataSource: DataSource,
     private readonly feedbackAction: StageFeedbackModelAction,
     private readonly eventEmitter: EventEmitter2,
+    private readonly llmService: LlmService,
   ) {}
 
   normalizePagination(page?: number, perPage?: number) {
@@ -108,7 +114,7 @@ export class FunnelsService {
 
     const mapped = funnels.map((f) => ({
       funnelId: f.id,
-      businessName: f.business_name,
+      funnelName: f.funnel_name,
       creationPath: f.creation_path,
       status: f.status,
       createdAt: f.created_at,
@@ -150,14 +156,14 @@ export class FunnelsService {
       completedAt: s.completed_at,
       explanation: s.explanation,
       actionPrompt: s.action_prompt,
-      tasks: (s.tasks ?? []).map((t) => ({ id: t.id, position: t.position, name: t.name, status: t.status })),
+      tasks: (s.tasks ?? []).map((t) => ({ id: t.id, position: t.position, name: t.name, description: t.task_text, status: t.status })),
       tasksTotal: countsMap.get(s.id)?.total ?? (s.tasks ?? []).length,
       tasksComplete: countsMap.get(s.id)?.complete ?? (s.tasks ?? []).filter((t) => t.status === 'complete').length,
     }));
 
     return {
       funnelId: funnel.id,
-      businessName: funnel.business_name,
+      funnelName: funnel.funnel_name,
       creationPath: funnel.creation_path,
       status: funnel.status,
       createdAt: funnel.created_at,
@@ -219,7 +225,7 @@ export class FunnelsService {
       completedAt: stage.completed_at,
       explanation: stage.explanation,
       actionPrompt: stage.action_prompt,
-      tasks: tasks.map((t) => ({ id: t.id, position: t.position, name: t.name, status: t.status })),
+      tasks: tasks.map((t) => ({ id: t.id, position: t.position, name: t.name, description: t.task_text, status: t.status })),
       tasksTotal: Number(rawCount?.total ?? 0),
       tasksComplete: Number(rawCount?.complete ?? 0),
     };
@@ -237,7 +243,7 @@ export class FunnelsService {
     }
 
     await this.checkRateLimit(userId);
-    const { businessName, businessContext } = await this.validateSourceAndDeriveContext(userId, dto);
+    const { funnelName, businessContext } = await this.validateSourceAndDeriveContext(userId, dto);
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -246,7 +252,7 @@ export class FunnelsService {
     try {
       const funnel = await queryRunner.manager.save(Funnel, {
         user_id: userId,
-        business_name: businessName,
+        funnel_name: funnelName,
         creation_path: dto.source,
         status: FunnelStatus.GENERATING,
         idempotency_key: dto.idempotency_key,
@@ -295,6 +301,40 @@ export class FunnelsService {
     }
   }
 
+  async renameFunnel(userId: string, funnelId: string, dto: RenameFunnelDto): Promise<FunnelRenameResult> {
+    const funnel = await this.funnelAction.findOwnedById(funnelId, userId);
+    if (!funnel) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
+
+    const trimmedName = dto.funnelName;
+    if (trimmedName === funnel.funnel_name) {
+      return this.toRenameResponse(funnel);
+    }
+
+    const oldName = funnel.funnel_name;
+    const updated = await this.funnelAction.updateFunnelName(funnelId, userId, trimmedName);
+    if (!updated) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
+
+    emitSafely(
+      this.eventEmitter,
+      this.logger,
+      APP_EVENTS.FUNNEL_RENAMED,
+      new FunnelRenamedEvent(userId, funnelId, oldName, trimmedName),
+    );
+
+    return this.toRenameResponse(updated);
+  }
+
+  private toRenameResponse(funnel: Funnel): FunnelRenameResult {
+    return {
+      id: funnel.id,
+      funnelName: funnel.funnel_name,
+      status: funnel.status,
+      creationPath: funnel.creation_path,
+      createdAt: funnel.created_at.toISOString(),
+      updatedAt: funnel.updated_at.toISOString(),
+    };
+  }
+
   async getStatus(funnelId: string, userId: string): Promise<FunnelStatusResult> {
     const funnel = await this.funnelAction.findOwnedById(funnelId, userId);
     if (!funnel) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
@@ -313,6 +353,53 @@ export class FunnelsService {
       };
     }
     return base;
+  }
+
+  async deleteFunnel(
+    userId: string,
+    funnelId: string,
+  ): Promise<{ statusCode: HttpStatus; message: string }> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const funnel = await this.funnelAction.findOwnedById(funnelId, userId, queryRunner.manager, true);
+      if (!funnel) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
+
+      if (funnel.status === FunnelStatus.ACTIVE) {
+        const remainingActive = await this.funnelAction.countActiveFunnelsExcluding(
+          userId,
+          funnelId,
+          queryRunner.manager,
+        );
+        if (remainingActive === 0) {
+          throw new ConflictException(SYS_MSG.FUNNEL_CANNOT_DELETE_ONLY_ACTIVE);
+        }
+      }
+
+      const funnelName = funnel.funnel_name;
+      const deleted = await this.funnelAction.deleteFunnelById(funnelId, userId, queryRunner.manager);
+      if (!deleted) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
+
+      await queryRunner.commitTransaction();
+
+      emitSafely(
+        this.eventEmitter,
+        this.logger,
+        APP_EVENTS.FUNNEL_DELETED,
+        new FunnelDeletedEvent(userId, funnelId, funnelName),
+      );
+
+      return { statusCode: HttpStatus.OK, message: SYS_MSG.FUNNEL_DELETED };
+    } catch (err) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   async completeStage(
@@ -441,21 +528,55 @@ export class FunnelsService {
   private async validateSourceAndDeriveContext(
     userId: string,
     dto: CreateFunnelDto,
-  ): Promise<{ businessName: string; businessContext: BusinessContext }> {
+  ): Promise<{ funnelName: string; businessContext: BusinessContext }> {
     if (dto.source === FunnelCreationPath.WIZARD) {
       const session = await this.funnelAction.getLatestCompletedWizard(userId);
       if (!session) throw new UnprocessableEntityException(SYS_MSG.ONBOARDING_INCOMPLETE);
 
-      const answers: Record<string, unknown> = session.answers ?? {};
-      const businessName = this.coerceString(answers.business_name) || DEFAULT_BUSINESS_NAME;
+      const step1 = (session.answers?.step_1 ?? {}) as { business_description?: string; business_type?: string };
+      const step3 = (session.answers?.step_3 ?? {}) as { discovery_channel?: string | string[] };
+      const user = await this.funnelAction.getUserProfile(userId);
+
+      const description = this.coerceString(step1.business_description);
+
+      let discoveryChannelStr = 'unknown';
+      const rawChannel = step3.discovery_channel;
+      if (Array.isArray(rawChannel)) {
+        discoveryChannelStr = rawChannel.join(', ');
+      } else if (typeof rawChannel === 'string' && rawChannel.trim()) {
+        discoveryChannelStr = rawChannel.trim();
+      }
+
+      let funnelName = DEFAULT_FUNNEL_NAME;
+      if (description) {
+        try {
+          funnelName = await this.llmService.generateFunnelNameWithGemini(description, discoveryChannelStr);
+        } catch (err) {
+          this.logger.warn({
+            message: 'Gemini funnel name generation failed, trying Groq',
+            error: (err as Error).message,
+          });
+          try {
+            funnelName = await this.llmService.generateFunnelNameWithGroq(description, discoveryChannelStr);
+          } catch (groqErr) {
+            this.logger.warn({
+              message: 'Groq funnel name generation failed, falling back to default',
+              error: (groqErr as Error).message,
+            });
+            funnelName = DEFAULT_FUNNEL_NAME;
+          }
+        }
+      }
+
+      const businessType = this.coerceString(step1.business_type) || this.coerceString(user?.business_type) || 'unknown';
       const businessContext: BusinessContext = {
-        businessType: this.coerceString(answers.business_type) || 'unknown',
-        discoveryChannel: this.coerceString(answers.discovery_channel) || 'unknown',
-        business_name: businessName,
-        business_description: this.coerceString(answers.business_description) || '',
-        target_customer: this.coerceString(answers.target_customer) || '',
+        businessType,
+        discoveryChannel: discoveryChannelStr,
+        business_name: funnelName,
+        business_description: description,
+        target_customer: this.coerceString(user?.target_customer) || '',
       };
-      return { businessName, businessContext };
+      return { funnelName, businessContext };
     }
 
     const ids = dto.upload_ids ?? [];
@@ -473,15 +594,15 @@ export class FunnelsService {
       .filter(Boolean)
       .join('\n')
       .slice(0, 4000);
-    const businessName = this.deriveNameFromFiles(docs) || DEFAULT_BUSINESS_NAME;
+    const funnelName = this.deriveNameFromFiles(docs) || DEFAULT_FUNNEL_NAME;
     const businessContext: BusinessContext = {
       businessType: 'unknown',
       discoveryChannel: 'unknown',
-      business_name: businessName,
+      business_name: funnelName,
       business_description: parsedJoin,
       target_customer: '',
     };
-    return { businessName, businessContext };
+    return { funnelName, businessContext };
   }
 
   private coerceString(value: unknown): string {
@@ -581,6 +702,7 @@ export class FunnelsService {
     return {
       taskId: task.id,
       name: task.name,
+      description: task.task_text,
       status: task.status,
       isComplete: task.is_complete,
       completedAt: task.completed_at ? task.completed_at.toISOString() : null,

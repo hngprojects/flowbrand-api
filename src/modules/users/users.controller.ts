@@ -8,6 +8,7 @@ import {
   Param,
   ParseUUIDPipe,
   Patch,
+  ValidationPipe,
   Post,
   UploadedFile,
   UseInterceptors,
@@ -22,13 +23,16 @@ import type { AuthenticatedUser } from '../../common/decorators/current-user.dec
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import {
   ChangePasswordDocs,
-  DeleteAccountDocs,
+  GetNotificationPreferencesDocs,
   GetProfileDocs,
+  UpdateNotificationPreferencesDocs,
+  UpdateProfileDocs,
   GetUserStateDocs,
+  DeleteAccountDocs,
   RemoveAvatarDocs,
   UploadAvatarDocs,
-  UpdateProfileDocs,
 } from './docs/users-swagger.doc';
+import { UpdateNotificationPreferencesDto } from '../notifications/dto/update-notification-preferences.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
 import * as SYS_MSG from '../../constants/system.messages';
 import { MAX_AVATAR_UPLOAD_BYTES } from './constants/avatar.constants';
@@ -59,10 +63,7 @@ export class UsersController {
   @Patch('me')
   @HttpCode(HttpStatus.OK)
   @UpdateProfileDocs()
-  async updateProfile(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: UpdateUserProfileDto,
-  ) {
+  async updateProfile(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateUserProfileDto) {
     const data = await this.usersService.updateProfile(user.userId, dto);
     return {
       statusCode: HttpStatus.OK,
@@ -135,6 +136,43 @@ export class UsersController {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.PASSWORD_CHANGE_SUCCESSFUL,
       data: null,
+    };
+  }
+
+  @Get('me/notification-preferences')
+  @HttpCode(HttpStatus.OK)
+  @GetNotificationPreferencesDocs()
+  async getNotificationPreferences(@CurrentUser('userId') userId: string) {
+    const data = await this.usersService.getNotificationPreferences(userId);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.NOTIFICATION_PREFERENCES_RETRIEVED_SUCCESSFULLY,
+      data,
+    };
+  }
+
+  @Patch('me/notification-preferences')
+  @HttpCode(HttpStatus.OK)
+  @UpdateNotificationPreferencesDocs()
+  async updateNotificationPreferences(
+    @CurrentUser('userId') userId: string,
+    @Body(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: false,
+        transform: true,
+        transformOptions: { enableImplicitConversion: false },
+        expectedType: UpdateNotificationPreferencesDto,
+      }),
+    )
+    rawDto: Record<string, unknown>,
+  ) {
+    const dto = rawDto as UpdateNotificationPreferencesDto;
+    const data = await this.usersService.updateNotificationPreferences(userId, dto);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.NOTIFICATION_PREFERENCES_UPDATED_SUCCESSFULLY,
+      data,
     };
   }
 

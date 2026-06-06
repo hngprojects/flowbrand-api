@@ -65,7 +65,11 @@ describe('auth-swagger.doc.ts', () => {
     expect(setupDocument).toBeUndefined();
     expect(setupOptions).toEqual({
       customJs: '/swagger-oauth-redirect.js',
-      swaggerOptions: { persistAuthorization: true },
+      swaggerOptions: {
+        persistAuthorization: true,
+        tagsSorter: 'alpha',
+        operationsSorter: 'alpha',
+      },
     });
   });
 
@@ -112,7 +116,11 @@ describe('auth-swagger.doc.ts', () => {
     expect(setupDocument).toBeUndefined();
     expect(setupOptions).toEqual({
       customJs: undefined,
-      swaggerOptions: { persistAuthorization: true },
+      swaggerOptions: {
+        persistAuthorization: true,
+        tagsSorter: 'alpha',
+        operationsSorter: 'alpha',
+      },
     });
   });
 

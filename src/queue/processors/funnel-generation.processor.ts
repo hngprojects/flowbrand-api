@@ -3,7 +3,7 @@ import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Job } from 'bull';
-import { DataSource } from 'typeorm';
+import { DataSource, QueryFailedError } from 'typeorm';
 import { APP_EVENTS } from '../../common/constants/app-events';
 import { emitSafely, FunnelFailedEvent, FunnelGeneratedEvent } from '../../common/events';
 import { JOBS, QUEUES } from '../../common/constants/queue.constants';
@@ -52,8 +52,21 @@ export class FunnelGenerationProcessor {
     // EC-05: skip if already completed (idempotency guard against duplicate delivery)
     const funnel = await this.funnelAction.get({ identifierOptions: { id: funnelId } });
     if (!funnel) {
-      this.logger.error({ message: 'Funnel not found — will retry', funnelId, jobId: job.id });
-      throw new Error(`Funnel ${funnelId} not found — DB commit may still be in flight`);
+      if (job.attemptsMade === 0) {
+        this.logger.warn({
+          message: 'Funnel not found — DB commit may still be in flight; will retry',
+          funnelId,
+          jobId: job.id,
+        });
+        throw new Error(`Funnel ${funnelId} not found — DB commit may still be in flight`);
+      }
+
+      this.logger.warn({
+        message: 'Funnel not found — likely deleted during generation; aborting job',
+        funnelId,
+        jobId: job.id,
+      });
+      return;
     }
     if (funnel.status === FunnelStatus.ACTIVE || funnel.status === FunnelStatus.FAILED) {
       this.logger.log({ message: `Funnel already ${funnel.status.toLowerCase()} — skipping`, funnelId, jobId: job.id });
@@ -85,12 +98,30 @@ export class FunnelGenerationProcessor {
 
     await job.progress(70);
 
-    await this.writeFunnelData(funnelId, stageData, job);
+    const wrote = await this.writeFunnelData(funnelId, stageData, job);
+    if (!wrote) {
+      this.logger.warn({
+        message: 'Funnel removed before generation write — aborting job',
+        funnelId,
+        jobId: job.id,
+      });
+      return;
+    }
 
     await job.progress(100);
 
     this.logger.log({ message: 'Funnel generation complete', funnelId, jobId: job.id });
-    emitSafely(this.eventEmitter, this.logger, APP_EVENTS.FUNNEL_GENERATED, new FunnelGeneratedEvent(userId, funnelId, funnel.business_name));
+    emitSafely(this.eventEmitter, this.logger, APP_EVENTS.FUNNEL_GENERATED, new FunnelGeneratedEvent(userId, funnelId, funnel.funnel_name));
+  }
+
+  private isForeignKeyViolation(err: unknown): boolean {
+    if (!(err instanceof QueryFailedError)) {
+      return false;
+    }
+
+    const queryError = err as QueryFailedError & { driverError?: { code?: string }; code?: string };
+    const code = queryError.driverError?.code ?? queryError.code;
+    return code === '23503';
   }
 
   private async tryAiGeneration(ctx: BusinessContext): Promise<LlmStageData[] | null> {
@@ -155,6 +186,9 @@ export class FunnelGenerationProcessor {
         throw new Error(`Stage ${stage.position}: tasks must be an array`);
       }
       for (const task of stage.tasks) {
+        if (!task.name || typeof task.name !== 'string') {
+          throw new Error(`Stage ${stage.position}: task missing name`);
+        }
         if (!task.taskText || typeof task.taskText !== 'string') {
           throw new Error(`Stage ${stage.position}: task missing taskText`);
         }
@@ -179,8 +213,13 @@ export class FunnelGenerationProcessor {
     funnelId: string,
     stageData: LlmStageData[],
     job: Job<GenerateFunnelJobPayload>,
-  ): Promise<void> {
+  ): Promise<boolean> {
     await job.progress(80);
+
+    const funnelStillExists = await this.funnelAction.get({ identifierOptions: { id: funnelId } });
+    if (!funnelStillExists) {
+      return false;
+    }
 
     const qr = this.dataSource.createQueryRunner();
     await qr.connect();
@@ -188,6 +227,14 @@ export class FunnelGenerationProcessor {
 
     try {
       const stages = await qr.manager.find(FunnelStage, { where: { funnel_id: funnelId } });
+      if (stages.length === 0) {
+        const funnelExists = await qr.manager.findOne(Funnel, { where: { id: funnelId } });
+        if (!funnelExists) {
+          await qr.rollbackTransaction();
+          return false;
+        }
+        throw new Error(`Funnel ${funnelId} has no stages — generation cannot complete`);
+      }
       const stageMap = new Map(stages.map((s) => [s.position, s]));
 
       for (const sd of stageData) {
@@ -207,7 +254,7 @@ export class FunnelGenerationProcessor {
           qr.manager.create(StageTask, {
             stage_id: stage.id,
             task_text: t.taskText,
-            name: t.taskText,
+            name: t.name.slice(0, 80),
             position: taskIdx + 1,
             is_complete: false,
             completed_at: null,
@@ -216,10 +263,25 @@ export class FunnelGenerationProcessor {
       });
 
       await qr.manager.save(StageTask, allTasks);
-      await qr.manager.update(Funnel, { id: funnelId }, { status: FunnelStatus.ACTIVE });
+      const activateResult = await qr.manager.update(Funnel, { id: funnelId }, { status: FunnelStatus.ACTIVE });
+      if ((activateResult.affected ?? 0) === 0) {
+        await qr.rollbackTransaction();
+        return false;
+      }
       await qr.commitTransaction();
+      return true;
     } catch (err) {
-      await qr.rollbackTransaction();
+      if (qr.isTransactionActive) {
+        await qr.rollbackTransaction();
+      }
+      if (this.isForeignKeyViolation(err)) {
+        this.logger.warn({
+          message: 'Funnel generation write skipped — funnel or stages no longer exist',
+          funnelId,
+          error: (err as Error).message,
+        });
+        return false;
+      }
       throw err;
     } finally {
       await qr.release();
@@ -267,7 +329,15 @@ export class FunnelGenerationProcessor {
         const funnel = await this.funnelAction.get({
           identifierOptions: { id: job.data.funnelId },
         });
-        if (funnel?.status === FunnelStatus.ACTIVE) {
+        if (!funnel) {
+          this.logger.warn({
+            event: 'funnel_job_failed_skip',
+            funnelId: job.data.funnelId,
+            message: 'Funnel no longer exists — skipping FAILED status write',
+          });
+          return;
+        }
+        if (funnel.status === FunnelStatus.ACTIVE) {
           this.logger.warn({
             event: 'funnel_job_failed_skip',
             funnelId: job.data.funnelId,
@@ -280,6 +350,12 @@ export class FunnelGenerationProcessor {
           updatePayload: { status: FunnelStatus.FAILED },
           transactionOptions: { useTransaction: false },
         });
+        emitSafely(
+          this.eventEmitter,
+          this.logger,
+          APP_EVENTS.FUNNEL_FAILED,
+          new FunnelFailedEvent(job.data.userId, job.data.funnelId),
+        );
       } catch (dbErr) {
         this.logger.error({
           event: 'funnel_failed_state_write_error',
@@ -288,12 +364,6 @@ export class FunnelGenerationProcessor {
           message: 'Could not mark funnel FAILED — manual reconciliation required',
         });
       }
-      await this.funnelAction.update({
-        identifierOptions: { id: job.data.funnelId },
-        updatePayload: { status: FunnelStatus.FAILED },
-        transactionOptions: { useTransaction: false },
-      });
-      emitSafely(this.eventEmitter, this.logger, APP_EVENTS.FUNNEL_FAILED, new FunnelFailedEvent(job.data.userId, job.data.funnelId));
     }
   }
 

@@ -23,7 +23,7 @@ export const AUTH_EMAIL_UNVERIFIED = 'Please verify your email address to log in
 export const USER_EMAIL_IN_USE = 'Email already in use';
 export const USER_NOT_FOUND = (id: string) => `User ${id} not found`;
 export const USER_UPDATE_FAILED = 'Failed to update user';
-export const USER_UNAUTHORIZED = "User not authorized"
+export const USER_UNAUTHORIZED = 'User not authorized';
 
 // OAuth and external auth messages
 export const GOOGLE_ACCOUNT_NO_EMAIL = 'Google account has no email';
@@ -123,13 +123,10 @@ export const FUNNEL_STAGE_LOCKED_MESSAGE = (stageName: string, priorStageName: s
   `The ${stageName} stage is locked. Complete all tasks in ${priorStageName} and mark it complete to unlock.`;
 export const STAGE_COMPLETED_SUCCESSFULLY = 'Stage completed successfully';
 export const STAGE_ALREADY_COMPLETE = 'Stage already complete';
-export const STAGE_HAS_PENDING_TASKS = (count: number) =>
-  `Cannot complete stage: ${count} task(s) are still pending.`;
+export const STAGE_HAS_PENDING_TASKS = (count: number) => `Cannot complete stage: ${count} task(s) are still pending.`;
 export const STAGE_HAS_NO_TASKS = 'Stage has no tasks. Cannot be marked complete.';
-export const STAGE_COMPLETION_REQUIRES_ACTIVE_FUNNEL =
-  'Funnel must be active before a stage can be completed.';
-export const STAGE_COMPLETION_CONCURRENT_UPDATE =
-  'Stage completion failed due to a concurrent update. Please retry.';
+export const STAGE_COMPLETION_REQUIRES_ACTIVE_FUNNEL = 'Funnel must be active before a stage can be completed.';
+export const STAGE_COMPLETION_CONCURRENT_UPDATE = 'Stage completion failed due to a concurrent update. Please retry.';
 export const FUNNEL_UNAUTHORIZED_ACCESS = 'You do not have permission to access this funnel';
 export const FUNNEL_TASK_NOT_FOUND = 'Funnel task not found or not accessible.';
 export const TASK_STATUS_UPDATED_SUCCESSFULLY = 'Task updated successfully';
@@ -147,12 +144,13 @@ export const PASSWORD_RESET_INVALID_TOKEN = 'Invalid or expired reset token.';
 //Password Change Messages
 export const PASSWORD_CHANGE_SUCCESSFUL = 'Password changed successfully';
 export const INCORRECT_OLD_PASSWORD = 'The old password you entered is incorrect.';
-export const PASSWORD_CHANGE_NOT_SUPPORTED = 'Password change is not supported for accounts registered via Google OAuth';
+export const PASSWORD_CHANGE_NOT_SUPPORTED =
+  'Password change is not supported for accounts registered via Google OAuth';
 export const PASSWORD_CHANGE_NOT_SUCCESSFUL = 'New password cannot be the same as the old password';
 export const INCORRECT_CONFIRM_PASSWORD = 'The value of the confirm password does not match the new password';
 export const PASSWORD_CHANGE_UNAVAILABLE = 'Password change is not available for this account';
-export const PASSWORD_TOO_WEAK = 'Your new password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
-
+export const PASSWORD_TOO_WEAK =
+  'Your new password must contain at least one uppercase letter, one lowercase letter, one number, and one special character';
 // Waitlist
 export const WAITLIST_JOINED_SUCCESSFULLY = 'Successfully joined the waitlist';
 export const WAITLIST_ALREADY_JOINED = 'You are already on the waitlist';
@@ -170,6 +168,7 @@ export const NOTIFICATIONS_MARKED_AS_READ = 'Notifications marked as read';
 export const NOTIFICATIONS_MARKED_AS_UNREAD = 'Notifications marked as unread';
 export const NOTIFICATION_DELETED = 'Notification deleted.';
 export const NOTIFICATION_NOT_FOUND = 'Notification not found';
+export const NOTIFICATION_PREFERENCES_UPDATE_FAILED = 'Notification preferences changed during update. Please retry.';
 
 // Spam Detection
 export const SPAM_PROHIBITED_CONTENT = 'Submission contains prohibited content';
@@ -200,6 +199,10 @@ export const FUNNEL_GENERATION_STARTED = 'Funnel generation started.';
 export const FUNNEL_ALREADY_EXISTS = 'Funnel already exists.';
 export const GENERATION_IN_PROGRESS = 'A funnel is already being generated for your account.';
 export const FUNNEL_NOT_FOUND = 'Funnel not found.';
+export const FUNNEL_DELETED = 'Funnel deleted.';
+export const FUNNEL_CANNOT_DELETE_ONLY_ACTIVE =
+  'You cannot delete your only active funnel. Create another strategy first.';
+export const FUNNEL_RENAMED_SUCCESSFULLY = 'Funnel renamed successfully.';
 export const FUNNEL_STATUS_RETRIEVED = 'Funnel status retrieved.';
 export const GENERATION_SERVICE_UNAVAILABLE =
   'Funnel generation service is temporarily unavailable. Please try again shortly.';
@@ -219,17 +222,19 @@ export const USER_NOT_FOUND_BY_TOKEN = 'User associated with this token no longe
 export const PROFILE_RETRIEVED_SUCCESSFULLY = 'Profile retrieved successfully';
 export const PROFILE_UPDATED_SUCCESSFULLY = 'Profile updated successfully';
 export const PROFILE_NOT_FOUND = 'Profile not found';
-export const PROFILE_EMAIL_CHANGE_FORBIDDEN =
-  'Email cannot be changed here. Please contact support.';
+export const PROFILE_EMAIL_CHANGE_FORBIDDEN = 'Email cannot be changed here. Please contact support.';
 export const PROFILE_UPDATE_FAILED = 'Failed to update profile';
 export const PROFILE_AVATAR_FILE_REQUIRED = 'Avatar file is required';
 export const PROFILE_AVATAR_UPLOADED_SUCCESSFULLY = 'Profile avatar uploaded successfully';
 export const PROFILE_AVATAR_REMOVED_SUCCESSFULLY = 'Profile avatar removed successfully';
-export const PROFILE_AVATAR_UPLOAD_INVALID_TYPE =
-  'Avatar must be a valid JPEG, PNG, or WebP image';
+export const PROFILE_AVATAR_UPLOAD_INVALID_TYPE = 'Avatar must be a valid JPEG, PNG, or WebP image';
 export const PROFILE_AVATAR_UPLOAD_TOO_LARGE = 'Avatar file size must be 2MB or less';
 export const PROFILE_AVATAR_UPLOAD_FAILED = 'Failed to upload profile avatar';
 export const PROFILE_AVATAR_DELETE_FAILED = 'Failed to remove profile avatar';
+
+// Notification Preferences
+export const NOTIFICATION_PREFERENCES_RETRIEVED_SUCCESSFULLY = 'Notification preferences retrieved successfully';
+export const NOTIFICATION_PREFERENCES_UPDATED_SUCCESSFULLY = 'Notification preferences updated successfully';
 
 // Account Deletion
 export const ACCOUNT_DELETED_SUCCESSFULLY = 'Your account has been deleted. You will be signed out.';
@@ -237,4 +242,92 @@ export const ACCOUNT_ALREADY_DELETED = 'Account already deleted';
 export const ACCOUNT_DELETION_CONFIRMATION_REQUIRED = 'You must type DELETE to confirm account deletion';
 export const ACCOUNT_DELETION_FAILED = 'Failed to delete account';
 export const ACCOUNT_DELETION_SCHEDULED = 'Account deletion scheduled for 30 days from now';
-export const ACCOUNT_EXISTS_WITH_RETENTION = 'An account with this email exists. If you recently deleted your account, please wait 30 days.';
+export const ACCOUNT_EXISTS_WITH_RETENTION =
+  'An account with this email exists. If you recently deleted your account, please wait 30 days.';
+
+// Tasks
+export const REAPER_TRIGGERED_SUCCESSFULLY = 'Background reaper triggered successfully';
+
+// Rate limits
+export const AUTH_REGISTER_RATE_LIMITED = 'Too many registration attempts. Please try again in an hour.';
+export const AUTH_LOGIN_RATE_LIMITED = 'Too many login attempts from this IP. Please try again later.';
+export const AUTH_REFRESH_RATE_LIMITED = 'Too many token refresh requests. Please try again later.';
+export const UPLOAD_RATE_LIMIT_EXCEEDED = 'Upload limit reached. You can upload up to 20 batches per hour.';
+
+// Admin auth
+export const ADMIN_LOGIN_SUCCESSFUL = 'Admin login successful';
+export const ADMIN_LOGOUT_SUCCESSFUL = 'Admin logout successful';
+export const ADMIN_INVALID_CREDENTIALS = 'Invalid email or password';
+export const ADMIN_ACCOUNT_LOCKED = 'Account temporarily locked';
+export const ADMIN_ACCESS_DENIED = 'Access denied';
+export const ADMIN_CREATED_SUCCESSFULLY = 'Admin account created successfully';
+export const ADMIN_EMAIL_CONFLICT = 'Email already registered';
+export const ADMIN_TOKEN_REFRESHED = 'Token refreshed';
+export const ADMIN_INVALID_PASSWORD_VALUE =
+  'password must contain at least one uppercase letter, one lowercase letter, one digit, and one special character';
+export const ADMIN_PROFILE_RETRIEVED_SUCCESSFULLY = 'Admin profile retrieved successfully';
+export const ADMIN_PROFILE_UPDATED_SUCCESSFULLY = 'Admin profile updated successfully';
+export const ADMIN_PROFILE_NOT_FOUND = 'Admin profile not found';
+export const ADMIN_PROFILE_UPDATE_FAILED = 'Failed to update admin profile';
+export const ADMIN_PROFILE_EMAIL_CHANGE_FORBIDDEN = 'Email cannot be changed here';
+export const ADMIN_PROFILE_RESPONSE_ROLE_RESOLUTION_FAILED = 'Failed to resolve admin role for profile response';
+export const ADMIN_PASSWORD_UPDATED_SUCCESSFULLY = 'Password updated successfully';
+export const ADMIN_OLD_PASSWORD_INCORRECT = 'Old password is incorrect';
+export const ADMIN_NEW_PASSWORD_MUST_DIFFER_FROM_OLD =
+  'New password must be different from your current password';
+export const ADMIN_CONFIRM_PASSWORD_MISMATCH = 'Confirm password must match new password';
+export const ADMIN_PASSWORD_POLICY_VALIDATION_FAILED =
+  'new_password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, one digit, and one symbol';
+export const ADMIN_DASHBOARD_STATS_RETRIEVED = 'Admin dashboard stats retrieved successfully';
+export const ADMIN_DASHBOARD_WEEKLY_OVERVIEW_RETRIEVED = 'Admin dashboard weekly overview retrieved successfully';
+export const ADMIN_DASHBOARD_USER_SEGMENTS_RETRIEVED = 'Admin dashboard user segments retrieved successfully';
+export const ADMIN_DASHBOARD_FUNNEL_PERFORMANCE_RETRIEVED = 'Admin dashboard funnel performance retrieved successfully';
+export const ADMIN_DASHBOARD_USER_STAGES_RETRIEVED = 'Admin dashboard user stages retrieved successfully';
+export const ADMIN_DASHBOARD_USER_RETENTION_RETRIEVED = 'Admin dashboard user retention retrieved successfully';
+
+// Payment messages
+export const PAYMENT_FAILED = 'Payment could not be processed';
+export const PAYMENT_PROVIDER_NOT_IMPLEMENTED = 'Payment provider is not yet implemented';
+export const PAYMENT_ALREADY_INITIATED = 'A payment for this request is already in progress';
+export const SUBSCRIPTION_ALREADY_ACTIVE = 'An active subscription already exists for this user';
+
+// Admin users list
+export const ADMIN_USERS_LIST_RETRIEVED = 'Users retrieved successfully';
+export const ADMIN_GLOBAL_SEARCH_SUCCESSFUL = 'Admin global search results retrieved successfully';
+export const ADMIN_USER_PROFILE_RETRIEVED = 'User profile retrieved successfully';
+export const ADMIN_USER_STATUS_UPDATED = 'User status updated successfully';
+export const ADMIN_USER_DELETED = 'User account deleted successfully';
+export const ADMIN_USER_NOT_FOUND = 'User not found';
+export const ADMIN_CANNOT_DELETE_SELF = 'You cannot delete your own user account as an admin';
+// Admin notifications
+export const ADMIN_NOTIFICATIONS_RETRIEVED = 'Admin notifications retrieved successfully';
+export const ADMIN_NOTIFICATION_NOT_FOUND = 'Notification not found';
+export const ADMIN_NOTIFICATION_MARKED_READ = 'Notification marked as read';
+export const ADMIN_NOTIFICATIONS_MARKED_READ = 'Notifications marked as read';
+export const ADMIN_NOTIFICATIONS_MARKED_UNREAD = 'Notifications marked as unread';
+export const ADMIN_NOTIFICATION_DELETED = 'Notification deleted successfully';
+export const ADMIN_NOTIFICATIONS_BULK_DELETED = 'Notifications deleted successfully';
+export const ADMIN_NOTIFICATION_STAR_TOGGLED = 'Notification star updated successfully';
+export const ADMIN_NOTIFICATION_BULK_SELECTION_REQUIRED = 'Provide either ids or all: true';
+export const ADMIN_NOTIFICATION_BULK_SELECTION_AMBIGUOUS = 'Provide either ids or all: true, not both';
+export const WEBHOOK_SIGNATURE_INVALID = 'Webhook signature verification failed';
+export const PAYMENT_PRICE_NOT_SET = (label: string, fallback: number) =>
+  `${label} not set — using placeholder ${fallback} kobo`;
+export const PAYMENT_PRICE_ZERO_MISCONFIGURATION = (label: string, fallback: number) =>
+  `${label} is zero — treating as misconfiguration, using placeholder ${fallback} kobo`;
+export const PAYMENT_USER_ALREADY_PRO = 'You are already on the Pro plan';
+export const PAYMENT_INITIATED_SUCCESSFULLY = 'Payment initiated successfully';
+export const PAYMENT_RATE_LIMIT_EXCEEDED = 'Too many payment requests. Please try again later';
+export const SUBSCRIPTION_CANCEL_TOKEN_MISSING = 'Subscription cancel failed: provider did not return email token';
+
+// Admin Teams
+export const TEAMS_RETRIEVED_SUCCESSFULLY = 'Teams retrieved successfully';
+export const TEAM_CREATED_SUCCESSFULLY = 'Team created successfully';
+export const TEAM_DELETED_SUCCESSFULLY = 'Team deleted successfully';
+export const TEAM_NOT_FOUND = 'Team not found';
+export const TEAM_INVITES_DISPATCHED = 'Invitations processed';
+export const TEAM_INVITATIONS_RETRIEVED = 'Invitations retrieved successfully';
+export const TEAM_INVITATION_REVOKED = 'Invitation revoked successfully';
+export const TEAM_INVITATION_NOT_FOUND = 'Invitation not found or already processed';
+export const TEAM_INVITE_ALREADY_PENDING = 'An invitation for this email is already pending';
+export const TEAM_ALREADY_MEMBER = 'This user is already a team member.';
