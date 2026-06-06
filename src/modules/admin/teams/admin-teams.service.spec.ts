@@ -244,11 +244,16 @@ describe('AdminTeamsService', () => {
     const dto = { emails: ['a@example.com', 'b@example.com'], role: 'member' };
 
     beforeEach(() => {
+      process.env.FRONTEND_URL = 'https://app.seil.io';
       mockAdminTeamAction.findActiveTeamById.mockResolvedValue(makeTeam());
       mockInvitationAction.findPendingByEmailAndTeam.mockResolvedValue(null);
       mockMembershipAction.isUserMemberOfTeam.mockResolvedValue(false);
       mockInvitationAction.createInvitation.mockResolvedValue(makeInvitation());
       mockEmailService.sendTeamInvite.mockResolvedValue('job-123');
+    });
+
+    afterEach(() => {
+      delete process.env.FRONTEND_URL;
     });
 
     it('throws NotFoundException when team does not exist', async () => {
@@ -319,15 +324,12 @@ describe('AdminTeamsService', () => {
     });
 
     it('stores SHA-256 hash — never the raw token — SEC-02', async () => {
-      // Set APP_URL for the test
-      process.env.APP_URL = 'https://app.seil.io';
-
       await service.inviteMembers(teamId, { emails: ['a@example.com'], role: 'member' }, invitedBy);
 
       const [, , , , tokenHash] = mockInvitationAction.createInvitation.mock.calls[0];
       const [, payload] = mockEmailService.sendTeamInvite.mock.calls[0];
 
-      // Extract token from URL (handle both with and without APP_URL)
+      // Extract token from URL (handle both with and without FRONTEND_URL)
       let rawToken: string;
       if (payload.inviteLink && payload.inviteLink.includes('token=')) {
         const url = new URL(payload.inviteLink);
@@ -342,20 +344,13 @@ describe('AdminTeamsService', () => {
       expect(tokenHash).toBe(expectedHash);
       expect(tokenHash).toHaveLength(64);
       expect(tokenHash).toMatch(/^[a-f0-9]{64}$/);
-
-      // Clean up
-      delete process.env.APP_URL;
     });
 
-    it('builds invite link from APP_URL env — SEC-03', async () => {
-      process.env.APP_URL = 'https://app.seil.io';
-
+    it('builds invite link from FRONTEND_URL env — SEC-03', async () => {
       await service.inviteMembers(teamId, { emails: ['a@example.com'], role: 'member' }, invitedBy);
 
       const [, payload] = mockEmailService.sendTeamInvite.mock.calls[0];
       expect(payload.inviteLink).toMatch(/^https:\/\/app\.seil\.io\/accept-invite\?token=[a-f0-9]{64}$/);
-
-      delete process.env.APP_URL;
     });
 
     it('sets expiry 7 days from now', async () => {

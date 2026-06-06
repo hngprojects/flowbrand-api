@@ -4,11 +4,6 @@ export class CreatePaymentTables1780524813543 implements MigrationInterface {
     name = 'CreatePaymentTables1780524813543'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`ALTER TABLE "notification_preferences" DROP CONSTRAINT "FK_notification_preferences_user_id"`);
-        await queryRunner.query(`ALTER TABLE "activity_events" DROP CONSTRAINT "FK_activity_events_user_id"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_notification_preferences_user_id"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_activity_events_user_id"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_activity_events_event_type"`);
         await queryRunner.query(`CREATE TYPE "public"."subscriptions_plan_enum" AS ENUM('pro')`);
         await queryRunner.query(`CREATE TYPE "public"."subscriptions_billing_cycle_enum" AS ENUM('monthly', 'annual')`);
         await queryRunner.query(`CREATE TYPE "public"."subscriptions_status_enum" AS ENUM('pending', 'active', 'cancelled', 'expired')`);
@@ -22,25 +17,15 @@ export class CreatePaymentTables1780524813543 implements MigrationInterface {
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_payments_idempotency_key" ON "payments" ("idempotency_key") `);
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_payments_provider_reference" ON "payments" ("provider_reference") WHERE "provider_reference" IS NOT NULL`);
         await queryRunner.query(`CREATE INDEX "IDX_payments_user_id" ON "payments" ("user_id") `);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_64c90edc7310c6be7c10c96f67" ON "notification_preferences" ("user_id") `);
-        await queryRunner.query(`CREATE INDEX "IDX_6b7520c53f24fe26f14807e811" ON "activity_events" ("user_id") `);
-        await queryRunner.query(`CREATE INDEX "IDX_c3c59635fd9b8dc3beecd07ca8" ON "activity_events" ("event_type") `);
         await queryRunner.query(`ALTER TABLE "subscriptions" ADD CONSTRAINT "FK_d0a95ef8a28188364c546eb65c1" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "payments" ADD CONSTRAINT "FK_427785468fb7d2733f59e7d7d39" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "payments" ADD CONSTRAINT "FK_75848dfef07fd19027e08ca81d2" FOREIGN KEY ("subscription_id") REFERENCES "subscriptions"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "notification_preferences" ADD CONSTRAINT "FK_64c90edc7310c6be7c10c96f675" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "activity_events" ADD CONSTRAINT "FK_6b7520c53f24fe26f14807e811d" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`ALTER TABLE "activity_events" DROP CONSTRAINT "FK_6b7520c53f24fe26f14807e811d"`);
-        await queryRunner.query(`ALTER TABLE "notification_preferences" DROP CONSTRAINT "FK_64c90edc7310c6be7c10c96f675"`);
         await queryRunner.query(`ALTER TABLE "payments" DROP CONSTRAINT "FK_75848dfef07fd19027e08ca81d2"`);
         await queryRunner.query(`ALTER TABLE "payments" DROP CONSTRAINT "FK_427785468fb7d2733f59e7d7d39"`);
         await queryRunner.query(`ALTER TABLE "subscriptions" DROP CONSTRAINT "FK_d0a95ef8a28188364c546eb65c1"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_c3c59635fd9b8dc3beecd07ca8"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_6b7520c53f24fe26f14807e811"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_64c90edc7310c6be7c10c96f67"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_payments_user_id"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_payments_provider_reference"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_payments_idempotency_key"`);
@@ -54,11 +39,6 @@ export class CreatePaymentTables1780524813543 implements MigrationInterface {
         await queryRunner.query(`DROP TYPE "public"."subscriptions_status_enum"`);
         await queryRunner.query(`DROP TYPE "public"."subscriptions_billing_cycle_enum"`);
         await queryRunner.query(`DROP TYPE "public"."subscriptions_plan_enum"`);
-        await queryRunner.query(`CREATE INDEX "IDX_activity_events_event_type" ON "activity_events" ("event_type") `);
-        await queryRunner.query(`CREATE INDEX "IDX_activity_events_user_id" ON "activity_events" ("user_id") `);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_notification_preferences_user_id" ON "notification_preferences" ("user_id") `);
-        await queryRunner.query(`ALTER TABLE "activity_events" ADD CONSTRAINT "FK_activity_events_user_id" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "notification_preferences" ADD CONSTRAINT "FK_notification_preferences_user_id" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
     }
 
 }

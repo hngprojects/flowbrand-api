@@ -17,6 +17,7 @@ const FUNNEL_READY_HBS = `<p>Hi {{name}}</p><p>Your funnel for {{businessName}} 
 const STAGE_UNLOCKED_HBS = `<p>Hi {{name}}</p><p><a href="{{dashboardUrl}}">SEIL</a> {{stageName}} is now active</p>`;
 const STAGE_COMPLETED_HBS = `<p>Hi {{name}}</p><p>You completed {{stageName}}</p><p>Open <a href="{{dashboardUrl}}">SEIL</a></p>`;
 const WEEKLY_DIGEST_HBS = `<p>Hi {{name}}</p><p>{{completedTasks}} of {{totalTasks}}</p>`;
+const TEAM_INVITE_HBS = `<p>Hi {{inviteeName}}</p><p>You have been invited to join {{teamName}}</p>`;
 
 describe('TemplateService', () => {
   let service: TemplateService;
@@ -52,6 +53,7 @@ describe('TemplateService', () => {
         if (p.includes('stage-unlocked')) return Promise.resolve(STAGE_UNLOCKED_HBS as never);
         if (p.includes('stage-completed')) return Promise.resolve(STAGE_COMPLETED_HBS as never);
         if (p.includes('weekly-digest')) return Promise.resolve(WEEKLY_DIGEST_HBS as never);
+        if (p.includes('team-invite')) return Promise.resolve(TEAM_INVITE_HBS as never);
         return Promise.reject(new Error(`Unexpected path: ${p}`));
       });
 
