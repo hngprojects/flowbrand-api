@@ -29,6 +29,7 @@ export const APP_EVENTS = {
 
   // Payments
   PLAN_UPGRADED: 'plan.upgraded',
+  PAYMENT_FAILED: 'payment.failed',
   SUBSCRIPTION_CANCELLED: 'subscription.cancelled',
 
   // User account
