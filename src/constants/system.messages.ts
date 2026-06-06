@@ -199,6 +199,10 @@ export const FUNNEL_GENERATION_STARTED = 'Funnel generation started.';
 export const FUNNEL_ALREADY_EXISTS = 'Funnel already exists.';
 export const GENERATION_IN_PROGRESS = 'A funnel is already being generated for your account.';
 export const FUNNEL_NOT_FOUND = 'Funnel not found.';
+export const FUNNEL_DELETED = 'Funnel deleted.';
+export const FUNNEL_CANNOT_DELETE_ONLY_ACTIVE =
+  'You cannot delete your only active funnel. Create another strategy first.';
+export const FUNNEL_RENAMED_SUCCESSFULLY = 'Funnel renamed successfully.';
 export const FUNNEL_STATUS_RETRIEVED = 'Funnel status retrieved.';
 export const GENERATION_SERVICE_UNAVAILABLE =
   'Funnel generation service is temporarily unavailable. Please try again shortly.';
@@ -278,4 +282,52 @@ export const ADMIN_DASHBOARD_STATS_RETRIEVED = 'Admin dashboard stats retrieved 
 export const ADMIN_DASHBOARD_WEEKLY_OVERVIEW_RETRIEVED = 'Admin dashboard weekly overview retrieved successfully';
 export const ADMIN_DASHBOARD_USER_SEGMENTS_RETRIEVED = 'Admin dashboard user segments retrieved successfully';
 export const ADMIN_DASHBOARD_FUNNEL_PERFORMANCE_RETRIEVED = 'Admin dashboard funnel performance retrieved successfully';
+export const ADMIN_DASHBOARD_USER_STAGES_RETRIEVED = 'Admin dashboard user stages retrieved successfully';
+export const ADMIN_DASHBOARD_USER_RETENTION_RETRIEVED = 'Admin dashboard user retention retrieved successfully';
+
+// Payment messages
+export const PAYMENT_FAILED = 'Payment could not be processed';
+export const PAYMENT_PROVIDER_NOT_IMPLEMENTED = 'Payment provider is not yet implemented';
+export const PAYMENT_ALREADY_INITIATED = 'A payment for this request is already in progress';
+export const SUBSCRIPTION_ALREADY_ACTIVE = 'An active subscription already exists for this user';
+
+// Admin users list
+export const ADMIN_USERS_LIST_RETRIEVED = 'Users retrieved successfully';
 export const ADMIN_GLOBAL_SEARCH_SUCCESSFUL = 'Admin global search results retrieved successfully';
+export const ADMIN_USER_PROFILE_RETRIEVED = 'User profile retrieved successfully';
+export const ADMIN_USER_STATUS_UPDATED = 'User status updated successfully';
+export const ADMIN_USER_DELETED = 'User account deleted successfully';
+export const ADMIN_USER_NOT_FOUND = 'User not found';
+export const ADMIN_CANNOT_DELETE_SELF = 'You cannot delete your own user account as an admin';
+// Admin notifications
+export const ADMIN_NOTIFICATIONS_RETRIEVED = 'Admin notifications retrieved successfully';
+export const ADMIN_NOTIFICATION_NOT_FOUND = 'Notification not found';
+export const ADMIN_NOTIFICATION_MARKED_READ = 'Notification marked as read';
+export const ADMIN_NOTIFICATIONS_MARKED_READ = 'Notifications marked as read';
+export const ADMIN_NOTIFICATIONS_MARKED_UNREAD = 'Notifications marked as unread';
+export const ADMIN_NOTIFICATION_DELETED = 'Notification deleted successfully';
+export const ADMIN_NOTIFICATIONS_BULK_DELETED = 'Notifications deleted successfully';
+export const ADMIN_NOTIFICATION_STAR_TOGGLED = 'Notification star updated successfully';
+export const ADMIN_NOTIFICATION_BULK_SELECTION_REQUIRED = 'Provide either ids or all: true';
+export const ADMIN_NOTIFICATION_BULK_SELECTION_AMBIGUOUS = 'Provide either ids or all: true, not both';
+export const WEBHOOK_SIGNATURE_INVALID = 'Webhook signature verification failed';
+export const PAYMENT_PRICE_NOT_SET = (label: string, fallback: number) =>
+  `${label} not set — using placeholder ${fallback} kobo`;
+export const PAYMENT_PRICE_ZERO_MISCONFIGURATION = (label: string, fallback: number) =>
+  `${label} is zero — treating as misconfiguration, using placeholder ${fallback} kobo`;
+export const PAYMENT_USER_ALREADY_PRO = 'You are already on the Pro plan';
+export const PAYMENT_INITIATED_SUCCESSFULLY = 'Payment initiated successfully';
+export const PAYMENT_RATE_LIMIT_EXCEEDED = 'Too many payment requests. Please try again later';
+export const SUBSCRIPTION_CANCEL_TOKEN_MISSING = 'Subscription cancel failed: provider did not return email token';
+
+// Admin Teams
+export const TEAMS_RETRIEVED_SUCCESSFULLY = 'Teams retrieved successfully';
+export const TEAM_CREATED_SUCCESSFULLY = 'Team created successfully';
+export const TEAM_DELETED_SUCCESSFULLY = 'Team deleted successfully';
+export const TEAM_NOT_FOUND = 'Team not found';
+export const TEAM_INVITES_DISPATCHED = 'Invitations processed';
+export const TEAM_INVITATIONS_RETRIEVED = 'Invitations retrieved successfully';
+export const TEAM_INVITATION_REVOKED = 'Invitation revoked successfully';
+export const TEAM_INVITATION_NOT_FOUND = 'Invitation not found or already processed';
+export const TEAM_INVITE_ALREADY_PENDING = 'An invitation for this email is already pending';
+export const TEAM_ALREADY_MEMBER = 'This user is already a team member.';

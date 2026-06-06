@@ -18,6 +18,7 @@ import { TemplateService } from '../template.service';
 export class EmailProcessor {
   private readonly logger = new Logger(EmailProcessor.name);
   private readonly from: string;
+  private readonly DEFAULT_FROM_EMAIL = 'SEIL <noreply@seil.app>';
 
   constructor(
     private readonly templateService: TemplateService,

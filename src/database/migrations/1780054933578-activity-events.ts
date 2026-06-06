@@ -30,10 +30,10 @@ export class ActivityEvents1780054933578 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `ALTER TABLE "activity_events" DROP CONSTRAINT "FK_activity_events_user_id"`,
+      `ALTER TABLE "activity_events" DROP CONSTRAINT IF EXISTS "FK_activity_events_user_id"`,
     );
-    await queryRunner.query(`DROP INDEX "public"."IDX_activity_events_event_type"`);
-    await queryRunner.query(`DROP INDEX "public"."IDX_activity_events_user_id"`);
-    await queryRunner.query(`DROP TABLE "activity_events"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_activity_events_event_type"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_activity_events_user_id"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "activity_events"`);
   }
 }

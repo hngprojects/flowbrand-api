@@ -59,6 +59,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
     AccountDeletionProcessor,
     AuthMetadataModelAction,
   ],
-  exports: [UsersService, UserModelAction, UserRoleModelAction, UserSessionModelAction],
+  exports: [UsersService, UserModelAction, UserRoleModelAction, UserSessionModelAction, BullModule],
 })
 export class UsersModule {}

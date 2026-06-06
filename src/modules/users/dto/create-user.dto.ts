@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsBoolean,
   IsEmail,
@@ -8,6 +8,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { UserRole } from '../enums/user-role.enum';
 
 export class CreateUserDto {
@@ -27,6 +28,20 @@ export class CreateUserDto {
   @MinLength(1)
   @MaxLength(255)
   fullName: string;
+
+  @ApiPropertyOptional({
+    example: 'Ben Clothing',
+    maxLength: 150,
+    description: 'Business name. Leading/trailing whitespace is trimmed automatically.',
+  })
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @MinLength(1)
+  @MaxLength(150)
+  businessName?: string;
 
   @ApiProperty({ enum: UserRole, required: false, default: UserRole.USER })
   @IsOptional()

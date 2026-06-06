@@ -91,17 +91,23 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
     service = module.get<OnboardingService>(OnboardingService);
   });
 
-  it('returns 200 with completed status and redirect when already complete', async () => {
+  it('creates a new IN_PROGRESS session after a prior completion (re-entry allowed)', async () => {
+    const newSession = buildSession({
+      id: 'new-session-id',
+      user_id: USER_A,
+      status: WizardStatus.IN_PROGRESS,
+      steps_completed: 0,
+      answers: {},
+    });
     mockWizardSessionModelAction.resolveStartWizardSession.mockResolvedValue({
-      status: 'already_complete',
+      status: 'created',
+      session: newSession,
     });
     const result = await service.startWizardSession(USER_A);
-    expect(result.statusCode).toBe(HttpStatus.OK);
-    expect(result.message).toBe(SYS_MSG.ONBOARDING_ALREADY_COMPLETE);
-    expect(result.data).toEqual({
-      status: WizardStatus.COMPLETE,
-      redirect: { to: 'funnel_generation' }
-    });
+    expect(result.statusCode).toBe(HttpStatus.CREATED);
+    expect(result.message).toBe(SYS_MSG.ONBOARDING_SESSION_STARTED);
+    expect(result.data.sessionId).toBe('new-session-id');
+    expect(result.data.status).toBe(WizardStatus.IN_PROGRESS);
   });
 
   it('returns existing active in-progress session with camelCase fields (idempotent)', async () => {
@@ -179,11 +185,14 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
     ).toHaveBeenCalledWith(USER_A, expect.any(Date), expect.any(Date));
   });
 
-  it('isolates users: completed for user A does not block user B', async () => {
+  it('isolates users: sessions for user A and user B are independent', async () => {
     mockWizardSessionModelAction.resolveStartWizardSession.mockImplementation(
       async (userId: string) => {
         if (userId === USER_A) {
-          return { status: 'already_complete' };
+          return {
+            status: 'created',
+            session: buildSession({ id: 'new-for-a', user_id: USER_A }),
+          };
         }
         return {
           status: 'created',
@@ -193,12 +202,13 @@ describe('OnboardingService — startWizardSession (edge cases)', () => {
     );
 
     const resultA = await service.startWizardSession(USER_A);
-    expect(resultA.statusCode).toBe(HttpStatus.OK);
-    expect(resultA.data.status).toBe(WizardStatus.COMPLETE);
+    expect(resultA.statusCode).toBe(HttpStatus.CREATED);
+    expect(resultA.data.userId).toBe(USER_A);
+    expect(resultA.data.status).toBe(WizardStatus.IN_PROGRESS);
 
-    const result = await service.startWizardSession(USER_B);
-    expect(result.statusCode).toBe(HttpStatus.CREATED);
-    expect(result.data.userId).toBe(USER_B);
+    const resultB = await service.startWizardSession(USER_B);
+    expect(resultB.statusCode).toBe(HttpStatus.CREATED);
+    expect(resultB.data.userId).toBe(USER_B);
   });
 
   it('delegates to atomic resolveStartWizardSession', async () => {

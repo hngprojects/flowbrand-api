@@ -20,6 +20,8 @@ import {
   FeedbackSubmittedEvent,
   TaskCompletedEvent,
   TaskReopenedEvent,
+  FunnelDeletedEvent,
+  FunnelRenamedEvent,
 } from '../../../common/events';
 import { emitSafely } from '../../../common/events/emit-safely';
 import { JOBS, QUEUES } from '../../../common/constants/queue.constants';
@@ -38,11 +40,13 @@ import { UploadDocumentStatus } from '../../upload/upload.types';
 import type { BusinessContext, GenerateFunnelJobPayload } from './../interfaces/generate-funnel-job.interface';
 import type {
   FunnelGenerationCreateResult,
+  FunnelRenameResult,
   FunnelStatusResult,
   StageCompletionResult,
   SubmitFeedbackResponse,
   TaskUpdateResult,
 } from './../interfaces/funnels.interfaces';
+import { RenameFunnelDto } from './../dto/rename-funnel.dto';
 import { StageTask, StageTaskStatus } from './../entities/stage-task.entity';
 import { UploadedDocument } from '../../upload/entities/uploaded-document.entity';
 import { StageFeedbackModelAction } from '../actions/stage-feedback.action';
@@ -297,6 +301,40 @@ export class FunnelsService {
     }
   }
 
+  async renameFunnel(userId: string, funnelId: string, dto: RenameFunnelDto): Promise<FunnelRenameResult> {
+    const funnel = await this.funnelAction.findOwnedById(funnelId, userId);
+    if (!funnel) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
+
+    const trimmedName = dto.funnelName;
+    if (trimmedName === funnel.funnel_name) {
+      return this.toRenameResponse(funnel);
+    }
+
+    const oldName = funnel.funnel_name;
+    const updated = await this.funnelAction.updateFunnelName(funnelId, userId, trimmedName);
+    if (!updated) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
+
+    emitSafely(
+      this.eventEmitter,
+      this.logger,
+      APP_EVENTS.FUNNEL_RENAMED,
+      new FunnelRenamedEvent(userId, funnelId, oldName, trimmedName),
+    );
+
+    return this.toRenameResponse(updated);
+  }
+
+  private toRenameResponse(funnel: Funnel): FunnelRenameResult {
+    return {
+      id: funnel.id,
+      funnelName: funnel.funnel_name,
+      status: funnel.status,
+      creationPath: funnel.creation_path,
+      createdAt: funnel.created_at.toISOString(),
+      updatedAt: funnel.updated_at.toISOString(),
+    };
+  }
+
   async getStatus(funnelId: string, userId: string): Promise<FunnelStatusResult> {
     const funnel = await this.funnelAction.findOwnedById(funnelId, userId);
     if (!funnel) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
@@ -315,6 +353,53 @@ export class FunnelsService {
       };
     }
     return base;
+  }
+
+  async deleteFunnel(
+    userId: string,
+    funnelId: string,
+  ): Promise<{ statusCode: HttpStatus; message: string }> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const funnel = await this.funnelAction.findOwnedById(funnelId, userId, queryRunner.manager, true);
+      if (!funnel) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
+
+      if (funnel.status === FunnelStatus.ACTIVE) {
+        const remainingActive = await this.funnelAction.countActiveFunnelsExcluding(
+          userId,
+          funnelId,
+          queryRunner.manager,
+        );
+        if (remainingActive === 0) {
+          throw new ConflictException(SYS_MSG.FUNNEL_CANNOT_DELETE_ONLY_ACTIVE);
+        }
+      }
+
+      const funnelName = funnel.funnel_name;
+      const deleted = await this.funnelAction.deleteFunnelById(funnelId, userId, queryRunner.manager);
+      if (!deleted) throw new NotFoundException(SYS_MSG.FUNNEL_NOT_FOUND);
+
+      await queryRunner.commitTransaction();
+
+      emitSafely(
+        this.eventEmitter,
+        this.logger,
+        APP_EVENTS.FUNNEL_DELETED,
+        new FunnelDeletedEvent(userId, funnelId, funnelName),
+      );
+
+      return { statusCode: HttpStatus.OK, message: SYS_MSG.FUNNEL_DELETED };
+    } catch (err) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   async completeStage(

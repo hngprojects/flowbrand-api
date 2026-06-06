@@ -60,6 +60,7 @@ describe('EmailProcessor.handleSendEmail', () => {
       expect(mockResend.emails.send).toHaveBeenCalledWith(
         expect.objectContaining({
           to: 'ada@test.com',
+          from: 'SEIL <noreply@seil.app>',
           subject: 'Your SEIL verification code',
           html: '<p>code: 123456</p>',
         }),
