@@ -9,13 +9,14 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { createHash } from 'crypto';
 import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
 import { env } from '../../config/env';
 import * as SYS_MSG from '../../constants/system.messages';
 import { APP_EVENTS } from '../../common/constants/app-events';
-import { PlanUpgradedEvent } from '../../common/events/events';
+import { PlanUpgradedEvent, SubscriptionCancelledEvent } from '../../common/events/events';
 import { PaymentModelAction } from './actions/payment.model-action';
 import { SubscriptionModelAction } from './actions/subscription.model-action';
 import { MockPaymentAdapter } from './adapters/mock-payment.adapter';
@@ -38,6 +39,22 @@ import { InitiatePaymentDto } from './dto/initiate-payment.dto';
 import { InitiateSubscriptionDto } from './dto/initiate-subscription.dto';
 import { Payment } from './entities/payment.entity';
 import { Subscription } from './entities/subscription.entity';
+
+export interface SubscriptionResponse {
+  subscriptionId: string;
+  plan: string;
+  billingCycle: string;
+  status: string;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  cancelledAt: string | null;
+  downgradeAt: string | null;
+}
+
+export interface CancelSubscriptionResponse {
+  cancelledAt: string;
+  accessUntil: string;
+}
 
 @Injectable()
 export class PaymentsService {
@@ -400,6 +417,90 @@ export class PaymentsService {
   /** Cancels a subscription with the configured provider. */
   async cancelSubscription(subscriptionCode: string): Promise<void> {
     return this.adapter.cancelSubscription(subscriptionCode);
+  }
+
+  async getUserSubscription(userId: string): Promise<SubscriptionResponse> {
+    const { payload } = await this.subscriptionModelAction.list({
+      filterRecordOptions: { user_id: userId, status: SubscriptionStatus.ACTIVE },
+      paginationPayload: { page: 1, limit: 1 },
+    });
+
+    const subscription = payload[0];
+    if (!subscription) {
+      throw new NotFoundException(SYS_MSG.SUBSCRIPTION_NOT_FOUND);
+    }
+
+    return this.mapSubscriptionToResponse(subscription);
+  }
+
+  async cancelUserSubscription(userId: string): Promise<CancelSubscriptionResponse> {
+    const { payload } = await this.subscriptionModelAction.list({
+      filterRecordOptions: { user_id: userId, status: SubscriptionStatus.ACTIVE },
+      paginationPayload: { page: 1, limit: 1 },
+    });
+
+    const subscription = payload[0];
+    if (!subscription) {
+      const { payload: terminal } = await this.subscriptionModelAction.list({
+        filterRecordOptions: [
+          { user_id: userId, status: SubscriptionStatus.CANCELLED },
+          { user_id: userId, status: SubscriptionStatus.EXPIRED },
+        ],
+        paginationPayload: { page: 1, limit: 1 },
+      });
+      if (terminal.length > 0) {
+        throw new ConflictException(SYS_MSG.SUBSCRIPTION_ALREADY_CANCELLED);
+      }
+      throw new NotFoundException(SYS_MSG.SUBSCRIPTION_NOT_FOUND);
+    }
+
+    if (!subscription.provider_subscription_code) {
+      this.logger.error({ message: SYS_MSG.SUBSCRIPTION_PROVIDER_CODE_MISSING, userId, subscriptionId: subscription.id });
+      throw new InternalServerErrorException(SYS_MSG.SUBSCRIPTION_PROVIDER_CODE_MISSING);
+    }
+
+    try {
+      await this.cancelSubscription(subscription.provider_subscription_code);
+    } catch (err: unknown) {
+      if (err instanceof HttpException) throw err;
+      throw new BadGatewayException(SYS_MSG.PAYMENT_FAILED);
+    }
+
+    const cancelledAt = new Date();
+    await this.subscriptionModelAction.update({
+      identifierOptions: { id: subscription.id },
+      updatePayload: {
+        status: SubscriptionStatus.CANCELLED,
+        cancel_at_period_end: true,
+        cancelled_at: cancelledAt,
+      },
+      transactionOptions: { useTransaction: false },
+    });
+
+    this.eventEmitter.emit(
+      APP_EVENTS.SUBSCRIPTION_CANCELLED,
+      new SubscriptionCancelledEvent(userId, subscription.id, subscription.current_period_end),
+    );
+
+    return {
+      cancelledAt: cancelledAt.toISOString(),
+      accessUntil: subscription.current_period_end.toISOString(),
+    };
+  }
+
+  private mapSubscriptionToResponse(subscription: Subscription): SubscriptionResponse {
+    return {
+      subscriptionId: subscription.id,
+      plan: subscription.plan,
+      billingCycle: subscription.billing_cycle,
+      status: subscription.status,
+      currentPeriodStart: subscription.current_period_start.toISOString(),
+      currentPeriodEnd: subscription.current_period_end.toISOString(),
+      cancelledAt: subscription.cancelled_at?.toISOString() ?? null,
+      downgradeAt: subscription.cancel_at_period_end
+        ? subscription.current_period_end.toISOString()
+        : null,
+    };
   }
 
   /** Routes a raw webhook payload to the configured provider's parser. */
