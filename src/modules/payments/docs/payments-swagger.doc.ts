@@ -88,8 +88,11 @@ export function WebhookDocs() {
   return applyDecorators(
     ApiOperation({
       summary: 'Receive payment gateway webhook events',
-      description:
-        'This endpoint cannot be tested via Swagger "Try it out". It requires a real POST from the payment gateway with a valid HMAC-SHA512 signature. Use the Paystack dashboard to send a test webhook
+      description: [
+        'Cannot be tested via Swagger "Try it out".',
+        'Requires a real POST from the payment gateway with a valid HMAC-SHA512 signature.',
+        'Use the Paystack dashboard to send a test webhook delivery instead.',
+      ].join(' '),
     }),
     ApiHeader({ name: 'x-paystack-signature', description: 'HMAC-SHA512 signature from payment gateway', required: true }),
     ApiResponse({
