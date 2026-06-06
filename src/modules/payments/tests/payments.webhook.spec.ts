@@ -9,6 +9,7 @@ import { PaymentModelAction } from '../actions/payment.model-action';
 import { SubscriptionModelAction } from '../actions/subscription.model-action';
 import { MockPaymentAdapter } from '../adapters/mock-payment.adapter';
 import { PaystackPaymentAdapter } from '../adapters/paystack-payment.adapter';
+import { BillingCycle } from '../enums/billing-cycle.enum';
 import { PaymentPlan } from '../enums/payment-plan.enum';
 import { PaymentStatus } from '../enums/payment-status.enum';
 import { PaymentType } from '../enums/payment-type.enum';
@@ -251,8 +252,8 @@ describe('PaymentsService — processWebhookEvent', () => {
     expect(updatePayload).not.toHaveProperty('status');
   });
 
-  // AC-11 — concurrent activation race: pre-check finds existing subscription, skips INSERT, event still emits
-  it('handles concurrent activation race on charge.success — event still emits', async () => {
+  // AC-11 — concurrent activation race: second request finds ACTIVE LIFETIME, skips both INSERT and UPDATE
+  it('handles concurrent activation race on charge.success — idempotent skip, event still emits', async () => {
     mockPaymentGet.mockResolvedValueOnce({
       id: 'p-1',
       user_id: USER_ID,
@@ -261,7 +262,11 @@ describe('PaymentsService — processWebhookEvent', () => {
       amount_kobo: 900000,
       provider_reference: REF,
     });
-    mockSubscriptionList.mockResolvedValueOnce({ payload: [{ id: 'sub-existing' }], paginationMeta: {} });
+    // First request already created ACTIVE LIFETIME; second request finds it and skips
+    mockSubscriptionList.mockResolvedValueOnce({
+      payload: [{ id: 'sub-existing', status: SubscriptionStatus.ACTIVE, billing_cycle: BillingCycle.LIFETIME }],
+      paginationMeta: {},
+    });
     jest
       .spyOn(service, 'handleWebhookEvent')
       .mockResolvedValueOnce({ type: 'charge.success', reference: REF, data: {} });
@@ -269,6 +274,7 @@ describe('PaymentsService — processWebhookEvent', () => {
     await service.processWebhookEvent(Buffer.from('{}'), 'sig');
 
     expect(mockSubscriptionCreate).not.toHaveBeenCalled();
+    expect(mockSubscriptionUpdate).not.toHaveBeenCalled();
     expect(mockEmit).toHaveBeenCalledWith(APP_EVENTS.PLAN_UPGRADED, expect.any(PlanUpgradedEvent));
   });
 

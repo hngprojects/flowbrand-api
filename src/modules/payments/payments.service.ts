@@ -223,9 +223,10 @@ export class PaymentsService {
   }
 
   private async activateProSubscription(userId: string, manager: EntityManager): Promise<boolean> {
-    // Pre-check before INSERT: the partial unique index covers PENDING + ACTIVE, so a failed
-    // INSERT inside an open transaction aborts the whole transaction even if the error is caught
-    // at the application level. Checking first avoids that aborted-transaction problem.
+    // Pre-check: the partial unique index (IDX_subscriptions_active_user) covers PENDING + ACTIVE,
+    // so we can never INSERT a second row while either status exists — a failed INSERT inside an
+    // open transaction aborts the whole tx even if the error is caught at the application level.
+    // Instead: UPDATE the existing row if one is found, INSERT only when none exists.
     const { payload: existing } = await this.subscriptionModelAction.list({
       filterRecordOptions: [
         { user_id: userId, status: SubscriptionStatus.ACTIVE },
@@ -235,7 +236,30 @@ export class PaymentsService {
     });
 
     if (existing.length > 0) {
-      this.logger.warn({ message: 'Pro subscription already active — idempotent skip', userId });
+      const existingSub = existing[0];
+      if (
+        existingSub.status === SubscriptionStatus.ACTIVE &&
+        existingSub.billing_cycle === BillingCycle.LIFETIME
+      ) {
+        // Already an ACTIVE LIFETIME subscription — idempotent replay, nothing to do.
+        this.logger.warn({ message: 'Pro subscription already active — idempotent skip', userId });
+        return true;
+      }
+
+      // Existing row is PENDING or ACTIVE with a different billing cycle (e.g. monthly subscription
+      // initiated before the one-time charge completed). Upgrade it to ACTIVE LIFETIME in-place —
+      // inserting a new row would violate the partial unique index.
+      await this.subscriptionModelAction.update({
+        identifierOptions: { id: existingSub.id },
+        updatePayload: {
+          plan: PaymentPlan.PRO,
+          billing_cycle: BillingCycle.LIFETIME,
+          status: SubscriptionStatus.ACTIVE,
+          current_period_start: new Date(),
+          current_period_end: new Date('9999-12-31'),
+        },
+        transactionOptions: { useTransaction: true, transaction: manager },
+      });
       return true;
     }
 

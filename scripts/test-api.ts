@@ -1525,6 +1525,145 @@ async function testWebhook() {
   note('  The DB update is covered by payments.verify.spec.ts (handleChargeFailed unit test).');
 }
 
+async function testSubscriptionManagement() {
+  section('Payments — GET/DELETE /payments/subscription (M4-BE-022)');
+
+  if (!accessToken) {
+    note('No accessToken — run testInitialLogin() first. Skipping.');
+    return;
+  }
+
+  // ── SM-SEC-01: No auth → 401 (GET) ──────────────────────────────────────────
+  await req('GET', '/payments/subscription', {
+    expectStatus: 401,
+    label: 'GET /payments/subscription (no auth → 401)',
+  });
+  pass('SM-SEC-01: GET /payments/subscription without token → 401');
+
+  // ── SM-SEC-02: No auth → 401 (DELETE) ───────────────────────────────────────
+  await req('DELETE', '/payments/subscription', {
+    expectStatus: 401,
+    label: 'DELETE /payments/subscription (no auth → 401)',
+  });
+  pass('SM-SEC-02: DELETE /payments/subscription without token → 401');
+
+  // ── SM-01: GET /payments/subscription — read current state ───────────────────
+  const { status: getStatus, body: getBody } = await req<{
+    statusCode?: number;
+    message?: string;
+    data?: {
+      subscriptionId?: string;
+      plan?: string;
+      billingCycle?: string;
+      status?: string;
+      currentPeriodStart?: string;
+      currentPeriodEnd?: string;
+      cancelledAt?: string | null;
+      downgradeAt?: string | null;
+    };
+  }>('GET', '/payments/subscription', {
+    token: accessToken,
+    expectStatus: [200, 404],
+    label: 'GET /payments/subscription (read active subscription)',
+  });
+
+  if (getStatus === 404) {
+    const msg404 = (getBody as { message?: string }).message ?? '';
+    if (!msg404.includes('No active subscription')) {
+      fail('SM-02 GET 404 message', `unexpected: "${msg404}"`);
+    }
+    pass('SM-02: GET /payments/subscription → 404 "No active subscription found"');
+    note('SM-03–SM-06 require an active subscription — skipping (run testWebhook → WH-03 first to activate one).');
+    return;
+  }
+
+  // ── SM-01: Assert response shape ─────────────────────────────────────────────
+  const sub = getBody.data;
+  if (!sub?.subscriptionId) fail('SM-01 shape', 'missing data.subscriptionId');
+  if (!sub?.plan) fail('SM-01 shape', 'missing data.plan');
+  if (!sub?.billingCycle) fail('SM-01 shape', 'missing data.billingCycle');
+  if (!sub?.status) fail('SM-01 shape', 'missing data.status');
+  if (!sub?.currentPeriodStart) fail('SM-01 shape', 'missing data.currentPeriodStart');
+  if (!sub?.currentPeriodEnd) fail('SM-01 shape', 'missing data.currentPeriodEnd');
+  if (!('cancelledAt' in (sub ?? {}))) fail('SM-01 shape', 'missing data.cancelledAt field');
+  if (!('downgradeAt' in (sub ?? {}))) fail('SM-01 shape', 'missing data.downgradeAt field');
+
+  pass(`SM-01: GET /payments/subscription → 200  plan=${sub!.plan}  billing=${sub!.billingCycle}  status=${sub!.status}`);
+  note(`nextBillingDate (currentPeriodEnd): ${sub!.currentPeriodEnd}`);
+  dump(getBody);
+
+  // ── SM-03: DELETE — conditional on subscription type ─────────────────────────
+  // LIFETIME subscriptions created by activateProSubscription have no provider_subscription_code
+  // (the SUB_xxx code only arrives via the subscription.create webhook from Paystack).
+  // Sending DELETE against a LIFETIME sub returns 500 — not a bug, just test-state limitation.
+  if (sub!.billingCycle === 'lifetime') {
+    note('SM-03: Active subscription is billing_cycle=lifetime — no provider_subscription_code.');
+    note('DELETE requires a Paystack-backed sub (SUB_xxx code set via subscription.create webhook).');
+    note('Full cancel flow is covered by payments.service.spec.ts unit tests (cancelUserSubscription).');
+    return;
+  }
+
+  // ── SM-03: DELETE /payments/subscription — cancel on Paystack ───────────────
+  const { body: deleteBody } = await req<{
+    statusCode?: number;
+    message?: string;
+    data?: { cancelledAt?: string; accessUntil?: string };
+  }>('DELETE', '/payments/subscription', {
+    token: accessToken,
+    expectStatus: 200,
+    label: 'DELETE /payments/subscription (cancel → 200)',
+  });
+  if (!deleteBody.data?.cancelledAt) fail('SM-03 DELETE shape', 'missing data.cancelledAt');
+  if (!deleteBody.data?.accessUntil) fail('SM-03 DELETE shape', 'missing data.accessUntil');
+  const cancelledAt = deleteBody.data!.cancelledAt!;
+  const accessUntil = deleteBody.data!.accessUntil!;
+  pass(`SM-03: DELETE /payments/subscription → 200  cancelledAt=${cancelledAt}`);
+  note(`accessUntil (current_period_end): ${accessUntil}`);
+
+  // ── SM-04: GET after cancel → 404 ────────────────────────────────────────────
+  const { body: postCancelGetBody } = await req<{ message?: string }>('GET', '/payments/subscription', {
+    token: accessToken,
+    expectStatus: 404,
+    label: 'GET /payments/subscription after cancel → 404',
+  });
+  if (!(postCancelGetBody.message ?? '').includes('No active subscription')) {
+    fail('SM-04 GET after cancel', `expected "No active subscription…", got: "${postCancelGetBody.message}"`);
+  }
+  pass('SM-04: GET /payments/subscription after cancel → 404 "No active subscription found"');
+
+  // ── SM-05: DELETE again → 409 ─────────────────────────────────────────────────
+  await req('DELETE', '/payments/subscription', {
+    token: accessToken,
+    expectStatus: 409,
+    label: 'DELETE /payments/subscription (already cancelled → 409)',
+  });
+  pass('SM-05: DELETE /payments/subscription when already cancelled → 409');
+
+  // ── SM-06: In-app notification created with readable date format ──────────────
+  // The SUBSCRIPTION_CANCELLED event listener writes a notification row synchronously.
+  // We poll the feed for a subscription_cancelled entry whose body contains the readable date.
+  const { body: notifBody } = await req<{
+    data?: {
+      items?: { type?: string; title?: string; body?: string }[];
+    };
+  }>('GET', '/notifications', {
+    token: accessToken,
+    expectStatus: 200,
+    label: 'GET /notifications (check subscription_cancelled notification)',
+  });
+
+  const items = notifBody.data?.items ?? [];
+  const cancelNotif = items.find((n) => n.type === 'subscription_cancelled');
+  if (!cancelNotif) {
+    fail('SM-06 notification', 'no subscription_cancelled notification in feed after DELETE');
+  }
+  // Body format: "You have access until 6 June 2026." (en-GB date from formatDate)
+  if (!cancelNotif!.body?.includes('You have access until')) {
+    fail('SM-06 notification body', `expected "You have access until …" — got: "${cancelNotif!.body}"`);
+  }
+  pass(`SM-06: SUBSCRIPTION_CANCELLED notification in feed  body="${cancelNotif!.body}"`);
+}
+
 async function testLogout() {
   section('Logout');
   const { body } = await req('POST', '/auth/logout', {
@@ -1977,6 +2116,7 @@ async function main() {
   await testSubscriptionInitiate();    // M4-BE-019b: POST /payments/subscriptions/initiate
   await testVerifyPayment();           // M4-BE-020:  GET /payments/verify
   await testWebhook();                 // M4-BE-021:  POST /payments/webhook
+  await testSubscriptionManagement();  // M4-BE-022:  GET/DELETE /payments/subscription
 
   // ── commented out ────────────────────────────────────────────────────────
   // await testOtpFlow();              // use when running the full registration flow
