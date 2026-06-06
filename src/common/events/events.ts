@@ -85,6 +85,15 @@ export class FeedbackSubmittedEvent {
   ) {}
 }
 
+// Payments
+export class PlanUpgradedEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly plan: string,
+    public readonly reference: string,
+  ) {}
+}
+
 // User account
 export class ProfileUpdatedEvent {
   public readonly updatedFields: ReadonlyArray<string>;
