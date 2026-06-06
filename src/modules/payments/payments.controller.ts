@@ -2,6 +2,7 @@ import {
   BadGatewayException,
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   HttpCode,
@@ -22,7 +23,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import * as SYS_MSG from '../../constants/system.messages';
 import { PRICING } from './constants/pricing.constants';
-import { InitiatePaymentDocs, InitiateSubscriptionDocs, VerifyPaymentDocs, WebhookDocs } from './docs/payments-swagger.doc';
+import { CancelSubscriptionDocs, GetSubscriptionDocs, InitiatePaymentDocs, InitiateSubscriptionDocs, VerifyPaymentDocs, WebhookDocs } from './docs/payments-swagger.doc';
 import { InitiateSubscriptionRequestDto } from './dto/initiate-subscription-request.dto';
 import { BillingCycle } from './enums/billing-cycle.enum';
 import { PaymentPlan } from './enums/payment-plan.enum';
@@ -36,7 +37,7 @@ import {
   InitiateSubscriptionResult,
   PaymentVerifyResponse,
 } from './interfaces/payment-provider.interface';
-import { PaymentsService } from './payments.service';
+import { CancelSubscriptionResponse, PaymentsService, SubscriptionResponse } from './payments.service';
 
 @ApiTags('Payments')
 @Controller('payments')
@@ -115,6 +116,33 @@ export class PaymentsController {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.WEBHOOK_RECEIVED,
       data: { received: true },
+    };
+  }
+
+  @Get('subscription')
+  @GetSubscriptionDocs()
+  async getSubscription(
+    @CurrentUser('userId') userId: string,
+  ): Promise<{ statusCode: number; message: string; data: SubscriptionResponse }> {
+    const data = await this.paymentsService.getUserSubscription(userId);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.SUBSCRIPTION_RETRIEVED_SUCCESSFULLY,
+      data,
+    };
+  }
+
+  @Delete('subscription')
+  @HttpCode(HttpStatus.OK)
+  @CancelSubscriptionDocs()
+  async cancelUserSubscription(
+    @CurrentUser('userId') userId: string,
+  ): Promise<{ statusCode: number; message: string; data: CancelSubscriptionResponse }> {
+    const data = await this.paymentsService.cancelUserSubscription(userId);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.SUBSCRIPTION_CANCELLED_SUCCESSFULLY,
+      data,
     };
   }
 

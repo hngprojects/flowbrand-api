@@ -84,6 +84,47 @@ export function VerifyPaymentDocs() {
   );
 }
 
+export function GetSubscriptionDocs() {
+  return applyDecorators(
+    ApiOperation({ summary: 'Get current user subscription state' }),
+    ApiResponse({
+      status: HttpStatus.OK,
+      description: 'Active subscription returned.',
+      schema: {
+        example: {
+          subscriptionId: 'uuid',
+          plan: 'pro',
+          billingCycle: 'monthly',
+          status: 'active',
+          currentPeriodStart: '2026-06-01T00:00:00.000Z',
+          currentPeriodEnd: '2026-07-01T00:00:00.000Z',
+          cancelledAt: null,
+          downgradeAt: null,
+        },
+      },
+    }),
+    ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'No active subscription found.' }),
+    ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Missing or invalid JWT.' }),
+  );
+}
+
+export function CancelSubscriptionDocs() {
+  return applyDecorators(
+    ApiOperation({ summary: 'Cancel active subscription — access continues until billing period ends' }),
+    ApiResponse({
+      status: HttpStatus.OK,
+      description: 'Subscription cancelled. Pro access continues until accessUntil date.',
+      schema: { example: { cancelledAt: '2026-06-04T12:00:00Z', accessUntil: '2026-07-04T12:00:00Z' } },
+    }),
+    ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'No active subscription found.' }),
+    ApiResponse({ status: HttpStatus.CONFLICT, description: 'Subscription is already cancelled or expired.' }),
+    ApiResponse({ status: HttpStatus.PAYMENT_REQUIRED, description: 'Provider declined the cancellation request.' }),
+    ApiResponse({ status: HttpStatus.BAD_GATEWAY, description: 'Payment provider cancellation failed.' }),
+    ApiResponse({ status: HttpStatus.INTERNAL_SERVER_ERROR, description: 'Subscription provider code missing — data integrity issue.' }),
+    ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Missing or invalid JWT.' }),
+  );
+}
+
 export function WebhookDocs() {
   return applyDecorators(
     ApiOperation({
