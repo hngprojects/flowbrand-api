@@ -59,6 +59,7 @@
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.4.2",
+    "express": "^5.2.1",
     "file-type": "^22.0.1",
     "groq-sdk": "^1.2.0",
     "handlebars": "^4.7.9",
