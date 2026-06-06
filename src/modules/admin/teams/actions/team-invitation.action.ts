@@ -59,4 +59,17 @@ export class TeamInvitationModelAction extends AbstractModelAction<TeamInvitatio
       where: { id: inviteId, team_id: teamId, status: InviteStatus.PENDING },
     });
   }
+
+  async findByTokenHash(tokenHash: string): Promise<TeamInvitation | null> {
+    return this.repository.findOne({ 
+      where: { 
+        token_hash: tokenHash,
+        status: InviteStatus.PENDING
+      } 
+    });
+  }
+
+  async markAccepted(inviteId: string): Promise<void> {
+    await this.repository.update(inviteId, { status: InviteStatus.ACCEPTED });
+  }  
 }
