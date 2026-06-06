@@ -15,7 +15,9 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AdminTeamsService } from './admin-teams.service';
 import { CreateTeamDto } from './dto/create-team.dto';
 import { InviteMembersDto } from './dto/invite-members.dto';
+import { AcceptInviteDto } from './dto/accept-invite.dto';
 import { AdminJwtGuard } from '../../auth/guards/admin-jwt.guard';
+import { Public } from '../../../common/decorators/public.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../../common/decorators/current-user.decorator';
 import { PaginationDto } from '../../users/dto/pagination.dto';
@@ -27,6 +29,8 @@ import {
   InviteMembersDocs,
   GetInvitationsDocs,
   RevokeInvitationDocs,
+  AcceptInviteDocs,
+  RevokeMemberDocs
 } from './docs/admin-teams-swagger.doc';
 
 @ApiTags('admin-teams')
@@ -36,6 +40,19 @@ import {
 export class AdminTeamsController {
   constructor(private readonly adminTeamsService: AdminTeamsService) {}
 
+  @Post('invitations/accept')
+  @Public()
+  @HttpCode(HttpStatus.CREATED)
+  @AcceptInviteDocs()
+  async acceptInvite(@Body() dto: AcceptInviteDto) {
+    const data = await this.adminTeamsService.acceptInvite(dto);
+    return {
+      statusCode: HttpStatus.CREATED,
+      message: SYS_MSG.INVITE_ACCEPTED_SUCCESSFULLY,
+      data,
+    };
+  }
+  
   @Get()
   @HttpCode(HttpStatus.OK)
   @GetTeamsDocs()
@@ -119,5 +136,19 @@ export class AdminTeamsController {
       message: SYS_MSG.TEAM_INVITATION_REVOKED,
       data: { success: true },
     };
+  }
+
+  @Delete(':teamId/members/:memberId')
+  @ApiBearerAuth('JWT')
+  @UseGuards(AdminJwtGuard)
+  @HttpCode(HttpStatus.OK)
+  @RevokeMemberDocs()
+  async revokeMember(
+    @Param('teamId', ParseUUIDPipe) teamId: string,
+    @Param('memberId', ParseUUIDPipe) memberId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.adminTeamsService.revokeMember(teamId, memberId, user.userId);
+    return { success: true };
   }
 }
