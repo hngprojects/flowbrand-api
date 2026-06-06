@@ -228,7 +228,7 @@ describe('NotificationListener', () => {
   });
 
   describe('onAccountDeleted', () => {
-    const accountDeleted = () => new AccountDeletedEvent('user-1');
+    const accountDeleted = () => new AccountDeletedEvent('user-1', 'ada@seil.app', 'Ada');
 
     it('sends delete-account email to the user', async () => {
       await listener.onAccountDeleted(accountDeleted());
@@ -246,10 +246,8 @@ describe('NotificationListener', () => {
       await expect(listener.onAccountDeleted(accountDeleted())).resolves.toBeUndefined();
     });
 
-    it('skips send when user cannot be resolved', async () => {
-      userAction.findById.mockResolvedValueOnce(null);
-
-      await listener.onAccountDeleted(accountDeleted());
+    it('skips send when event carries no email', async () => {
+      await listener.onAccountDeleted(new AccountDeletedEvent('user-1', '', 'Ada'));
 
       expect(emailService.sendDeleteAccount).not.toHaveBeenCalled();
     });

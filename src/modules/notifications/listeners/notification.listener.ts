@@ -143,6 +143,7 @@ export class NotificationListener {
     });
   }
 
+  // Transactional lifecycle email: intentionally not gated by notification preferences.
   @OnEvent(APP_EVENTS.USER_SIGNED_UP)
   async onUserSignedUp(event: UserSignedUpEvent): Promise<void> {
     await this.safely('user.signed_up', event.userId, async () => {
@@ -152,12 +153,13 @@ export class NotificationListener {
     });
   }
 
+  // Transactional lifecycle email: intentionally not gated by notification preferences.
+  // Uses event-carried email/name because the user record is hard-deleted before this fires.
   @OnEvent(APP_EVENTS.ACCOUNT_DELETED)
   async onAccountDeleted(event: AccountDeletedEvent): Promise<void> {
     await this.safely('user.account_deleted', event.userId, async () => {
-      await this.email(event.userId, (to, name) =>
-        this.emailService.sendDeleteAccount(to, { name }, event.userId),
-      );
+      if (!event.email) return;
+      await this.emailService.sendDeleteAccount(event.email, { name: event.name }, event.userId);
     });
   }
 
