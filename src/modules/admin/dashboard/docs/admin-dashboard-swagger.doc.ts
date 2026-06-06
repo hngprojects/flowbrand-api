@@ -73,7 +73,9 @@ export function GetStatsDocs() {
     ApiOperation({
       summary: 'Get admin dashboard headline stats',
       description:
-        'Returns platform-wide KPIs: total users, active users (last 30 days), total funnels generated, funnels created this week, and a free/pro plan distribution breakdown. Response is served from a
+        'Returns platform-wide KPIs: total users, active users (last 30 days), ' +
+        'total funnels generated, funnels created this week, and a free/pro plan distribution breakdown. ' +
+        'Response is served from a 5-minute Redis cache.',
     }),
     ApiExtraModels(DashboardStatsDataDto, PlanDistributionDto),
     ApiOkResponse({
