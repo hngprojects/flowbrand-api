@@ -1,5 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs/promises';
 import { TemplateService } from '../template.service';
 
@@ -17,23 +16,18 @@ const FUNNEL_READY_HBS = `<p>Hi {{name}}</p><p>Your funnel for {{businessName}} 
 const STAGE_UNLOCKED_HBS = `<p>Hi {{name}}</p><p><a href="{{dashboardUrl}}">SEIL</a> {{stageName}} is now active</p>`;
 const STAGE_COMPLETED_HBS = `<p>Hi {{name}}</p><p>You completed {{stageName}}</p><p>Open <a href="{{dashboardUrl}}">SEIL</a></p>`;
 const WEEKLY_DIGEST_HBS = `<p>Hi {{name}}</p><p>{{completedTasks}} of {{totalTasks}}</p>`;
+const TEAM_INVITE_HBS = `<p>You have been invited to {{teamName}}</p><a href="{{inviteLink}}">Join</a>`;
+const PAYMENT_SUCCESSFUL_HBS = `<p>Hi {{name}}</p><p>Amount: {{amount}}</p><p>Ref: {{reference}}</p>`;
+const PAYMENT_FAILED_HBS = `<p>Hi {{name}}</p><p>Payment failed</p><a href="{{upgradeUrl}}">Update details</a>`;
+const SUBSCRIPTION_CANCELLED_HBS = `<p>Hi {{name}}</p><p>Access until {{accessUntil}}</p><a href="{{upgradeUrl}}">Reactivate</a>`;
+const NOTIFICATION_ALERT_HBS = `<p>Hi {{name}}</p><p>You have {{unreadCount}} notifications</p><a href="{{dashboardUrl}}">View</a>`;
 
 describe('TemplateService', () => {
   let service: TemplateService;
 
   function buildService(): Promise<TestingModule> {
     return Test.createTestingModule({
-      providers: [
-        TemplateService,
-        { provide: ConfigService, 
-                  useValue: { 
-                    get: jest.fn().mockImplementation((key: string) => {
-                      if (key === 'app.frontendUrl') return 'http://localhost:3000';
-                      throw new Error(`Unexpected config key: ${key}`);
-                    })
-                  }
-        },
-      ],
+      providers: [TemplateService],
     }).compile();
   }
 
@@ -52,6 +46,11 @@ describe('TemplateService', () => {
         if (p.includes('stage-unlocked')) return Promise.resolve(STAGE_UNLOCKED_HBS as never);
         if (p.includes('stage-completed')) return Promise.resolve(STAGE_COMPLETED_HBS as never);
         if (p.includes('weekly-digest')) return Promise.resolve(WEEKLY_DIGEST_HBS as never);
+        if (p.includes('team-invite')) return Promise.resolve(TEAM_INVITE_HBS as never);
+        if (p.includes('payment-successful')) return Promise.resolve(PAYMENT_SUCCESSFUL_HBS as never);
+        if (p.includes('payment-failed')) return Promise.resolve(PAYMENT_FAILED_HBS as never);
+        if (p.includes('subscription-cancelled')) return Promise.resolve(SUBSCRIPTION_CANCELLED_HBS as never);
+        if (p.includes('notification-alert')) return Promise.resolve(NOTIFICATION_ALERT_HBS as never);
         return Promise.reject(new Error(`Unexpected path: ${p}`));
       });
 

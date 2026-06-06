@@ -16,7 +16,7 @@ import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
 import { env } from '../../config/env';
 import * as SYS_MSG from '../../constants/system.messages';
 import { APP_EVENTS } from '../../common/constants/app-events';
-import { PlanUpgradedEvent, SubscriptionCancelledEvent } from '../../common/events/events';
+import { PaymentFailedEvent, PlanUpgradedEvent, SubscriptionCancelledEvent } from '../../common/events/events';
 import { PaymentModelAction } from './actions/payment.model-action';
 import { SubscriptionModelAction } from './actions/subscription.model-action';
 import { MockPaymentAdapter } from './adapters/mock-payment.adapter';

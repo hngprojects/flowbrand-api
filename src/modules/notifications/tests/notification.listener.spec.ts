@@ -9,6 +9,7 @@ import {
 import { EmailService } from '../../../email/email.service';
 import { StageTaskModelAction } from '../../funnels/actions/stage-task.action';
 import { UserModelAction } from '../../users/actions/user.action';
+import { PaymentModelAction } from '../../payments/actions/payment.model-action';
 import { NotificationModelAction } from '../actions/notification.action';
 import { NotificationsService } from '../notifications.service';
 import { NotificationListener } from '../listeners/notification.listener';
@@ -38,6 +39,7 @@ describe('NotificationListener', () => {
   };
   const taskAction = { getFunnelTaskProgress: jest.fn() };
   const userAction = { findById: jest.fn() };
+  const paymentModelAction = { findByReference: jest.fn().mockResolvedValue(null) };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -56,6 +58,7 @@ describe('NotificationListener', () => {
         { provide: EmailService, useValue: emailService },
         { provide: StageTaskModelAction, useValue: taskAction },
         { provide: UserModelAction, useValue: userAction },
+        { provide: PaymentModelAction, useValue: paymentModelAction },
       ],
     }).compile();
 
