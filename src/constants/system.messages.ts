@@ -340,3 +340,4 @@ export const INVITE_ACCEPTED_SUCCESSFULLY  = 'Invitation accepted successfully.'
 export const MEMBER_REVOKE_SELF_FORBIDDEN  = 'You cannot revoke your own access.';
 export const MEMBER_NOT_FOUND              = 'Team member not found.';
 export const MEMBER_REVOKED_SUCCESSFULLY   = 'Member access revoked successfully.';
+export const PASSWORD_VALIDATION_FAILED    = 'password must contain at least one uppercase letter, one lowercase letter, one digit, and one special character'
