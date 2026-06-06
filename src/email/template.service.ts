@@ -1,8 +1,8 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs/promises';
 import * as Handlebars from 'handlebars';
 import * as path from 'path';
+import { env } from '../config/env';
 import type { EmailType } from './interfaces/email-job.interface';
 
 type CompiledTemplate = Handlebars.TemplateDelegate;
@@ -19,6 +19,10 @@ const EMAIL_TYPES: EmailType[] = [
   'stage-completed',
   'weekly-digest',
   'team-invite',
+  'payment-successful',
+  'payment-failed',
+  'subscription-cancelled',
+  'notification-alert',
 ];
 
 @Injectable()
@@ -26,8 +30,6 @@ export class TemplateService implements OnModuleInit {
   private readonly logger = new Logger(TemplateService.name);
   private baseLayout: CompiledTemplate;
   private readonly templates = new Map<EmailType, CompiledTemplate>();
-
-  constructor(private readonly config: ConfigService) {}
 
   private readonly SUBJECTS: Record<EmailType, string> = {
     'otp-verification': 'Your SEIL verification code',
@@ -41,6 +43,10 @@ export class TemplateService implements OnModuleInit {
     'stage-completed': 'You completed "{{stageName}}"',
     'weekly-digest': 'Your weekly SEIL progress',
     'team-invite': "You've been invited to '{{teamName}}'",
+    'payment-successful': 'Payment Successful — Your FlowBrand subscription is now active',
+    'payment-failed': 'Payment Failed — We could not process your payment',
+    'subscription-cancelled': 'Your FlowBrand subscription has been cancelled',
+    'notification-alert': 'You have {{unreadCount}} new notification(s) from FlowBrand',
   };
 
   private compiledSubjects: Record<EmailType, Handlebars.TemplateDelegate>;
@@ -73,22 +79,20 @@ export class TemplateService implements OnModuleInit {
       throw new Error(`No compiled template found for type: ${type}`);
     }
 
-    const frontendUrl = this.config.get<string>('app.frontendUrl');
-    if (!frontendUrl) {
-      throw new Error('Missing app.frontendUrl configuration');
-    }
-    const templateContext = {
-      ...payload,
-      dashboardUrl: `${frontendUrl}/dashboard`,
+    const urlContext = {
+      unsubscribeUrl: `${env.FRONTEND_URL}/unsubscribe`,
+      privacyPolicyUrl: `${env.FRONTEND_URL}/privacy-policy`,
+      upgradeUrl: `${env.FRONTEND_URL}/upgrade`,
+      dashboardUrl: `${env.FRONTEND_URL}/dashboard`,
+      notificationPreferencesUrl: `${env.FRONTEND_URL}/settings/notifications`,
     };
 
-    const body = compiled(templateContext);
+    const body = compiled({ ...payload, ...urlContext });
     const html = this.baseLayout({
-      ...templateContext,
+      ...payload,
+      ...urlContext,
       body,
       year: new Date().getFullYear(),
-      unsubscribeUrl: `${frontendUrl}/unsubscribe`,
-      privacyPolicyUrl: `${frontendUrl}/privacy-policy`,
     });
 
     const subject = this.compiledSubjects[type](payload);
