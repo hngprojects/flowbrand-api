@@ -24,7 +24,6 @@ import { UserRoleModelAction } from '../../users/actions/user-role.action';
 import { UserSessionModelAction } from '../../users/actions/user-session.action';
 import { RedisService } from '../../redis/redis.service';
 import { AdminAuthService } from '../auth/admin-auth.service';
-import { redisKeys } from '../../../constants/redis-keys';
 
 export interface InviteResult {
   email: string;
@@ -278,7 +277,7 @@ export class AdminTeamsService {
     const inviteRole = invitation.role as UserRole;
     const currentRole = await this.userRoleModelAction.resolveHighestRole(user.id);
 
-    if (!currentRole || ROLE_PRIORITY[inviteRole] > ROLE_PRIORITY[currentRole]) {
+    if (!currentRole || this.getRolePriority(inviteRole) > this.getRolePriority(currentRole)) {
       await this.userRoleModelAction.create({
         createPayload: { user_id: user.id, role: inviteRole },
         transactionOptions: { useTransaction: false },
@@ -319,5 +318,42 @@ export class AdminTeamsService {
         role: inviteRole,
       },
     };
+  }
+
+  async revokeMember(teamId: string, memberId: string, requestingUserId: string): Promise<void> {
+    if (memberId === requestingUserId) {
+      throw new ForbiddenException(SYS_MSG.MEMBER_REVOKE_SELF_FORBIDDEN);
+    }
+
+    const membership = await this.teamMembershipModelAction.findByTeamAndUser(teamId, memberId);
+
+    if (!membership) {
+      throw new NotFoundException(SYS_MSG.MEMBER_NOT_FOUND);
+    }
+
+    await this.teamMembershipModelAction.deleteMembership(teamId, memberId);
+
+    const revokedSessionIds = await this.userSessionModelAction.revokeAllUserSessionsInDb(memberId);
+
+    await this.userModelAction.update({
+      identifierOptions: { id: memberId },
+      updatePayload: { is_active: false },
+      transactionOptions: { useTransaction: false },
+    });
+
+    if (revokedSessionIds.length > 0) {
+      await this.redisService.delByPattern(`sess:${memberId}:*`);
+    }
+
+    this.logger.info('admin.team.member.revoked', {
+      teamId,
+      memberId,
+      revokedBy: requestingUserId,
+      sessionsRevoked: revokedSessionIds.length,
+    });
+  }
+
+  private getRolePriority(role: UserRole): number {
+    return ROLE_PRIORITY[role] ?? -1;
   }
 }
