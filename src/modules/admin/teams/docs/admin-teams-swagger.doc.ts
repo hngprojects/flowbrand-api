@@ -208,3 +208,121 @@ export const RevokeInvitationDocs = () =>
     ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthenticated' }),
     ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Access denied' }),
   );
+
+export const AcceptInviteDocs = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: 'Accept a team invitation',
+      description:
+        'Public endpoint — no JWT required. ' +
+        'Validates the invite token, creates or links a user account, ' +
+        'adds the user to the team, and returns a JWT for immediate login. ' +
+        'Returns HTTP 400 for invalid, expired, or already-used tokens.',
+    }),
+    ApiResponse({
+      status: HttpStatus.CREATED,
+      description: 'Invitation accepted — JWT issued for immediate login',
+      schema: {
+        example: {
+          statusCode: HttpStatus.CREATED,
+          message: SYS_MSG.INVITE_ACCEPTED_SUCCESSFULLY,
+          data: {
+            accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+            user: {
+              id: '550e8400-e29b-41d4-a716-446655440000',
+              full_name: 'Jane Doe',
+              email: 'jane@example.com',
+              role: 'admin',
+            },
+          },
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.BAD_REQUEST,
+      description: SYS_MSG.INVITE_EXPIRED,
+      schema: {
+        examples: {
+          invalid: {
+            value: {
+              statusCode: HttpStatus.BAD_REQUEST,
+              message: SYS_MSG.INVITE_EXPIRED,
+            },
+          },
+          expired: {
+            value: {
+              statusCode: HttpStatus.BAD_REQUEST,
+              message: SYS_MSG.INVITE_EXPIRED,
+            },
+          },
+          used: {
+            value: {
+              statusCode: HttpStatus.BAD_REQUEST,
+              message: SYS_MSG.INVITE_ALREADY_USED,
+            },
+          },
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: SYS_MSG.PASSWORD_VALIDATION_FAILED,
+      schema: {
+        example: {
+          statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          message: SYS_MSG.PASSWORD_VALIDATION_FAILED,
+          error: 'UnprocessableEntityException',
+        },
+      },
+    }),
+    ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthenticated' }),
+    ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Access denied' }),
+  );
+
+export const RevokeMemberDocs = () =>
+  applyDecorators(
+    ApiBearerAuth('JWT'),
+    ApiOperation({
+      summary: 'Revoke a team member\'s access',
+      description:
+        'Removes the member from the team, invalidates all their active sessions immediately, ' +
+        'and deactivates their account. Admins cannot revoke their own access.',
+    }),
+    ApiParam({ name: 'teamId', type: String, format: 'uuid', description: 'Team ID' }),
+    ApiParam({ name: 'memberId', type: String, format: 'uuid', description: 'Member user ID to revoke' }),
+    ApiResponse({
+      status: HttpStatus.OK,
+      description: 'Member access revoked — sessions invalidated immediately',
+      schema: {
+        example: {
+          statusCode: HttpStatus.OK,
+          message: SYS_MSG.MEMBER_REVOKED_SUCCESSFULLY,
+          data: { success: true },
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.NOT_FOUND,
+      description: 'Team member not found',
+      schema: {
+        example: {
+          statusCode: HttpStatus.NOT_FOUND,
+          message: SYS_MSG.MEMBER_NOT_FOUND,
+          error: 'NotFoundException',
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.FORBIDDEN,
+      description: 'Cannot revoke your own access — EC-02 / AC-07',
+      schema: {
+        example: {
+          statusCode: HttpStatus.FORBIDDEN,
+          message: SYS_MSG.MEMBER_REVOKE_SELF_FORBIDDEN,
+          error: 'ForbiddenException',
+        },
+      },
+    }),
+    ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthenticated — valid JWT required' }),
+    ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Access denied — insufficient permissions' }),
+  );
