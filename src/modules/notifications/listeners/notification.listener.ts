@@ -6,6 +6,7 @@ import {
   PlanUpgradedEvent,
   StageCompletedEvent,
   StageUnlockedEvent,
+  SubscriptionCancelledEvent,
   TaskCompletedEvent,
 } from '../../../common/events/events';
 import * as SYS_MSG from '../../../constants/system.messages';
@@ -160,6 +161,21 @@ export class NotificationListener {
     });
   }
 
+  @OnEvent(APP_EVENTS.SUBSCRIPTION_CANCELLED)
+  async onSubscriptionCancelled(event: SubscriptionCancelledEvent): Promise<void> {
+    await this.safely('subscription.cancelled', event.userId, async () => {
+      await this.notificationsService.createNotification(
+        event.userId,
+        'subscription_cancelled',
+        SYS_MSG.NOTIFICATION_SUBSCRIPTION_CANCELLED_TITLE,
+        SYS_MSG.NOTIFICATION_SUBSCRIPTION_CANCELLED_BODY(this.formatDate(event.accessUntil)),
+        { subscriptionId: event.subscriptionId },
+      );
+      // Email: TODO — sendSubscriptionCancelled method and template not yet implemented.
+      // Add in a follow-up PR alongside payment-related email templates.
+    });
+  }
+
   /** Resolves the recipient from the trusted userId (SEC-02) and dispatches when an email exists. */
   private async email(
     userId: string,
@@ -170,6 +186,10 @@ export class NotificationListener {
       return;
     }
     await dispatch(user.email, user.full_name);
+  }
+
+  private formatDate(date: Date): string {
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   }
 
   private async safely(label: string, userId: string, fn: () => Promise<void>): Promise<void> {
