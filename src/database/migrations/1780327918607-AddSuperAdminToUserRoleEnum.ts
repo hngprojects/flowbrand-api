@@ -4,7 +4,7 @@ export class AddSuperAdminToUserRoleEnum1780327918607 implements MigrationInterf
   public transaction = false;
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TYPE "public"."user_roles_role_enum" ADD VALUE 'super_admin'`);
+    await queryRunner.query(`ALTER TYPE "public"."user_roles_role_enum" ADD VALUE IF NOT EXISTS 'super_admin'`);
   }
 
   // ALTER TYPE ... ADD VALUE cannot be reversed in Postgres without recreating
