@@ -28,4 +28,28 @@ export class TeamMembershipModelAction extends AbstractModelAction<TeamMembershi
       where: { team_id: teamId },
     });
   }
+
+  async createMembership(
+    teamId: string,
+    userId: string,
+    role: string,
+  ): Promise<TeamMembership> {
+    const membership = this.repository.create({
+      team_id: teamId,
+      user_id: userId,
+      role,
+      joined_at: new Date(),
+    });
+    return this.repository.save(membership);
+  }
+
+  async findByTeamAndUser(teamId: string, userId: string,): Promise<TeamMembership | null> {
+    return this.repository.findOne({
+      where: { team_id: teamId, user_id: userId },
+    });
+  }
+
+  async deleteMembership(teamId: string, userId: string): Promise<void> {
+    await this.repository.delete({ team_id: teamId, user_id: userId });
+  }
 }
