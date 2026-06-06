@@ -136,12 +136,19 @@ export class PaystackPaymentAdapter implements PaymentProvider {
         ? env.PAYSTACK_PRO_ANNUAL_PLAN_CODE!
         : env.PAYSTACK_PRO_MONTHLY_PLAN_CODE!;
 
+    // Generate our own UUID reference so provider_reference in the DB is UUID-format,
+    // which ParseUUIDPipe requires on the verify endpoint. Without this, Paystack
+    // generates a short alphanumeric reference (e.g. "re4lyvq3s3") that fails validation.
+    const reference = randomUUID();
+
     try {
       const response = await this.client.transaction.initialize({
         email,
         // Paystack ignores amount when plan is set — plan defines the charge amount
         amount: '0',
+        reference,
         plan: planCode,
+        channels: ['card'],
         metadata: { userId, plan: dto.plan, billingCycle: dto.billingCycle },
       });
 
@@ -150,6 +157,7 @@ export class PaystackPaymentAdapter implements PaymentProvider {
       }
       const data = response.data as PaystackInitializeData;
       return {
+        reference: data.reference,
         // access_code is the checkout session token — NOT the SUB_xxx subscription identifier.
         // The real subscription code arrives in the subscription.create webhook (M4-BE-021).
         subscriptionCode: data.access_code,

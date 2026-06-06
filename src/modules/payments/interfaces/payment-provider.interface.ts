@@ -20,6 +20,7 @@ export interface VerifyPaymentResult {
 }
 
 export interface InitiateSubscriptionResult {
+  reference: string;
   subscriptionCode: string;
   authorizationUrl: string;
   provider: string;

@@ -130,9 +130,9 @@ export class PaymentsService {
       periodEnd.setMonth(periodEnd.getMonth() + 1);
     }
 
+    let paymentId: string;
     try {
-      await this.dataSource.transaction(async (manager) => {
-         
+      const payment: Payment = await this.dataSource.transaction(async (manager) => {
         const sub: Subscription = await this.subscriptionModelAction.create({
           createPayload: {
             user_id: userId,
@@ -146,8 +146,7 @@ export class PaymentsService {
           transactionOptions: { useTransaction: true, transaction: manager },
         });
 
-
-        await this.paymentModelAction.create({
+        return this.paymentModelAction.create({
           createPayload: {
             user_id: userId,
             subscription_id: sub.id,
@@ -163,13 +162,11 @@ export class PaymentsService {
           },
           transactionOptions: { useTransaction: true, transaction: manager },
         });
-
-        return sub;
       });
+      paymentId = payment.id;
     } catch (err: unknown) {
       if (err instanceof QueryFailedError && (err as { code?: string }).code === '23505') {
         // Row exists — check if a prior completed attempt left a subscription code
-         
         const { payload: subs } = await this.subscriptionModelAction.find({
           findOptions: { user_id: userId, plan: dto.plan, billing_cycle: dto.billingCycle },
           order: { created_at: 'DESC' },
@@ -179,7 +176,7 @@ export class PaymentsService {
         const existing: Subscription | undefined = subs[0];
         if (existing?.provider_subscription_code) {
           // Prior attempt fully succeeded — idempotent return
-          return { subscriptionCode: existing.provider_subscription_code, authorizationUrl: '', provider: env.PAYMENT_PROVIDER };
+          return { reference: '', subscriptionCode: existing.provider_subscription_code, authorizationUrl: '', provider: env.PAYMENT_PROVIDER };
         }
         // Subscription exists but has no code — prior attempt failed after DB write but before provider update.
         // 409 is correct: the in-flight subscription must be resolved before creating another.
@@ -189,6 +186,12 @@ export class PaymentsService {
     }
 
     const result = await this.adapter.initiateSubscription(dto, userId, email);
+
+    await this.paymentModelAction.update({
+      identifierOptions: { id: paymentId },
+      updatePayload: { provider_reference: result.reference },
+      transactionOptions: { useTransaction: false },
+    });
 
     // provider_subscription_code is NOT set here — the real SUB_xxx code arrives
     // via the subscription.create webhook (M4-BE-021). Storing access_code here
