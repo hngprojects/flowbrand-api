@@ -1,6 +1,7 @@
 import { applyDecorators, HttpStatus } from '@nestjs/common';
-import { ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiBody, ApiExcludeEndpoint, ApiHeader, ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import * as SYS_MSG from '../../../constants/system.messages';
+import { InitiateSubscriptionRequestDto } from '../dto/initiate-subscription-request.dto';
 
 export function InitiatePaymentDocs() {
   return applyDecorators(
@@ -26,5 +27,121 @@ export function InitiatePaymentDocs() {
     ApiResponse({ status: HttpStatus.PAYMENT_REQUIRED, description: 'Provider declined the payment.' }),
     ApiResponse({ status: HttpStatus.BAD_GATEWAY, description: 'Payment provider is unavailable or returned an unexpected error.' }),
     ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Missing or invalid JWT. Handled by the global AuthGuard.' }),
+  );
+}
+
+export function InitiateSubscriptionDocs() {
+  return applyDecorators(
+    ApiOperation({ summary: 'Initiate a Pro plan subscription checkout' }),
+    ApiBody({ type: InitiateSubscriptionRequestDto }),
+    ApiResponse({
+      status: HttpStatus.CREATED,
+      description: 'Subscription checkout created. Redirect the user to authorizationUrl.',
+      schema: {
+        example: {
+          statusCode: 201,
+          message: SYS_MSG.SUBSCRIPTION_INITIATED_SUCCESSFULLY,
+          data: {
+            authorizationUrl: 'https://checkout.paystack.com/0peioxfhpn',
+            amount: 300000,
+            currency: 'NGN',
+            billingCycle: 'monthly',
+          },
+        },
+      },
+    }),
+    ApiResponse({ status: HttpStatus.CONFLICT, description: 'User already has an active or pending subscription.' }),
+    ApiResponse({ status: HttpStatus.TOO_MANY_REQUESTS, description: 'Rate limit exceeded — max 5 initiations per hour.' }),
+    ApiResponse({ status: HttpStatus.PAYMENT_REQUIRED, description: 'Provider declined the request.' }),
+    ApiResponse({ status: HttpStatus.BAD_GATEWAY, description: 'Payment provider unavailable or returned an unexpected error.' }),
+    ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Missing or invalid JWT. Handled by the global AuthGuard.' }),
+    ApiResponse({
+      status: HttpStatus.BAD_REQUEST,
+      description: 'Invalid billingCycle value.',
+      schema: {
+        example: {
+          statusCode: 400,
+          error: 'Bad Request',
+          message: SYS_MSG.VALIDATION_FAILED,
+          details: ['billingCycle must be one of the following values: monthly, annual'],
+        },
+      },
+    }),
+  );
+}
+
+export function VerifyPaymentDocs() {
+  return applyDecorators(
+    ApiOperation({ summary: 'Verify a payment and activate Pro access on success' }),
+    ApiQuery({ name: 'reference', required: true, description: 'UUID v4 provider reference returned by the initiate endpoint' }),
+    ApiResponse({ status: HttpStatus.OK, description: 'Payment status resolved (success | failed | pending | refunded).' }),
+    ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'reference is not a valid UUID v4.' }),
+    ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Missing or invalid JWT.' }),
+    ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Reference not found or belongs to a different user.' }),
+    ApiResponse({ status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'Gateway amount does not match the expected price.' }),
+    ApiResponse({ status: HttpStatus.BAD_GATEWAY, description: 'Payment provider returned an error.' }),
+    ApiResponse({ status: HttpStatus.GATEWAY_TIMEOUT, description: 'Payment provider did not respond in time.' }),
+  );
+}
+
+export function GetSubscriptionDocs() {
+  return applyDecorators(
+    ApiOperation({ summary: 'Get current user subscription state' }),
+    ApiResponse({
+      status: HttpStatus.OK,
+      description: 'Active subscription returned.',
+      schema: {
+        example: {
+          subscriptionId: 'uuid',
+          plan: 'pro',
+          billingCycle: 'monthly',
+          status: 'active',
+          currentPeriodStart: '2026-06-01T00:00:00.000Z',
+          currentPeriodEnd: '2026-07-01T00:00:00.000Z',
+          cancelledAt: null,
+          downgradeAt: null,
+        },
+      },
+    }),
+    ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'No active subscription found.' }),
+    ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Missing or invalid JWT.' }),
+  );
+}
+
+export function CancelSubscriptionDocs() {
+  return applyDecorators(
+    ApiOperation({ summary: 'Cancel active subscription — access continues until billing period ends' }),
+    ApiResponse({
+      status: HttpStatus.OK,
+      description: 'Subscription cancelled. Pro access continues until accessUntil date.',
+      schema: { example: { cancelledAt: '2026-06-04T12:00:00Z', accessUntil: '2026-07-04T12:00:00Z' } },
+    }),
+    ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'No active subscription found.' }),
+    ApiResponse({ status: HttpStatus.CONFLICT, description: 'Subscription is already cancelled or expired.' }),
+    ApiResponse({ status: HttpStatus.PAYMENT_REQUIRED, description: 'Provider declined the cancellation request.' }),
+    ApiResponse({ status: HttpStatus.BAD_GATEWAY, description: 'Payment provider cancellation failed.' }),
+    ApiResponse({ status: HttpStatus.INTERNAL_SERVER_ERROR, description: 'Subscription provider code missing — data integrity issue.' }),
+    ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Missing or invalid JWT.' }),
+  );
+}
+
+export function WebhookDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: 'Receive payment gateway webhook events',
+      description: [
+        'Cannot be tested via Swagger "Try it out".',
+        'Requires a real POST from the payment gateway with a valid HMAC-SHA512 signature.',
+        'Use the Paystack dashboard to send a test webhook delivery instead.',
+      ].join(' '),
+    }),
+    ApiHeader({ name: 'x-paystack-signature', description: 'HMAC-SHA512 signature from payment gateway', required: true }),
+    ApiResponse({
+      status: HttpStatus.OK,
+      description: 'Event acknowledged. Always returned after signature verification passes.',
+      schema: { example: { statusCode: 200, message: 'Webhook received', data: { received: true } } },
+    }),
+    ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Invalid or missing webhook signature.' }),
+    ApiExcludeEndpoint(false),
   );
 }

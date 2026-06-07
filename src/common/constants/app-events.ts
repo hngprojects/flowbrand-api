@@ -27,6 +27,10 @@ export const APP_EVENTS = {
   // Feedback
   FEEDBACK_SUBMITTED: 'feedback.submitted',
 
+  // Payments
+  PLAN_UPGRADED: 'plan.upgraded',
+  SUBSCRIPTION_CANCELLED: 'subscription.cancelled',
+
   // User account
   // Emission deferred — wired in AuthService once ActivityLogListener ships.
   USER_SIGNED_UP: 'user.signed_up',
