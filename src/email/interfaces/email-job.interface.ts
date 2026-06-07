@@ -9,7 +9,9 @@ export type EmailType =
   | 'stage-unlocked'
   | 'stage-completed'
   | 'weekly-digest'
-  | 'team-invite';
+  | 'team-invite'
+  | 'welcome'
+  | 'delete-account';
 
 export interface OtpPayload {
   fullName: string;
@@ -62,6 +64,14 @@ export interface TeamInvitePayload {
   customMessage?: string;
 }
 
+export interface WelcomePayload {
+  name: string;
+}
+
+export interface DeleteAccountPayload {
+  name: string;
+}
+
 export type EmailPayload =
   | OtpPayload
   | WaitlistPayload
@@ -70,7 +80,9 @@ export type EmailPayload =
   | StageUnlockedPayload
   | StageCompletedPayload
   | WeeklyDigestPayload
-  | TeamInvitePayload;
+  | TeamInvitePayload
+  | WelcomePayload
+  | DeleteAccountPayload;
 
 interface BaseEmailJob {
   to: string;
@@ -88,5 +100,7 @@ export type EmailJob = BaseEmailJob &
     | { type: 'stage-unlocked'; payload: StageUnlockedPayload }
     | { type: 'stage-completed'; payload: StageCompletedPayload }
     | { type: 'weekly-digest'; payload: WeeklyDigestPayload }
-    | { type: 'team-invite'; payload: TeamInvitePayload; }
+    | { type: 'team-invite'; payload: TeamInvitePayload }
+    | { type: 'welcome'; payload: WelcomePayload }
+    | { type: 'delete-account'; payload: DeleteAccountPayload }
   );

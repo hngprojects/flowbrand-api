@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
@@ -18,6 +19,8 @@ import { OtpTokenModelAction } from './actions/otp-token.action';
 import { EmailService } from '../../email/email.service';
 import { LogService } from '../../common/services/log.service';
 import { AdminLogActionType, AdminLogStatus } from '../admin/logs/enums/admin-log.enum';
+import { APP_EVENTS } from '../../common/constants/app-events';
+import { UserSignedUpEvent } from '../../common/events';
 import * as SYS_MSG from '../../constants/system.messages';
 
 jest.mock('bcrypt');
@@ -54,6 +57,7 @@ const mockEmailService = {
   sendOtpReset: jest.fn(),
 };
 const mockLogService = { log: jest.fn() };
+const mockEventEmitter = { emit: jest.fn() };
 
 const TEST_USER = {
   id: 'user-uuid-1',
@@ -111,6 +115,7 @@ describe('AuthService login lockout (BE-005)', () => {
         { provide: OtpTokenModelAction, useValue: mockOtpTokenModelAction },
         { provide: EmailService, useValue: mockEmailService },
         { provide: LogService, useValue: mockLogService },
+        { provide: EventEmitter2, useValue: mockEventEmitter },
       ],
     }).compile();
 
@@ -143,6 +148,27 @@ describe('AuthService login lockout (BE-005)', () => {
       expect(mockUsersService.create).toHaveBeenCalledWith(
         expect.objectContaining({ businessName: undefined }),
       );
+    });
+
+    it('emits USER_SIGNED_UP with the new user id on success', async () => {
+      mockUsersService.create.mockResolvedValue({ ...TEST_USER, email: REGISTER_DTO.email });
+
+      await service.register(REGISTER_DTO);
+
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        APP_EVENTS.USER_SIGNED_UP,
+        expect.any(UserSignedUpEvent),
+      );
+      const emittedEvent = mockEventEmitter.emit.mock.calls[0][1] as UserSignedUpEvent;
+      expect(emittedEvent.userId).toBe(TEST_USER.id);
+    });
+
+    it('does not emit USER_SIGNED_UP when user creation fails', async () => {
+      mockUsersService.create.mockRejectedValue(new Error('DB error'));
+
+      await expect(service.register(REGISTER_DTO)).rejects.toThrow();
+
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
     });
   });
 
@@ -728,6 +754,7 @@ describe('AuthService - Password Reset Flow (BE-012)', () => {
         { provide: OtpTokenModelAction, useValue: mockOtpTokenModelAction },
         { provide: EmailService, useValue: mockEmailService },
         { provide: LogService, useValue: mockLogService },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 
@@ -1010,6 +1037,7 @@ describe('AuthService - refresh() rate limit (BE-64)', () => {
         { provide: OtpTokenModelAction, useValue: mockOtpTokenModelAction },
         { provide: EmailService, useValue: mockEmailService },
         { provide: LogService, useValue: mockLogService },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 

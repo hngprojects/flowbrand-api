@@ -2,11 +2,16 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { APP_EVENTS } from '../../../common/constants/app-events';
 import {
+  AccountDeletedEvent,
   FunnelGeneratedEvent,
+  PlanUpgradedEvent,
   StageCompletedEvent,
   StageUnlockedEvent,
+  SubscriptionCancelledEvent,
   TaskCompletedEvent,
+  UserSignedUpEvent,
 } from '../../../common/events/events';
+import * as SYS_MSG from '../../../constants/system.messages';
 import { EmailService } from '../../../email/email.service';
 import { StageTaskModelAction } from '../../funnels/actions/stage-task.action';
 import { UserModelAction } from '../../users/actions/user.action';
@@ -109,6 +114,23 @@ export class NotificationListener {
     });
   }
 
+  @OnEvent(APP_EVENTS.PLAN_UPGRADED)
+  async onPlanUpgraded(event: PlanUpgradedEvent): Promise<void> {
+    await this.safely('plan.upgraded', event.userId, async () => {
+      // Always create — payment confirmation is a system event, not preference-gated
+      await this.notificationsService.createNotification(
+        event.userId,
+        'plan_upgraded',
+        SYS_MSG.NOTIFICATION_PLAN_UPGRADED_TITLE,
+        SYS_MSG.NOTIFICATION_PLAN_UPGRADED_BODY,
+        { plan: event.plan },
+      );
+
+      // Email: TODO — sendPaymentSuccess method and payment-success.hbs template
+      // are not yet implemented. Add in a follow-up PR alongside the email template.
+    });
+  }
+
   @OnEvent(APP_EVENTS.TASK_COMPLETED)
   async onTaskCompleted(event: TaskCompletedEvent): Promise<void> {
     await this.safely('task.completed', event.userId, async () => {
@@ -141,6 +163,41 @@ export class NotificationListener {
     });
   }
 
+  @OnEvent(APP_EVENTS.SUBSCRIPTION_CANCELLED)
+  async onSubscriptionCancelled(event: SubscriptionCancelledEvent): Promise<void> {
+    await this.safely('subscription.cancelled', event.userId, async () => {
+      await this.notificationsService.createNotification(
+        event.userId,
+        'subscription_cancelled',
+        SYS_MSG.NOTIFICATION_SUBSCRIPTION_CANCELLED_TITLE,
+        SYS_MSG.NOTIFICATION_SUBSCRIPTION_CANCELLED_BODY(this.formatDate(event.accessUntil)),
+        { subscriptionId: event.subscriptionId },
+      );
+      // Email: TODO — sendSubscriptionCancelled method and template not yet implemented.
+      // Add in a follow-up PR alongside payment-related email templates.
+    });
+  }
+
+  // Transactional lifecycle email: intentionally not gated by notification preferences.
+  @OnEvent(APP_EVENTS.USER_SIGNED_UP)
+  async onUserSignedUp(event: UserSignedUpEvent): Promise<void> {
+    await this.safely('user.signed_up', event.userId, async () => {
+      await this.email(event.userId, (to, name) =>
+        this.emailService.sendWelcome(to, { name }, event.userId),
+      );
+    });
+  }
+
+  // Transactional lifecycle email: intentionally not gated by notification preferences.
+  // Uses event-carried email/name because the user record is hard-deleted before this fires.
+  @OnEvent(APP_EVENTS.ACCOUNT_DELETED)
+  async onAccountDeleted(event: AccountDeletedEvent): Promise<void> {
+    await this.safely('user.account_deleted', event.userId, async () => {
+      if (!event.email) return;
+      await this.emailService.sendDeleteAccount(event.email, { name: event.name }, event.userId);
+    });
+  }
+
   /** Resolves the recipient from the trusted userId (SEC-02) and dispatches when an email exists. */
   private async email(
     userId: string,
@@ -151,6 +208,10 @@ export class NotificationListener {
       return;
     }
     await dispatch(user.email, user.full_name);
+  }
+
+  private formatDate(date: Date): string {
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   }
 
   private async safely(label: string, userId: string, fn: () => Promise<void>): Promise<void> {

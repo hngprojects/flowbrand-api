@@ -45,9 +45,12 @@ async function bootstrap() {
 
   // IP allowlist — reject non-Paystack source IPs before HMAC check (SEC-06).
   // HMAC (SEC-03) is the authoritative guard; this is defence-in-depth.
+  // In non-production environments, localhost is allowed through so smoke tests can hit the endpoint.
+  const LOOPBACK_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
   httpAdapter.use('/api/payments/webhook', (req: Request, res: Response, next: NextFunction) => {
     const ip = req.ip ?? req.socket.remoteAddress ?? '';
-    if (!PAYSTACK_WEBHOOK_IPS.has(ip)) {
+    const isLoopback = env.NODE_ENV !== 'production' && LOOPBACK_IPS.has(ip);
+    if (!isLoopback && !PAYSTACK_WEBHOOK_IPS.has(ip)) {
       bootstrapLogger.warn(`Webhook request from unknown IP rejected before HMAC check: ${ip}`);
       res.status(403).json({ message: 'Forbidden' });
       return;

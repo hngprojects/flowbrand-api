@@ -242,12 +242,12 @@ export class UsersService {
   }
 
   async remove(id: string): Promise<void> {
-    await this.findById(id);
+    const user = await this.findById(id);
     await this.userModelAction.delete({
       ...NO_TRANSACTION,
       identifierOptions: { id },
     });
-    emitSafely(this.eventEmitter, this.logger, APP_EVENTS.ACCOUNT_DELETED, new AccountDeletedEvent(id));
+    emitSafely(this.eventEmitter, this.logger, APP_EVENTS.ACCOUNT_DELETED, new AccountDeletedEvent(id, user.email, user.full_name));
   }
 
   private async revokeAllUserSessions(userId: string): Promise<void> {

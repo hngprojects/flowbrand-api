@@ -350,6 +350,28 @@ describe('PaystackPaymentAdapter', () => {
       const sig = makeSignature(raw);
       await expect(adapter.handleWebhookEvent(raw, sig)).rejects.toThrow();
     });
+
+    it('maps reference to data.subscription_code for subscription.disable events', async () => {
+      const subPayload = { event: 'subscription.disable', data: { subscription_code: 'SUB_abc123', reference: 'should-not-be-used' } };
+      const raw = Buffer.from(JSON.stringify(subPayload));
+      const sig = makeSignature(raw);
+
+      const result = await adapter.handleWebhookEvent(raw, sig);
+
+      expect(result.type).toBe('subscription.disable');
+      expect(result.reference).toBe('SUB_abc123');
+    });
+
+    it('maps reference to data.subscription_code for subscription.not_renew events', async () => {
+      const subPayload = { event: 'subscription.not_renew', data: { subscription_code: 'SUB_xyz789', reference: 'should-not-be-used' } };
+      const raw = Buffer.from(JSON.stringify(subPayload));
+      const sig = makeSignature(raw);
+
+      const result = await adapter.handleWebhookEvent(raw, sig);
+
+      expect(result.type).toBe('subscription.not_renew');
+      expect(result.reference).toBe('SUB_xyz789');
+    });
   });
 
   // ─── Security (SEC-01) ──────────────────────────────────────────────────────
