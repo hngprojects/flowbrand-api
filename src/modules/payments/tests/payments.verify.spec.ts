@@ -293,7 +293,7 @@ describe('PaymentsService — resolvePayment', () => {
 
   // ─── EC-02: idempotency guard ─────────────────────────────────────────────────
 
-  it('ONE_TIME: skips Pro activation when subscription already exists and still returns SUCCESS with event (EC-02)', async () => {
+  it('ONE_TIME: idempotent skip when ACTIVE subscription already exists (EC-02)', async () => {
     mockPaymentGet.mockResolvedValueOnce({
       id: 'p-1', user_id: USER_ID, status: PaymentStatus.PENDING,
       provider_reference: REF, amount_kobo: 900000, payment_type: PaymentType.ONE_TIME,
@@ -301,15 +301,49 @@ describe('PaymentsService — resolvePayment', () => {
     jest.spyOn(service, 'verifyPayment').mockResolvedValueOnce({
       reference: REF, status: PaymentStatus.SUCCESS, amount: 900000, currency: 'NGN',
     });
-    // Pre-check finds an existing non-terminal subscription — INSERT is skipped entirely
-    // (avoids a failed INSERT that would abort the open transaction)
-    mockSubscriptionList.mockResolvedValueOnce({ payload: [{ id: 'sub-existing' }], paginationMeta: {} });
+    // Pre-check finds ACTIVE — already done, skip both INSERT and UPDATE
+    mockSubscriptionList.mockResolvedValueOnce({
+      payload: [{ id: 'sub-existing', status: SubscriptionStatus.ACTIVE, plan: PaymentPlan.PRO }],
+      paginationMeta: {},
+    });
 
     const result = await service.resolvePayment(USER_ID, REF);
 
     expect(mockSubscriptionCreate).not.toHaveBeenCalled();
+    expect(mockSubscriptionUpdate).not.toHaveBeenCalled();
     expect(result.status).toBe(PaymentStatus.SUCCESS);
-    // Pro access exists — event must still fire
+    // Already active — PLAN_UPGRADED event still fires
+    expect(mockEmit).toHaveBeenCalledWith(APP_EVENTS.PLAN_UPGRADED, expect.any(PlanUpgradedEvent));
+  });
+
+  it('ONE_TIME: upgrades PENDING subscription to ACTIVE MONTHLY when pre-check finds existing PENDING row (EC-02b)', async () => {
+    mockPaymentGet.mockResolvedValueOnce({
+      id: 'p-1', user_id: USER_ID, status: PaymentStatus.PENDING,
+      provider_reference: REF, amount_kobo: 900000, payment_type: PaymentType.ONE_TIME,
+    });
+    jest.spyOn(service, 'verifyPayment').mockResolvedValueOnce({
+      reference: REF, status: PaymentStatus.SUCCESS, amount: 900000, currency: 'NGN',
+    });
+    // Pre-check finds PENDING monthly — can't INSERT (unique index), must UPDATE in-place
+    mockSubscriptionList.mockResolvedValueOnce({
+      payload: [{ id: 'sub-pending', status: SubscriptionStatus.PENDING, billing_cycle: BillingCycle.MONTHLY }],
+      paginationMeta: {},
+    });
+
+    const result = await service.resolvePayment(USER_ID, REF);
+
+    expect(mockSubscriptionCreate).not.toHaveBeenCalled();
+    expect(mockSubscriptionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identifierOptions: { id: 'sub-pending' },
+        updatePayload: expect.objectContaining({
+          plan: PaymentPlan.PRO,
+          billing_cycle: BillingCycle.MONTHLY,
+          status: SubscriptionStatus.ACTIVE,
+        }),
+      }),
+    );
+    expect(result.status).toBe(PaymentStatus.SUCCESS);
     expect(mockEmit).toHaveBeenCalledWith(APP_EVENTS.PLAN_UPGRADED, expect.any(PlanUpgradedEvent));
   });
 

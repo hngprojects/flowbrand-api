@@ -9,13 +9,14 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { createHash } from 'crypto';
 import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
 import { env } from '../../config/env';
 import * as SYS_MSG from '../../constants/system.messages';
 import { APP_EVENTS } from '../../common/constants/app-events';
-import { PlanUpgradedEvent } from '../../common/events/events';
+import { PlanUpgradedEvent, SubscriptionCancelledEvent } from '../../common/events/events';
 import { PaymentModelAction } from './actions/payment.model-action';
 import { SubscriptionModelAction } from './actions/subscription.model-action';
 import { MockPaymentAdapter } from './adapters/mock-payment.adapter';
@@ -27,10 +28,12 @@ import { PaymentStatus } from './enums/payment-status.enum';
 import { PaymentType } from './enums/payment-type.enum';
 import { SubscriptionStatus } from './enums/subscription-status.enum';
 import {
+  CancelSubscriptionResponse,
   InitiatePaymentResult,
   InitiateSubscriptionResult,
   PaymentProvider,
   PaymentVerifyResponse,
+  SubscriptionResponse,
   VerifyPaymentResult,
   WebhookEvent,
 } from './interfaces/payment-provider.interface';
@@ -220,9 +223,10 @@ export class PaymentsService {
   }
 
   private async activateProSubscription(userId: string, manager: EntityManager): Promise<boolean> {
-    // Pre-check before INSERT: the partial unique index covers PENDING + ACTIVE, so a failed
-    // INSERT inside an open transaction aborts the whole transaction even if the error is caught
-    // at the application level. Checking first avoids that aborted-transaction problem.
+    // Pre-check: the partial unique index (IDX_subscriptions_active_user) covers PENDING + ACTIVE,
+    // so we can never INSERT a second row while either status exists — a failed INSERT inside an
+    // open transaction aborts the whole tx even if the error is caught at the application level.
+    // Instead: UPDATE the existing row if one is found, INSERT only when none exists.
     const { payload: existing } = await this.subscriptionModelAction.list({
       filterRecordOptions: [
         { user_id: userId, status: SubscriptionStatus.ACTIVE },
@@ -231,14 +235,34 @@ export class PaymentsService {
       paginationPayload: { page: 1, limit: 1 },
     });
 
-    if (existing.length > 0) {
-      this.logger.warn({ message: 'Pro subscription already active — idempotent skip', userId });
-      return true;
-    }
-
     const periodStart = new Date();
     const periodEnd = new Date(periodStart);
     periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+    if (existing.length > 0) {
+      const existingSub = existing[0];
+      if (existingSub.status === SubscriptionStatus.ACTIVE) {
+        // Already ACTIVE — idempotent replay, nothing to do.
+        this.logger.warn({ message: 'Pro subscription already active — idempotent skip', userId });
+        return true;
+      }
+
+      // Existing row is PENDING (e.g. a subscription attempt initiated before the one-time charge
+      // completed). Upgrade it to ACTIVE PRO in-place — inserting a new row would violate the
+      // partial unique index.
+      await this.subscriptionModelAction.update({
+        identifierOptions: { id: existingSub.id },
+        updatePayload: {
+          plan: PaymentPlan.PRO,
+          billing_cycle: BillingCycle.MONTHLY,
+          status: SubscriptionStatus.ACTIVE,
+          current_period_start: periodStart,
+          current_period_end: periodEnd,
+        },
+        transactionOptions: { useTransaction: true, transaction: manager },
+      });
+      return true;
+    }
 
     await this.subscriptionModelAction.create({
       createPayload: {
@@ -399,6 +423,90 @@ export class PaymentsService {
   /** Cancels a subscription with the configured provider. */
   async cancelSubscription(subscriptionCode: string): Promise<void> {
     return this.adapter.cancelSubscription(subscriptionCode);
+  }
+
+  async getUserSubscription(userId: string): Promise<SubscriptionResponse> {
+    const { payload } = await this.subscriptionModelAction.list({
+      filterRecordOptions: { user_id: userId, status: SubscriptionStatus.ACTIVE },
+      paginationPayload: { page: 1, limit: 1 },
+    });
+
+    const subscription = payload[0];
+    if (!subscription) {
+      throw new NotFoundException(SYS_MSG.SUBSCRIPTION_NOT_FOUND);
+    }
+
+    return this.mapSubscriptionToResponse(subscription);
+  }
+
+  async cancelUserSubscription(userId: string): Promise<CancelSubscriptionResponse> {
+    const { payload } = await this.subscriptionModelAction.list({
+      filterRecordOptions: { user_id: userId, status: SubscriptionStatus.ACTIVE },
+      paginationPayload: { page: 1, limit: 1 },
+    });
+
+    const subscription = payload[0];
+    if (!subscription) {
+      const { payload: terminal } = await this.subscriptionModelAction.list({
+        filterRecordOptions: [
+          { user_id: userId, status: SubscriptionStatus.CANCELLED },
+          { user_id: userId, status: SubscriptionStatus.EXPIRED },
+        ],
+        paginationPayload: { page: 1, limit: 1 },
+      });
+      if (terminal.length > 0) {
+        throw new ConflictException(SYS_MSG.SUBSCRIPTION_ALREADY_CANCELLED);
+      }
+      throw new NotFoundException(SYS_MSG.SUBSCRIPTION_NOT_FOUND);
+    }
+
+    if (!subscription.provider_subscription_code) {
+      this.logger.error({ message: SYS_MSG.SUBSCRIPTION_PROVIDER_CODE_MISSING, userId, subscriptionId: subscription.id });
+      throw new InternalServerErrorException(SYS_MSG.SUBSCRIPTION_PROVIDER_CODE_MISSING);
+    }
+
+    try {
+      await this.cancelSubscription(subscription.provider_subscription_code);
+    } catch (err: unknown) {
+      if (err instanceof HttpException) throw err;
+      throw new BadGatewayException(SYS_MSG.PAYMENT_FAILED);
+    }
+
+    const cancelledAt = new Date();
+    await this.subscriptionModelAction.update({
+      identifierOptions: { id: subscription.id },
+      updatePayload: {
+        status: SubscriptionStatus.CANCELLED,
+        cancel_at_period_end: true,
+        cancelled_at: cancelledAt,
+      },
+      transactionOptions: { useTransaction: false },
+    });
+
+    this.eventEmitter.emit(
+      APP_EVENTS.SUBSCRIPTION_CANCELLED,
+      new SubscriptionCancelledEvent(userId, subscription.id, subscription.current_period_end),
+    );
+
+    return {
+      cancelledAt: cancelledAt.toISOString(),
+      accessUntil: subscription.current_period_end.toISOString(),
+    };
+  }
+
+  private mapSubscriptionToResponse(subscription: Subscription): SubscriptionResponse {
+    return {
+      subscriptionId: subscription.id,
+      plan: subscription.plan,
+      billingCycle: subscription.billing_cycle,
+      status: subscription.status,
+      currentPeriodStart: subscription.current_period_start.toISOString(),
+      currentPeriodEnd: subscription.current_period_end.toISOString(),
+      cancelledAt: subscription.cancelled_at?.toISOString() ?? null,
+      downgradeAt: subscription.cancel_at_period_end
+        ? subscription.current_period_end.toISOString()
+        : null,
+    };
   }
 
   /** Routes a raw webhook payload to the configured provider's parser. */

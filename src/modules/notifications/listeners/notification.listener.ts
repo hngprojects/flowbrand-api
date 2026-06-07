@@ -7,6 +7,7 @@ import {
   PlanUpgradedEvent,
   StageCompletedEvent,
   StageUnlockedEvent,
+  SubscriptionCancelledEvent,
   TaskCompletedEvent,
   UserSignedUpEvent,
 } from '../../../common/events/events';
@@ -162,6 +163,21 @@ export class NotificationListener {
     });
   }
 
+  @OnEvent(APP_EVENTS.SUBSCRIPTION_CANCELLED)
+  async onSubscriptionCancelled(event: SubscriptionCancelledEvent): Promise<void> {
+    await this.safely('subscription.cancelled', event.userId, async () => {
+      await this.notificationsService.createNotification(
+        event.userId,
+        'subscription_cancelled',
+        SYS_MSG.NOTIFICATION_SUBSCRIPTION_CANCELLED_TITLE,
+        SYS_MSG.NOTIFICATION_SUBSCRIPTION_CANCELLED_BODY(this.formatDate(event.accessUntil)),
+        { subscriptionId: event.subscriptionId },
+      );
+      // Email: TODO — sendSubscriptionCancelled method and template not yet implemented.
+      // Add in a follow-up PR alongside payment-related email templates.
+    });
+  }
+
   // Transactional lifecycle email: intentionally not gated by notification preferences.
   @OnEvent(APP_EVENTS.USER_SIGNED_UP)
   async onUserSignedUp(event: UserSignedUpEvent): Promise<void> {
@@ -192,6 +208,10 @@ export class NotificationListener {
       return;
     }
     await dispatch(user.email, user.full_name);
+  }
+
+  private formatDate(date: Date): string {
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   }
 
   private async safely(label: string, userId: string, fn: () => Promise<void>): Promise<void> {

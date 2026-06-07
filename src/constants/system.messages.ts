@@ -330,6 +330,13 @@ export const PAYMENT_NOT_FOUND = 'Payment not found or does not belong to this a
 export const PAYMENT_VERIFIED_SUCCESSFULLY = 'Payment verified successfully';
 export const PAYMENT_PROVIDER_TIMEOUT = 'Payment provider did not respond in time';
 export const PAYMENT_AMOUNT_MISMATCH = 'Payment amount does not match the expected price — contact support';
+export const SUBSCRIPTION_NOT_FOUND = 'No active subscription found';
+export const SUBSCRIPTION_ALREADY_CANCELLED = 'Subscription is already cancelled or has expired';
+export const SUBSCRIPTION_PROVIDER_CODE_MISSING = 'Subscription provider identifier is missing — contact support';
+export const SUBSCRIPTION_CANCELLED_SUCCESSFULLY = 'Subscription cancelled successfully';
+export const SUBSCRIPTION_RETRIEVED_SUCCESSFULLY = 'Subscription retrieved successfully';
+export const NOTIFICATION_SUBSCRIPTION_CANCELLED_TITLE = 'Your subscription has been cancelled';
+export const NOTIFICATION_SUBSCRIPTION_CANCELLED_BODY = (date: string) => `You have access until ${date}.`;
 
 // Admin Teams
 export const TEAMS_RETRIEVED_SUCCESSFULLY = 'Teams retrieved successfully';

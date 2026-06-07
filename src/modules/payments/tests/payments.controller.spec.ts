@@ -1,4 +1,4 @@
-import { BadGatewayException, ConflictException, ExecutionContext, HttpStatus } from '@nestjs/common';
+import { BadGatewayException, ConflictException, ExecutionContext, HttpStatus, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentsController } from '../payments.controller';
 import { PaymentsService } from '../payments.service';
@@ -264,6 +264,110 @@ describe('PaymentRateLimitGuard', () => {
     });
     await guard.canActivate(buildContext()).catch(() => undefined);
     expect(REDIS_SERVICE_MOCK.rateLimit).not.toHaveBeenCalled();
+  });
+});
+
+describe('PaymentsController — GET /payments/subscription', () => {
+  let controller: PaymentsController;
+
+  const SUBSCRIPTION_SERVICE_MOCK = {
+    ...SERVICE_MOCK,
+    getUserSubscription: jest.fn(),
+    cancelUserSubscription: jest.fn(),
+  };
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [PaymentsController],
+      providers: [{ provide: PaymentsService, useValue: SUBSCRIPTION_SERVICE_MOCK }],
+    })
+      .overrideGuard(PaymentRateLimitGuard)
+      .useValue(RATE_LIMIT_GUARD_MOCK)
+      .overrideGuard(SubscriptionRateLimitGuard)
+      .useValue(SUBSCRIPTION_RATE_LIMIT_GUARD_MOCK)
+      .compile();
+
+    controller = module.get<PaymentsController>(PaymentsController);
+  });
+
+  const SUBSCRIPTION_DATA = {
+    subscriptionId: 'sub-1',
+    plan: 'pro',
+    billingCycle: 'monthly',
+    status: 'active',
+    currentPeriodStart: '2026-06-01T00:00:00.000Z',
+    currentPeriodEnd: '2026-07-01T00:00:00.000Z',
+    cancelledAt: null,
+    downgradeAt: null,
+  };
+
+  it('returns 200 with data from the service', async () => {
+    SUBSCRIPTION_SERVICE_MOCK.getUserSubscription.mockResolvedValueOnce(SUBSCRIPTION_DATA);
+
+    const result = await controller.getSubscription(USER_ID);
+
+    expect(result.statusCode).toBe(HttpStatus.OK);
+    expect(result.data).toEqual(SUBSCRIPTION_DATA);
+    expect(SUBSCRIPTION_SERVICE_MOCK.getUserSubscription).toHaveBeenCalledWith(USER_ID);
+  });
+
+  it('propagates NotFoundException (404) unchanged when no active subscription', async () => {
+    SUBSCRIPTION_SERVICE_MOCK.getUserSubscription.mockRejectedValueOnce(new NotFoundException('No active subscription found'));
+
+    await expect(controller.getSubscription(USER_ID)).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('PaymentsController — DELETE /payments/subscription', () => {
+  let controller: PaymentsController;
+
+  const SUBSCRIPTION_SERVICE_MOCK = {
+    ...SERVICE_MOCK,
+    getUserSubscription: jest.fn(),
+    cancelUserSubscription: jest.fn(),
+  };
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [PaymentsController],
+      providers: [{ provide: PaymentsService, useValue: SUBSCRIPTION_SERVICE_MOCK }],
+    })
+      .overrideGuard(PaymentRateLimitGuard)
+      .useValue(RATE_LIMIT_GUARD_MOCK)
+      .overrideGuard(SubscriptionRateLimitGuard)
+      .useValue(SUBSCRIPTION_RATE_LIMIT_GUARD_MOCK)
+      .compile();
+
+    controller = module.get<PaymentsController>(PaymentsController);
+  });
+
+  const CANCEL_DATA = {
+    cancelledAt: '2026-06-06T12:00:00.000Z',
+    accessUntil: '2026-07-01T00:00:00.000Z',
+  };
+
+  it('returns 200 with data from the service', async () => {
+    SUBSCRIPTION_SERVICE_MOCK.cancelUserSubscription.mockResolvedValueOnce(CANCEL_DATA);
+
+    const result = await controller.cancelUserSubscription(USER_ID);
+
+    expect(result.statusCode).toBe(HttpStatus.OK);
+    expect(result.data).toEqual(CANCEL_DATA);
+    expect(SUBSCRIPTION_SERVICE_MOCK.cancelUserSubscription).toHaveBeenCalledWith(USER_ID);
+  });
+
+  it('propagates NotFoundException (404) when no active subscription', async () => {
+    SUBSCRIPTION_SERVICE_MOCK.cancelUserSubscription.mockRejectedValueOnce(new NotFoundException('No active subscription found'));
+
+    await expect(controller.cancelUserSubscription(USER_ID)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('propagates ConflictException (409) when subscription is already cancelled', async () => {
+    SUBSCRIPTION_SERVICE_MOCK.cancelUserSubscription.mockRejectedValueOnce(new ConflictException('already cancelled'));
+
+    await expect(controller.cancelUserSubscription(USER_ID)).rejects.toBeInstanceOf(ConflictException);
   });
 });
 
