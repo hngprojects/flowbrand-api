@@ -12,6 +12,9 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as crypto from 'crypto';
+import type { Request } from 'express';
+import { LogService } from '../../common/services/log.service';
+import { AdminLogActionType, AdminLogStatus } from '../admin/logs/enums/admin-log.enum';
 import { UserSessionModelAction } from '../users/actions/user-session.action';
 import { AuthMetadataModelAction } from './actions/auth-metadata.action';
 import { OtpTokenModelAction } from './actions/otp-token.action';
@@ -62,6 +65,7 @@ export class AuthService {
     private readonly authMetadataModelAction: AuthMetadataModelAction,
     private readonly otpTokenModelAction: OtpTokenModelAction,
     private readonly emailService: EmailService,
+    private readonly logService: LogService,
     @Optional() private readonly logger = new Logger(AuthService.name),
     private readonly eventEmitter: EventEmitter2,
   ) { }
@@ -101,7 +105,7 @@ export class AuthService {
     return this.otpTokenModelAction;
   }
 
-  async register(dto: RegisterDto): Promise<{ message: string }> {
+  async register(dto: RegisterDto, req: Request | null = null): Promise<{ message: string }> {
     if (!dto.termsAccepted) {
       throw new BadRequestException(SYS_MSG.AUTH_TERMS_REQUIRED);
     }
@@ -113,6 +117,7 @@ export class AuthService {
       businessName: dto.businessName,
       termsAccepted: true,
     });
+    this.logService.log(user.id, AdminLogActionType.SIGNUP, 'New account registered', req, AdminLogStatus.SUCCESS);
     await this.sendOtp(user.email);
 
     emitSafely(this.eventEmitter, this.logger, APP_EVENTS.USER_SIGNED_UP, new UserSignedUpEvent(user.id));
@@ -120,10 +125,18 @@ export class AuthService {
     return { message: SYS_MSG.REGISTRATION_SUCCESSFUL_VERIFY_EMAIL };
   }
 
-  async login(dto: LoginDto): Promise<AuthResponse> {
+  async login(dto: LoginDto, req: Request | null = null): Promise<AuthResponse> {
     const user = await this.usersService.findByEmail(dto.email);
 
     if (!user?.password_hash) {
+      // EC-02: unknown email — there is no user to attribute the attempt to.
+      this.logService.log(
+        user?.id ?? null,
+        AdminLogActionType.LOGIN,
+        'Failed login attempt',
+        req,
+        AdminLogStatus.FAILED,
+      );
       throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_CREDENTIALS);
     }
 
@@ -138,10 +151,12 @@ export class AuthService {
 
     if (!passwordMatches) {
       await this.recordFailedLogin(user.id);
+      this.logService.log(user.id, AdminLogActionType.LOGIN, 'Failed login attempt', req, AdminLogStatus.FAILED);
       throw new UnauthorizedException(SYS_MSG.AUTH_INVALID_CREDENTIALS);
     }
 
     await this.recordSuccessfulLogin(user.id);
+    this.logService.log(user.id, AdminLogActionType.LOGIN, 'User logged in', req, AdminLogStatus.SUCCESS);
     return this.issueTokens(user);
   }
 
@@ -277,7 +292,7 @@ export class AuthService {
     return this.issueTokens(user, session.id);
   }
 
-  async logout(userId: string, sessionId: string): Promise<void> {
+  async logout(userId: string, sessionId: string, req: Request | null = null): Promise<void> {
     if (!sessionId) return;
 
     const redisKey = redisKeys.activeSession(userId, sessionId);
@@ -290,6 +305,7 @@ export class AuthService {
       this.redisService.del(redisKey),
       this.redisService.del(legacyRedisKey),
     ]);
+    this.logService.log(userId, AdminLogActionType.LOGOUT, 'User logged out', req, AdminLogStatus.SUCCESS);
   }
 
   async getProfile(userId: string): Promise<User> {

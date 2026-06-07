@@ -74,8 +74,8 @@ export class AuthController {
   @Throttle({ default: { ttl: 3_600_000, limit: 5 } })
   @ThrottleMessage(SYS_MSG.AUTH_REGISTER_RATE_LIMITED)
   @RegisterDocs()
-  async register(@Body() dto: RegisterDto) {
-    const { message } = await this.authService.register(dto);
+  async register(@Body() dto: RegisterDto, @Req() req: Request) {
+    const { message } = await this.authService.register(dto, req);
     return { statusCode: HttpStatus.CREATED, message };
   }
 
@@ -85,8 +85,8 @@ export class AuthController {
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @ThrottleMessage(SYS_MSG.AUTH_LOGIN_RATE_LIMITED)
   @LoginDocs()
-  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
-    const result = await this.authService.login(dto);
+  async login(@Body() dto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.login(dto, req);
     res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
     return {
       statusCode: HttpStatus.OK,
@@ -129,9 +129,10 @@ export class AuthController {
   async logout(
     @CurrentUser('sub') userId: string,
     @CurrentUser('sessionId') sessionId: string,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    await this.authService.logout(userId, sessionId);
+    await this.authService.logout(userId, sessionId, req);
     res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

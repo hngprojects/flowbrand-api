@@ -6,11 +6,13 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Req,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { diskStorage } from 'multer';
 import * as os from 'node:os';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -40,8 +42,12 @@ export class UploadController {
   @UploadFunnelDocumentsDocs()
   @UseInterceptors(uploadInterceptor)
   @HttpCode(HttpStatus.CREATED)
-  async upload(@CurrentUser('sub') userId: string, @UploadedFiles() files: Express.Multer.File[] | undefined) {
-    const result = await this.uploadService.handleUpload(userId, files);
+  async upload(
+    @CurrentUser('sub') userId: string,
+    @UploadedFiles() files: Express.Multer.File[] | undefined,
+    @Req() req: Request,
+  ) {
+    const result = await this.uploadService.handleUpload(userId, files, req);
     return {
       statusCode: HttpStatus.CREATED,
       message: SYS_MSG.UPLOAD_BATCH_ACCEPTED,

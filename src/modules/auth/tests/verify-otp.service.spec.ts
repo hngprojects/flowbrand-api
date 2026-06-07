@@ -11,6 +11,7 @@ import { UserSessionModelAction } from '../../users/actions/user-session.action'
 import { AuthMetadataModelAction } from '../actions/auth-metadata.action';
 import { OtpTokenModelAction } from '../actions/otp-token.action';
 import { EmailService } from '../../../email/email.service';
+import { LogService } from '../../../common/services/log.service';
 import * as SYS_MSG from '../../../constants/system.messages';
 
 const mockUsersService = {
@@ -89,6 +90,7 @@ describe('AuthService.verifyOtp (BE-004)', () => {
         { provide: AuthMetadataModelAction, useValue: mockAuthMetadataModelAction },
         { provide: OtpTokenModelAction, useValue: mockOtpTokenModelAction },
         { provide: EmailService, useValue: mockEmailService },
+        { provide: LogService, useValue: { log: jest.fn() } },
       ],
     }).compile();
 
