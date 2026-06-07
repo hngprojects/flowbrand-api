@@ -311,9 +311,9 @@ export class PaymentsService {
       periodEnd.setMonth(periodEnd.getMonth() + 1);
     }
 
-    let paymentId = '';
+    let payment: Payment;
     try {
-      const payment: Payment = await this.dataSource.transaction(async (manager) => {
+      payment = await this.dataSource.transaction(async (manager) => {
         const sub: Subscription = await this.subscriptionModelAction.create({
           createPayload: {
             user_id: userId,
@@ -344,7 +344,6 @@ export class PaymentsService {
           transactionOptions: { useTransaction: true, transaction: manager },
         });
       });
-      paymentId = payment.id;
     } catch (err: unknown) {
       if (err instanceof QueryFailedError && (err as { code?: string }).code === '23505') {
         // Row exists — check if a prior completed attempt left a subscription code
@@ -378,7 +377,7 @@ export class PaymentsService {
     const result = await this.adapter.initiateSubscription(dto, userId, email);
 
     await this.paymentModelAction.update({
-      identifierOptions: { id: paymentId },
+      identifierOptions: { id: payment!.id },
       updatePayload: { provider_reference: result.reference },
       transactionOptions: { useTransaction: false },
     });
