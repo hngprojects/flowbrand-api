@@ -214,9 +214,15 @@ export class PaystackPaymentAdapter implements PaymentProvider {
     try {
       const parsed = JSON.parse(rawBody.toString()) as Record<string, unknown>;
       const data = parsed.data as Record<string, unknown>;
+      // subscription.* events identify the subscription via data.subscription_code;
+      // charge.* events identify the payment transaction via data.reference.
+      const isSubscriptionEvent = (parsed.event as string).startsWith('subscription.');
+      const reference = isSubscriptionEvent
+        ? ((data.subscription_code as string) ?? '')
+        : (data.reference as string);
       return Promise.resolve({
         type: parsed.event as string,
-        reference: data.reference as string,
+        reference,
         data,
       });
     } catch (err: unknown) {

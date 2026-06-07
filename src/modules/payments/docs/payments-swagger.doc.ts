@@ -1,5 +1,5 @@
 import { applyDecorators, HttpStatus } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { ApiBody, ApiExcludeEndpoint, ApiHeader, ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { InitiateSubscriptionRequestDto } from '../dto/initiate-subscription-request.dto';
 
@@ -81,5 +81,26 @@ export function VerifyPaymentDocs() {
     ApiResponse({ status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'Gateway amount does not match the expected price.' }),
     ApiResponse({ status: HttpStatus.BAD_GATEWAY, description: 'Payment provider returned an error.' }),
     ApiResponse({ status: HttpStatus.GATEWAY_TIMEOUT, description: 'Payment provider did not respond in time.' }),
+  );
+}
+
+export function WebhookDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: 'Receive payment gateway webhook events',
+      description: [
+        'Cannot be tested via Swagger "Try it out".',
+        'Requires a real POST from the payment gateway with a valid HMAC-SHA512 signature.',
+        'Use the Paystack dashboard to send a test webhook delivery instead.',
+      ].join(' '),
+    }),
+    ApiHeader({ name: 'x-paystack-signature', description: 'HMAC-SHA512 signature from payment gateway', required: true }),
+    ApiResponse({
+      status: HttpStatus.OK,
+      description: 'Event acknowledged. Always returned after signature verification passes.',
+      schema: { example: { statusCode: 200, message: 'Webhook received', data: { received: true } } },
+    }),
+    ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Invalid or missing webhook signature.' }),
+    ApiExcludeEndpoint(false),
   );
 }
