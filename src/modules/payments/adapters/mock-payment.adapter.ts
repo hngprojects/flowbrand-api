@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { env } from '../../../config/env';
 import { PaymentStatus } from '../enums/payment-status.enum';
 import { PaymentFailedException } from '../exceptions/payment-failed.exception';
@@ -35,6 +36,7 @@ export class MockPaymentAdapter implements PaymentProvider {
       return Promise.reject(new PaymentFailedException('mock failure'));
     }
     return Promise.resolve({
+      reference: randomUUID(),
       subscriptionCode: `mock_sub_${Date.now()}`,
       authorizationUrl: 'https://mock.pay/sub',
       provider: 'mock',

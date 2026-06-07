@@ -290,6 +290,9 @@ export const PAYMENT_FAILED = 'Payment could not be processed';
 export const PAYMENT_PROVIDER_NOT_IMPLEMENTED = 'Payment provider is not yet implemented';
 export const PAYMENT_ALREADY_INITIATED = 'A payment for this request is already in progress';
 export const SUBSCRIPTION_ALREADY_ACTIVE = 'An active subscription already exists for this user';
+export const SUBSCRIPTION_INITIATED_SUCCESSFULLY = 'Subscription initiated successfully';
+export const SUBSCRIPTION_RATE_LIMIT_EXCEEDED = 'Too many subscription requests. Please try again later';
+export const SUBSCRIPTION_USER_ALREADY_SUBSCRIBED = 'You already have an active or pending subscription';
 
 // Admin users list
 export const ADMIN_USERS_LIST_RETRIEVED = 'Users retrieved successfully';
