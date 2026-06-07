@@ -16,6 +16,8 @@ import { UploadedDocument } from './entities/uploaded-document.entity';
 import { UploadedDocumentModelAction } from './actions/uploaded-document.action';
 import { DocumentTextExtractorService } from './services/document-text-extractor.service';
 import { UploadService } from './upload.service';
+import { LogService } from '../../common/services/log.service';
+import { AdminLogActionType, AdminLogStatus } from '../admin/logs/enums/admin-log.enum';
 import {
   UPLOAD_OBJECT_STORAGE,
   UploadDocumentStatus,
@@ -65,6 +67,7 @@ const mockObjectStorage: jest.Mocked<ObjectStorage> = {
 };
 
 const mockRedisService = { rateLimit: jest.fn() };
+const mockLogService = { log: jest.fn() };
 
 function buildRow(
   overrides: Partial<UploadedDocument> = {},
@@ -164,6 +167,7 @@ describe('UploadService', () => {
         },
         { provide: UPLOAD_OBJECT_STORAGE, useValue: mockObjectStorage },
         { provide: RedisService, useValue: mockRedisService },
+        { provide: LogService, useValue: mockLogService },
       ],
     }).compile();
 
@@ -292,6 +296,27 @@ describe('UploadService', () => {
         status: UploadDocumentStatus.UPLOADING,
         percentComplete: UPLOAD_PROGRESS.PARSING,
       });
+    });
+
+    it('BE-ADM-609: records a document_uploaded audit entry for an accepted batch', async () => {
+      const result = await service.handleUpload(USER_ID, [mockPdfFile()]);
+
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        USER_ID,
+        AdminLogActionType.DOCUMENT_UPLOADED,
+        expect.any(String),
+        null,
+        AdminLogStatus.SUCCESS,
+        { batchId: result.batchId, acceptedCount: 1, totalFiles: 1 },
+      );
+    });
+
+    it('BE-ADM-609: records no audit entry when every file is rejected', async () => {
+      mockObjectStorage.putObject.mockRejectedValue(new Error('storage down'));
+
+      await expect(service.handleUpload(USER_ID, [mockPdfFile()])).rejects.toBeDefined();
+
+      expect(mockLogService.log).not.toHaveBeenCalled();
     });
 
     it('EC-01: rejects when MinIO putObject fails for the only file', async () => {

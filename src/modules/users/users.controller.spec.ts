@@ -1,4 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
+import type { Request } from 'express';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
@@ -20,6 +21,8 @@ const mockUsersService = {
 };
 
 const USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+const MOCK_REQ = { ip: '127.0.0.1', headers: {} } as unknown as Request;
 
 const mockAuthUser = {
   userId: USER_ID,
@@ -100,46 +103,50 @@ describe('UsersController — profile endpoints', () => {
       const updated = { ...mockProfile, fullName: 'Jane Updated' };
       mockUsersService.updateProfile.mockResolvedValue(updated);
 
-      const result = await controller.updateProfile(mockAuthUser, { fullName: 'Jane Updated' });
+      const result = await controller.updateProfile(mockAuthUser, { fullName: 'Jane Updated' }, MOCK_REQ);
 
       expect(result).toEqual({
         statusCode: HttpStatus.OK,
         message: SYS_MSG.PROFILE_UPDATED_SUCCESSFULLY,
         data: updated,
       });
-      expect(mockUsersService.updateProfile).toHaveBeenCalledWith(USER_ID, {
-        fullName: 'Jane Updated',
-      });
+      expect(mockUsersService.updateProfile).toHaveBeenCalledWith(
+        USER_ID,
+        { fullName: 'Jane Updated' },
+        MOCK_REQ,
+      );
     });
 
     it('updates country and returns 200', async () => {
       const updated = { ...mockProfile, country: 'Ghana' };
       mockUsersService.updateProfile.mockResolvedValue(updated);
 
-      const result = await controller.updateProfile(mockAuthUser, { country: 'Ghana' });
+      const result = await controller.updateProfile(mockAuthUser, { country: 'Ghana' }, MOCK_REQ);
 
       expect(result).toMatchObject({
         statusCode: HttpStatus.OK,
         message: SYS_MSG.PROFILE_UPDATED_SUCCESSFULLY,
       });
-      expect(mockUsersService.updateProfile).toHaveBeenCalledWith(USER_ID, {
-        country: 'Ghana',
-      });
+      expect(mockUsersService.updateProfile).toHaveBeenCalledWith(
+        USER_ID,
+        { country: 'Ghana' },
+        MOCK_REQ,
+      );
     });
 
     it('empty body returns 200 with unchanged profile', async () => {
       mockUsersService.updateProfile.mockResolvedValue(mockProfile);
 
-      const result = await controller.updateProfile(mockAuthUser, {});
+      const result = await controller.updateProfile(mockAuthUser, {}, MOCK_REQ);
 
       expect(result.statusCode).toBe(HttpStatus.OK);
-      expect(mockUsersService.updateProfile).toHaveBeenCalledWith(USER_ID, {});
+      expect(mockUsersService.updateProfile).toHaveBeenCalledWith(USER_ID, {}, MOCK_REQ);
     });
 
     it('passes userId from JWT — never from path param', async () => {
       mockUsersService.updateProfile.mockResolvedValue(mockProfile);
 
-      await controller.updateProfile(mockAuthUser, {});
+      await controller.updateProfile(mockAuthUser, {}, MOCK_REQ);
 
       // First arg to updateProfile must be the JWT userId, not a path param
       expect(mockUsersService.updateProfile.mock.calls[0][0]).toBe(USER_ID);

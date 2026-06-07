@@ -4,6 +4,7 @@ import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import type { StringValue } from 'ms';
 import { env } from '../../config/env';
+import { LogModule } from '../../common/services/log.module';
 import { UsersModule } from '../users/users.module';
 import { RedisModule } from '../redis/redis.module';
 import { EmailModule } from '../../email/email.module';
@@ -29,6 +30,7 @@ import { GoogleStrategy } from './strategies/google.strategy';
     UsersModule,
     RedisModule,
     EmailModule,
+    LogModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, GoogleStrategy, OtpTokenModelAction, AuthMetadataModelAction],

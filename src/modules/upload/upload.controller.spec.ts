@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpStatus } from '@nestjs/common';
+import type { Request } from 'express';
 import { UploadController } from './upload.controller';
 import { UploadService } from './upload.service';
 import { UploadDocumentStatus } from './upload.types';
@@ -10,6 +11,8 @@ const mockUploadService = {
   handleUpload: jest.fn(),
   getProgress: jest.fn(),
 };
+
+const MOCK_REQ = { ip: '127.0.0.1', headers: {} } as unknown as Request;
 
 const batchResult: UploadBatchResponse = {
   message: SYS_MSG.FUNNEL_UPLOAD_COMPLETED,
@@ -58,8 +61,9 @@ describe('UploadController', () => {
     it('returns a single-level envelope: data holds { batchId, uploads } with no nested envelope', async () => {
       mockUploadService.handleUpload.mockResolvedValue(batchResult);
 
-      const result = await controller.upload('user-1', [] as Express.Multer.File[]);
+      const result = await controller.upload('user-1', [] as Express.Multer.File[], MOCK_REQ);
 
+      expect(mockUploadService.handleUpload).toHaveBeenCalledWith('user-1', [], MOCK_REQ);
       expect(result.statusCode).toBe(HttpStatus.CREATED);
       expect(result.message).toBe(SYS_MSG.UPLOAD_BATCH_ACCEPTED);
       expect(result.data.batchId).toBe('batch-1');
