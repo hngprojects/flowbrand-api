@@ -235,37 +235,34 @@ export class PaymentsService {
       paginationPayload: { page: 1, limit: 1 },
     });
 
+    const periodStart = new Date();
+    const periodEnd = new Date(periodStart);
+    periodEnd.setMonth(periodEnd.getMonth() + 1);
+
     if (existing.length > 0) {
       const existingSub = existing[0];
-      if (
-        existingSub.status === SubscriptionStatus.ACTIVE &&
-        existingSub.billing_cycle === BillingCycle.LIFETIME
-      ) {
-        // Already an ACTIVE LIFETIME subscription — idempotent replay, nothing to do.
+      if (existingSub.status === SubscriptionStatus.ACTIVE) {
+        // Already ACTIVE — idempotent replay, nothing to do.
         this.logger.warn({ message: 'Pro subscription already active — idempotent skip', userId });
         return true;
       }
 
-      // Existing row is PENDING or ACTIVE with a different billing cycle (e.g. monthly subscription
-      // initiated before the one-time charge completed). Upgrade it to ACTIVE LIFETIME in-place —
-      // inserting a new row would violate the partial unique index.
+      // Existing row is PENDING (e.g. a subscription attempt initiated before the one-time charge
+      // completed). Upgrade it to ACTIVE PRO in-place — inserting a new row would violate the
+      // partial unique index.
       await this.subscriptionModelAction.update({
         identifierOptions: { id: existingSub.id },
         updatePayload: {
           plan: PaymentPlan.PRO,
-          billing_cycle: BillingCycle.LIFETIME,
+          billing_cycle: BillingCycle.MONTHLY,
           status: SubscriptionStatus.ACTIVE,
-          current_period_start: new Date(),
-          current_period_end: new Date('9999-12-31'),
+          current_period_start: periodStart,
+          current_period_end: periodEnd,
         },
         transactionOptions: { useTransaction: true, transaction: manager },
       });
       return true;
     }
-
-    const periodStart = new Date();
-    const periodEnd = new Date(periodStart);
-    periodEnd.setMonth(periodEnd.getMonth() + 1);
 
     await this.subscriptionModelAction.create({
       createPayload: {
