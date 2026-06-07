@@ -4,6 +4,7 @@ import { APP_EVENTS } from '../../../common/constants/app-events';
 import {
   AccountDeletedEvent,
   FunnelGeneratedEvent,
+  PaymentFailedEvent,
   PlanUpgradedEvent,
   StageCompletedEvent,
   StageUnlockedEvent,
@@ -14,6 +15,7 @@ import {
 import * as SYS_MSG from '../../../constants/system.messages';
 import { EmailService } from '../../../email/email.service';
 import { StageTaskModelAction } from '../../funnels/actions/stage-task.action';
+import { PaymentModelAction } from '../../payments/actions/payment.model-action';
 import { UserModelAction } from '../../users/actions/user.action';
 import { NotificationModelAction } from '../actions/notification.action';
 import { NotificationsService } from '../notifications.service';
@@ -39,6 +41,7 @@ export class NotificationListener {
     private readonly emailService: EmailService,
     private readonly taskAction: StageTaskModelAction,
     private readonly userAction: UserModelAction,
+    private readonly paymentModelAction: PaymentModelAction,
   ) {}
 
   @OnEvent(APP_EVENTS.STAGE_COMPLETED)
@@ -117,7 +120,7 @@ export class NotificationListener {
   @OnEvent(APP_EVENTS.PLAN_UPGRADED)
   async onPlanUpgraded(event: PlanUpgradedEvent): Promise<void> {
     await this.safely('plan.upgraded', event.userId, async () => {
-      // Always create — payment confirmation is a system event, not preference-gated
+      // In-app notification (always — payment confirmation is a system event)
       await this.notificationsService.createNotification(
         event.userId,
         'plan_upgraded',
@@ -126,8 +129,36 @@ export class NotificationListener {
         { plan: event.plan },
       );
 
-      // Email: TODO — sendPaymentSuccess method and payment-success.hbs template
-      // are not yet implemented. Add in a follow-up PR alongside the email template.
+      // Email
+      const payment = await this.paymentModelAction.findByReference(event.reference);
+      if (!payment) {
+        this.logger.warn({ message: 'Payment row not found for PLAN_UPGRADED event', reference: event.reference });
+        return;
+      }
+      if (!payment.amount_kobo) {
+        this.logger.warn({ message: 'Payment amount is 0 or null — skipping email', reference: event.reference });
+        return;
+      }
+      if (!payment.paid_at) {
+        this.logger.warn({ message: 'Payment paid_at is null', reference: event.reference });
+      }
+      // SEC-02: only include card_last4 when it is a valid 4-digit numeric string
+      const cardLast4 = /^\d{4}$/.test(payment.card_last4 ?? '') ? payment.card_last4 : null;
+
+      await this.email(event.userId, (to, name) =>
+        this.emailService.sendPaymentSuccessful(
+          to,
+          {
+            name,
+            amount: this.formatKobo(payment.amount_kobo),
+            cardLast4,
+            cardBrand: payment.card_brand,
+            reference: event.reference,
+            paidAt: payment.paid_at ? this.formatDate(payment.paid_at) : null,
+          },
+          event.userId,
+        ),
+      );
     });
   }
 
@@ -166,6 +197,7 @@ export class NotificationListener {
   @OnEvent(APP_EVENTS.SUBSCRIPTION_CANCELLED)
   async onSubscriptionCancelled(event: SubscriptionCancelledEvent): Promise<void> {
     await this.safely('subscription.cancelled', event.userId, async () => {
+      // In-app notification (added in M4-BE-022)
       await this.notificationsService.createNotification(
         event.userId,
         'subscription_cancelled',
@@ -173,8 +205,32 @@ export class NotificationListener {
         SYS_MSG.NOTIFICATION_SUBSCRIPTION_CANCELLED_BODY(this.formatDate(event.accessUntil)),
         { subscriptionId: event.subscriptionId },
       );
-      // Email: TODO — sendSubscriptionCancelled method and template not yet implemented.
-      // Add in a follow-up PR alongside payment-related email templates.
+
+      // Email
+      await this.email(event.userId, (to, name) =>
+        this.emailService.sendSubscriptionCancelled(
+          to,
+          { name, accessUntil: this.formatDate(event.accessUntil) },
+          event.userId,
+        ),
+      );
+    });
+  }
+
+  @OnEvent(APP_EVENTS.PAYMENT_FAILED)
+  async onPaymentFailed(event: PaymentFailedEvent): Promise<void> {
+    await this.safely('payment.failed', event.userId, async () => {
+      await this.notificationsService.createNotification(
+        event.userId,
+        'payment_failed',
+        SYS_MSG.NOTIFICATION_PAYMENT_FAILED_TITLE,
+        SYS_MSG.NOTIFICATION_PAYMENT_FAILED_BODY,
+        { reference: event.reference },
+      );
+
+      await this.email(event.userId, (to, name) =>
+        this.emailService.sendPaymentFailed(to, { name, failureReason: event.failureReason }, event.userId),
+      );
     });
   }
 
@@ -210,8 +266,14 @@ export class NotificationListener {
     await dispatch(user.email, user.full_name);
   }
 
+  private formatKobo(amountInKobo: number | null): string {
+    const naira = (amountInKobo ?? 0) / 100;
+    const formatted = naira.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `₦${formatted}`;
+  }
+
   private formatDate(date: Date): string {
-    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   }
 
   private async safely(label: string, userId: string, fn: () => Promise<void>): Promise<void> {

@@ -340,6 +340,8 @@ export const SUBSCRIPTION_CANCELLED_SUCCESSFULLY = 'Subscription cancelled succe
 export const SUBSCRIPTION_RETRIEVED_SUCCESSFULLY = 'Subscription retrieved successfully';
 export const NOTIFICATION_SUBSCRIPTION_CANCELLED_TITLE = 'Your subscription has been cancelled';
 export const NOTIFICATION_SUBSCRIPTION_CANCELLED_BODY = (date: string) => `You have access until ${date}.`;
+export const NOTIFICATION_PAYMENT_FAILED_TITLE = 'Your payment could not be processed';
+export const NOTIFICATION_PAYMENT_FAILED_BODY = 'Please update your payment details to continue enjoying Pro.';
 
 // Admin Teams
 export const TEAMS_RETRIEVED_SUCCESSFULLY = 'Teams retrieved successfully';

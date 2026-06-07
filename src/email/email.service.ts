@@ -5,7 +5,11 @@ import { JOBS, QUEUES } from '../common/constants/queue.constants';
 import { maskEmail, maskId } from '../utils/pii.utils';
 import type {
   EmailJob,
+  NotificationAlertPayload,
   OtpPayload,
+  PaymentFailedPayload,
+  PaymentSuccessfulPayload,
+  SubscriptionCancelledPayload,
   WaitlistPayload,
   ContactConfirmationPayload,
   ContactAdminNotificationPayload,
@@ -34,108 +38,69 @@ export class EmailService {
     return this.dispatch({ to, type: 'otp-reset', payload, userId }, DEFAULT_PRIORITY);
   }
 
-  async sendPasswordReset(
-    to: string,
-    payload: OtpPayload,
-    userId?: string,
-  ): Promise<string | undefined> {
-    return this.dispatch(
-      { to, type: 'password-reset', payload, userId },
-      DEFAULT_PRIORITY,
-    );
-  }
-  
-  async sendWaitlistConfirmation(
-     to: string, 
-     payload: WaitlistPayload
-   ): Promise<string | undefined> {
-    return this.dispatch(
-      { to, type: 'waitlist', payload }, 
-      DEFAULT_PRIORITY
-    );
+  async sendPasswordReset(to: string, payload: OtpPayload, userId?: string): Promise<string | undefined> {
+    return this.dispatch({ to, type: 'password-reset', payload, userId }, DEFAULT_PRIORITY);
   }
 
-  async sendContactConfirmation(
-    to: string, 
-    payload: ContactConfirmationPayload
-   ): Promise<string | undefined> {
-    return this.dispatch(
-      { to, type: 'contact-confirmation', payload }, 
-      DEFAULT_PRIORITY
-    );
+  async sendWaitlistConfirmation(to: string, payload: WaitlistPayload): Promise<string | undefined> {
+    return this.dispatch({ to, type: 'waitlist', payload }, DEFAULT_PRIORITY);
   }
 
-  async sendContactAdminNotification(
-    to: string,
-    payload: ContactAdminNotificationPayload,
-  ): Promise<string | undefined> {
-    return this.dispatch(
-      { to, type: 'contact-admin-notification', payload }, 
-      DEFAULT_PRIORITY
-    );
+  async sendContactConfirmation(to: string, payload: ContactConfirmationPayload): Promise<string | undefined> {
+    return this.dispatch({ to, type: 'contact-confirmation', payload }, DEFAULT_PRIORITY);
   }
 
-  async sendFunnelReady(
-    to: string,
-    payload: FunnelReadyPayload,
-    userId?: string,
-  ): Promise<string | undefined> {
+  async sendContactAdminNotification(to: string, payload: ContactAdminNotificationPayload): Promise<string | undefined> {
+    return this.dispatch({ to, type: 'contact-admin-notification', payload }, DEFAULT_PRIORITY);
+  }
+
+  async sendFunnelReady(to: string, payload: FunnelReadyPayload, userId?: string): Promise<string | undefined> {
     return this.dispatch({ to, type: 'funnel-ready', payload, userId }, DEFAULT_PRIORITY);
   }
 
-  async sendStageUnlocked(
-    to: string,
-    payload: StageUnlockedPayload,
-    userId?: string,
-  ): Promise<string | undefined> {
+  async sendStageUnlocked(to: string, payload: StageUnlockedPayload, userId?: string): Promise<string | undefined> {
     return this.dispatch({ to, type: 'stage-unlocked', payload, userId }, DEFAULT_PRIORITY);
   }
 
-  async sendStageCompleted(
-    to: string,
-    payload: StageCompletedPayload,
-    userId?: string,
-  ): Promise<string | undefined> {
+  async sendStageCompleted(to: string, payload: StageCompletedPayload, userId?: string): Promise<string | undefined> {
     return this.dispatch({ to, type: 'stage-completed', payload, userId }, DEFAULT_PRIORITY);
   }
 
-  async sendWeeklyDigest(
-    to: string,
-    payload: WeeklyDigestPayload,
-    userId?: string,
-  ): Promise<string | undefined> {
+  async sendWeeklyDigest(to: string, payload: WeeklyDigestPayload, userId?: string): Promise<string | undefined> {
     return this.dispatch({ to, type: 'weekly-digest', payload, userId }, DEFAULT_PRIORITY);
   }
 
-  async sendTeamInvite(
-    to: string,
-    payload: TeamInvitePayload,
-    userId?: string,
-  ): Promise<string | undefined> {
+  async sendTeamInvite(to: string, payload: TeamInvitePayload, userId?: string): Promise<string | undefined> {
     return this.dispatch({ to, type: 'team-invite', payload, userId }, DEFAULT_PRIORITY);
   }
 
-  async sendWelcome(
-    to: string,
-    payload: WelcomePayload,
-    userId?: string,
-  ): Promise<string | undefined> {
+  async sendPaymentSuccessful(to: string, payload: PaymentSuccessfulPayload, userId?: string): Promise<string | undefined> {
+    return this.dispatch({ to, type: 'payment-successful', payload, userId }, DEFAULT_PRIORITY);
+  }
+
+  async sendPaymentFailed(to: string, payload: PaymentFailedPayload, userId?: string): Promise<string | undefined> {
+    return this.dispatch({ to, type: 'payment-failed', payload, userId }, DEFAULT_PRIORITY);
+  }
+
+  async sendSubscriptionCancelled(to: string, payload: SubscriptionCancelledPayload, userId?: string): Promise<string | undefined> {
+    return this.dispatch({ to, type: 'subscription-cancelled', payload, userId }, DEFAULT_PRIORITY);
+  }
+
+  async sendNotificationAlert(to: string, payload: NotificationAlertPayload, userId?: string): Promise<string | undefined> {
+    return this.dispatch({ to, type: 'notification-alert', payload, userId }, DEFAULT_PRIORITY);
+  }
+
+  async sendWelcome(to: string, payload: WelcomePayload, userId?: string): Promise<string | undefined> {
     return this.dispatch({ to, type: 'welcome', payload, userId }, DEFAULT_PRIORITY);
   }
 
-  async sendDeleteAccount(
-    to: string,
-    payload: DeleteAccountPayload,
-    userId?: string,
-  ): Promise<string | undefined> {
+  async sendDeleteAccount(to: string, payload: DeleteAccountPayload, userId?: string): Promise<string | undefined> {
     return this.dispatch({ to, type: 'delete-account', payload, userId }, DEFAULT_PRIORITY);
   }
 
   private async dispatch(job: EmailJob, priority: number): Promise<string | undefined> {
     try {
-      const queued = await this.emailQueue.add(JOBS.SEND_EMAIL, job, {
-        priority,
-      });
+      const queued = await this.emailQueue.add(JOBS.SEND_EMAIL, job, { priority });
 
       this.logger.log({
         message: 'Email job queued',

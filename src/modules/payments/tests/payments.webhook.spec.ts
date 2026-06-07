@@ -3,13 +3,12 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { APP_EVENTS } from '../../../common/constants/app-events';
-import { PlanUpgradedEvent } from '../../../common/events/events';
+import { PaymentFailedEvent, PlanUpgradedEvent } from '../../../common/events/events';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { PaymentModelAction } from '../actions/payment.model-action';
 import { SubscriptionModelAction } from '../actions/subscription.model-action';
 import { MockPaymentAdapter } from '../adapters/mock-payment.adapter';
 import { PaystackPaymentAdapter } from '../adapters/paystack-payment.adapter';
-import { BillingCycle } from '../enums/billing-cycle.enum';
 import { PaymentPlan } from '../enums/payment-plan.enum';
 import { PaymentStatus } from '../enums/payment-status.enum';
 import { PaymentType } from '../enums/payment-type.enum';
@@ -154,7 +153,7 @@ describe('PaymentsService — processWebhookEvent', () => {
       expect.objectContaining({ updatePayload: { status: PaymentStatus.FAILED } }),
     );
     expect(mockSubscriptionCreate).not.toHaveBeenCalled();
-    expect(mockEmit).not.toHaveBeenCalled();
+    expect(mockEmit).toHaveBeenCalledWith(APP_EVENTS.PAYMENT_FAILED, expect.any(PaymentFailedEvent));
   });
 
   // AC-04 — charge.success replayed (already success) → no-op

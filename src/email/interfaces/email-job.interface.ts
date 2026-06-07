@@ -10,6 +10,10 @@ export type EmailType =
   | 'stage-completed'
   | 'weekly-digest'
   | 'team-invite'
+  | 'payment-successful'
+  | 'payment-failed'
+  | 'subscription-cancelled'
+  | 'notification-alert'
   | 'welcome'
   | 'delete-account';
 
@@ -24,6 +28,7 @@ export interface WaitlistPayload {
     name: string;
   };
 }
+
 export interface ContactConfirmationPayload {
   fullName: string;
 }
@@ -64,6 +69,35 @@ export interface TeamInvitePayload {
   customMessage?: string;
 }
 
+export interface PaymentSuccessfulPayload {
+  name: string;
+  /** Pre-formatted Naira string, e.g. '₦10,000.00'. */
+  amount: string;
+  /** null when card details are absent or fail the /^\d{4}$/ guard — template omits the line. */
+  cardLast4: string | null;
+  cardBrand: string | null;
+  /** Paystack provider_reference shown as Transaction ID. */
+  reference: string;
+  /** Pre-formatted date string e.g. 'May 4, 2026'. null when paid_at is missing — template omits the row. */
+  paidAt: string | null;
+}
+
+export interface PaymentFailedPayload {
+  name: string;
+  failureReason?: string;
+}
+
+export interface SubscriptionCancelledPayload {
+  name: string;
+  /** Pre-formatted date string, e.g. 'May 4, 2026'. */
+  accessUntil: string;
+}
+
+export interface NotificationAlertPayload {
+  name: string;
+  unreadCount: number;
+}
+
 export interface WelcomePayload {
   name: string;
 }
@@ -81,6 +115,10 @@ export type EmailPayload =
   | StageCompletedPayload
   | WeeklyDigestPayload
   | TeamInvitePayload
+  | PaymentSuccessfulPayload
+  | PaymentFailedPayload
+  | SubscriptionCancelledPayload
+  | NotificationAlertPayload
   | WelcomePayload
   | DeleteAccountPayload;
 
@@ -101,6 +139,10 @@ export type EmailJob = BaseEmailJob &
     | { type: 'stage-completed'; payload: StageCompletedPayload }
     | { type: 'weekly-digest'; payload: WeeklyDigestPayload }
     | { type: 'team-invite'; payload: TeamInvitePayload }
+    | { type: 'payment-successful'; payload: PaymentSuccessfulPayload }
+    | { type: 'payment-failed'; payload: PaymentFailedPayload }
+    | { type: 'subscription-cancelled'; payload: SubscriptionCancelledPayload }
+    | { type: 'notification-alert'; payload: NotificationAlertPayload }
     | { type: 'welcome'; payload: WelcomePayload }
     | { type: 'delete-account'; payload: DeleteAccountPayload }
   );

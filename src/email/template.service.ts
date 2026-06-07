@@ -18,6 +18,10 @@ const EMAIL_TYPES: EmailType[] = [
   'stage-completed',
   'weekly-digest',
   'team-invite',
+  'payment-successful',
+  'payment-failed',
+  'subscription-cancelled',
+  'notification-alert',
   'welcome',
   'delete-account',
 ];
@@ -40,6 +44,10 @@ export class TemplateService implements OnModuleInit {
     'stage-completed': 'You completed "{{stageName}}"',
     'weekly-digest': 'Your weekly SEIL progress',
     'team-invite': "You've been invited to '{{teamName}}'",
+    'payment-successful': 'Payment Successful — Your FlowBrand subscription is now active',
+    'payment-failed': 'Payment Failed — We could not process your payment',
+    'subscription-cancelled': 'Your FlowBrand subscription has been cancelled',
+    'notification-alert': 'You have {{unreadCount}} new notification(s) from FlowBrand',
     'welcome': 'Welcome to Seil',
     'delete-account': 'Delete Account Request',
   };
@@ -75,20 +83,22 @@ export class TemplateService implements OnModuleInit {
     }
 
     const frontendUrl = (process.env.FRONTEND_URL ?? 'http://localhost:3000').replace(/\/$/, '');
-    const templateContext = {
-      ...payload,
+    const urlContext = {
+      unsubscribeUrl: `${frontendUrl}/unsubscribe`,
+      privacyPolicyUrl: `${frontendUrl}/privacy-policy`,
+      upgradeUrl: `${frontendUrl}/upgrade`,
       dashboardUrl: `${frontendUrl}/dashboard`,
+      notificationPreferencesUrl: `${frontendUrl}/settings/notifications`,
       ctaUrl: `${frontendUrl}/onboarding`,
       supportUrl: `${frontendUrl}/support`,
     };
 
-    const body = compiled(templateContext);
+    const body = compiled({ ...payload, ...urlContext });
     const html = this.baseLayout({
-      ...templateContext,
+      ...payload,
+      ...urlContext,
       body,
       year: new Date().getFullYear(),
-      unsubscribeUrl: `${frontendUrl}/unsubscribe`,
-      privacyPolicyUrl: `${frontendUrl}/privacy-policy`,
     });
 
     const subject = this.compiledSubjects[type](payload);

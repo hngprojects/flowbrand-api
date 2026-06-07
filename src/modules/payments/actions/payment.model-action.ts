@@ -9,4 +9,8 @@ export class PaymentModelAction extends AbstractModelAction<Payment> {
   constructor(@InjectRepository(Payment) repository: Repository<Payment>) {
     super(repository, Payment);
   }
+
+  async findByReference(reference: string): Promise<Payment | null> {
+    return this.get({ identifierOptions: { provider_reference: reference } });
+  }
 }
