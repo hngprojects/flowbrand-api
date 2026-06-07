@@ -1,5 +1,5 @@
 import { applyDecorators, HttpStatus } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { InitiateSubscriptionRequestDto } from '../dto/initiate-subscription-request.dto';
 
@@ -67,5 +67,19 @@ export function InitiateSubscriptionDocs() {
         },
       },
     }),
+  );
+}
+
+export function VerifyPaymentDocs() {
+  return applyDecorators(
+    ApiOperation({ summary: 'Verify a payment and activate Pro access on success' }),
+    ApiQuery({ name: 'reference', required: true, description: 'UUID v4 provider reference returned by the initiate endpoint' }),
+    ApiResponse({ status: HttpStatus.OK, description: 'Payment status resolved (success | failed | pending | refunded).' }),
+    ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'reference is not a valid UUID v4.' }),
+    ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Missing or invalid JWT.' }),
+    ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Reference not found or belongs to a different user.' }),
+    ApiResponse({ status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'Gateway amount does not match the expected price.' }),
+    ApiResponse({ status: HttpStatus.BAD_GATEWAY, description: 'Payment provider returned an error.' }),
+    ApiResponse({ status: HttpStatus.GATEWAY_TIMEOUT, description: 'Payment provider did not respond in time.' }),
   );
 }
