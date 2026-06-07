@@ -32,6 +32,7 @@ import { Logger } from '@nestjs/common';
 import { StageFeedbackModelAction } from '../../actions/stage-feedback.action';
 import { StageFeedback } from '../../entities/stage-feedback.entity';
 import { LlmService } from '../../../../queue/interfaces/llm.service.interface';
+import { LogService } from '../../../../common/services/log.service';
 
 const USER_ID = '00000000-0000-4000-8000-0000000000a1';
 const OTHER_USER_ID = '00000000-0000-4000-8000-0000000000b2';
@@ -154,6 +155,7 @@ describe('FunnelsService', () => {
         { provide: StageFeedbackModelAction, useValue: feedbackAction },
         { provide: EventEmitter2, useValue: mockEventEmitter },
         { provide: LlmService, useValue: mockLlmService },
+        { provide: LogService, useValue: { log: jest.fn() } },
       ],
     }).compile();
 

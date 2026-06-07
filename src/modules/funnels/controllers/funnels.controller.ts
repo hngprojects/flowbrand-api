@@ -10,10 +10,12 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UnprocessableEntityException,
   ValidationError,
   ValidationPipe,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { CreateFunnelDto, FunnelIdParamDto } from '../dto/create-funnel.dto';
@@ -180,8 +182,9 @@ export class FunnelsController {
     @Param('stageId', ParseUUIDPipe) stageId: string,
     @Param('taskId', ParseUUIDPipe) taskId: string,
     @Body() dto: UpdateTaskStatusDto,
+    @Req() req: Request,
   ) {
-    const data = await this.funnelsService.updateTaskStatus(userId, funnelId, stageId, taskId, dto.status);
+    const data = await this.funnelsService.updateTaskStatus(userId, funnelId, stageId, taskId, dto.status, req);
     return {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.TASK_STATUS_UPDATED_SUCCESSFULLY,
