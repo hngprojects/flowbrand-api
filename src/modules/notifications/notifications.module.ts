@@ -1,4 +1,4 @@
-import { forwardRef, Logger, Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EmailModule } from '../../email/email.module';
 import { EmailQueueModule } from '../../email/email-queue.module';
@@ -32,4 +32,4 @@ import { NotificationsService } from './notifications.service';
   ],
   exports: [NotificationModelAction, NotificationPreferenceModelAction, NotificationsService],
 })
-export class NotificationsModule {} // OnModuleInit removed
+export class NotificationsModule { } // OnModuleInit removed

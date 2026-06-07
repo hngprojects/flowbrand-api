@@ -1,5 +1,6 @@
 import { ForbiddenException, HttpStatus, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { LlmService } from '../../../../queue/interfaces/llm.service.interface';
+import { LogService } from '../../../../common/services/log.service';
 import { getQueueToken } from '@nestjs/bull';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -102,6 +103,7 @@ describe('FunnelsService - stage completion', () => {
         { provide: DataSource, useValue: dataSource },
         { provide: EventEmitter2, useValue: mockEventEmitter },
         { provide: LlmService, useValue: {} },
+        { provide: LogService, useValue: { log: jest.fn() } },
       ],
     }).compile();
 

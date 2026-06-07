@@ -28,13 +28,6 @@ export class WizardSessionModelAction extends AbstractModelAction<WizardSession>
 
         const repo = manager.getRepository(WizardSession);
 
-        const completed = await repo.findOne({
-          where: { user_id: userId, status: WizardStatus.COMPLETE },
-        });
-        if (completed) {
-          return { status: 'already_complete' };
-        }
-
         const active = await this.findActiveInProgress(repo, userId, at);
         if (active) {
           return { status: 'active', session: active };

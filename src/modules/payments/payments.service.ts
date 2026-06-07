@@ -242,14 +242,14 @@ export class PaymentsService {
     if (existing.length > 0) {
       const existingSub = existing[0];
       if (existingSub.status === SubscriptionStatus.ACTIVE) {
-        // Already an ACTIVE subscription — idempotent replay, nothing to do.
+        // Already ACTIVE — idempotent replay, nothing to do.
         this.logger.warn({ message: 'Pro subscription already active — idempotent skip', userId });
         return true;
       }
 
-      // Existing row is PENDING (e.g. monthly subscription initiated before the one-time charge
-      // completed). Upgrade it to ACTIVE MONTHLY in-place — inserting a new row would violate
-      // the partial unique index.
+      // Existing row is PENDING (e.g. a subscription attempt initiated before the one-time charge
+      // completed). Upgrade it to ACTIVE PRO in-place — inserting a new row would violate the
+      // partial unique index.
       await this.subscriptionModelAction.update({
         identifierOptions: { id: existingSub.id },
         updatePayload: {
@@ -342,9 +342,9 @@ export class PaymentsService {
       periodEnd.setMonth(periodEnd.getMonth() + 1);
     }
 
-    let paymentId = '';
+    let payment: Payment;
     try {
-      const payment: Payment = await this.dataSource.transaction(async (manager) => {
+      payment = await this.dataSource.transaction(async (manager) => {
         const sub: Subscription = await this.subscriptionModelAction.create({
           createPayload: {
             user_id: userId,
@@ -375,7 +375,6 @@ export class PaymentsService {
           transactionOptions: { useTransaction: true, transaction: manager },
         });
       });
-      paymentId = payment.id;
     } catch (err: unknown) {
       if (err instanceof QueryFailedError && (err as { code?: string }).code === '23505') {
         // Row exists — check if a prior completed attempt left a subscription code
@@ -409,7 +408,7 @@ export class PaymentsService {
     const result = await this.adapter.initiateSubscription(dto, userId, email);
 
     await this.paymentModelAction.update({
-      identifierOptions: { id: paymentId },
+      identifierOptions: { id: payment!.id },
       updatePayload: { provider_reference: result.reference },
       transactionOptions: { useTransaction: false },
     });

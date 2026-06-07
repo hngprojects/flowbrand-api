@@ -92,7 +92,13 @@ export class FunnelTemplateService {
       channel: this.substitute(stage.channel, ctx),
       explanation: this.substitute(stage.explanation, ctx),
       actionPrompt: this.substitute(stage.actionPrompt, ctx),
-      tasks: stage.tasks.map<StageTaskData>((t) => ({ taskText: this.substitute(t, ctx) })),
+      tasks: stage.tasks.map<StageTaskData>((t) => {
+        const text = this.substitute(t, ctx);
+        // Fallback name: first 3-4 words
+        let name = text.split(' ').slice(0, 4).join(' ');
+        if (name.length > 50) name = name.slice(0, 50);
+        return { name, taskText: text };
+      }),
     };
   }
 
@@ -178,7 +184,11 @@ export class FunnelTemplateService {
     const channel = this.sanitize(safe.discoveryChannel) || 'your main channel';
 
     const toTasks = (lines: readonly string[]): StageTaskData[] =>
-      lines.map((taskText) => ({ taskText }));
+      lines.map((taskText) => {
+        let name = taskText.split(' ').slice(0, 4).join(' ');
+        if (name.length > 50) name = name.slice(0, 50);
+        return { name, taskText };
+      });
 
     return [
       {

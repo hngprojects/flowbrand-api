@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { APP_EVENTS } from '../../../common/constants/app-events';
 import {
+  AccountDeletedEvent,
   FunnelGeneratedEvent,
   PaymentFailedEvent,
   PlanUpgradedEvent,
@@ -9,6 +10,7 @@ import {
   StageUnlockedEvent,
   SubscriptionCancelledEvent,
   TaskCompletedEvent,
+  UserSignedUpEvent,
 } from '../../../common/events/events';
 import * as SYS_MSG from '../../../constants/system.messages';
 import { EmailService } from '../../../email/email.service';
@@ -229,6 +231,26 @@ export class NotificationListener {
       await this.email(event.userId, (to, name) =>
         this.emailService.sendPaymentFailed(to, { name, failureReason: event.failureReason }, event.userId),
       );
+    });
+  }
+
+  // Transactional lifecycle email: intentionally not gated by notification preferences.
+  @OnEvent(APP_EVENTS.USER_SIGNED_UP)
+  async onUserSignedUp(event: UserSignedUpEvent): Promise<void> {
+    await this.safely('user.signed_up', event.userId, async () => {
+      await this.email(event.userId, (to, name) =>
+        this.emailService.sendWelcome(to, { name }, event.userId),
+      );
+    });
+  }
+
+  // Transactional lifecycle email: intentionally not gated by notification preferences.
+  // Uses event-carried email/name because the user record is hard-deleted before this fires.
+  @OnEvent(APP_EVENTS.ACCOUNT_DELETED)
+  async onAccountDeleted(event: AccountDeletedEvent): Promise<void> {
+    await this.safely('user.account_deleted', event.userId, async () => {
+      if (!event.email) return;
+      await this.emailService.sendDeleteAccount(event.email, { name: event.name }, event.userId);
     });
   }
 

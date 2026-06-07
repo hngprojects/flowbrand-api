@@ -13,7 +13,9 @@ export type EmailType =
   | 'payment-successful'
   | 'payment-failed'
   | 'subscription-cancelled'
-  | 'notification-alert';
+  | 'notification-alert'
+  | 'welcome'
+  | 'delete-account';
 
 export interface OtpPayload {
   fullName: string;
@@ -96,6 +98,14 @@ export interface NotificationAlertPayload {
   unreadCount: number;
 }
 
+export interface WelcomePayload {
+  name: string;
+}
+
+export interface DeleteAccountPayload {
+  name: string;
+}
+
 export type EmailPayload =
   | OtpPayload
   | WaitlistPayload
@@ -108,7 +118,9 @@ export type EmailPayload =
   | PaymentSuccessfulPayload
   | PaymentFailedPayload
   | SubscriptionCancelledPayload
-  | NotificationAlertPayload;
+  | NotificationAlertPayload
+  | WelcomePayload
+  | DeleteAccountPayload;
 
 interface BaseEmailJob {
   to: string;
@@ -131,4 +143,6 @@ export type EmailJob = BaseEmailJob &
     | { type: 'payment-failed'; payload: PaymentFailedPayload }
     | { type: 'subscription-cancelled'; payload: SubscriptionCancelledPayload }
     | { type: 'notification-alert'; payload: NotificationAlertPayload }
+    | { type: 'welcome'; payload: WelcomePayload }
+    | { type: 'delete-account'; payload: DeleteAccountPayload }
   );

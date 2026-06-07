@@ -301,9 +301,9 @@ describe('PaymentsService — resolvePayment', () => {
     jest.spyOn(service, 'verifyPayment').mockResolvedValueOnce({
       reference: REF, status: PaymentStatus.SUCCESS, amount: 900000, currency: 'NGN',
     });
-    // Pre-check finds ACTIVE subscription — already done, skip both INSERT and UPDATE
+    // Pre-check finds ACTIVE — already done, skip both INSERT and UPDATE
     mockSubscriptionList.mockResolvedValueOnce({
-      payload: [{ id: 'sub-existing', status: SubscriptionStatus.ACTIVE, billing_cycle: BillingCycle.MONTHLY }],
+      payload: [{ id: 'sub-existing', status: SubscriptionStatus.ACTIVE, plan: PaymentPlan.PRO }],
       paginationMeta: {},
     });
 
@@ -312,7 +312,7 @@ describe('PaymentsService — resolvePayment', () => {
     expect(mockSubscriptionCreate).not.toHaveBeenCalled();
     expect(mockSubscriptionUpdate).not.toHaveBeenCalled();
     expect(result.status).toBe(PaymentStatus.SUCCESS);
-    // Pro plan already active — PLAN_UPGRADED event still fires
+    // Already active — PLAN_UPGRADED event still fires
     expect(mockEmit).toHaveBeenCalledWith(APP_EVENTS.PLAN_UPGRADED, expect.any(PlanUpgradedEvent));
   });
 

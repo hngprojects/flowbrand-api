@@ -7,6 +7,8 @@ import { DataSource, QueryFailedError } from 'typeorm';
 import { APP_EVENTS } from '../../common/constants/app-events';
 import { emitSafely, FunnelFailedEvent, FunnelGeneratedEvent } from '../../common/events';
 import { JOBS, QUEUES } from '../../common/constants/queue.constants';
+import { LogService } from '../../common/services/log.service';
+import { AdminLogActionType, AdminLogStatus } from '../../modules/admin/logs/enums/admin-log.enum';
 import { FunnelModelAction } from '../../modules/funnels/actions/funnel.action';
 import { Funnel } from '../../modules/funnels/entities/funnel.entity';
 import { FunnelStage } from '../../modules/funnels/entities/funnel-stage.entity';
@@ -35,6 +37,7 @@ export class FunnelGenerationProcessor {
     private readonly templateService: FunnelTemplateService,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly eventEmitter: EventEmitter2,
+    private readonly logService: LogService,
   ) {}
 
   @Process(JOBS.GENERATE_FUNNEL)
@@ -112,6 +115,10 @@ export class FunnelGenerationProcessor {
 
     this.logger.log({ message: 'Funnel generation complete', funnelId, jobId: job.id });
     emitSafely(this.eventEmitter, this.logger, APP_EVENTS.FUNNEL_GENERATED, new FunnelGeneratedEvent(userId, funnelId, funnel.funnel_name));
+    // Queue-triggered action: no HTTP request, so ip_address is null (FR-3).
+    this.logService.log(userId, AdminLogActionType.FUNNEL_GENERATED, `Funnel generated: ${funnel.funnel_name}`, null, AdminLogStatus.SUCCESS, {
+      funnelId,
+    });
   }
 
   private isForeignKeyViolation(err: unknown): boolean {
@@ -186,6 +193,9 @@ export class FunnelGenerationProcessor {
         throw new Error(`Stage ${stage.position}: tasks must be an array`);
       }
       for (const task of stage.tasks) {
+        if (!task.name || typeof task.name !== 'string') {
+          throw new Error(`Stage ${stage.position}: task missing name`);
+        }
         if (!task.taskText || typeof task.taskText !== 'string') {
           throw new Error(`Stage ${stage.position}: task missing taskText`);
         }
@@ -251,7 +261,7 @@ export class FunnelGenerationProcessor {
           qr.manager.create(StageTask, {
             stage_id: stage.id,
             task_text: t.taskText,
-            name: t.taskText.slice(0, 80),
+            name: t.name.slice(0, 80),
             position: taskIdx + 1,
             is_complete: false,
             completed_at: null,

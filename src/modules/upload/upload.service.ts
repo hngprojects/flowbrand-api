@@ -13,7 +13,10 @@ import * as fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { InjectQueue } from '@nestjs/bull';
 import type { Queue } from 'bull';
+import type { Request } from 'express';
 import { JOBS, QUEUES } from '../../common/constants/queue.constants';
+import { LogService } from '../../common/services/log.service';
+import { AdminLogActionType, AdminLogStatus } from '../admin/logs/enums/admin-log.enum';
 import * as SYS_MSG from '../../constants/system.messages';
 import { redisKeys } from '../../constants/redis-keys';
 import { RedisService } from '../redis/redis.service';
@@ -42,9 +45,14 @@ export class UploadService {
     @Inject(UPLOAD_OBJECT_STORAGE)
     private readonly objectStorage: ObjectStorage,
     private readonly redisService: RedisService,
+    private readonly logService: LogService,
   ) {}
 
-  async handleUpload(userId: string, files: Express.Multer.File[] | undefined): Promise<UploadBatchResponse> {
+  async handleUpload(
+    userId: string,
+    files: Express.Multer.File[] | undefined,
+    req: Request | null = null,
+  ): Promise<UploadBatchResponse> {
     if (!files?.length) {
       throw new UnprocessableEntityException({
         error: 'UnprocessableEntityException',
@@ -81,6 +89,13 @@ export class UploadService {
       });
     }
     const allAccepted = acceptedCount === uploads.length;
+
+    this.logService.log(userId, AdminLogActionType.DOCUMENT_UPLOADED, 'User uploaded documents', req, AdminLogStatus.SUCCESS, {
+      batchId,
+      acceptedCount,
+      totalFiles: uploads.length,
+    });
+
     return {
       message: allAccepted ? SYS_MSG.FUNNEL_UPLOAD_COMPLETED : SYS_MSG.FUNNEL_UPLOAD_PARTIAL,
       batchId,

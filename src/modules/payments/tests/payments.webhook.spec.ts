@@ -9,7 +9,6 @@ import { PaymentModelAction } from '../actions/payment.model-action';
 import { SubscriptionModelAction } from '../actions/subscription.model-action';
 import { MockPaymentAdapter } from '../adapters/mock-payment.adapter';
 import { PaystackPaymentAdapter } from '../adapters/paystack-payment.adapter';
-import { BillingCycle } from '../enums/billing-cycle.enum';
 import { PaymentPlan } from '../enums/payment-plan.enum';
 import { PaymentStatus } from '../enums/payment-status.enum';
 import { PaymentType } from '../enums/payment-type.enum';
@@ -264,7 +263,7 @@ describe('PaymentsService — processWebhookEvent', () => {
     });
     // First request already created ACTIVE subscription; second request finds it and skips
     mockSubscriptionList.mockResolvedValueOnce({
-      payload: [{ id: 'sub-existing', status: SubscriptionStatus.ACTIVE, billing_cycle: BillingCycle.MONTHLY }],
+      payload: [{ id: 'sub-existing', status: SubscriptionStatus.ACTIVE, plan: PaymentPlan.PRO }],
       paginationMeta: {},
     });
     jest

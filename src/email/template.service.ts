@@ -2,7 +2,6 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as Handlebars from 'handlebars';
 import * as path from 'path';
-import { env } from '../config/env';
 import type { EmailType } from './interfaces/email-job.interface';
 
 type CompiledTemplate = Handlebars.TemplateDelegate;
@@ -23,6 +22,8 @@ const EMAIL_TYPES: EmailType[] = [
   'payment-failed',
   'subscription-cancelled',
   'notification-alert',
+  'welcome',
+  'delete-account',
 ];
 
 @Injectable()
@@ -47,6 +48,8 @@ export class TemplateService implements OnModuleInit {
     'payment-failed': 'Payment Failed — We could not process your payment',
     'subscription-cancelled': 'Your FlowBrand subscription has been cancelled',
     'notification-alert': 'You have {{unreadCount}} new notification(s) from FlowBrand',
+    'welcome': 'Welcome to Seil',
+    'delete-account': 'Delete Account Request',
   };
 
   private compiledSubjects: Record<EmailType, Handlebars.TemplateDelegate>;
@@ -79,12 +82,15 @@ export class TemplateService implements OnModuleInit {
       throw new Error(`No compiled template found for type: ${type}`);
     }
 
+    const frontendUrl = (process.env.FRONTEND_URL ?? 'http://localhost:3000').replace(/\/$/, '');
     const urlContext = {
-      unsubscribeUrl: `${env.FRONTEND_URL}/unsubscribe`,
-      privacyPolicyUrl: `${env.FRONTEND_URL}/privacy-policy`,
-      upgradeUrl: `${env.FRONTEND_URL}/upgrade`,
-      dashboardUrl: `${env.FRONTEND_URL}/dashboard`,
-      notificationPreferencesUrl: `${env.FRONTEND_URL}/settings/notifications`,
+      unsubscribeUrl: `${frontendUrl}/unsubscribe`,
+      privacyPolicyUrl: `${frontendUrl}/privacy-policy`,
+      upgradeUrl: `${frontendUrl}/upgrade`,
+      dashboardUrl: `${frontendUrl}/dashboard`,
+      notificationPreferencesUrl: `${frontendUrl}/settings/notifications`,
+      ctaUrl: `${frontendUrl}/onboarding`,
+      supportUrl: `${frontendUrl}/support`,
     };
 
     const body = compiled({ ...payload, ...urlContext });

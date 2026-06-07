@@ -11,9 +11,12 @@ import {
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import type { Queue } from 'bull';
+import type { Request } from 'express';
 import { DataSource } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { APP_EVENTS } from '../../../common/constants/app-events';
+import { LogService } from '../../../common/services/log.service';
+import { AdminLogActionType, AdminLogStatus } from '../../admin/logs/enums/admin-log.enum';
 import {
   StageCompletedEvent,
   StageUnlockedEvent,
@@ -72,6 +75,7 @@ export class FunnelsService {
     private readonly feedbackAction: StageFeedbackModelAction,
     private readonly eventEmitter: EventEmitter2,
     private readonly llmService: LlmService,
+    private readonly logService: LogService,
   ) {}
 
   normalizePagination(page?: number, perPage?: number) {
@@ -654,6 +658,7 @@ export class FunnelsService {
     stageId: string,
     taskId: string,
     status: StageTaskStatus,
+    req: Request | null = null,
   ): Promise<TaskUpdateResult> {
     const funnel = await this.funnelAction.findOwnedById(funnelId, userId);
     if (!funnel) throw new NotFoundException(SYS_MSG.FUNNEL_TASK_NOT_FOUND);
@@ -686,6 +691,11 @@ export class FunnelsService {
         APP_EVENTS.TASK_COMPLETED,
         new TaskCompletedEvent(userId, funnelId, stageId, taskId, saved.name),
       );
+      this.logService.log(userId, AdminLogActionType.TASK_COMPLETED, `Task completed: ${saved.name}`, req, AdminLogStatus.SUCCESS, {
+        funnelId,
+        stageId,
+        taskId,
+      });
     } else {
       emitSafely(
         this.eventEmitter,

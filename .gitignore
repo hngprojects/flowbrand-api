@@ -8,8 +8,8 @@
 /build
 *.tsbuildinfo
 
-# Logs
-logs
+# Logs (root runtime output only; must not swallow source dirs like src/modules/admin/logs)
+/logs
 *.log
 npm-debug.log*
 pnpm-debug.log*

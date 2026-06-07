@@ -15,6 +15,8 @@ import type { LlmStageData } from '../../../modules/funnels/interfaces/llm-stage
 import { FunnelTemplateService } from '../../../modules/funnels/services/funnel-template.service';
 import { LlmService } from '../../interfaces/llm.service.interface';
 import { FunnelGenerationProcessor } from '../funnel-generation.processor';
+import { LogService } from '../../../common/services/log.service';
+import { AdminLogActionType, AdminLogStatus } from '../../../modules/admin/logs/enums/admin-log.enum';
 
 
 // Mocks
@@ -60,6 +62,7 @@ const mockTemplateService = {
 
 
 const mockEventEmitter = { emit: jest.fn() };
+const mockLogService = { log: jest.fn() };
 
 
 // Helpers
@@ -77,7 +80,7 @@ function makeValidStageData(): LlmStageData[] {
     channel: 'Instagram',
     explanation: `Explanation for stage ${position}`,
     actionPrompt: `Action for stage ${position}`,
-    tasks: [{ taskText: `Task A for stage ${position}` }, { taskText: `Task B for stage ${position}` }],
+    tasks: [{ name: `Name A`, taskText: `Task A for stage ${position}` }, { name: `Name B`, taskText: `Task B for stage ${position}` }, { name: `Name C`, taskText: `Task C for stage ${position}` }],
   }));
 }
 
@@ -132,6 +135,7 @@ describe('FunnelGenerationProcessor', () => {
         { provide: FunnelTemplateService, useValue: mockTemplateService },
         { provide: getDataSourceToken(), useValue: mockDataSource },
         { provide: EventEmitter2, useValue: mockEventEmitter },
+        { provide: LogService, useValue: mockLogService },
       ],
     }).compile();
 
@@ -165,6 +169,35 @@ describe('FunnelGenerationProcessor', () => {
         { id: 'funnel-uuid' },
         { status: FunnelStatus.ACTIVE },
       );
+    });
+
+    it('BE-ADM-609: records a funnel_generated audit entry with a null ip', async () => {
+      mockLlmService.generateWithGemini.mockResolvedValue(makeValidStageData());
+      const job = makeJob();
+
+      await processor.handleGenerateFunnel(job);
+
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        'user-uuid',
+        AdminLogActionType.FUNNEL_GENERATED,
+        expect.any(String),
+        null,
+        AdminLogStatus.SUCCESS,
+        { funnelId: 'funnel-uuid' },
+      );
+    });
+
+    it('BE-ADM-609: records no audit entry when the funnel is already active (idempotent skip)', async () => {
+      mockFunnelAction.get.mockResolvedValue({
+        id: 'funnel-uuid',
+        status: FunnelStatus.ACTIVE,
+        funnel_name: 'Test Bakery',
+        business_context: businessContext,
+      });
+
+      await processor.handleGenerateFunnel(makeJob());
+
+      expect(mockLogService.log).not.toHaveBeenCalled();
     });
 
 
