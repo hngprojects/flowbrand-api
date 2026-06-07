@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
-import { DataSource, QueryFailedError } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { APP_EVENTS } from '../../../common/constants/app-events';
 import { PlanUpgradedEvent } from '../../../common/events/events';
 import { PaymentsService } from '../payments.service';
@@ -43,6 +43,7 @@ const mockPaymentUpdate = jest.fn().mockResolvedValue(undefined);
 const mockSubscriptionCreate = jest.fn().mockResolvedValue({ id: 'sub-1' });
 const mockSubscriptionUpdate = jest.fn().mockResolvedValue(undefined);
 const mockSubscriptionFind = jest.fn().mockResolvedValue({ payload: [], paginationMeta: {} });
+const mockSubscriptionList = jest.fn().mockResolvedValue({ payload: [], paginationMeta: {} });
 const mockEmit = jest.fn();
 const mockTransaction = jest
   .fn()
@@ -56,6 +57,7 @@ const SUBSCRIPTION_ACTION_MOCK: Partial<SubscriptionModelAction> = {
   create: mockSubscriptionCreate,
   update: mockSubscriptionUpdate,
   find: mockSubscriptionFind,
+  list: mockSubscriptionList,
 };
 
 const STUB_ADAPTER = {
@@ -291,7 +293,7 @@ describe('PaymentsService — resolvePayment', () => {
 
   // ─── EC-02: idempotency guard ─────────────────────────────────────────────────
 
-  it('ONE_TIME: skips Pro activation on 23505 and still returns SUCCESS with event (EC-02)', async () => {
+  it('ONE_TIME: skips Pro activation when subscription already exists and still returns SUCCESS with event (EC-02)', async () => {
     mockPaymentGet.mockResolvedValueOnce({
       id: 'p-1', user_id: USER_ID, status: PaymentStatus.PENDING,
       provider_reference: REF, amount_kobo: 900000, payment_type: PaymentType.ONE_TIME,
@@ -299,14 +301,15 @@ describe('PaymentsService — resolvePayment', () => {
     jest.spyOn(service, 'verifyPayment').mockResolvedValueOnce({
       reference: REF, status: PaymentStatus.SUCCESS, amount: 900000, currency: 'NGN',
     });
-    const pgError = Object.assign(new QueryFailedError('', [], new Error()), { code: '23505' });
-    mockSubscriptionCreate.mockRejectedValueOnce(pgError);
+    // Pre-check finds an existing non-terminal subscription — INSERT is skipped entirely
+    // (avoids a failed INSERT that would abort the open transaction)
+    mockSubscriptionList.mockResolvedValueOnce({ payload: [{ id: 'sub-existing' }], paginationMeta: {} });
 
     const result = await service.resolvePayment(USER_ID, REF);
 
-    expect(mockSubscriptionCreate).toHaveBeenCalledTimes(1);
+    expect(mockSubscriptionCreate).not.toHaveBeenCalled();
     expect(result.status).toBe(PaymentStatus.SUCCESS);
-    // Pro access exists via concurrent path — event must still fire
+    // Pro access exists — event must still fire
     expect(mockEmit).toHaveBeenCalledWith(APP_EVENTS.PLAN_UPGRADED, expect.any(PlanUpgradedEvent));
   });
 

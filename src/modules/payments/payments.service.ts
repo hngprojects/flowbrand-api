@@ -220,31 +220,38 @@ export class PaymentsService {
   }
 
   private async activateProSubscription(userId: string, manager: EntityManager): Promise<boolean> {
+    // Pre-check before INSERT: the partial unique index covers PENDING + ACTIVE, so a failed
+    // INSERT inside an open transaction aborts the whole transaction even if the error is caught
+    // at the application level. Checking first avoids that aborted-transaction problem.
+    const { payload: existing } = await this.subscriptionModelAction.list({
+      filterRecordOptions: [
+        { user_id: userId, status: SubscriptionStatus.ACTIVE },
+        { user_id: userId, status: SubscriptionStatus.PENDING },
+      ],
+      paginationPayload: { page: 1, limit: 1 },
+    });
+
+    if (existing.length > 0) {
+      this.logger.warn({ message: 'Pro subscription already active — idempotent skip', userId });
+      return true;
+    }
+
     const periodStart = new Date();
     const periodEnd = new Date(periodStart);
     periodEnd.setMonth(periodEnd.getMonth() + 1);
 
-    try {
-      await this.subscriptionModelAction.create({
-        createPayload: {
-          user_id: userId,
-          plan: PaymentPlan.PRO,
-          billing_cycle: BillingCycle.MONTHLY,
-          status: SubscriptionStatus.ACTIVE,
-          current_period_start: periodStart,
-          current_period_end: periodEnd,
-        },
-        transactionOptions: { useTransaction: true, transaction: manager },
-      });
-      return true;
-    } catch (err: unknown) {
-      if (err instanceof QueryFailedError && (err as { code?: string }).code === '23505') {
-        // Pro access already exists via a concurrent path — still true, event should still fire
-        this.logger.warn({ message: 'Pro subscription already active — idempotent skip', userId });
-        return true;
-      }
-      throw err;
-    }
+    await this.subscriptionModelAction.create({
+      createPayload: {
+        user_id: userId,
+        plan: PaymentPlan.PRO,
+        billing_cycle: BillingCycle.MONTHLY,
+        status: SubscriptionStatus.ACTIVE,
+        current_period_start: periodStart,
+        current_period_end: periodEnd,
+      },
+      transactionOptions: { useTransaction: true, transaction: manager },
+    });
+    return true;
   }
 
   private async activateSubscriptionPayment(userId: string, manager: EntityManager): Promise<boolean> {
@@ -397,6 +404,165 @@ export class PaymentsService {
   /** Routes a raw webhook payload to the configured provider's parser. */
   async handleWebhookEvent(payload: Buffer, signature: string): Promise<WebhookEvent> {
     return this.adapter.handleWebhookEvent(payload, signature);
+  }
+
+  /**
+   * Verifies the webhook signature via the adapter, normalizes the event, and
+   * dispatches to the appropriate private handler. After a valid signature, all
+   * processing errors are swallowed so the provider receives HTTP 200 and does
+   * not retry indefinitely.
+   *
+   * Throws UnauthorizedException if the signature is invalid — the only exception
+   * that should propagate to the controller.
+   */
+  async processWebhookEvent(rawBody: Buffer, signature: string): Promise<void> {
+    const event = await this.handleWebhookEvent(rawBody, signature);
+
+    try {
+      switch (event.type) {
+        case 'charge.success':
+          await this.handleChargeSuccess(event);
+          break;
+        case 'charge.failed':
+        case 'charge.dispute.create':
+          await this.handleChargeFailed(event);
+          break;
+        case 'subscription.disable':
+          await this.handleSubscriptionCancelled(event);
+          break;
+        case 'subscription.not_renew':
+          await this.handleSubscriptionSetNotRenew(event);
+          break;
+        case 'subscription.expiry_date_update':
+          this.logger.log({ message: 'Subscription expiry update received', reference: event.reference });
+          break;
+        default:
+          this.logger.log({ message: 'Unhandled webhook event type', type: event.type });
+      }
+    } catch (err: unknown) {
+      this.logger.error({
+        message: SYS_MSG.WEBHOOK_PROCESSING_ERROR,
+        type: event.type,
+        reference: event.reference,
+        error: (err as Error).message,
+      });
+    }
+  }
+
+  private async handleChargeSuccess(event: WebhookEvent): Promise<void> {
+    const payment = await this.paymentModelAction.get({
+      identifierOptions: { provider_reference: event.reference },
+    });
+
+    if (!payment) {
+      this.logger.warn({ message: 'Payment row not found for charge.success', reference: event.reference });
+      return;
+    }
+
+    if (payment.status !== PaymentStatus.PENDING) {
+      this.logger.log({ message: 'Charge.success replayed — already terminal', reference: event.reference, status: payment.status });
+      return;
+    }
+
+    const eventData = event.data;
+    const receivedAmount = eventData.amount as number | undefined;
+    if (receivedAmount !== undefined && receivedAmount !== payment.amount_kobo) {
+      this.logger.error({
+        message: SYS_MSG.PAYMENT_AMOUNT_MISMATCH,
+        reference: event.reference,
+        expected: payment.amount_kobo,
+        received: receivedAmount,
+      });
+      return;
+    }
+
+    const auth = eventData.authorization as Record<string, unknown> | undefined;
+    const cardLast4 = (auth?.last4 as string | undefined) ?? null;
+    const cardBrand = (auth?.brand as string | undefined) ?? null;
+
+    await this.dataSource.transaction(async (manager) => {
+      await this.paymentModelAction.update({
+        identifierOptions: { id: payment.id },
+        updatePayload: {
+          status: PaymentStatus.SUCCESS,
+          card_last4: cardLast4,
+          card_brand: cardBrand,
+          paid_at: new Date(),
+        },
+        transactionOptions: { useTransaction: true, transaction: manager },
+      });
+
+      if (payment.payment_type === PaymentType.ONE_TIME) {
+        await this.activateProSubscription(payment.user_id, manager);
+      } else {
+        await this.activateSubscriptionPayment(payment.user_id, manager);
+      }
+    });
+
+    this.eventEmitter.emit(
+      APP_EVENTS.PLAN_UPGRADED,
+      new PlanUpgradedEvent(payment.user_id, PaymentPlan.PRO, event.reference),
+    );
+  }
+
+  private async handleChargeFailed(event: WebhookEvent): Promise<void> {
+    const payment = await this.paymentModelAction.get({
+      identifierOptions: { provider_reference: event.reference },
+    });
+
+    if (!payment || payment.status !== PaymentStatus.PENDING) {
+      return;
+    }
+
+    await this.paymentModelAction.update({
+      identifierOptions: { id: payment.id },
+      updatePayload: { status: PaymentStatus.FAILED },
+      transactionOptions: { useTransaction: false },
+    });
+  }
+
+  // event.reference is data.subscription_code for subscription events (adapter mapping, DC-3)
+  private async handleSubscriptionCancelled(event: WebhookEvent): Promise<void> {
+    const { payload: subs } = await this.subscriptionModelAction.list({
+      filterRecordOptions: { provider_subscription_code: event.reference, status: SubscriptionStatus.ACTIVE },
+      paginationPayload: { page: 1, limit: 1 },
+    });
+
+    const sub = subs[0];
+    if (!sub) {
+      this.logger.warn({ message: 'Subscription not found for cancellation webhook', subscriptionCode: event.reference });
+      return;
+    }
+
+    await this.subscriptionModelAction.update({
+      identifierOptions: { id: sub.id },
+      updatePayload: {
+        status: SubscriptionStatus.CANCELLED,
+        cancel_at_period_end: false,
+        cancelled_at: new Date(),
+      },
+      transactionOptions: { useTransaction: false },
+    });
+  }
+
+  // event.reference is data.subscription_code for subscription events (adapter mapping, DC-3)
+  private async handleSubscriptionSetNotRenew(event: WebhookEvent): Promise<void> {
+    const { payload: subs } = await this.subscriptionModelAction.list({
+      filterRecordOptions: { provider_subscription_code: event.reference, status: SubscriptionStatus.ACTIVE },
+      paginationPayload: { page: 1, limit: 1 },
+    });
+
+    const sub = subs[0];
+    if (!sub) {
+      this.logger.warn({ message: 'Subscription not found for not_renew webhook', subscriptionCode: event.reference });
+      return;
+    }
+
+    await this.subscriptionModelAction.update({
+      identifierOptions: { id: sub.id },
+      updatePayload: { cancel_at_period_end: true },
+      transactionOptions: { useTransaction: false },
+    });
   }
 
   private resolveAmountKobo(dto: InitiatePaymentDto): number {

@@ -4,11 +4,13 @@ import { APP_EVENTS } from '../../../common/constants/app-events';
 import {
   AccountDeletedEvent,
   FunnelGeneratedEvent,
+  PlanUpgradedEvent,
   StageCompletedEvent,
   StageUnlockedEvent,
   TaskCompletedEvent,
   UserSignedUpEvent,
 } from '../../../common/events/events';
+import * as SYS_MSG from '../../../constants/system.messages';
 import { EmailService } from '../../../email/email.service';
 import { StageTaskModelAction } from '../../funnels/actions/stage-task.action';
 import { UserModelAction } from '../../users/actions/user.action';
@@ -108,6 +110,23 @@ export class NotificationListener {
           this.emailService.sendFunnelReady(to, { name, funnelName: event.funnelName }, event.userId),
         );
       }
+    });
+  }
+
+  @OnEvent(APP_EVENTS.PLAN_UPGRADED)
+  async onPlanUpgraded(event: PlanUpgradedEvent): Promise<void> {
+    await this.safely('plan.upgraded', event.userId, async () => {
+      // Always create — payment confirmation is a system event, not preference-gated
+      await this.notificationsService.createNotification(
+        event.userId,
+        'plan_upgraded',
+        SYS_MSG.NOTIFICATION_PLAN_UPGRADED_TITLE,
+        SYS_MSG.NOTIFICATION_PLAN_UPGRADED_BODY,
+        { plan: event.plan },
+      );
+
+      // Email: TODO — sendPaymentSuccess method and payment-success.hbs template
+      // are not yet implemented. Add in a follow-up PR alongside the email template.
     });
   }
 
