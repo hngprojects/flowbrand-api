@@ -5,8 +5,6 @@ import { Seeder } from './seeder.interface';
 import { UserRole } from '../../modules/users/enums/user-role.enum';
 import { UserRoleEntity } from '../../modules/users/entities/user-role.entity';
 
-const ADMIN_ROLES = [UserRole.ADMIN, UserRole.SUPER_ADMIN];
-
 /** Validates that a password meets the minimum policy. */
 function validatePassword(password: string): void {
   if (password.length < 8) {
@@ -42,12 +40,12 @@ export const userSeeder: Seeder = {
     validatePassword(password);
 
     const roleRepository = dataSource.getRepository(UserRoleEntity);
-    const existingAdmin = await roleRepository.findOne({
-      where: ADMIN_ROLES.map((role) => ({ role })),
+    const existingSuperAdmin = await roleRepository.findOne({
+      where: { role: UserRole.SUPER_ADMIN },
     });
 
-    if (existingAdmin) {
-      console.log('[UserSeeder] Admin or super_admin already exists — skipping');
+    if (existingSuperAdmin) {
+      console.log('[UserSeeder] super_admin already exists — skipping');
       return;
     }
 

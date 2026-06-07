@@ -19,9 +19,9 @@ Output schema (strict):
       "explanation": "<2-3 sentences, 10-2000 chars>",
       "actionPrompt": "<1 clear action, 10-500 chars>",
       "tasks": [
-        { "taskText": "<non-empty string>" },
-        { "taskText": "<non-empty string>" },
-        { "taskText": "<non-empty string>" }
+        { "name": "<short punchy title, 2-5 words>", "taskText": "<Detailed, step-by-step actionable guide (2-4 sentences) explaining exactly how to execute this task>" },
+        { "name": "<short punchy title, 2-5 words>", "taskText": "<Detailed, step-by-step actionable guide (2-4 sentences) explaining exactly how to execute this task>" },
+        { "name": "<short punchy title, 2-5 words>", "taskText": "<Detailed, step-by-step actionable guide (2-4 sentences) explaining exactly how to execute this task>" }
       ]
     }
   ]
@@ -490,12 +490,13 @@ export class LlmServiceImpl extends LlmService {
     }
 
     const t = item as Record<string, unknown>;
+    const name = t['name'];
     const taskText = t['taskText'];
 
-    if (typeof taskText !== 'string' || !taskText.trim()) {
+    if (typeof name !== 'string' || !name.trim() || typeof taskText !== 'string' || !taskText.trim()) {
       return null;
     }
 
-    return { taskText };
+    return { name, taskText };
   }
 }

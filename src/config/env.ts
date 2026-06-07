@@ -4,7 +4,6 @@ import { z } from 'zod';
 dotenv.config();
 
 const boolEnv = z.union([z.boolean(), z.enum(['true', 'false'])]).transform((v) => v === true || v === 'true');
-const emailFromPattern = /^(?:[^<>\r\n]+\s<([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[A-Za-z]{2,})>|([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[A-Za-z]{2,}))$/;
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -30,12 +29,6 @@ const envSchema = z.object({
 
   CORS_ORIGIN: z.string().default('*'),
   SWAGGER_ENABLED: boolEnv.default(true),
-  FRONTEND_URL: z.string().url().default('http://localhost:3000'),
-  EMAIL_FROM: z.string()
-    .default('SEIL <noreply@seil.app>')
-    .refine((val) => emailFromPattern.test(val.trim()), {
-      message: 'EMAIL_FROM must be a valid email or "Display Name <email>" format',
-    }),
 
   REDIS_HOST: z.string().default('localhost'),
   REDIS_PORT: z.coerce.number().int().positive().default(6379),

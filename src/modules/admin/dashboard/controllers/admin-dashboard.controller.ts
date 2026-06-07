@@ -1,20 +1,25 @@
-import { Controller, Get, UseGuards, HttpStatus } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Query, UseGuards } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { AdminDashboardService } from '../services/admin-dashboard.service';
 import { AdminJwtGuard } from '../../../auth/guards/admin-jwt.guard';
 import * as SYS_MSG from '../../../../constants/system.messages';
-import { 
-  DashboardStats, 
-  WeeklyOverviewItem, 
-  UserSegmentItem, 
-  FunnelPerformanceItem 
+import {
+  DashboardStats,
+  FunnelPerformanceItem,
+  RetentionBandItem,
+  UserSegmentItem,
+  UserStageItem,
+  WeeklyOverviewItem,
 } from '../interfaces/admin-dashboard.interface';
-import { 
-  GetStatsDocs, 
-  GetWeeklyOverviewDocs, 
-  GetUserSegmentsDocs, 
-  GetFunnelPerformanceDocs 
+import { WeeklyOverviewQueryDto } from '../dtos/admin-dashboard.dto';
+import {
+  GetFunnelPerformanceDocs,
+  GetStatsDocs,
+  GetUserRetentionDocs,
+  GetUserSegmentsDocs,
+  GetUserStagesDocs,
+  GetWeeklyOverviewDocs,
 } from '../docs/admin-dashboard-swagger.doc';
-import { ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Admin Dashboard')
 @Controller('admin/dashboard')
@@ -35,8 +40,10 @@ export class AdminDashboardController {
 
   @Get('weekly-overview')
   @GetWeeklyOverviewDocs()
-  async getWeeklyOverview(): Promise<{ statusCode: number; message: string; data: WeeklyOverviewItem[] }> {
-    const data = await this.dashboardService.getWeeklyOverview();
+  async getWeeklyOverview(
+    @Query() query: WeeklyOverviewQueryDto,
+  ): Promise<{ statusCode: number; message: string; data: WeeklyOverviewItem[] }> {
+    const data = await this.dashboardService.getWeeklyOverview(query.period);
     return {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.ADMIN_DASHBOARD_WEEKLY_OVERVIEW_RETRIEVED,
@@ -62,6 +69,28 @@ export class AdminDashboardController {
     return {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.ADMIN_DASHBOARD_FUNNEL_PERFORMANCE_RETRIEVED,
+      data,
+    };
+  }
+
+  @Get('user-stages')
+  @GetUserStagesDocs()
+  async getUserStages(): Promise<{ statusCode: number; message: string; data: UserStageItem[] }> {
+    const data = await this.dashboardService.getUserStages();
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.ADMIN_DASHBOARD_USER_STAGES_RETRIEVED,
+      data,
+    };
+  }
+
+  @Get('user-retention')
+  @GetUserRetentionDocs()
+  async getUserRetention(): Promise<{ statusCode: number; message: string; data: RetentionBandItem[] }> {
+    const data = await this.dashboardService.getUserRetention();
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.ADMIN_DASHBOARD_USER_RETENTION_RETRIEVED,
       data,
     };
   }

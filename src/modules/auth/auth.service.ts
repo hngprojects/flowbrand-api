@@ -32,6 +32,10 @@ import type { GoogleOAuthProfile, OAuthLoginResponse } from './interface/google-
 import { maskEmail } from '../../utils/pii.utils';
 import { JwtPayload } from './strategies/jwt.strategy';
 import { redisKeys } from '../../constants/redis-keys';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { emitSafely } from '../../common/events/emit-safely';
+import { UserSignedUpEvent } from '../../common/events';
+import { APP_EVENTS } from '../../common/constants/app-events';
 
 export interface AuthTokens {
   accessToken: string;
@@ -59,6 +63,7 @@ export class AuthService {
     private readonly otpTokenModelAction: OtpTokenModelAction,
     private readonly emailService: EmailService,
     @Optional() private readonly logger = new Logger(AuthService.name),
+    private readonly eventEmitter: EventEmitter2,
   ) { }
 
   // Local minimal interface to avoid unsafe-call lint issues from third-party model action types
@@ -109,6 +114,8 @@ export class AuthService {
       termsAccepted: true,
     });
     await this.sendOtp(user.email);
+
+    emitSafely(this.eventEmitter, this.logger, APP_EVENTS.USER_SIGNED_UP, new UserSignedUpEvent(user.id));
 
     return { message: SYS_MSG.REGISTRATION_SUCCESSFUL_VERIFY_EMAIL };
   }

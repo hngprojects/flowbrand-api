@@ -110,7 +110,11 @@ export class PasswordChangedEvent {
 }
 
 export class AccountDeletedEvent {
-  constructor(public readonly userId: string) {}
+  constructor(
+    public readonly userId: string,
+    public readonly email: string,
+    public readonly name: string,
+  ) {}
 }
 
 export class UserSignedInEvent {
@@ -124,7 +128,7 @@ export class UserSignedInEvent {
 export class UserSignedUpEvent {
   constructor(
     public readonly userId: string,
-    public readonly ip: string,
-    public readonly userAgent: string,
+    public readonly ip?: string,
+    public readonly userAgent?: string,
   ) {}
 }
