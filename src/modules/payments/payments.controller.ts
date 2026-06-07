@@ -2,17 +2,20 @@ import {
   BadGatewayException,
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpException,
   HttpStatus,
+  ParseUUIDPipe,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../constants/system.messages';
 import { PRICING } from './constants/pricing.constants';
-import { InitiatePaymentDocs, InitiateSubscriptionDocs } from './docs/payments-swagger.doc';
+import { InitiatePaymentDocs, InitiateSubscriptionDocs, VerifyPaymentDocs } from './docs/payments-swagger.doc';
 import { InitiateSubscriptionRequestDto } from './dto/initiate-subscription-request.dto';
 import { BillingCycle } from './enums/billing-cycle.enum';
 import { PaymentPlan } from './enums/payment-plan.enum';
@@ -24,6 +27,7 @@ import {
   InitiatePaymentResult,
   InitiateSubscriptionResponse,
   InitiateSubscriptionResult,
+  PaymentVerifyResponse,
 } from './interfaces/payment-provider.interface';
 import { PaymentsService } from './payments.service';
 
@@ -63,6 +67,20 @@ export class PaymentsController {
         amount: PRICING.PRO_ONETIME_KOBO,
         currency: 'NGN',
       },
+    };
+  }
+
+  @Get('verify')
+  @VerifyPaymentDocs()
+  async verify(
+    @Query('reference', new ParseUUIDPipe({ version: '4' })) reference: string,
+    @CurrentUser('userId') userId: string,
+  ): Promise<{ statusCode: number; message: string; data: PaymentVerifyResponse }> {
+    const result = await this.paymentsService.resolvePayment(userId, reference);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.PAYMENT_VERIFIED_SUCCESSFULLY,
+      data: result,
     };
   }
 

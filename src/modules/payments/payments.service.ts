@@ -1,14 +1,28 @@
-import { ConflictException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import {
+  BadGatewayException,
+  ConflictException,
+  GatewayTimeoutException,
+  HttpException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { createHash } from 'crypto';
-import { DataSource, QueryFailedError } from 'typeorm';
+import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
 import { env } from '../../config/env';
 import * as SYS_MSG from '../../constants/system.messages';
+import { APP_EVENTS } from '../../common/constants/app-events';
+import { PlanUpgradedEvent } from '../../common/events/events';
 import { PaymentModelAction } from './actions/payment.model-action';
 import { SubscriptionModelAction } from './actions/subscription.model-action';
 import { MockPaymentAdapter } from './adapters/mock-payment.adapter';
 import { PaystackPaymentAdapter } from './adapters/paystack-payment.adapter';
 import { PRICING } from './constants/pricing.constants';
 import { BillingCycle } from './enums/billing-cycle.enum';
+import { PaymentPlan } from './enums/payment-plan.enum';
 import { PaymentStatus } from './enums/payment-status.enum';
 import { PaymentType } from './enums/payment-type.enum';
 import { SubscriptionStatus } from './enums/subscription-status.enum';
@@ -16,6 +30,7 @@ import {
   InitiatePaymentResult,
   InitiateSubscriptionResult,
   PaymentProvider,
+  PaymentVerifyResponse,
   VerifyPaymentResult,
   WebhookEvent,
 } from './interfaces/payment-provider.interface';
@@ -35,6 +50,7 @@ export class PaymentsService {
     private readonly mockAdapter: MockPaymentAdapter,
     private readonly paystackAdapter: PaystackPaymentAdapter,
     private readonly dataSource: DataSource,
+    private readonly eventEmitter: EventEmitter2,
   ) {
     this.adapter = this.resolveAdapter();
   }
@@ -114,6 +130,171 @@ export class PaymentsService {
     return this.adapter.verifyPayment(reference);
   }
 
+  async resolvePayment(userId: string, reference: string): Promise<PaymentVerifyResponse> {
+    // SEC-01: ownership check before any gateway call
+    const payment = await this.paymentModelAction.get({
+      identifierOptions: { provider_reference: reference },
+    });
+    if (!payment || payment.user_id !== userId) {
+      throw new NotFoundException(SYS_MSG.PAYMENT_NOT_FOUND);
+    }
+
+    // FR-4: short-circuit — already resolved, no gateway call needed
+    if (payment.status !== PaymentStatus.PENDING) {
+      return this.buildResponse(payment.status, reference, payment);
+    }
+
+    // FR-5: live gateway verify
+    let gatewayResult: VerifyPaymentResult;
+    try {
+      gatewayResult = await this.verifyPayment(reference);
+    } catch (err: unknown) {
+      if (err instanceof HttpException) throw err;
+      const isTimeout = err instanceof Error && err.name === 'AbortError';
+      if (isTimeout) throw new GatewayTimeoutException(SYS_MSG.PAYMENT_PROVIDER_TIMEOUT);
+      throw new BadGatewayException(SYS_MSG.PAYMENT_FAILED);
+    }
+
+    // SEC-05: amount check runs BEFORE any DB write — mismatch → 422
+    if (gatewayResult.status === PaymentStatus.SUCCESS) {
+      if (gatewayResult.amount !== payment.amount_kobo) {
+        this.logger.error({
+          message: SYS_MSG.PAYMENT_AMOUNT_MISMATCH,
+          reference,
+          expected: payment.amount_kobo,
+          received: gatewayResult.amount,
+        });
+        throw new UnprocessableEntityException(SYS_MSG.PAYMENT_AMOUNT_MISMATCH);
+      }
+    }
+
+    if (gatewayResult.status === PaymentStatus.SUCCESS) {
+      let activated = false;
+      await this.dataSource.transaction(async (manager) => {
+        await this.paymentModelAction.update({
+          identifierOptions: { id: payment.id },
+          updatePayload: {
+            status: PaymentStatus.SUCCESS,
+            card_last4: gatewayResult.cardLast4 ?? null,
+            card_brand: gatewayResult.cardBrand ?? null,
+            paid_at: new Date(),
+          },
+          transactionOptions: { useTransaction: true, transaction: manager },
+        });
+
+        if (payment.payment_type === PaymentType.ONE_TIME) {
+          activated = await this.activateProSubscription(userId, manager);
+        } else {
+          activated = await this.activateSubscriptionPayment(userId, manager);
+        }
+      });
+
+      // Emit AFTER transaction commits (CONTRIBUTING.md domain event rule).
+      // Skip emit if SUBSCRIPTION path found no PENDING row — Pro access not confirmed.
+      if (activated) {
+        this.eventEmitter.emit(
+          APP_EVENTS.PLAN_UPGRADED,
+          new PlanUpgradedEvent(userId, PaymentPlan.PRO, reference),
+        );
+      }
+
+      return this.buildResponse(PaymentStatus.SUCCESS, reference, {
+        ...payment,
+        status: PaymentStatus.SUCCESS,
+        card_last4: gatewayResult.cardLast4 ?? null,
+        card_brand: gatewayResult.cardBrand ?? null,
+      });
+    }
+
+    if (gatewayResult.status === PaymentStatus.FAILED) {
+      await this.paymentModelAction.update({
+        identifierOptions: { id: payment.id },
+        updatePayload: { status: PaymentStatus.FAILED },
+        transactionOptions: { useTransaction: false },
+      });
+      return this.buildResponse(PaymentStatus.FAILED, reference, null);
+    }
+
+    // PENDING — no DB write; client polls again
+    return this.buildResponse(PaymentStatus.PENDING, reference, null);
+  }
+
+  private async activateProSubscription(userId: string, manager: EntityManager): Promise<boolean> {
+    const periodStart = new Date();
+    const periodEnd = new Date(periodStart);
+    periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+    try {
+      await this.subscriptionModelAction.create({
+        createPayload: {
+          user_id: userId,
+          plan: PaymentPlan.PRO,
+          billing_cycle: BillingCycle.MONTHLY,
+          status: SubscriptionStatus.ACTIVE,
+          current_period_start: periodStart,
+          current_period_end: periodEnd,
+        },
+        transactionOptions: { useTransaction: true, transaction: manager },
+      });
+      return true;
+    } catch (err: unknown) {
+      if (err instanceof QueryFailedError && (err as { code?: string }).code === '23505') {
+        // Pro access already exists via a concurrent path — still true, event should still fire
+        this.logger.warn({ message: 'Pro subscription already active — idempotent skip', userId });
+        return true;
+      }
+      throw err;
+    }
+  }
+
+  private async activateSubscriptionPayment(userId: string, manager: EntityManager): Promise<boolean> {
+    const { payload: pending } = await this.subscriptionModelAction.find({
+      findOptions: { user_id: userId, status: SubscriptionStatus.PENDING },
+      transactionOptions: { useTransaction: true, transaction: manager },
+    });
+    if (!pending.length) {
+      this.logger.warn({ message: 'No PENDING subscription row found to activate', userId });
+      return false;
+    }
+    const sub = pending[0];
+    const now = new Date();
+    const periodEnd = new Date(now);
+    if (sub.billing_cycle === BillingCycle.ANNUAL) {
+      periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+    } else {
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+    }
+    await this.subscriptionModelAction.update({
+      identifierOptions: { id: sub.id },
+      updatePayload: {
+        status: SubscriptionStatus.ACTIVE,
+        current_period_start: now,
+        current_period_end: periodEnd,
+      },
+      transactionOptions: { useTransaction: true, transaction: manager },
+    });
+    return true;
+  }
+
+  private buildResponse(
+    status: PaymentStatus,
+    reference: string,
+    payment: Partial<Payment> | null,
+  ): PaymentVerifyResponse {
+    if (status === PaymentStatus.SUCCESS && payment) {
+      return {
+        status,
+        plan: PaymentPlan.PRO,
+        reference,
+        amount: payment.amount_kobo,
+        currency: 'NGN',
+        cardLast4: payment.card_last4 ?? undefined,
+        cardBrand: payment.card_brand ?? undefined,
+      };
+    }
+    return { status, reference };
+  }
+
   /**
    * Creates subscription + payment rows atomically in PENDING state, then calls
    * the provider. Status is upgraded to ACTIVE by the M4-BE-021 webhook handler
@@ -130,7 +311,7 @@ export class PaymentsService {
       periodEnd.setMonth(periodEnd.getMonth() + 1);
     }
 
-    let paymentId: string;
+    let paymentId = '';
     try {
       const payment: Payment = await this.dataSource.transaction(async (manager) => {
         const sub: Subscription = await this.subscriptionModelAction.create({
@@ -175,8 +356,17 @@ export class PaymentsService {
         });
         const existing: Subscription | undefined = subs[0];
         if (existing?.provider_subscription_code) {
-          // Prior attempt fully succeeded — idempotent return
-          return { reference: '', subscriptionCode: existing.provider_subscription_code, authorizationUrl: '', provider: env.PAYMENT_PROVIDER };
+          // Look up the payment row for this subscription to recover its provider_reference.
+          // The frontend needs the reference to call GET /verify and confirm the charge.
+          const priorPayment = await this.paymentModelAction.get({
+            identifierOptions: { subscription_id: existing.id },
+          });
+          return {
+            reference: priorPayment?.provider_reference ?? '',
+            subscriptionCode: existing.provider_subscription_code,
+            authorizationUrl: '',
+            provider: env.PAYMENT_PROVIDER,
+          };
         }
         // Subscription exists but has no code — prior attempt failed after DB write but before provider update.
         // 409 is correct: the in-flight subscription must be resolved before creating another.

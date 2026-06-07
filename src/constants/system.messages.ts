@@ -322,6 +322,10 @@ export const PAYMENT_USER_ALREADY_PRO = 'You are already on the Pro plan';
 export const PAYMENT_INITIATED_SUCCESSFULLY = 'Payment initiated successfully';
 export const PAYMENT_RATE_LIMIT_EXCEEDED = 'Too many payment requests. Please try again later';
 export const SUBSCRIPTION_CANCEL_TOKEN_MISSING = 'Subscription cancel failed: provider did not return email token';
+export const PAYMENT_NOT_FOUND = 'Payment not found or does not belong to this account';
+export const PAYMENT_VERIFIED_SUCCESSFULLY = 'Payment verified successfully';
+export const PAYMENT_PROVIDER_TIMEOUT = 'Payment provider did not respond in time';
+export const PAYMENT_AMOUNT_MISMATCH = 'Payment amount does not match the expected price — contact support';
 
 // Admin Teams
 export const TEAMS_RETRIEVED_SUCCESSFULLY = 'Teams retrieved successfully';

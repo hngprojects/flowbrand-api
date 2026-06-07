@@ -1,4 +1,5 @@
 import { ConflictException, InternalServerErrorException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
 import { DataSource, QueryFailedError } from 'typeorm';
@@ -53,6 +54,7 @@ const PAYSTACK_ADAPTER_MOCK: Partial<PaystackPaymentAdapter> = {
     provider: 'paystack',
   }),
   initiateSubscription: jest.fn().mockResolvedValue({
+    reference: 'ps_sub_ref_1',
     subscriptionCode: 'access_code_1',
     authorizationUrl: 'https://paystack.com/pay/sub',
     provider: 'paystack',
@@ -68,6 +70,7 @@ const MOCK_ADAPTER_MOCK: Partial<MockPaymentAdapter> = {
     provider: 'mock',
   }),
   initiateSubscription: jest.fn().mockResolvedValue({
+    reference: 'mock_sub_ref_uuid',
     subscriptionCode: 'mock_sub_1',
     authorizationUrl: 'https://mock.pay/sub',
     provider: 'mock',
@@ -96,6 +99,7 @@ describe('PaymentsService', () => {
         { provide: MockPaymentAdapter, useValue: MOCK_ADAPTER_MOCK },
         { provide: PaystackPaymentAdapter, useValue: PAYSTACK_ADAPTER_MOCK },
         { provide: DataSource, useValue: DATA_SOURCE_MOCK },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 
@@ -232,9 +236,12 @@ describe('PaymentsService', () => {
         payload: [{ id: 's-1', provider_subscription_code: 'sub_prior' }],
         paginationMeta: {},
       });
+      // The payment row linked to this subscription carries the reference the FE needs for /verify
+      mockPaymentGet.mockResolvedValueOnce({ id: 'p-1', provider_reference: 'prior-ref-uuid', subscription_id: 's-1' });
 
       const result = await service.initiateSubscription(userId, email, dto);
       expect(result.subscriptionCode).toBe('sub_prior');
+      expect(result.reference).toBe('prior-ref-uuid');
       expect(MOCK_ADAPTER_MOCK.initiateSubscription).not.toHaveBeenCalled();
     });
 
@@ -272,6 +279,8 @@ describe('PaymentsService', () => {
   });
 
   describe('resolveAdapter', () => {
+    const mockEmitter = { emit: jest.fn() } as unknown as EventEmitter2;
+
     it('resolves PaystackPaymentAdapter when PAYMENT_PROVIDER=paystack', () => {
       (env as { PAYMENT_PROVIDER: string }).PAYMENT_PROVIDER = 'paystack';
       const svc = new PaymentsService(
@@ -280,6 +289,7 @@ describe('PaymentsService', () => {
         MOCK_ADAPTER_MOCK as MockPaymentAdapter,
         PAYSTACK_ADAPTER_MOCK as PaystackPaymentAdapter,
         DATA_SOURCE_MOCK as unknown as DataSource,
+        mockEmitter,
       );
       expect(svc).toBeDefined();
       (env as { PAYMENT_PROVIDER: string }).PAYMENT_PROVIDER = 'mock';
@@ -295,6 +305,7 @@ describe('PaymentsService', () => {
             MOCK_ADAPTER_MOCK as MockPaymentAdapter,
             PAYSTACK_ADAPTER_MOCK as PaystackPaymentAdapter,
             DATA_SOURCE_MOCK as unknown as DataSource,
+            mockEmitter,
           ),
       ).toThrow(InternalServerErrorException);
       (env as { PAYMENT_PROVIDER: string }).PAYMENT_PROVIDER = 'mock';
