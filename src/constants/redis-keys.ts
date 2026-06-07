@@ -14,6 +14,10 @@ export const redisKeys = {
 
   adminDashboardStats: () => 'admin-dashboard:stats',
   adminDashboardWeeklyOverview: () => 'admin-dashboard:weekly-overview',
+  adminDashboardWeeklyOverview7d: () => 'admin-dashboard:weekly-overview:7d',
+  adminDashboardWeeklyOverview12w: () => 'admin-dashboard:weekly-overview:12w',
   adminDashboardUserSegments: () => 'admin-dashboard:user-segments',
   adminDashboardFunnelPerformance: () => 'admin-dashboard:funnel-performance',
+  adminDashboardUserStages: () => 'admin-dashboard:user-stages',
+  adminDashboardUserRetention: () => 'admin-dashboard:user-retention',
 };

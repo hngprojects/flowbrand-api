@@ -187,7 +187,7 @@ describe('ActivityListener', () => {
   });
 
   it('writes a user.account_deleted row', async () => {
-    await listener.onAccountDeleted(new AccountDeletedEvent('user-1'));
+    await listener.onAccountDeleted(new AccountDeletedEvent('user-1', 'ada@seil.app', 'Ada'));
     expect(lastPayload()).toEqual(
       expect.objectContaining({
         event_type: APP_EVENTS.ACCOUNT_DELETED,

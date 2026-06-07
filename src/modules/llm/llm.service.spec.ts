@@ -15,7 +15,7 @@ const VALID_STAGES_JSON = JSON.stringify({
     channel: 'WhatsApp',
     explanation: 'This is a valid explanation with enough characters to pass.',
     actionPrompt: 'Do this one clear action right now.',
-    tasks: [{ taskText: 'Task one' }, { taskText: 'Task two' }, { taskText: 'Task three' }],
+    tasks: [{ name: 'N1', taskText: 'Task one' }, { name: 'N2', taskText: 'Task two' }, { name: 'N3', taskText: 'Task three' }],
   })),
 });
 
@@ -69,7 +69,7 @@ describe('LlmServiceImpl', () => {
           channel: 'WhatsApp',
           explanation: 'Valid explanation text here.',
           actionPrompt: 'Do this action now.',
-          tasks: [{ taskText: 'T1' }, { taskText: 'T2' }],
+          tasks: [{ name: 'N1', taskText: 'T1' }, { name: 'N2', taskText: 'T2' }],
         })),
       });
       expect(service.validateLlmOutput(bad)).toBeNull();
@@ -87,7 +87,7 @@ describe('LlmServiceImpl', () => {
 
     it('EC-02: rejects tasks array with 1 item', () => {
       const stages = JSON.parse(VALID_STAGES_JSON);
-      stages.stages[0].tasks = [{ taskText: 'Only one' }];
+      stages.stages[0].tasks = [{ name: 'N1', taskText: 'Only one' }];
       expect(service.validateLlmOutput(JSON.stringify(stages))).toBeNull();
     });
 

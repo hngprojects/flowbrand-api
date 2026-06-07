@@ -14,6 +14,8 @@ import type {
   StageCompletedPayload,
   WeeklyDigestPayload,
   TeamInvitePayload,
+  WelcomePayload,
+  DeleteAccountPayload,
 } from './interfaces/email-job.interface';
 
 const DEFAULT_PRIORITY = 5;
@@ -108,9 +110,25 @@ export class EmailService {
   async sendTeamInvite(
     to: string,
     payload: TeamInvitePayload,
-    userId?: string
+    userId?: string,
   ): Promise<string | undefined> {
     return this.dispatch({ to, type: 'team-invite', payload, userId }, DEFAULT_PRIORITY);
+  }
+
+  async sendWelcome(
+    to: string,
+    payload: WelcomePayload,
+    userId?: string,
+  ): Promise<string | undefined> {
+    return this.dispatch({ to, type: 'welcome', payload, userId }, DEFAULT_PRIORITY);
+  }
+
+  async sendDeleteAccount(
+    to: string,
+    payload: DeleteAccountPayload,
+    userId?: string,
+  ): Promise<string | undefined> {
+    return this.dispatch({ to, type: 'delete-account', payload, userId }, DEFAULT_PRIORITY);
   }
 
   private async dispatch(job: EmailJob, priority: number): Promise<string | undefined> {

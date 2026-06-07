@@ -77,7 +77,7 @@ function makeValidStageData(): LlmStageData[] {
     channel: 'Instagram',
     explanation: `Explanation for stage ${position}`,
     actionPrompt: `Action for stage ${position}`,
-    tasks: [{ taskText: `Task A for stage ${position}` }, { taskText: `Task B for stage ${position}` }],
+    tasks: [{ name: `Name A`, taskText: `Task A for stage ${position}` }, { name: `Name B`, taskText: `Task B for stage ${position}` }, { name: `Name C`, taskText: `Task C for stage ${position}` }],
   }));
 }
 
