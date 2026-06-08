@@ -9,17 +9,8 @@ import { AdminUsersService } from './admin-users.service';
 import { LogService } from '../profile/services/log.service';
 
 @Module({
-  imports: [
-    AdminAuthModule, 
-    UsersModule,
-  ],
+  imports: [AdminAuthModule, UsersModule],
   controllers: [AdminUsersController],
-  providers: [
-    AdminUsersService, 
-    AdminUsersListAction, 
-    AdminUserDetailAction, 
-    RolesGuard, 
-    LogService
-  ],
+  providers: [AdminUsersService, AdminUsersListAction, AdminUserDetailAction, RolesGuard, LogService],
 })
 export class AdminUsersModule {}
