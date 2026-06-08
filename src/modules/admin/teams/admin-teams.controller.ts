@@ -149,6 +149,10 @@ export class AdminTeamsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     await this.adminTeamsService.revokeMember(teamId, memberId, user.userId);
-    return { success: true };
+    return { 
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.MEMBER_REVOKED_SUCCESSFULLY,
+      data: { success: true },
+    };
   }
 }
