@@ -576,7 +576,7 @@ export class FunnelsService {
       const businessContext: BusinessContext = {
         businessType,
         discoveryChannel: discoveryChannelStr,
-        business_name: funnelName,
+        business_name: user?.business_name || funnelName,
         business_description: description,
         target_customer: this.coerceString(user?.target_customer) || '',
       };
@@ -599,10 +599,11 @@ export class FunnelsService {
       .join('\n')
       .slice(0, 4000);
     const funnelName = this.deriveNameFromFiles(docs) || DEFAULT_FUNNEL_NAME;
+    const uploadUser = await this.funnelAction.getUserProfile(userId);
     const businessContext: BusinessContext = {
       businessType: 'unknown',
       discoveryChannel: 'unknown',
-      business_name: funnelName,
+      business_name: uploadUser?.business_name || funnelName,
       business_description: parsedJoin,
       target_customer: '',
     };

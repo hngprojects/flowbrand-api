@@ -812,6 +812,7 @@ describe('FunnelsService', () => {
       funnelAction.getUserProfile.mockResolvedValue({
         business_type: 'restaurant',
         target_customer: 'office workers',
+        business_name: null,
       });
 
       await service.createGeneration(USER_ID, BASE_DTO);
