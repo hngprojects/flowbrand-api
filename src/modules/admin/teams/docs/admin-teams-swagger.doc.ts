@@ -246,7 +246,7 @@ export const AcceptInviteDocs = () =>
           invalid: {
             value: {
               statusCode: HttpStatus.BAD_REQUEST,
-              message: SYS_MSG.INVITE_EXPIRED,
+              message: SYS_MSG.INVITE_TOKEN_INVALID,
             },
           },
           expired: {
