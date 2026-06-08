@@ -22,4 +22,5 @@ export const redisKeys = {
   adminDashboardUserRetention: () => 'admin-dashboard:user-retention',
 
   voiceSession: (sessionId: string) => `voice_session:${sessionId}`,
+  voiceSessionMeta: (sessionId: string) => `voice_session_meta:${sessionId}`,
 };

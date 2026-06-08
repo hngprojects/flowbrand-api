@@ -171,3 +171,42 @@ export function CompleteVoiceSessionDocs() {
     }),
   );
 }
+
+export function GetVoiceSessionStatusDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: 'Check transcription status of a voice session',
+      description: 'Retrieves the number of uploaded chunks and the number of successfully transcribed chunks for a given voice session.',
+    }),
+    ApiOkResponse({
+      description: 'Session status retrieved successfully',
+      schema: {
+        example: {
+          success: true,
+          statusCode: HttpStatus.OK,
+          message: 'Status retrieved successfully',
+          data: {
+            expectedCount: 3,
+            completedCount: 3,
+            isReady: true,
+          },
+        },
+      },
+    }),
+    ApiNotFoundResponse({
+      description: 'Session expired, deleted, or does not exist.',
+      schema: {
+        example: {
+          success: false,
+          statusCode: HttpStatus.NOT_FOUND,
+          error: 'NotFoundException',
+          message: 'SESSION_EXPIRED',
+        },
+      },
+    }),
+    ApiUnauthorizedResponse({
+      description: 'Missing or invalid JWT token.',
+      schema: { example: unauthorizedExample },
+    }),
+  );
+}

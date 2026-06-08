@@ -1,9 +1,12 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
+  Param,
   ParseFilePipeBuilder,
+  ParseUUIDPipe,
   Post,
   UploadedFile,
   UseInterceptors,
@@ -12,8 +15,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../../../constants/system.messages';
-import { CompleteVoiceSessionDto, VoiceSessionCompleteResponseDto, VoiceSessionResponseDto } from '../dto/voice-onboarding.dto';
-import { CompleteVoiceSessionDocs, UploadVoiceRoundDocs } from '../docs/voice-onboarding-swagger.doc';
+import { CompleteVoiceSessionDto, VoiceSessionCompleteResponseDto, VoiceSessionResponseDto, VoiceSessionStatusResponseDto } from '../dto/voice-onboarding.dto';
+import { CompleteVoiceSessionDocs, UploadVoiceRoundDocs, GetVoiceSessionStatusDocs } from '../docs/voice-onboarding-swagger.doc';
 import { VoiceOnboardingService } from '../services/voice-onboarding.service';
 
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024; // 10MB
@@ -67,6 +70,21 @@ export class VoiceOnboardingController {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.VOICE_SESSION_COMPLETED,
       data: VoiceSessionCompleteResponseDto.from(uploadId),
+    };
+  }
+
+  @Get(':voiceSessionId/status')
+  @GetVoiceSessionStatusDocs()
+  @HttpCode(HttpStatus.OK)
+  async getVoiceSessionStatus(
+    @Param('voiceSessionId', new ParseUUIDPipe()) voiceSessionId: string,
+  ) {
+    const status = await this.voiceOnboardingService.getSessionStatus(voiceSessionId);
+    
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Status retrieved successfully',
+      data: VoiceSessionStatusResponseDto.from(status.expectedCount, status.completedCount),
     };
   }
 }

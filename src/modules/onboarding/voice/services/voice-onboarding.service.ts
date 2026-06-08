@@ -42,6 +42,11 @@ export class VoiceOnboardingService {
       contentLength: file.size,
     });
 
+    // Update meta tracking
+    const metaKey = redisKeys.voiceSessionMeta(sessionId);
+    await this.redisService.getClient().hincrby(metaKey, 'expectedCount', 1);
+    await this.redisService.getClient().expire(metaKey, 1800);
+
     // Enqueue transcription job
     await this.transcriptionQueue.add(
       {
@@ -91,7 +96,27 @@ export class VoiceOnboardingService {
     });
 
     await this.redisService.getClient().del(sessionKey);
+    await this.redisService.getClient().del(redisKeys.voiceSessionMeta(sessionId));
 
     return document.id;
+  }
+
+  async getSessionStatus(sessionId: string): Promise<{ expectedCount: number; completedCount: number; isReady: boolean }> {
+    const metaKey = redisKeys.voiceSessionMeta(sessionId);
+    const exists = await this.redisService.exists(metaKey);
+
+    if (!exists) {
+      throw new NotFoundException('SESSION_EXPIRED');
+    }
+
+    const meta = await this.redisService.getClient().hgetall(metaKey);
+    const expectedCount = parseInt(meta.expectedCount || '0', 10);
+    const completedCount = parseInt(meta.completedCount || '0', 10);
+
+    return {
+      expectedCount,
+      completedCount,
+      isReady: expectedCount > 0 && expectedCount === completedCount,
+    };
   }
 }

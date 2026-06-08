@@ -35,6 +35,10 @@ export class VoiceTranscriptionProcessor {
       await redisClient.rpush(sessionKey, transcript);
       await redisClient.expire(sessionKey, 1800); // 30 minutes TTL
 
+      // Update completed count
+      const metaKey = redisKeys.voiceSessionMeta(voiceSessionId);
+      await redisClient.hincrby(metaKey, 'completedCount', 1);
+
       // Cleanup S3 audio
       await this.objectStorage.deleteObject(storagePath);
 

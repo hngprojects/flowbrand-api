@@ -45,3 +45,31 @@ export class VoiceSessionCompleteResponseDto {
     return dto;
   }
 }
+
+export class VoiceSessionStatusResponseDto {
+  @ApiProperty({
+    description: 'The number of audio chunks that have been uploaded for transcription',
+    example: 3,
+  })
+  expectedCount: number;
+
+  @ApiProperty({
+    description: 'The number of audio chunks that have finished transcribing',
+    example: 3,
+  })
+  completedCount: number;
+
+  @ApiProperty({
+    description: 'True if all uploaded chunks have finished transcribing, and there is at least 1 chunk',
+    example: true,
+  })
+  isReady: boolean;
+
+  static from(expectedCount: number, completedCount: number): VoiceSessionStatusResponseDto {
+    const dto = new VoiceSessionStatusResponseDto();
+    dto.expectedCount = expectedCount;
+    dto.completedCount = completedCount;
+    dto.isReady = expectedCount > 0 && expectedCount === completedCount;
+    return dto;
+  }
+}
