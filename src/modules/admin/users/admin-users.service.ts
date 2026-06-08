@@ -1,4 +1,10 @@
-import { ConflictException, Injectable, NotFoundException, ForbiddenException, InternalServerErrorException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
 import { InjectQueue } from '@nestjs/bull';
@@ -154,14 +160,14 @@ export class AdminUsersService {
         targetCustomer: user.target_customer,
         primaryGoal: user.primary_goal,
       },
-      strategies: funnels.map(f => ({
+      strategies: funnels.map((f) => ({
         id: f.id,
         funnelName: f.funnel_name,
         stageCount: f.stage_count,
         createdAt: f.created_at,
         status: f.status,
       })),
-      documents: documents.map(d => ({
+      documents: documents.map((d) => ({
         id: d.id,
         fileName: d.file_name,
         fileSizeBytes: d.file_size_bytes,
@@ -220,16 +226,12 @@ export class AdminUsersService {
       await queryRunner.startTransaction();
 
       const now = new Date();
-      await queryRunner.manager.update(
-        User,
-        userId,
-        {
-          deleted_at: now,
-          is_active: false,
-          status: UserAccountStatus.DELETED,
-          ...(user.auth_provider === 'google' ? { provider_user_id: null } : {}),
-        }
-      );
+      await queryRunner.manager.update(User, userId, {
+        deleted_at: now,
+        is_active: false,
+        status: UserAccountStatus.DELETED,
+        ...(user.auth_provider === 'google' ? { provider_user_id: null } : {}),
+      });
 
       const revokedSessionIds = await this.userSessionModelAction.revokeAllUserSessionsInDb(
         userId,
@@ -244,7 +246,11 @@ export class AdminUsersService {
           await this.redisService.delByPattern(`sess:${userId}:*`);
         }
 
-        await this.accountDeletionQueue.add('hard-delete', { userId, email: user.email }, { delay: 30 * 24 * 60 * 60 * 1000 });
+        await this.accountDeletionQueue.add(
+          'hard-delete',
+          { userId, email: user.email },
+          { delay: 30 * 24 * 60 * 60 * 1000 },
+        );
 
         await this.logService.logAction({
           admin_id: adminId,
