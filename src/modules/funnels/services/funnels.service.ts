@@ -573,7 +573,7 @@ export class FunnelsService {
     if (docs.some((d) => d.status !== UploadDocumentStatus.READY))
       throw new UnprocessableEntityException(SYS_MSG.UPLOAD_NOT_READY);
 
-    const perDoc = Math.floor(4000 / docs.length);
+    const perDoc = Math.floor((4001 - docs.length) / docs.length);
     const parsedJoin = docs
       .map((d) => (d.parsed_text ?? '').slice(0, perDoc))
       .filter(Boolean)
