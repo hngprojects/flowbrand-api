@@ -7,6 +7,7 @@ import {
   BadRequestException, 
   ForbiddenException,
 } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { AdminTeamModelAction } from './actions/admin-team.action';
 import { TeamMembershipModelAction } from './actions/team-membership.action';
 import { TeamInvitationModelAction } from './actions/team-invitation.action';
@@ -24,6 +25,7 @@ import { UserRoleModelAction } from '../../users/actions/user-role.action';
 import { UserSessionModelAction } from '../../users/actions/user-session.action';
 import { RedisService } from '../../redis/redis.service';
 import { AdminAuthService } from '../auth/admin-auth.service';
+import { redisKeys } from '../../../constants/redis-keys';
 
 export interface InviteResult {
   email: string;
@@ -54,6 +56,7 @@ export class AdminTeamsService {
     private readonly adminAuthService: AdminAuthService,
     private readonly emailService: EmailService,
     private readonly logger: PinoLoggerService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async findAll(pagination: PaginationDto) {
@@ -243,68 +246,99 @@ export class AdminTeamsService {
       throw new BadRequestException(SYS_MSG.INVITE_EXPIRED);
     }
 
-    let user = await this.userModelAction.findByEmail(invitation.email);
-
-    if (!user) {
-      const passwordHash = await bcrypt.hash(dto.password, BCRYPT_INVITE_ROUNDS);
-
-      user = await this.userModelAction.create({
-        createPayload: {
-          email: invitation.email,
-          full_name: dto.full_name,
-          password_hash: passwordHash,
-          is_verified: true,   // invited users skip OTP verification
-          is_active: true,
-          termsAccepted: true,
-          roles: [],  
-        },
-        transactionOptions: { useTransaction: false },
-      });
-
-      this.logger.info('admin.team.invite.user_created', {
-        userId: user.id,
-        email: invitation.email,
-        teamId: invitation.team_id,
-      });
-    } else {
-      this.logger.info('admin.team.invite.user_linked', {
-        userId: user.id,
-        email: invitation.email,
-        teamId: invitation.team_id,
-      });
+    if (!Object.values(UserRole).includes(invitation.role as UserRole)) {
+      throw new BadRequestException(SYS_MSG.INVITE_TOKEN_INVALID);
     }
-
     const inviteRole = invitation.role as UserRole;
-    const currentRole = await this.userRoleModelAction.resolveHighestRole(user.id);
 
-    if (!currentRole || this.getRolePriority(inviteRole) > this.getRolePriority(currentRole)) {
-      await this.userRoleModelAction.create({
-        createPayload: { user_id: user.id, role: inviteRole },
-        transactionOptions: { useTransaction: false },
-      });
+    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_INVITE_ROUNDS);
 
-      this.logger.info('admin.team.invite.role_assigned', {
-        userId: user.id,
-        role: inviteRole,
-      });
-    }
+    let userId: string;
+    let userEmail: string;
+    let userFullName: string;
 
-    await this.teamMembershipModelAction.createMembership(
-      invitation.team_id,
-      user.id,
-      invitation.role,
-    );
+    await this.dataSource.transaction(async (manager) => {
+      const claimed = await this.teamInvitationModelAction.claimWithManager(
+        invitation.id,
+        manager,
+      );
 
-    await this.teamInvitationModelAction.markAccepted(invitation.id);
+      if (!claimed) {
+        this.logger.warn('admin.team.invite.claim_failed', {
+          inviteId: invitation.id,
+          reason: 'Already claimed or expired',
+        });
+        throw new BadRequestException(SYS_MSG.INVITE_ALREADY_USED);
+      }
+
+      let user = await this.userModelAction.findByEmail(invitation.email);
+
+      if (!user) {
+        user = await this.userModelAction.create({
+          createPayload: {
+            email: invitation.email,
+            full_name: dto.full_name,
+            password_hash: passwordHash,
+            is_verified: true,  
+            is_active: true,
+            termsAccepted: true,
+            roles: [],
+          },
+          transactionOptions: { useTransaction: false },
+        });
+
+        this.logger.info('admin.team.invite.user_created', {
+          userId: user.id,
+          email: invitation.email,
+          teamId: invitation.team_id,
+        });
+      } else {
+        this.logger.info('admin.team.invite.user_linked', {
+          userId: user.id,
+          email: invitation.email,
+          teamId: invitation.team_id,
+        });
+      }
+
+      const currentRole = await this.userRoleModelAction.resolveHighestRole(user.id);
+
+      if (!currentRole || this.getRolePriority(inviteRole) > this.getRolePriority(currentRole)) {
+        await this.userRoleModelAction.create({
+          createPayload: { user_id: user.id, role: inviteRole },
+          transactionOptions: { useTransaction: false },
+        });
+
+        this.logger.info('admin.team.invite.role_assigned', { userId: user.id, role: inviteRole });
+      }
+
+      const existingMembership = await this.teamMembershipModelAction.findByTeamAndUserWithManager(
+        invitation.team_id,
+        user.id,
+        manager,
+      );
+
+      if (!existingMembership) {
+        await this.teamMembershipModelAction.createMembershipWithManager(
+          invitation.team_id,
+          user.id,
+          invitation.role,
+          manager,
+        );
+      }
+
+      userId = user.id;
+      userEmail = user.email;
+      userFullName = user.full_name;
+    });
 
     const tokens = await this.adminAuthService.issueTokensForInvite(
-      user.id,
-      user.email,
+      userId!,
+      userEmail!,
       inviteRole,
     );
 
     this.logger.info('admin.team.invite.accepted', {
-      userId: user.id,
+      userId: userId!,
       teamId: invitation.team_id,
       inviteId: invitation.id,
     });
@@ -312,9 +346,9 @@ export class AdminTeamsService {
     return {
       accessToken: tokens.accessToken,
       user: {
-        id: user.id,
-        full_name: user.full_name,
-        email: user.email,
+        id: userId!,
+        full_name: userFullName!,
+        email: userEmail!,
         role: inviteRole,
       },
     };
@@ -342,7 +376,12 @@ export class AdminTeamsService {
     });
 
     if (revokedSessionIds.length > 0) {
-      await this.redisService.delByPattern(`sess:${memberId}:*`);
+      await Promise.all(
+        revokedSessionIds.flatMap((sessionId) => [
+          this.redisService.del(redisKeys.activeSession(memberId, sessionId)),
+          this.redisService.del(redisKeys.session(memberId, sessionId)),
+        ]),
+      );
     }
 
     this.logger.info('admin.team.member.revoked', {
