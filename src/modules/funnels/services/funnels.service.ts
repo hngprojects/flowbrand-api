@@ -573,11 +573,11 @@ export class FunnelsService {
     if (docs.some((d) => d.status !== UploadDocumentStatus.READY))
       throw new UnprocessableEntityException(SYS_MSG.UPLOAD_NOT_READY);
 
+    const perDoc = Math.floor((4001 - docs.length) / docs.length);
     const parsedJoin = docs
-      .map((d) => d.parsed_text ?? '')
+      .map((d) => (d.parsed_text ?? '').slice(0, perDoc))
       .filter(Boolean)
-      .join('\n')
-      .slice(0, 4000);
+      .join('\n');
     const funnelName = await this.generateFunnelNameWithFallback(parsedJoin, 'unknown');
     const uploadUser = await this.funnelAction.getUserProfile(userId);
     const businessContext: BusinessContext = {
