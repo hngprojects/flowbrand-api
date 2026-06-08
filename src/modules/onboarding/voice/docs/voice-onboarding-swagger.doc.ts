@@ -229,17 +229,6 @@ export function GetActiveVoiceSessionDocs() {
         },
       },
     }),
-    ApiNotFoundResponse({
-      description: 'No active session exists for this user.',
-      schema: {
-        example: {
-          success: false,
-          statusCode: HttpStatus.NOT_FOUND,
-          error: 'NotFoundException',
-          message: SYS_MSG.VOICE_NO_ACTIVE_SESSION,
-        },
-      },
-    }),
     ApiUnauthorizedResponse({
       description: 'Missing or invalid JWT token.',
       schema: { example: unauthorizedExample },

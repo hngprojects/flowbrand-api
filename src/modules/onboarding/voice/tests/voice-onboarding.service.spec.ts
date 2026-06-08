@@ -155,6 +155,7 @@ describe('VoiceOnboardingService', () => {
       // Cleanup
       expect(mockRedisService.del).toHaveBeenCalledWith(sessionKey);
       expect(mockRedisService.del).toHaveBeenCalledWith(metaKey);
+      expect(mockRedisService.del).toHaveBeenCalledWith(redisKeys.activeVoiceSession(mockUserId));
     });
 
     it('should throw BadRequestException if transcripts list is empty', async () => {

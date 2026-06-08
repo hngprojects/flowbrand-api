@@ -7,5 +7,5 @@ export interface VoiceTranscriptionJobData {
   voiceSessionId: string;
   storagePath: string;
   mimeType: string;
-  originalName: string;
+  originalName?: string;
 }

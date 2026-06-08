@@ -125,7 +125,7 @@ describe('VoiceOnboardingController', () => {
 
       expect(mockVoiceOnboardingService.getActiveSession).toHaveBeenCalledWith(mockUserId);
       expect(result).toEqual({
-        statusCode: HttpStatus.NOT_FOUND,
+        statusCode: HttpStatus.OK,
         message: SYS_MSG.VOICE_NO_ACTIVE_SESSION,
         data: null,
       });
@@ -140,7 +140,6 @@ describe('VoiceOnboardingController', () => {
       mockVoiceOnboardingService.getSessionStatus.mockResolvedValue({
         expectedCount: 3,
         completedCount: 3,
-        isReady: true,
       });
 
       const result = await controller.getVoiceSessionStatus(mockUserId, mockSessionId);

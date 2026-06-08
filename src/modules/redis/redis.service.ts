@@ -225,7 +225,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       return await this.client.rpush(key, ...values);
     } catch (err) {
       this.logger.error(`RPUSH failed`, (err as Error).message);
-      return 0;
+      throw err;
     }
   }
 
@@ -234,7 +234,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       return await this.client.lpush(key, ...values);
     } catch (err) {
       this.logger.error(`LPUSH failed`, (err as Error).message);
-      return 0;
+      throw err;
     }
   }
 
@@ -261,7 +261,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       return await this.client.hincrby(key, field, increment);
     } catch (err) {
       this.logger.error(`HINCRBY failed`, (err as Error).message);
-      return 0;
+      throw err;
     }
   }
 

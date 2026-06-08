@@ -30,9 +30,7 @@ export class VoiceTranscriptionProcessor {
 
       // Check idempotency guard
       const idempotencyKey = `voice_job_processed:${job.id}`;
-      const isFirstProcessing = await this.redisService.setNx(idempotencyKey, '1', 1800);
-
-      if (!isFirstProcessing) {
+      if (await this.redisService.exists(idempotencyKey)) {
         this.logger.debug(`Job ${job.id} already processed, skipping redis updates.`);
         await this.objectStorage.deleteObject(storagePath);
         return;
@@ -51,6 +49,8 @@ export class VoiceTranscriptionProcessor {
         await this.redisService.hincrby(metaKey, 'completedCount', 1);
         await this.redisService.expire(metaKey, 1800);
       }
+
+      await this.redisService.setStrict(idempotencyKey, '1', 1800);
 
       // Cleanup S3 audio
       await this.objectStorage.deleteObject(storagePath);

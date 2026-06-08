@@ -80,7 +80,7 @@ export class VoiceOnboardingController {
     const sessionId = await this.voiceOnboardingService.getActiveSession(userId);
     if (!sessionId) {
       return {
-        statusCode: HttpStatus.NOT_FOUND,
+        statusCode: HttpStatus.OK,
         message: SYS_MSG.VOICE_NO_ACTIVE_SESSION,
         data: null,
       };
