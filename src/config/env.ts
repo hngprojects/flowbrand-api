@@ -36,6 +36,9 @@ const envSchema = z.object({
 
   CONTACT_ADMIN_EMAIL: z.string().email().default('useseil@hng14.com'),
 
+  SEED_ADMIN_EMAIL: z.string().email().default(''),
+  SEED_ADMIN_PASSWORD: z.string().default(''),
+
   UPLOAD_STORAGE_ENDPOINT: z.string().default(''),
   UPLOAD_STORAGE_ACCESS_KEY: z.string().default(''),
   UPLOAD_STORAGE_SECRET_KEY: z.string().default(''),
