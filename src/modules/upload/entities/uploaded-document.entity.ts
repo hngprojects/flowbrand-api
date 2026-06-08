@@ -43,6 +43,9 @@ export class UploadedDocument extends BaseEntity {
   @Column({ type: 'varchar', length: 200, nullable: true })
   failure_reason: string | null;
 
+  @Column({ type: 'varchar', default: 'document' })
+  source_type: string;
+
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;
