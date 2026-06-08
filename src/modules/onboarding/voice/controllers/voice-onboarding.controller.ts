@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   HttpCode,
@@ -11,18 +10,18 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import * as SYS_MSG from '../../../constants/system.messages';
-import { CompleteVoiceSessionDto, VoiceSessionCompleteResponseDto, VoiceSessionResponseDto } from './dto/voice-onboarding.dto';
-import { CompleteVoiceSessionDocs, UploadVoiceRoundDocs } from './docs/voice-onboarding-swagger.doc';
-import { VoiceOnboardingService } from './services/voice-onboarding.service';
+import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
+import * as SYS_MSG from '../../../../constants/system.messages';
+import { CompleteVoiceSessionDto, VoiceSessionCompleteResponseDto, VoiceSessionResponseDto } from '../dto/voice-onboarding.dto';
+import { CompleteVoiceSessionDocs, UploadVoiceRoundDocs } from '../docs/voice-onboarding-swagger.doc';
+import { VoiceOnboardingService } from '../services/voice-onboarding.service';
 
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024; // 10MB
 const ALLOWED_MIME_TYPES = /(audio\/webm|audio\/mpeg|audio\/mp3|audio\/wav|audio\/ogg|audio\/mp4|audio\/m4a)/;
 
 @ApiTags('onboarding')
 @ApiBearerAuth('JWT')
-@Controller('api/v1/onboarding/voice')
+@Controller('onboarding/voice')
 export class VoiceOnboardingController {
   constructor(private readonly voiceOnboardingService: VoiceOnboardingService) {}
 

@@ -35,7 +35,7 @@ export class VoiceTranscriptionService {
   }
 
   private async transcribeWithGroq(audioBuffer: Buffer, fileName: string): Promise<string> {
-    const file = new File([audioBuffer], fileName, { type: 'audio/webm' }); // Type is ignored by Groq for Buffer/File blobs usually, but required for SDK signature.
+    const file = new File([new Uint8Array(audioBuffer)], fileName, { type: 'audio/webm' }); // Type is ignored by Groq for Buffer/File blobs usually, but required for SDK signature.
     
     const transcription = await this.groq.audio.transcriptions.create({
       file,

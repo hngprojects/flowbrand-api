@@ -1,7 +1,7 @@
 import { Process, Processor } from '@nestjs/bull';
 import { Inject, Logger } from '@nestjs/common';
-import { Job } from 'bull';
-import { ObjectStorage, UPLOAD_OBJECT_STORAGE } from '../../../upload/upload.types';
+import type { Job } from 'bull';
+import { UPLOAD_OBJECT_STORAGE, type ObjectStorage } from '../../../upload/upload.types';
 import { VoiceTranscriptionService } from '../services/voice-transcription.service';
 import { VoiceTranscriptionJobData } from '../interfaces/voice-onboarding.interfaces';
 import { RedisService } from '../../../redis/redis.service';
@@ -20,13 +20,13 @@ export class VoiceTranscriptionProcessor {
   @Process()
   async processTranscription(job: Job<VoiceTranscriptionJobData>): Promise<void> {
     const { voiceSessionId, storagePath } = job.data;
-    this.logger.debug(\`Processing transcription for session: \${voiceSessionId}\`);
+    this.logger.debug(`Processing transcription for session: ${voiceSessionId}`);
 
     try {
       const audioBuffer = await this.objectStorage.getObject(storagePath);
       
       const { transcript, provider } = await this.transcriptionService.transcribe(audioBuffer, 'audio.webm');
-      this.logger.debug(\`Transcription successful via \${provider} for session: \${voiceSessionId}\`);
+      this.logger.debug(`Transcription successful via ${provider} for session: ${voiceSessionId}`);
 
       // Append to Redis list and reset TTL
       const sessionKey = redisKeys.voiceSession(voiceSessionId);
@@ -39,7 +39,7 @@ export class VoiceTranscriptionProcessor {
       await this.objectStorage.deleteObject(storagePath);
 
     } catch (error: unknown) {
-      this.logger.error(\`Transcription failed for session \${voiceSessionId}\`, error instanceof Error ? error.stack : 'Unknown error');
+      this.logger.error(`Transcription failed for session ${voiceSessionId}`, error instanceof Error ? error.stack : 'Unknown error');
       
       // Jitter for rate limits
       const baseDelay = job.opts.backoff && typeof job.opts.backoff === 'object' ? job.opts.backoff.delay ?? 2000 : 2000;
