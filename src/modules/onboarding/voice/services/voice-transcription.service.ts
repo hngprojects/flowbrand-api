@@ -21,7 +21,7 @@ export class VoiceTranscriptionService {
       
       // Fallback to AssemblyAI
       if (!env.ASSEMBLYAI_API_KEY) {
-        throw new Error('AssemblyAI fallback unavailable: Missing API key');
+        throw new Error('AssemblyAI fallback unavailable: Missing API key', { cause: error });
       }
       
       try {
@@ -29,7 +29,7 @@ export class VoiceTranscriptionService {
         return { transcript, provider: VoiceProvider.ASSEMBLYAI };
       } catch (fallbackError: unknown) {
         this.logger.error('AssemblyAI transcription failed', fallbackError instanceof Error ? fallbackError.stack : 'Unknown error');
-        throw new Error('Transcription failed on both providers');
+        throw new Error('Transcription failed on both providers', { cause: fallbackError });
       }
     }
   }
