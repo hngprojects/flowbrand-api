@@ -37,11 +37,11 @@ export class VoiceSessionCompleteResponseDto {
     description: 'The generated UploadDocument ID representing the finalized transcription',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  upload_id: string;
+  uploadId: string;
 
   static from(uploadId: string): VoiceSessionCompleteResponseDto {
     const dto = new VoiceSessionCompleteResponseDto();
-    dto.upload_id = uploadId;
+    dto.uploadId = uploadId;
     return dto;
   }
 }

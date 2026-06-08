@@ -64,6 +64,9 @@ export class VoiceOnboardingService {
     await this.redisService.hincrby(metaKey, 'expectedCount', 1);
     await this.redisService.expire(metaKey, 1800);
 
+    // Track as the currently active session for this user
+    await this.redisService.setStrict(redisKeys.activeVoiceSession(userId), sessionId, 1800);
+
     return sessionId;
   }
 
@@ -105,6 +108,7 @@ export class VoiceOnboardingService {
 
     await this.redisService.del(sessionKey);
     await this.redisService.del(metaKey);
+    await this.redisService.del(redisKeys.activeVoiceSession(userId));
 
     return document.id;
   }
@@ -126,5 +130,21 @@ export class VoiceOnboardingService {
       completedCount,
       isReady: expectedCount > 0 && expectedCount === completedCount,
     };
+  }
+
+  async getActiveSession(userId: string): Promise<string | null> {
+    const sessionId = await this.redisService.get(redisKeys.activeVoiceSession(userId));
+    if (!sessionId) {
+      return null;
+    }
+
+    // Verify it's still a valid session (hasn't expired/completed)
+    const exists = await this.redisService.exists(redisKeys.voiceSessionMeta(userId, sessionId));
+    if (!exists) {
+      await this.redisService.del(redisKeys.activeVoiceSession(userId));
+      return null;
+    }
+
+    return sessionId;
   }
 }

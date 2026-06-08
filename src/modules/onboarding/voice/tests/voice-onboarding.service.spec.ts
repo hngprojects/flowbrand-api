@@ -21,6 +21,8 @@ describe('VoiceOnboardingService', () => {
 
   const mockRedisService = {
     exists: jest.fn(),
+    get: jest.fn(),
+    setStrict: jest.fn(),
     lpush: jest.fn(),
     lpop: jest.fn(),
     expire: jest.fn(),
@@ -227,6 +229,40 @@ describe('VoiceOnboardingService', () => {
       mockRedisService.exists.mockResolvedValue(false);
 
       await expect(service.getSessionStatus(mockUserId, mockSessionId)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getActiveSession', () => {
+    const mockUserId = 'user-123';
+    const mockSessionId = 'active-session-456';
+
+    it('should return null if no active session key exists', async () => {
+      mockRedisService.get.mockResolvedValue(null);
+
+      const result = await service.getActiveSession(mockUserId);
+
+      expect(mockRedisService.get).toHaveBeenCalledWith(redisKeys.activeVoiceSession(mockUserId));
+      expect(result).toBeNull();
+    });
+
+    it('should return null and delete key if active session key exists but meta does not', async () => {
+      mockRedisService.get.mockResolvedValue(mockSessionId);
+      mockRedisService.exists.mockResolvedValue(false);
+
+      const result = await service.getActiveSession(mockUserId);
+
+      expect(mockRedisService.exists).toHaveBeenCalledWith(redisKeys.voiceSessionMeta(mockUserId, mockSessionId));
+      expect(mockRedisService.del).toHaveBeenCalledWith(redisKeys.activeVoiceSession(mockUserId));
+      expect(result).toBeNull();
+    });
+
+    it('should return sessionId if active session is fully valid', async () => {
+      mockRedisService.get.mockResolvedValue(mockSessionId);
+      mockRedisService.exists.mockResolvedValue(true);
+
+      const result = await service.getActiveSession(mockUserId);
+
+      expect(result).toBe(mockSessionId);
     });
   });
 });

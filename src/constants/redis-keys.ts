@@ -23,4 +23,5 @@ export const redisKeys = {
 
   voiceSession: (userId: string, sessionId: string) => `voice_session:${userId}:${sessionId}`,
   voiceSessionMeta: (userId: string, sessionId: string) => `voice_session_meta:${userId}:${sessionId}`,
+  activeVoiceSession: (userId: string) => `active_voice_session:${userId}`,
 };

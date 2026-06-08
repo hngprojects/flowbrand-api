@@ -12,6 +12,7 @@ describe('VoiceOnboardingController', () => {
     handleAudioUpload: jest.fn(),
     completeSession: jest.fn(),
     getSessionStatus: jest.fn(),
+    getActiveSession: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -90,8 +91,43 @@ describe('VoiceOnboardingController', () => {
         statusCode: HttpStatus.OK,
         message: SYS_MSG.VOICE_SESSION_COMPLETED,
         data: {
-          upload_id: mockUploadId,
+          uploadId: mockUploadId,
         },
+      });
+    });
+  });
+
+  describe('getActiveVoiceSession', () => {
+    it('should return the active session if one exists', async () => {
+      const mockUserId = 'user-123';
+      const mockSessionId = 'active-session-456';
+
+      mockVoiceOnboardingService.getActiveSession.mockResolvedValue(mockSessionId);
+
+      const result = await controller.getActiveVoiceSession(mockUserId);
+
+      expect(mockVoiceOnboardingService.getActiveSession).toHaveBeenCalledWith(mockUserId);
+      expect(result).toEqual({
+        statusCode: HttpStatus.OK,
+        message: SYS_MSG.VOICE_ACTIVE_SESSION_RETRIEVED,
+        data: {
+          voiceSessionId: mockSessionId,
+        },
+      });
+    });
+
+    it('should return 404 if no active session exists', async () => {
+      const mockUserId = 'user-123';
+
+      mockVoiceOnboardingService.getActiveSession.mockResolvedValue(null);
+
+      const result = await controller.getActiveVoiceSession(mockUserId);
+
+      expect(mockVoiceOnboardingService.getActiveSession).toHaveBeenCalledWith(mockUserId);
+      expect(result).toEqual({
+        statusCode: HttpStatus.NOT_FOUND,
+        message: SYS_MSG.VOICE_NO_ACTIVE_SESSION,
+        data: null,
       });
     });
   });

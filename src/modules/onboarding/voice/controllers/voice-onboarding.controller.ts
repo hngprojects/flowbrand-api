@@ -16,7 +16,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import * as SYS_MSG from '../../../../constants/system.messages';
 import { CompleteVoiceSessionDto, VoiceSessionCompleteResponseDto, VoiceSessionResponseDto, VoiceSessionStatusResponseDto } from '../dto/voice-onboarding.dto';
-import { CompleteVoiceSessionDocs, UploadVoiceRoundDocs, GetVoiceSessionStatusDocs } from '../docs/voice-onboarding-swagger.doc';
+import { CompleteVoiceSessionDocs, UploadVoiceRoundDocs, GetVoiceSessionStatusDocs, GetActiveVoiceSessionDocs } from '../docs/voice-onboarding-swagger.doc';
 import { VoiceOnboardingService } from '../services/voice-onboarding.service';
 
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024; // 10MB
@@ -70,6 +70,28 @@ export class VoiceOnboardingController {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.VOICE_SESSION_COMPLETED,
       data: VoiceSessionCompleteResponseDto.from(uploadId),
+    };
+  }
+
+  @Get('active')
+  @GetActiveVoiceSessionDocs()
+  @HttpCode(HttpStatus.OK)
+  async getActiveVoiceSession(@CurrentUser('sub') userId: string) {
+    const sessionId = await this.voiceOnboardingService.getActiveSession(userId);
+    if (!sessionId) {
+      return {
+        statusCode: HttpStatus.NOT_FOUND,
+        message: SYS_MSG.VOICE_NO_ACTIVE_SESSION,
+        data: null,
+      };
+    }
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.VOICE_ACTIVE_SESSION_RETRIEVED,
+      data: {
+        voiceSessionId: sessionId,
+      },
     };
   }
 

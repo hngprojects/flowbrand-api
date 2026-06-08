@@ -112,7 +112,7 @@ export function CompleteVoiceSessionDocs() {
       description:
         'Finalizes a voice onboarding session by aggregating all transcriptions ' +
         'associated with the session ID. The aggregated text is then saved as a new ' +
-        'UploadDocument record. Returns the resulting upload_id which can be passed ' +
+        'UploadDocument record. Returns the resulting uploadId which can be passed ' +
         'to the funnel generation endpoints.',
     }),
     ApiBody({ type: CompleteVoiceSessionDto }),
@@ -124,7 +124,7 @@ export function CompleteVoiceSessionDocs() {
           statusCode: HttpStatus.OK,
           message: SYS_MSG.VOICE_SESSION_COMPLETED,
           data: {
-            upload_id: '123e4567-e89b-12d3-a456-426614174000',
+            uploadId: '123e4567-e89b-12d3-a456-426614174000',
           },
         },
       },
@@ -201,6 +201,42 @@ export function GetVoiceSessionStatusDocs() {
           statusCode: HttpStatus.NOT_FOUND,
           error: 'NotFoundException',
           message: 'SESSION_EXPIRED',
+        },
+      },
+    }),
+    ApiUnauthorizedResponse({
+      schema: { example: unauthorizedExample },
+    }),
+  );
+}
+
+export function GetActiveVoiceSessionDocs() {
+  return applyDecorators(
+    ApiOperation({
+      summary: 'Retrieve the currently active voice session',
+      description: 'Fetches the voiceSessionId of the current user\'s active voice session, if one exists.',
+    }),
+    ApiOkResponse({
+      description: 'Active session retrieved successfully',
+      schema: {
+        example: {
+          success: true,
+          statusCode: HttpStatus.OK,
+          message: SYS_MSG.VOICE_ACTIVE_SESSION_RETRIEVED,
+          data: {
+            voiceSessionId: '550e8400-e29b-41d4-a716-446655440001',
+          },
+        },
+      },
+    }),
+    ApiNotFoundResponse({
+      description: 'No active session exists for this user.',
+      schema: {
+        example: {
+          success: false,
+          statusCode: HttpStatus.NOT_FOUND,
+          error: 'NotFoundException',
+          message: SYS_MSG.VOICE_NO_ACTIVE_SESSION,
         },
       },
     }),
