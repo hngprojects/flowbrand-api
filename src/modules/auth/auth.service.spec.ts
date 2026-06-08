@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
@@ -16,6 +17,10 @@ import { UserSessionModelAction } from '../users/actions/user-session.action';
 import { AuthMetadataModelAction } from './actions/auth-metadata.action';
 import { OtpTokenModelAction } from './actions/otp-token.action';
 import { EmailService } from '../../email/email.service';
+import { LogService } from '../../common/services/log.service';
+import { AdminLogActionType, AdminLogStatus } from '../admin/logs/enums/admin-log.enum';
+import { APP_EVENTS } from '../../common/constants/app-events';
+import { UserSignedUpEvent } from '../../common/events';
 import * as SYS_MSG from '../../constants/system.messages';
 
 jest.mock('bcrypt');
@@ -51,6 +56,8 @@ const mockEmailService = {
   sendOtpVerification: jest.fn(),
   sendOtpReset: jest.fn(),
 };
+const mockLogService = { log: jest.fn() };
+const mockEventEmitter = { emit: jest.fn() };
 
 const TEST_USER = {
   id: 'user-uuid-1',
@@ -107,6 +114,8 @@ describe('AuthService login lockout (BE-005)', () => {
         },
         { provide: OtpTokenModelAction, useValue: mockOtpTokenModelAction },
         { provide: EmailService, useValue: mockEmailService },
+        { provide: LogService, useValue: mockLogService },
+        { provide: EventEmitter2, useValue: mockEventEmitter },
       ],
     }).compile();
 
@@ -139,6 +148,27 @@ describe('AuthService login lockout (BE-005)', () => {
       expect(mockUsersService.create).toHaveBeenCalledWith(
         expect.objectContaining({ businessName: undefined }),
       );
+    });
+
+    it('emits USER_SIGNED_UP with the new user id on success', async () => {
+      mockUsersService.create.mockResolvedValue({ ...TEST_USER, email: REGISTER_DTO.email });
+
+      await service.register(REGISTER_DTO);
+
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        APP_EVENTS.USER_SIGNED_UP,
+        expect.any(UserSignedUpEvent),
+      );
+      const emittedEvent = mockEventEmitter.emit.mock.calls[0][1] as UserSignedUpEvent;
+      expect(emittedEvent.userId).toBe(TEST_USER.id);
+    });
+
+    it('does not emit USER_SIGNED_UP when user creation fails', async () => {
+      mockUsersService.create.mockRejectedValue(new Error('DB error'));
+
+      await expect(service.register(REGISTER_DTO)).rejects.toThrow();
+
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
     });
   });
 
@@ -270,6 +300,111 @@ describe('AuthService login lockout (BE-005)', () => {
       expect(result.accessToken).toBe('signed.jwt.token');
       expect(result.refreshToken).toBe('signed.jwt.token');
       expect(result.user.email).toBe(TEST_USER.email);
+    });
+  });
+
+  describe('admin audit logging (BE-ADM-609)', () => {
+    it('AC-06: register records a signup success entry', async () => {
+      mockUsersService.create.mockResolvedValue({ ...TEST_USER, email: 'new@example.com' });
+
+      await service.register({
+        email: 'new@example.com',
+        password: 'Password123!',
+        fullName: 'New User',
+        termsAccepted: true,
+      });
+
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        TEST_USER.id,
+        AdminLogActionType.SIGNUP,
+        expect.any(String),
+        null,
+        AdminLogStatus.SUCCESS,
+      );
+    });
+
+    it('AC-01: successful login records a login success entry', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(TEST_USER);
+      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata());
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      await service.login(LOGIN_DTO);
+
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        TEST_USER.id,
+        AdminLogActionType.LOGIN,
+        expect.any(String),
+        null,
+        AdminLogStatus.SUCCESS,
+      );
+    });
+
+    it('AC-02: wrong password records a login failed entry for the user', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(TEST_USER);
+      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata());
+      mockAuthMetadataModelAction.incrementFailedAttempts.mockResolvedValue(1);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        TEST_USER.id,
+        AdminLogActionType.LOGIN,
+        expect.any(String),
+        null,
+        AdminLogStatus.FAILED,
+      );
+    });
+
+    it('EC-02: unknown email records a login failed entry with a null user_id', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(null);
+
+      await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        null,
+        AdminLogActionType.LOGIN,
+        expect.any(String),
+        null,
+        AdminLogStatus.FAILED,
+      );
+    });
+
+    it('logout records a logout success entry', async () => {
+      await service.logout(TEST_USER.id, 'sess-1');
+
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        TEST_USER.id,
+        AdminLogActionType.LOGOUT,
+        expect.any(String),
+        null,
+        AdminLogStatus.SUCCESS,
+      );
+    });
+
+    it('forwards the request object so the IP address can be recorded', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(TEST_USER);
+      mockAuthMetadataModelAction.findByUserId.mockResolvedValue(buildMetadata());
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      const req = { ip: '203.0.113.9', headers: {} } as unknown as import('express').Request;
+
+      await service.login(LOGIN_DTO, req);
+
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        TEST_USER.id,
+        AdminLogActionType.LOGIN,
+        expect.any(String),
+        req,
+        AdminLogStatus.SUCCESS,
+      );
+    });
+
+    it('does not record an audit entry when login fails because the email is unverified', async () => {
+      mockUsersService.findByEmail.mockResolvedValue({ ...TEST_USER, is_verified: false });
+
+      await expect(service.login(LOGIN_DTO)).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(mockLogService.log).not.toHaveBeenCalled();
     });
   });
 
@@ -618,6 +753,8 @@ describe('AuthService - Password Reset Flow (BE-012)', () => {
         { provide: AuthMetadataModelAction, useValue: mockAuthMetadataModelAction },
         { provide: OtpTokenModelAction, useValue: mockOtpTokenModelAction },
         { provide: EmailService, useValue: mockEmailService },
+        { provide: LogService, useValue: mockLogService },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 
@@ -899,6 +1036,8 @@ describe('AuthService - refresh() rate limit (BE-64)', () => {
         { provide: AuthMetadataModelAction, useValue: mockAuthMetadataModelAction },
         { provide: OtpTokenModelAction, useValue: mockOtpTokenModelAction },
         { provide: EmailService, useValue: mockEmailService },
+        { provide: LogService, useValue: mockLogService },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 

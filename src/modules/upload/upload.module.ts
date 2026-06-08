@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bull';
 import { RedisModule } from '../redis/redis.module';
 import { QUEUES } from '../../common/constants/queue.constants';
+import { LogModule } from '../../common/services/log.module';
 import { UploadedDocumentModelAction } from './actions/uploaded-document.action';
 import { EXTRACTION_LOCK_MS } from './constants/upload.constants';
 import { UploadedDocument } from './entities/uploaded-document.entity';
@@ -17,6 +18,7 @@ import { ExtractionProcessor } from './processors/extraction.processor';
 @Module({
   imports: [
     RedisModule,
+    LogModule,
     TypeOrmModule.forFeature([UploadedDocument]),
     BullModule.registerQueue({
       name: QUEUES.DOCUMENT_EXTRACTION,

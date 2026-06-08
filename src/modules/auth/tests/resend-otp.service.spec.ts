@@ -1,4 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
@@ -11,6 +12,7 @@ import { UserSessionModelAction } from '../../users/actions/user-session.action'
 import { AuthMetadataModelAction } from '../actions/auth-metadata.action';
 import { OtpTokenModelAction } from '../actions/otp-token.action';
 import { EmailService } from '../../../email/email.service';
+import { LogService } from '../../../common/services/log.service';
 import * as SYS_MSG from '../../../constants/system.messages';
 
 const mockUsersService = {
@@ -74,6 +76,8 @@ describe('AuthService.resendOtp (BE-004)', () => {
         { provide: AuthMetadataModelAction, useValue: mockAuthMetadataModelAction },
         { provide: OtpTokenModelAction, useValue: mockOtpTokenModelAction },
         { provide: EmailService, useValue: mockEmailService },
+        { provide: LogService, useValue: { log: jest.fn() } },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 

@@ -10,11 +10,13 @@ import {
   Patch,
   ValidationPipe,
   Post,
+  Req,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { memoryStorage } from 'multer';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UsersService } from './users.service';
@@ -63,8 +65,8 @@ export class UsersController {
   @Patch('me')
   @HttpCode(HttpStatus.OK)
   @UpdateProfileDocs()
-  async updateProfile(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateUserProfileDto) {
-    const data = await this.usersService.updateProfile(user.userId, dto);
+  async updateProfile(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateUserProfileDto, @Req() req: Request) {
+    const data = await this.usersService.updateProfile(user.userId, dto, req);
     return {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.PROFILE_UPDATED_SUCCESSFULLY,
@@ -106,8 +108,9 @@ export class UsersController {
   async deleteAccount(
     @CurrentUser('userId') userId: string,
     @Body() dto: DeleteAccountDto,
+    @Req() req: Request,
   ) {
-    await this.usersService.deleteAccount(userId, dto.confirmation);
+    await this.usersService.deleteAccount(userId, dto.confirmation, req);
     return {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.ACCOUNT_DELETED_SUCCESSFULLY,
@@ -130,8 +133,8 @@ export class UsersController {
   @Patch('me/password')
   @ChangePasswordDocs()
   @HttpCode(HttpStatus.OK)
-  async changePassword(@CurrentUser('sub') userId: string, @Body() dto: ChangePasswordDto) {
-    await this.usersService.changePassword(userId, dto);
+  async changePassword(@CurrentUser('sub') userId: string, @Body() dto: ChangePasswordDto, @Req() req: Request) {
+    await this.usersService.changePassword(userId, dto, req);
     return {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.PASSWORD_CHANGE_SUCCESSFUL,

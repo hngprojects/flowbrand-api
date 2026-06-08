@@ -1,5 +1,7 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { LlmService } from '../../../../queue/interfaces/llm.service.interface';
+import { LogService } from '../../../../common/services/log.service';
+import { AdminLogActionType, AdminLogStatus } from '../../../admin/logs/enums/admin-log.enum';
 import { getQueueToken } from '@nestjs/bull';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -52,9 +54,11 @@ describe('FunnelsService - task status update', () => {
   let stageAction: jest.Mocked<FunnelStageModelAction>;
   let taskAction: jest.Mocked<StageTaskModelAction>;
   let mockEventEmitter: { emit: jest.Mock };
+  let mockLogService: { log: jest.Mock };
 
   beforeEach(async () => {
     mockEventEmitter = { emit: jest.fn() };
+    mockLogService = { log: jest.fn() };
     funnelAction = { findOwnedById: jest.fn() } as unknown as jest.Mocked<FunnelModelAction>;
     stageAction = { get: jest.fn() } as unknown as jest.Mocked<FunnelStageModelAction>;
     taskAction = {
@@ -80,6 +84,7 @@ describe('FunnelsService - task status update', () => {
         { provide: getRepositoryToken(StageFeedback), useValue: {} },
         { provide: EventEmitter2, useValue: mockEventEmitter },
         { provide: LlmService, useValue: {} },
+        { provide: LogService, useValue: mockLogService },
       ],
     }).compile();
 
@@ -128,6 +133,37 @@ describe('FunnelsService - task status update', () => {
       APP_EVENTS.TASK_REOPENED,
       expect.objectContaining({ userId: USER_ID, funnelId: FUNNEL_ID, stageId: STAGE_ID, taskId: TASK_ID }),
     );
+  });
+
+  it('BE-ADM-609: records a task_completed audit entry when a task is completed', async () => {
+    funnelAction.findOwnedById.mockResolvedValue(buildFunnel());
+    stageAction.get.mockResolvedValue(buildStage());
+    taskAction.findOwnedTask.mockResolvedValue(buildTask());
+    taskAction.saveTask.mockResolvedValue(buildTask({ status: 'complete', is_complete: true }));
+
+    await service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, 'complete');
+
+    expect(mockLogService.log).toHaveBeenCalledWith(
+      USER_ID,
+      AdminLogActionType.TASK_COMPLETED,
+      expect.any(String),
+      null,
+      AdminLogStatus.SUCCESS,
+      { funnelId: FUNNEL_ID, stageId: STAGE_ID, taskId: TASK_ID },
+    );
+  });
+
+  it('BE-ADM-609: records no audit entry when a task is reopened', async () => {
+    funnelAction.findOwnedById.mockResolvedValue(buildFunnel());
+    stageAction.get.mockResolvedValue(buildStage());
+    taskAction.findOwnedTask.mockResolvedValue(
+      buildTask({ status: 'complete', is_complete: true, completed_at: new Date('2026-05-26T10:00:00.000Z') }),
+    );
+    taskAction.saveTask.mockResolvedValue(buildTask({ status: 'pending', is_complete: false, completed_at: null }));
+
+    await service.updateTaskStatus(USER_ID, FUNNEL_ID, STAGE_ID, TASK_ID, 'pending');
+
+    expect(mockLogService.log).not.toHaveBeenCalled();
   });
 
   it('AC-03: task does not belong to the stage returns 404 without writing', async () => {

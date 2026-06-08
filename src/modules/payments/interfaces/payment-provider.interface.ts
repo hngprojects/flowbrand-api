@@ -1,5 +1,6 @@
 import { InitiatePaymentDto } from '../dto/initiate-payment.dto';
 import { InitiateSubscriptionDto } from '../dto/initiate-subscription.dto';
+import { BillingCycle } from '../enums/billing-cycle.enum';
 import { PaymentStatus } from '../enums/payment-status.enum';
 
 export interface InitiatePaymentResult {
@@ -19,6 +20,7 @@ export interface VerifyPaymentResult {
 }
 
 export interface InitiateSubscriptionResult {
+  reference: string;
   subscriptionCode: string;
   authorizationUrl: string;
   provider: string;
@@ -30,6 +32,17 @@ export interface WebhookEvent {
   data: Record<string, unknown>;
 }
 
+export interface InitiateSubscriptionResponse {
+  statusCode: number;
+  message: string;
+  data: {
+    authorizationUrl: string;
+    amount: number;
+    currency: string;
+    billingCycle: BillingCycle;
+  };
+}
+
 export interface InitiatePaymentResponse {
   statusCode: number;
   message: string;
@@ -39,6 +52,32 @@ export interface InitiatePaymentResponse {
     amount: number;
     currency: string;
   };
+}
+
+export interface PaymentVerifyResponse {
+  status: PaymentStatus;
+  reference: string;
+  plan?: string;
+  amount?: number;
+  currency?: string;
+  cardLast4?: string;
+  cardBrand?: string;
+}
+
+export interface SubscriptionResponse {
+  subscriptionId: string;
+  plan: string;
+  billingCycle: string;
+  status: string;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  cancelledAt: string | null;
+  downgradeAt: string | null;
+}
+
+export interface CancelSubscriptionResponse {
+  cancelledAt: string;
+  accessUntil: string;
 }
 
 export interface PaymentProvider {
