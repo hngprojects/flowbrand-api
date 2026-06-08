@@ -15,7 +15,10 @@ import { QueryFailedError, DataSource } from 'typeorm';
 import { InjectQueue } from '@nestjs/bull';
 import type { Queue } from 'bull';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import type { Request } from 'express';
 import { APP_EVENTS } from '../../common/constants/app-events';
+import { LogService } from '../../common/services/log.service';
+import { AdminLogActionType, AdminLogStatus } from '../admin/logs/enums/admin-log.enum';
 import { ProfileUpdatedEvent, AccountDeletedEvent } from '../../common/events';
 import { emitSafely } from '../../common/events/emit-safely';
 import { UserModelAction } from './actions/user.action';
@@ -85,6 +88,7 @@ export class UsersService {
     private readonly dataSource: DataSource,
     @Inject(UPLOAD_OBJECT_STORAGE)
     private readonly objectStorage: ObjectStorage,
+    private readonly logService: LogService,
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
@@ -238,12 +242,12 @@ export class UsersService {
   }
 
   async remove(id: string): Promise<void> {
-    await this.findById(id);
+    const user = await this.findById(id);
     await this.userModelAction.delete({
       ...NO_TRANSACTION,
       identifierOptions: { id },
     });
-    emitSafely(this.eventEmitter, this.logger, APP_EVENTS.ACCOUNT_DELETED, new AccountDeletedEvent(id));
+    emitSafely(this.eventEmitter, this.logger, APP_EVENTS.ACCOUNT_DELETED, new AccountDeletedEvent(id, user.email, user.full_name));
   }
 
   private async revokeAllUserSessions(userId: string): Promise<void> {
@@ -275,7 +279,7 @@ export class UsersService {
     });
   }
 
-  async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
+  async changePassword(userId: string, dto: ChangePasswordDto, req: Request | null = null): Promise<void> {
     const user = await this.findById(userId);
 
     if (!user.password_hash) {
@@ -324,6 +328,8 @@ export class UsersService {
     }
 
     await this.revokeAllUserSessions(userId);
+
+    this.logService.log(userId, AdminLogActionType.PASSWORD_CHANGED, 'User changed their password', req, AdminLogStatus.SUCCESS);
 
     this.logger.log({
       message: SYS_MSG.PASSWORD_CHANGE_SUCCESSFUL,
@@ -510,7 +516,11 @@ export class UsersService {
     return this.toNotificationPreferenceResponse(preference);
   }
 
-  async updateProfile(userId: string, dto: UpdateUserProfileDto & { email?: unknown }): Promise<IUserProfile> {
+  async updateProfile(
+    userId: string,
+    dto: UpdateUserProfileDto & { email?: unknown },
+    req: Request | null = null,
+  ): Promise<IUserProfile> {
     if ('email' in dto && dto.email !== undefined) {
       throw new UnprocessableEntityException(SYS_MSG.PROFILE_EMAIL_CHANGE_FORBIDDEN);
     }
@@ -565,10 +575,14 @@ export class UsersService {
       new ProfileUpdatedEvent(userId, changedFields),
     );
 
+    this.logService.log(userId, AdminLogActionType.PROFILE_UPDATED, 'User updated their profile', req, AdminLogStatus.SUCCESS, {
+      updatedFields: changedFields,
+    });
+
     return await this.toProfileResponse(updated);
   }
 
-  async deleteAccount(userId: string, confirmation: string): Promise<void> {
+  async deleteAccount(userId: string, confirmation: string, req: Request | null = null): Promise<void> {
     if (confirmation !== 'DELETE') {
       throw new UnprocessableEntityException(SYS_MSG.ACCOUNT_DELETION_CONFIRMATION_REQUIRED);
     }
@@ -617,6 +631,8 @@ export class UsersService {
       }
 
       this.pinoLogger.info('Account deleted', { userId });
+
+      this.logService.log(userId, AdminLogActionType.ACCOUNT_DELETED, 'User deleted their account', req, AdminLogStatus.SUCCESS);
 
       await this.accountDeletionQueue.add('hard-delete', { userId, email: user.email }, { delay: thirtyDaysLater });
     } catch (error) {

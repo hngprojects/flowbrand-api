@@ -1,5 +1,6 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { LogModule } from '../../common/services/log.module';
 import { FunnelsModule } from '../funnels/funnels.module';
 import { UploadModule } from '../upload/upload.module';
 import { RedisModule } from '../redis/redis.module';
@@ -28,6 +29,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     forwardRef(() => NotificationsModule),
     RedisModule,
     UploadModule,
+    LogModule,
     BullModule.registerQueueAsync({
       name: ACCOUNT_DELETION_QUEUE,
       useFactory: (configService: ConfigService) => ({

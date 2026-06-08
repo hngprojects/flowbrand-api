@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JOB_RETENTION, QUEUES } from '../common/constants/queue.constants';
+import { LogModule } from '../common/services/log.module';
 import { FunnelModelAction } from '../modules/funnels/actions/funnel.action';
 import { Funnel } from '../modules/funnels/entities/funnel.entity';
 import { FunnelStage } from '../modules/funnels/entities/funnel-stage.entity';
@@ -16,6 +17,7 @@ import { LlmModule } from '../modules/llm/llm.module';
   imports: [
     QueueModule,
     LlmModule,
+    LogModule,
     BullModule.registerQueueAsync({
       name: QUEUES.FUNNEL_GENERATION,
       useFactory: (config: ConfigService) => ({

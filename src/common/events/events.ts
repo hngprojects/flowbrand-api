@@ -85,6 +85,31 @@ export class FeedbackSubmittedEvent {
   ) {}
 }
 
+// Payments
+export class PaymentFailedEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly reference: string,
+    public readonly failureReason: string,
+  ) {}
+}
+
+export class SubscriptionCancelledEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly subscriptionId: string,
+    public readonly accessUntil: Date,
+  ) {}
+}
+
+export class PlanUpgradedEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly plan: string,
+    public readonly reference: string,
+  ) {}
+}
+
 // User account
 export class ProfileUpdatedEvent {
   public readonly updatedFields: ReadonlyArray<string>;
@@ -101,7 +126,11 @@ export class PasswordChangedEvent {
 }
 
 export class AccountDeletedEvent {
-  constructor(public readonly userId: string) {}
+  constructor(
+    public readonly userId: string,
+    public readonly email: string,
+    public readonly name: string,
+  ) {}
 }
 
 export class UserSignedInEvent {
@@ -115,7 +144,7 @@ export class UserSignedInEvent {
 export class UserSignedUpEvent {
   constructor(
     public readonly userId: string,
-    public readonly ip: string,
-    public readonly userAgent: string,
+    public readonly ip?: string,
+    public readonly userAgent?: string,
   ) {}
 }
