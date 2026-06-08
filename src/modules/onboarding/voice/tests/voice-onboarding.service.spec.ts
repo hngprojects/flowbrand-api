@@ -4,6 +4,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { VoiceOnboardingService } from '../services/voice-onboarding.service';
 import { RedisService } from '../../../redis/redis.service';
 import { UPLOAD_OBJECT_STORAGE, UploadDocumentStatus } from '../../../upload/upload.types';
+import { DocumentSourceType } from '../../../upload/entities/uploaded-document.entity';
 import { UploadedDocumentModelAction } from '../../../upload/actions/uploaded-document.action';
 import { redisKeys } from '../../../../constants/redis-keys';
 
@@ -144,7 +145,7 @@ describe('VoiceOnboardingService', () => {
           file_type: 'doc',
           status: UploadDocumentStatus.READY,
           percent_complete: 100,
-          source_type: 'voice',
+          source_type: DocumentSourceType.VOICE,
           parsed_text: 'transcript 1. transcript 2.',
         }),
       );

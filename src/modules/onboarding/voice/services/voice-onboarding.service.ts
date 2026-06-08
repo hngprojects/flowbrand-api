@@ -6,6 +6,7 @@ import { RedisService } from '../../../redis/redis.service';
 import { redisKeys } from '../../../../constants/redis-keys';
 import { UPLOAD_OBJECT_STORAGE, UploadDocumentStatus, type ObjectStorage } from '../../../upload/upload.types';
 import { UploadedDocumentModelAction } from '../../../upload/actions/uploaded-document.action';
+import { DocumentSourceType } from '../../../upload/entities/uploaded-document.entity';
 import { VoiceTranscriptionJobData } from '../interfaces/voice-onboarding.interfaces';
 
 @Injectable()
@@ -98,7 +99,7 @@ export class VoiceOnboardingService {
       status: UploadDocumentStatus.READY,
       percent_complete: 100,
       storage_path: 'voice-onboarding-virtual',
-      source_type: 'voice',
+      source_type: DocumentSourceType.VOICE,
       parsed_text: combinedTranscript,
     });
 
