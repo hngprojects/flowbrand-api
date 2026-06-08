@@ -369,12 +369,6 @@ export class AdminTeamsService {
 
     const revokedSessionIds = await this.userSessionModelAction.revokeAllUserSessionsInDb(memberId);
 
-    await this.userModelAction.update({
-      identifierOptions: { id: memberId },
-      updatePayload: { is_active: false },
-      transactionOptions: { useTransaction: false },
-    });
-
     if (revokedSessionIds.length > 0) {
       await Promise.all(
         revokedSessionIds.flatMap((sessionId) => [
