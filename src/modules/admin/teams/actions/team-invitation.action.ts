@@ -1,7 +1,7 @@
 import { AbstractModelAction } from '@hng-sdk/orm';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { TeamInvitation } from '../entities/team-invitation.entity';
 import { InviteStatus } from '../enums/invite-status.enum';
 
@@ -64,12 +64,19 @@ export class TeamInvitationModelAction extends AbstractModelAction<TeamInvitatio
     return this.repository.findOne({ 
       where: { 
         token_hash: tokenHash,
-        status: InviteStatus.PENDING
       } 
     });
   }
 
   async markAccepted(inviteId: string): Promise<void> {
     await this.repository.update(inviteId, { status: InviteStatus.ACCEPTED });
-  }  
+  }
+  
+  async claimWithManager(inviteId: string, manager: EntityManager): Promise<boolean> {
+    const result = await manager.getRepository(TeamInvitation).update(
+      { id: inviteId, status: InviteStatus.PENDING },
+      { status: InviteStatus.ACCEPTED },
+    );
+    return (result.affected ?? 0) > 0;
+  }
 }
