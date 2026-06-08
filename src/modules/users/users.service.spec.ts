@@ -28,6 +28,8 @@ import { PinoLoggerService } from '../../common/logger/pino-logger.service';
 import { UserRole } from './enums/user-role.enum';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UPLOAD_OBJECT_STORAGE } from '../upload/upload.types';
+import { LogService } from '../../common/services/log.service';
+import { AdminLogActionType, AdminLogStatus } from '../admin/logs/enums/admin-log.enum';
 import { env } from '../../config/env';
 import { AVATAR_SIGNED_URL_EXPIRY_SECONDS } from './constants/avatar.constants';
 
@@ -220,6 +222,8 @@ const mockPinoLoggerService = {
   runWithContext: jest.fn(),
 };
 
+const mockLogService = { log: jest.fn() };
+
 describe('UsersService', () => {
   let service: UsersService;
   let mockEventEmitter: { emit: jest.Mock };
@@ -242,6 +246,7 @@ describe('UsersService', () => {
         { provide: EventEmitter2, useValue: mockEventEmitter },
         { provide: NotificationsService, useValue: mockNotificationsService },
         { provide: UPLOAD_OBJECT_STORAGE, useValue: mockObjectStorage },
+        { provide: LogService, useValue: mockLogService },
       ],
     }).compile();
 
@@ -441,6 +446,26 @@ describe('UsersService', () => {
         { password_changed_at: expect.any(Date) },
       );
       expect(mockAuthMetaModelAction.findByUserId).toHaveBeenCalledWith(USER_ID);
+    });
+
+    it('BE-ADM-609: records a password_changed audit entry on success', async () => {
+      await service.changePassword(USER_ID, changePasswordDto);
+
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        USER_ID,
+        AdminLogActionType.PASSWORD_CHANGED,
+        expect.any(String),
+        null,
+        AdminLogStatus.SUCCESS,
+      );
+    });
+
+    it('BE-ADM-609: records no audit entry when the old password is wrong', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      await expect(service.changePassword(USER_ID, changePasswordDto)).rejects.toBeDefined();
+
+      expect(mockLogService.log).not.toHaveBeenCalled();
     });
 
     it('AC-17: revokes all user sessions after successful password change', async () => {
@@ -912,6 +937,30 @@ describe('UsersService', () => {
       expect(mockEventEmitter.emit).not.toHaveBeenCalled();
     });
 
+    it('BE-ADM-609: records a profile_updated audit entry with the changed fields', async () => {
+      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+      mockUserModelAction.update.mockResolvedValue({ ...mockFullUser, full_name: 'New Name' });
+
+      await service.updateProfile(USER_ID, { fullName: 'New Name' });
+
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        USER_ID,
+        AdminLogActionType.PROFILE_UPDATED,
+        expect.any(String),
+        null,
+        AdminLogStatus.SUCCESS,
+        { updatedFields: ['full_name'] },
+      );
+    });
+
+    it('BE-ADM-609: records no audit entry for a no-op update', async () => {
+      mockUserModelAction.get.mockResolvedValue(mockFullUser);
+
+      await service.updateProfile(USER_ID, {});
+
+      expect(mockLogService.log).not.toHaveBeenCalled();
+    });
+
     it('throws 422 when email is present in body', async () => {
       mockUserModelAction.get.mockResolvedValue(mockFullUser);
 
@@ -1179,6 +1228,7 @@ describe('UsersService', () => {
           { provide: EventEmitter2, useValue: mockEventEmitter },
           { provide: NotificationsService, useValue: mockNotificationsService },
           { provide: UPLOAD_OBJECT_STORAGE, useValue: mockObjectStorage },
+          { provide: LogService, useValue: mockLogService },
         ],
       }).compile();
 
@@ -1222,6 +1272,28 @@ describe('UsersService', () => {
           USER_ID,
           mockQueryRunner.manager,
         );
+      });
+    });
+
+    describe('BE-ADM-609: audit logging', () => {
+      it('records an account_deleted audit entry after the deletion commits', async () => {
+        mockUserModelAction.findById.mockResolvedValue(mockLocalUser);
+
+        await service.deleteAccount(USER_ID, 'DELETE');
+
+        expect(mockLogService.log).toHaveBeenCalledWith(
+          USER_ID,
+          AdminLogActionType.ACCOUNT_DELETED,
+          expect.any(String),
+          null,
+          AdminLogStatus.SUCCESS,
+        );
+      });
+
+      it('records no audit entry when the confirmation phrase is wrong', async () => {
+        await expect(service.deleteAccount(USER_ID, 'delete')).rejects.toBeDefined();
+
+        expect(mockLogService.log).not.toHaveBeenCalled();
       });
     });
 

@@ -12,13 +12,20 @@ import { EmailModule } from '../../../email/email.module';
 import { QueueModule } from '../../../queue/queue.module';
 import { AdminAuthModule } from '../auth/admin-auth.module';
 import { User } from '../../users/entities/user.entity';
+import { UserModelAction } from '../../users/actions/user.action';
+import { UserRoleModelAction }     from '../../users/actions/user-role.action';
+import { UserSessionModelAction }  from '../../users/actions/user-session.action';
+import { RedisModule }             from '../../redis/redis.module';
+import { UserRoleEntity }          from '../../users/entities/user-role.entity';
+import { UserSession }             from '../../users/entities/user-session.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([AdminTeam, TeamMembership, TeamInvitation, User]),
+    TypeOrmModule.forFeature([AdminTeam, TeamMembership, TeamInvitation, User, UserRoleEntity, UserSession]),
     QueueModule,
     EmailModule,
     AdminAuthModule,
+    RedisModule, 
   ],
   controllers: [AdminTeamsController],
   providers: [
@@ -26,6 +33,9 @@ import { User } from '../../users/entities/user.entity';
     TeamMembershipModelAction,
     TeamInvitationModelAction,
     AdminTeamsService,
+    UserModelAction, 
+    UserRoleModelAction, 
+    UserSessionModelAction
   ],
   exports: [AdminTeamsService],
 })

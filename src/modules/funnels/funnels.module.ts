@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bull';
 import { QUEUES } from '../../common/constants/queue.constants';
+import { LogModule } from '../../common/services/log.module';
 import { WizardSession } from '../onboarding/entities/wizzard-session.entity';
 import { RedisModule } from '../redis/redis.module';
 import { UploadedDocument } from '../upload/entities/uploaded-document.entity';
@@ -23,6 +24,7 @@ import { LlmModule } from '../llm/llm.module';
     BullModule.registerQueue({ name: QUEUES.FUNNEL_GENERATION }),
     RedisModule,
     LlmModule,
+    LogModule,
   ],
   controllers: [FunnelsController],
   providers: [

@@ -17,13 +17,18 @@ const STAGE_UNLOCKED_HBS = `<p>Hi {{name}}</p><p><a href="{{dashboardUrl}}">SEIL
 const STAGE_COMPLETED_HBS = `<p>Hi {{name}}</p><p>You completed {{stageName}}</p><p>Open <a href="{{dashboardUrl}}">SEIL</a></p>`;
 const WEEKLY_DIGEST_HBS = `<p>Hi {{name}}</p><p>{{completedTasks}} of {{totalTasks}}</p>`;
 const TEAM_INVITE_HBS = `<p>Hi {{inviteeName}}</p><p>You have been invited to {{teamName}}</p><p><a href="{{inviteUrl}}">Join</a></p>`;
-
+const PAYMENT_SUCCESSFUL_HBS = `<p>Hi {{name}}</p><p>Amount: {{amount}}</p><p>Ref: {{reference}}</p>`;
+const PAYMENT_FAILED_HBS = `<p>Hi {{name}}</p><p>Payment failed</p><a href="{{upgradeUrl}}">Update details</a>`;
+const SUBSCRIPTION_CANCELLED_HBS = `<p>Hi {{name}}</p><p>Access until {{accessUntil}}</p><a href="{{upgradeUrl}}">Reactivate</a>`;
+const NOTIFICATION_ALERT_HBS = `<p>Hi {{name}}</p><p>You have {{unreadCount}} notifications</p><a href="{{dashboardUrl}}">View</a>`;
+const WELCOME_HBS = `<p>Hi {{name}}</p><p>Welcome to Seil</p>`;
+const DELETE_ACCOUNT_HBS = `<p>Hi {{name}}</p><p>Your account has been deleted</p>`;
 
 describe('TemplateService', () => {
   let service: TemplateService;
 
   function buildService(): Promise<TestingModule> {
-     return Test.createTestingModule({ providers: [TemplateService] }).compile();
+    return Test.createTestingModule({ providers: [TemplateService] }).compile();
   }
 
   describe('onModuleInit - happy path', () => {
@@ -42,6 +47,12 @@ describe('TemplateService', () => {
         if (p.includes('stage-completed')) return Promise.resolve(STAGE_COMPLETED_HBS as never);
         if (p.includes('weekly-digest')) return Promise.resolve(WEEKLY_DIGEST_HBS as never);
         if (p.includes('team-invite')) return Promise.resolve(TEAM_INVITE_HBS as never);
+        if (p.includes('payment-successful')) return Promise.resolve(PAYMENT_SUCCESSFUL_HBS as never);
+        if (p.includes('payment-failed')) return Promise.resolve(PAYMENT_FAILED_HBS as never);
+        if (p.includes('subscription-cancelled')) return Promise.resolve(SUBSCRIPTION_CANCELLED_HBS as never);
+        if (p.includes('notification-alert')) return Promise.resolve(NOTIFICATION_ALERT_HBS as never);
+        if (p.includes('welcome')) return Promise.resolve(WELCOME_HBS as never);
+        if (p.includes('delete-account')) return Promise.resolve(DELETE_ACCOUNT_HBS as never);
         return Promise.reject(new Error(`Unexpected path: ${p}`));
       });
 

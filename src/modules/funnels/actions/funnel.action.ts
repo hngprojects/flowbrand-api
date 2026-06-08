@@ -153,10 +153,14 @@ export class FunnelModelAction extends AbstractModelAction<Funnel> {
       .getOne();
   }
 
-  async getUserProfile(userId: string): Promise<{ business_type: string | null; target_customer: string | null } | null> {
+  async getUserProfile(userId: string): Promise<{
+    business_type: string | null;
+    target_customer: string | null;
+    business_name: string | null;
+  } | null> {
     return this.manager.getRepository(User).findOne({
       where: { id: userId },
-      select: { business_type: true, target_customer: true },
+      select: { business_type: true, target_customer: true, business_name: true },
     });
   }
 

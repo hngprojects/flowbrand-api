@@ -1,0 +1,17 @@
+<tr>
+  <td align="left" style="padding: 40px 40px 48px">
+    <h1 style="margin: 0 0 28px; font-size: 32px; line-height: 1.2; font-weight: 700; color: #020e1f">Payment Successful</h1>
+    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.55; color: #020e1f">Hi {{name}},</p>
+    <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.55; color: #020e1f">Your payment has been processed successfully, and your Seil subscription is now active.</p>
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="font-size: 16px; line-height: 1.8; color: #020e1f">
+      <tr><td style="padding: 4px 0"><strong>Amount:</strong> {{amount}}</td></tr>
+      {{#if cardBrand}}
+      <tr><td style="padding: 4px 0"><strong>Payment Method:</strong> {{cardBrand}}{{#if cardLast4}} ending in {{cardLast4}}{{/if}}</td></tr>
+      {{/if}}
+      <tr><td style="padding: 4px 0"><strong>Transaction ID:</strong> {{reference}}</td></tr>
+      {{#if paidAt}}
+      <tr><td style="padding: 4px 0"><strong>Date:</strong> {{paidAt}}</td></tr>
+      {{/if}}
+    </table>
+  </td>
+</tr>

@@ -140,6 +140,14 @@ export class AdminAuthService {
     return this.issueTokens(payload.sub, payload.email, highestRole, session.id);
   }
 
+  async issueTokensForInvite(
+    userId: string,
+    email: string,
+    role: UserRole,
+  ): Promise<AdminAuthTokens> {
+    return this.issueTokens(userId, email, role);
+  }
+
   private async issueTokens(
     userId: string,
     email: string,
