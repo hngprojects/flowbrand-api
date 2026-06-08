@@ -543,6 +543,32 @@ describe('FunnelGenerationProcessor', () => {
 
       await expect(processor.onFailed(job, new Error('boom'))).resolves.toBeUndefined();
     });
+
+
+    it('EC-01: skips FAILED write and logs warning when funnel no longer exists in DB', async () => {
+      const job = makeJob({ attemptsMade: 3 });
+      mockFunnelAction.get.mockResolvedValue(null);
+      const warnSpy = jest.spyOn((processor as any).logger, 'warn');
+
+
+      await processor.onFailed(job, new Error('boom'));
+
+
+      expect(mockFunnelAction.update).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(expect.objectContaining({ event: 'funnel_job_failed_skip' }));
+    });
+
+
+    it('EC-02: funnelAction.update is called exactly once per terminal failure — regression guard for double-write', async () => {
+      const job = makeJob({ attemptsMade: 3 });
+      mockFunnelAction.get.mockResolvedValue({ id: 'funnel-uuid', status: FunnelStatus.GENERATING });
+
+
+      await processor.onFailed(job, new Error('boom'));
+
+
+      expect(mockFunnelAction.update).toHaveBeenCalledTimes(1);
+    });
   });
 
 
@@ -659,6 +685,37 @@ describe('FunnelGenerationProcessor', () => {
 
 
       expect(mockEventEmitter.emit).not.toHaveBeenCalledWith(APP_EVENTS.FUNNEL_FAILED, expect.anything());
+    });
+
+
+    it('EC-03: does NOT emit FUNNEL_FAILED when the DB status update throws', async () => {
+      const job = makeJob({ attemptsMade: 3, opts: { attempts: 3 } });
+      mockFunnelAction.get.mockResolvedValue({ id: 'funnel-uuid', status: FunnelStatus.GENERATING });
+      mockFunnelAction.update.mockRejectedValueOnce(new Error('DB down'));
+
+
+      await processor.onFailed(job, new Error('boom'));
+
+
+      expect(mockEventEmitter.emit).not.toHaveBeenCalledWith(APP_EVENTS.FUNNEL_FAILED, expect.anything());
+    });
+
+
+    it('SEC-01: FUNNEL_FAILED payload contains only userId and funnelId — no PII', async () => {
+      const job = makeJob({ attemptsMade: 3, opts: { attempts: 3 } });
+      mockFunnelAction.get.mockResolvedValue({ id: 'funnel-uuid', status: FunnelStatus.GENERATING });
+
+
+      await processor.onFailed(job, new Error('boom'));
+
+
+      const [, payload] = (mockEventEmitter.emit as jest.Mock).mock.calls[0];
+      expect(payload).not.toHaveProperty('email');
+      expect(payload).not.toHaveProperty('password');
+      expect(payload).not.toHaveProperty('token');
+      expect(payload).not.toHaveProperty('hash');
+      expect(payload).toHaveProperty('userId', 'user-uuid');
+      expect(payload).toHaveProperty('funnelId', 'funnel-uuid');
     });
   });
 
