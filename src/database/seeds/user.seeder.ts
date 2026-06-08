@@ -1,5 +1,6 @@
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
+import { env } from '../../config/env';
 import { User } from '../../modules/users/entities/user.entity';
 import { Seeder } from './seeder.interface';
 import { UserRole } from '../../modules/users/enums/user-role.enum';
@@ -27,8 +28,8 @@ function validatePassword(password: string): void {
 export const userSeeder: Seeder = {
   name: 'UserSeeder',
   async run(dataSource: DataSource) {
-    const email = process.env.SEED_ADMIN_EMAIL;
-    const password = process.env.SEED_ADMIN_PASSWORD;
+    const email = env.SEED_ADMIN_EMAIL;
+    const password = env.SEED_ADMIN_PASSWORD;
 
     if (!email) {
       throw new Error('SEED_ADMIN_EMAIL env var is required');
