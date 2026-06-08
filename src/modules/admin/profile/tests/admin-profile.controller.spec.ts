@@ -3,11 +3,14 @@ import * as SYS_MSG from '../../../../constants/system.messages';
 import { AuthenticatedUser } from '../../../../common/decorators/current-user.decorator';
 import { UserRole } from '../../../users/enums/user-role.enum';
 import { UpdateAdminProfileDto } from '../dto/update-admin-profile.dto';
+import { UpdateAdminNotificationPreferencesDto } from '../dto/update-admin-notification-preferences.dto';
 import { AdminProfileController } from '../admin-profile.controller';
 import { AdminProfileService } from '../admin-profile.service';
 
 const mockAdminProfileService = {
   getProfile: jest.fn(),
+  getNotificationPreferences: jest.fn(),
+  updateNotificationPreferences: jest.fn(),
   updateProfile: jest.fn(),
   changePassword: jest.fn(),
 };
@@ -53,11 +56,27 @@ describe('AdminProfileController', () => {
         }),
     });
 
+  const createNotificationPreferencesValidationPipe = () =>
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: false },
+      expectedType: UpdateAdminNotificationPreferencesDto,
+      validationError: { target: false, value: false },
+      exceptionFactory: (errors: ValidationError[]) =>
+        new UnprocessableEntityException({
+          success: false,
+          statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          error: 'UnprocessableEntityException',
+          message: SYS_MSG.VALIDATION_FAILED,
+          details: errors,
+        }),
+    });
+
   beforeEach(() => {
     jest.clearAllMocks();
-    controller = new AdminProfileController(
-      mockAdminProfileService as unknown as AdminProfileService,
-    );
+    controller = new AdminProfileController(mockAdminProfileService as unknown as AdminProfileService);
   });
 
   describe('GET /admin/profile', () => {
@@ -97,9 +116,13 @@ describe('AdminProfileController', () => {
         message: SYS_MSG.ADMIN_PROFILE_UPDATED_SUCCESSFULLY,
         data: updated,
       });
-      expect(mockAdminProfileService.updateProfile).toHaveBeenCalledWith(ADMIN_ID, {
-        full_name: 'Jane Updated',
-      }, 'admin');
+      expect(mockAdminProfileService.updateProfile).toHaveBeenCalledWith(
+        ADMIN_ID,
+        {
+          full_name: 'Jane Updated',
+        },
+        'admin',
+      );
     });
 
     it('AC-05: empty body returns HTTP 200 with unchanged profile', async () => {
@@ -110,6 +133,92 @@ describe('AdminProfileController', () => {
       expect(result.statusCode).toBe(HttpStatus.OK);
       expect(result.data).toEqual(PROFILE);
       expect(mockAdminProfileService.updateProfile).toHaveBeenCalledWith(ADMIN_ID, {}, 'admin');
+    });
+  });
+
+  describe('GET /admin/profile/notification-preferences', () => {
+    it('AC-01: returns authenticated admin notification preferences', async () => {
+      mockAdminProfileService.getNotificationPreferences.mockResolvedValue({
+        generalNotifications: true,
+        pushEmail: true,
+      });
+
+      const result = await controller.getNotificationPreferences(ADMIN_USER);
+
+      expect(result).toEqual({
+        statusCode: HttpStatus.OK,
+        message: SYS_MSG.ADMIN_NOTIFICATION_PREFERENCES_RETRIEVED_SUCCESSFULLY,
+        data: {
+          generalNotifications: true,
+          pushEmail: true,
+        },
+      });
+      expect(mockAdminProfileService.getNotificationPreferences).toHaveBeenCalledWith(ADMIN_ID);
+    });
+  });
+
+  describe('PATCH /admin/profile/notification-preferences', () => {
+    it('AC-02: updates admin preferences and returns HTTP 200', async () => {
+      mockAdminProfileService.updateNotificationPreferences.mockResolvedValue({
+        generalNotifications: true,
+        pushEmail: false,
+      });
+
+      const result = await controller.updateNotificationPreferences(ADMIN_USER, {
+        push_email: false,
+      });
+
+      expect(result).toEqual({
+        statusCode: HttpStatus.OK,
+        message: SYS_MSG.ADMIN_NOTIFICATION_PREFERENCES_UPDATED_SUCCESSFULLY,
+        data: {
+          generalNotifications: true,
+          pushEmail: false,
+        },
+      });
+      expect(mockAdminProfileService.updateNotificationPreferences).toHaveBeenCalledWith(ADMIN_ID, {
+        push_email: false,
+      });
+    });
+
+    it('AC-05: empty body returns HTTP 200 with unchanged preferences', async () => {
+      mockAdminProfileService.updateNotificationPreferences.mockResolvedValue({
+        generalNotifications: true,
+        pushEmail: true,
+      });
+
+      const result = await controller.updateNotificationPreferences(ADMIN_USER, {});
+
+      expect(result.statusCode).toBe(HttpStatus.OK);
+      expect(mockAdminProfileService.updateNotificationPreferences).toHaveBeenCalledWith(ADMIN_ID, {});
+    });
+
+    it('AC-06: validation pipe rejects unknown keys with 422 envelope', async () => {
+      try {
+        await createNotificationPreferencesValidationPipe().transform(
+          { push_email: false, extra_field: 'ignored' },
+          { type: 'body', metatype: UpdateAdminNotificationPreferencesDto, data: '' },
+        );
+        fail('Expected validation to throw');
+      } catch (error) {
+        expect(error).toBeInstanceOf(UnprocessableEntityException);
+        expect((error as UnprocessableEntityException).getStatus()).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
+        expect((error as UnprocessableEntityException).getResponse()).toMatchObject({
+          success: false,
+          statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          error: 'UnprocessableEntityException',
+          message: SYS_MSG.VALIDATION_FAILED,
+        });
+      }
+    });
+
+    it('AC-06: validation pipe accepts an empty body', async () => {
+      const result = (await createNotificationPreferencesValidationPipe().transform(
+        {},
+        { type: 'body', metatype: UpdateAdminNotificationPreferencesDto, data: '' },
+      )) as UpdateAdminNotificationPreferencesDto;
+
+      expect(result).toEqual({});
     });
   });
 
@@ -138,11 +247,11 @@ describe('AdminProfileController', () => {
     it('AC-07: controller never includes password values in response payload', async () => {
       mockAdminProfileService.changePassword.mockResolvedValue(undefined);
 
-      const result = await controller.changePassword(ADMIN_ID, {
+      const result = (await controller.changePassword(ADMIN_ID, {
         old_password: 'CurrentAdmin@123',
         new_password: 'NewAdmin!789',
         confirm_password: 'NewAdmin!789',
-      }) as unknown as Record<string, unknown>;
+      })) as unknown as Record<string, unknown>;
 
       const serialized = JSON.stringify(result);
       expect(serialized).not.toContain('CurrentAdmin@123');

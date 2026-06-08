@@ -1,9 +1,9 @@
 import {
   Body,
   Controller,
-  Get,
   HttpCode,
   HttpStatus,
+  Get,
   Patch,
   UnprocessableEntityException,
   UseGuards,
@@ -21,10 +21,13 @@ import { UserRole } from '../../users/enums/user-role.enum';
 import { AdminProfileService } from './admin-profile.service';
 import {
   ChangeAdminPasswordDocs,
+  GetAdminNotificationPreferencesDocs,
   GetAdminProfileDocs,
+  UpdateAdminNotificationPreferencesDocs,
   UpdateAdminProfileDocs,
 } from './docs/admin-profile-swagger.doc';
 import { ChangeAdminPasswordDto } from './dto/change-admin-password.dto';
+import { UpdateAdminNotificationPreferencesDto } from './dto/update-admin-notification-preferences.dto';
 import { UpdateAdminProfileDto } from './dto/update-admin-profile.dto';
 
 @ApiTags('admin')
@@ -43,6 +46,52 @@ export class AdminProfileController {
     return {
       statusCode: HttpStatus.OK,
       message: SYS_MSG.ADMIN_PROFILE_RETRIEVED_SUCCESSFULLY,
+      data,
+    };
+  }
+
+  @Get('notification-preferences')
+  @HttpCode(HttpStatus.OK)
+  @GetAdminNotificationPreferencesDocs()
+  async getNotificationPreferences(@CurrentUser() currentUser: AuthenticatedUser) {
+    const data = await this.adminProfileService.getNotificationPreferences(currentUser.userId);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.ADMIN_NOTIFICATION_PREFERENCES_RETRIEVED_SUCCESSFULLY,
+      data,
+    };
+  }
+
+  @Patch('notification-preferences')
+  @HttpCode(HttpStatus.OK)
+  @UpdateAdminNotificationPreferencesDocs()
+  async updateNotificationPreferences(
+    @CurrentUser() currentUser: AuthenticatedUser,
+    @Body(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+        transformOptions: { enableImplicitConversion: false },
+        expectedType: UpdateAdminNotificationPreferencesDto,
+        validationError: { target: false, value: false },
+        exceptionFactory: (errors: ValidationError[]) =>
+          new UnprocessableEntityException({
+            success: false,
+            statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+            error: 'UnprocessableEntityException',
+            message: SYS_MSG.VALIDATION_FAILED,
+            details: errors,
+          }),
+      }),
+    )
+    rawDto: Record<string, unknown>,
+  ) {
+    const dto = rawDto as UpdateAdminNotificationPreferencesDto;
+    const data = await this.adminProfileService.updateNotificationPreferences(currentUser.userId, dto);
+    return {
+      statusCode: HttpStatus.OK,
+      message: SYS_MSG.ADMIN_NOTIFICATION_PREFERENCES_UPDATED_SUCCESSFULLY,
       data,
     };
   }
@@ -67,7 +116,8 @@ export class AdminProfileController {
             error: 'UnprocessableEntityException',
             message: SYS_MSG.VALIDATION_FAILED,
             details: errors,
-          }),      }),
+          }),
+      }),
     )
     dto: UpdateAdminProfileDto,
   ) {
