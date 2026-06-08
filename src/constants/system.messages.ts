@@ -354,3 +354,13 @@ export const TEAM_INVITATION_REVOKED = 'Invitation revoked successfully';
 export const TEAM_INVITATION_NOT_FOUND = 'Invitation not found or already processed';
 export const TEAM_INVITE_ALREADY_PENDING = 'An invitation for this email is already pending';
 export const TEAM_ALREADY_MEMBER = 'This user is already a team member.';
+
+// Invite Accept & member Revoke
+export const INVITE_TOKEN_INVALID          = 'Invalid invitation token.';
+export const INVITE_ALREADY_USED           = 'This invitation has already been used or revoked.';
+export const INVITE_EXPIRED                = 'This invitation has expired.';
+export const INVITE_ACCEPTED_SUCCESSFULLY  = 'Invitation accepted successfully.';
+export const MEMBER_REVOKE_SELF_FORBIDDEN  = 'You cannot revoke your own access.';
+export const MEMBER_NOT_FOUND              = 'Team member not found.';
+export const MEMBER_REVOKED_SUCCESSFULLY   = 'Member access revoked successfully.';
+export const PASSWORD_VALIDATION_FAILED    = 'password must contain at least one uppercase letter, one lowercase letter, one digit, and one special character'
