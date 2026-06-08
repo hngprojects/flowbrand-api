@@ -1,0 +1,97 @@
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
+import { v4 as uuidv4 } from 'uuid';
+import { RedisService } from '../../../redis/redis.service';
+import { redisKeys } from '../../../../constants/redis-keys';
+import { ObjectStorage, UPLOAD_OBJECT_STORAGE, UploadDocumentStatus } from '../../../upload/upload.types';
+import { UploadedDocumentModelAction } from '../../../upload/actions/uploaded-document.action';
+import { VoiceTranscriptionJobData } from '../interfaces/voice-onboarding.interfaces';
+
+@Injectable()
+export class VoiceOnboardingService {
+  constructor(
+    @InjectQueue('voice-transcription') private readonly transcriptionQueue: Queue<VoiceTranscriptionJobData>,
+    private readonly redisService: RedisService,
+    @Inject(UPLOAD_OBJECT_STORAGE) private readonly objectStorage: ObjectStorage,
+    private readonly documentAction: UploadedDocumentModelAction,
+  ) {}
+
+  async handleAudioUpload(userId: string, file: Express.Multer.File, existingSessionId?: string): Promise<string> {
+    const sessionId = existingSessionId || uuidv4();
+    const storagePath = `voice-onboarding/\${userId}/\${uuidv4()}\`;
+
+    // Ensure session validity if providing an existing one
+    if (existingSessionId) {
+      const exists = await this.redisService.exists(redisKeys.voiceSession(existingSessionId));
+      if (!exists) {
+        throw new NotFoundException('SESSION_EXPIRED');
+      }
+    } else {
+      // Initialize an empty list to track the session creation
+      await this.redisService.getClient().lpush(redisKeys.voiceSession(sessionId), 'SESSION_START');
+      await this.redisService.getClient().expire(redisKeys.voiceSession(sessionId), 1800);
+      await this.redisService.getClient().lpop(redisKeys.voiceSession(sessionId)); // remove placeholder
+    }
+
+    // Upload to MinIO/S3
+    await this.objectStorage.putObject({
+      storagePath,
+      body: file.buffer,
+      contentType: file.mimetype,
+      contentLength: file.size,
+    });
+
+    // Enqueue transcription job
+    await this.transcriptionQueue.add(
+      {
+        userId,
+        voiceSessionId: sessionId,
+        storagePath,
+      },
+      {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000,
+        },
+        removeOnComplete: true,
+        removeOnFail: false,
+      },
+    );
+
+    return sessionId;
+  }
+
+  async completeSession(userId: string, sessionId: string): Promise<string> {
+    const sessionKey = redisKeys.voiceSession(sessionId);
+    const exists = await this.redisService.exists(sessionKey);
+    
+    if (!exists) {
+      throw new NotFoundException('SESSION_EXPIRED');
+    }
+
+    const transcripts = await this.redisService.getClient().lrange(sessionKey, 0, -1);
+    if (transcripts.length === 0) {
+      throw new BadRequestException('TRANSCRIPTION_EMPTY');
+    }
+
+    const combinedTranscript = transcripts.join(' ');
+
+    const document = await this.documentAction.createDocument({
+      user_id: userId,
+      file_name: \`Voice Onboarding - \${new Date().toISOString()}\`,
+      file_size_bytes: String(Buffer.byteLength(combinedTranscript, 'utf-8')),
+      file_type: 'doc', // Fallback type as it's not a real file
+      status: UploadDocumentStatus.READY,
+      percent_complete: 100,
+      storage_path: 'voice-onboarding-virtual',
+      source_type: 'voice',
+      parsed_text: combinedTranscript,
+    });
+
+    await this.redisService.getClient().del(sessionKey);
+
+    return document.id;
+  }
+}

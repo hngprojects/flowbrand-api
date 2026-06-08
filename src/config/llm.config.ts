@@ -8,6 +8,4 @@ export const llmConfig = registerAs('llm', () => ({
   groqApiKey: env.GROQ_API_KEY,
   groqModel: env.GROQ_MODEL,
   groqTimeoutMs: env.GROQ_TIMEOUT_MS,
-  groqWhisperModel: env.GROQ_WHISPER_MODEL,
-  assemblyApiKey: env.ASSEMBLYAI_API_KEY,
 }));
