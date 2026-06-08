@@ -51,7 +51,6 @@ import type {
 } from './../interfaces/funnels.interfaces';
 import { RenameFunnelDto } from './../dto/rename-funnel.dto';
 import { StageTask, StageTaskStatus } from './../entities/stage-task.entity';
-import { UploadedDocument } from '../../upload/entities/uploaded-document.entity';
 import { StageFeedbackModelAction } from '../actions/stage-feedback.action';
 import { SubmitStageFeedbackDto } from '../dto/submit-stage-feedback.dto';
 import { StageFeedback } from '../entities/stage-feedback.entity';
@@ -551,32 +550,13 @@ export class FunnelsService {
         discoveryChannelStr = rawChannel.trim();
       }
 
-      let funnelName = DEFAULT_FUNNEL_NAME;
-      if (description) {
-        try {
-          funnelName = await this.llmService.generateFunnelNameWithGemini(description, discoveryChannelStr);
-        } catch (err) {
-          this.logger.warn({
-            message: 'Gemini funnel name generation failed, trying Groq',
-            error: (err as Error).message,
-          });
-          try {
-            funnelName = await this.llmService.generateFunnelNameWithGroq(description, discoveryChannelStr);
-          } catch (groqErr) {
-            this.logger.warn({
-              message: 'Groq funnel name generation failed, falling back to default',
-              error: (groqErr as Error).message,
-            });
-            funnelName = DEFAULT_FUNNEL_NAME;
-          }
-        }
-      }
+      const funnelName = await this.generateFunnelNameWithFallback(description, discoveryChannelStr);
 
       const businessType = this.coerceString(step1.business_type) || this.coerceString(user?.business_type) || 'unknown';
       const businessContext: BusinessContext = {
         businessType,
         discoveryChannel: discoveryChannelStr,
-        business_name: funnelName,
+        business_name: user?.business_name || funnelName,
         business_description: description,
         target_customer: this.coerceString(user?.target_customer) || '',
       };
@@ -598,28 +578,35 @@ export class FunnelsService {
       .filter(Boolean)
       .join('\n')
       .slice(0, 4000);
-    const funnelName = this.deriveNameFromFiles(docs) || DEFAULT_FUNNEL_NAME;
+    const funnelName = await this.generateFunnelNameWithFallback(parsedJoin, 'unknown');
+    const uploadUser = await this.funnelAction.getUserProfile(userId);
     const businessContext: BusinessContext = {
       businessType: 'unknown',
       discoveryChannel: 'unknown',
-      business_name: funnelName,
+      business_name: uploadUser?.business_name || funnelName,
       business_description: parsedJoin,
       target_customer: '',
     };
     return { funnelName, businessContext };
   }
 
-  private coerceString(value: unknown): string {
-    return typeof value === 'string' ? value.trim() : '';
+  private async generateFunnelNameWithFallback(description: string, discoveryChannel: string): Promise<string> {
+    if (!description) return DEFAULT_FUNNEL_NAME;
+    try {
+      return await this.llmService.generateFunnelNameWithGemini(description, discoveryChannel);
+    } catch (err) {
+      this.logger.warn({ message: 'Gemini funnel name generation failed, trying Groq', error: (err as Error).message });
+    }
+    try {
+      return await this.llmService.generateFunnelNameWithGroq(description, discoveryChannel);
+    } catch (groqErr) {
+      this.logger.warn({ message: 'Groq funnel name generation failed, falling back to default', error: (groqErr as Error).message });
+    }
+    return DEFAULT_FUNNEL_NAME;
   }
 
-  private deriveNameFromFiles(docs: UploadedDocument[]): string {
-    const first = docs[0]?.file_name;
-    if (!first) return '';
-    return first
-      .replace(/\.[a-zA-Z0-9]+$/, '')
-      .slice(0, 100)
-      .trim();
+  private coerceString(value: unknown): string {
+    return typeof value === 'string' ? value.trim() : '';
   }
 
   private buildStageCompletionResult(
