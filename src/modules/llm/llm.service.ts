@@ -296,6 +296,7 @@ export class LlmServiceImpl extends LlmService {
 
   buildPrompt(ctx: BusinessContext): string {
     return [
+      ctx.business_name ? `Business name: ${ctx.business_name as string}` : null,
       `Business type: ${ctx.businessType}`,
       `Primary discovery channel: ${ctx.discoveryChannel}`,
       ctx.business_description ? `Business description: ${ctx.business_description as string}` : null,

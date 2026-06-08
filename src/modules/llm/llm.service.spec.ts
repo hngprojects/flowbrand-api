@@ -263,4 +263,26 @@ describe('LlmServiceImpl', () => {
       expect(result).toBe('My Awesome Cafe');
     });
   });
+
+  describe('buildPrompt', () => {
+    it('includes business_name as first line when present', () => {
+      const prompt = service.buildPrompt({
+        ...VALID_CTX,
+        business_name: 'TechCorp',
+        business_description: 'We sell software',
+        target_customer: 'SMEs',
+      });
+      const lines = prompt.split('\n');
+      expect(lines[0]).toBe('Business name: TechCorp');
+      expect(prompt).toContain('Business type: food vendor');
+      expect(prompt).toContain('Business description: We sell software');
+      expect(prompt).toContain('Target customer: SMEs');
+    });
+
+    it('omits Business name line when business_name is absent', () => {
+      const prompt = service.buildPrompt(VALID_CTX);
+      expect(prompt).not.toContain('Business name:');
+      expect(prompt.split('\n')[0]).toBe('Business type: food vendor');
+    });
+  });
 });
