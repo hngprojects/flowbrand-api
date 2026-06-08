@@ -1,7 +1,7 @@
 import { AbstractModelAction } from '@hng-sdk/orm';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { TeamMembership } from '../entities/team-membership.entity';
 
 @Injectable()
@@ -51,5 +51,27 @@ export class TeamMembershipModelAction extends AbstractModelAction<TeamMembershi
 
   async deleteMembership(teamId: string, userId: string): Promise<void> {
     await this.repository.delete({ team_id: teamId, user_id: userId });
+  }
+
+  async findByTeamAndUserWithManager(
+    teamId: string,
+    userId: string,
+    manager: EntityManager,
+  ): Promise<TeamMembership | null> {
+    return manager.getRepository(TeamMembership).findOne({
+      where: { team_id: teamId, user_id: userId },
+    });
+  }
+
+  async createMembershipWithManager(
+    teamId: string,
+    userId: string,
+    role: string,
+    manager: EntityManager,
+  ): Promise<TeamMembership> {
+    const repo = manager.getRepository(TeamMembership);
+    return repo.save(
+      repo.create({ team_id: teamId, user_id: userId, role, joined_at: new Date() })
+    )
   }
 }
