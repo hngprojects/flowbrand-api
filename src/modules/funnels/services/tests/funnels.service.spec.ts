@@ -101,6 +101,7 @@ describe('FunnelsService', () => {
       getUserProfile: jest.fn().mockResolvedValue({
         business_type: 'restaurant',
         target_customer: 'office workers',
+        business_name: null,
       }),
     } as unknown as jest.Mocked<FunnelModelAction>;
 
@@ -298,6 +299,110 @@ describe('FunnelsService', () => {
           upload_ids: ['u1'],
         }),
       ).rejects.toThrow(UnprocessableEntityException);
+    });
+  });
+
+  describe('document_upload context derivation', () => {
+    const UPLOAD_DTO = {
+      source: FunnelCreationPath.DOCUMENT_UPLOAD,
+      idempotency_key: IDEMPOTENCY_KEY,
+      upload_ids: ['u1'],
+    };
+
+    const READY_DOC = {
+      id: 'u1',
+      user_id: USER_ID,
+      status: UploadDocumentStatus.READY,
+      file_name: 'brand-guide.pdf',
+      parsed_text: 'We sell handcrafted leather goods to premium buyers',
+    };
+
+    type SavedFunnel = {
+      funnel_name: string;
+      business_context: { business_name: string; businessType: string; target_customer: string };
+    };
+
+    beforeEach(() => {
+      funnelAction.findByIdempotency.mockResolvedValue(null);
+      funnelAction.getUploadedDocuments.mockResolvedValue([READY_DOC as any]);
+    });
+
+    it('uses parsed document text to generate funnel name via Gemini', async () => {
+      mockLlmService.generateFunnelNameWithGemini.mockResolvedValueOnce('Leather Craft Co');
+
+      await service.createGeneration(USER_ID, UPLOAD_DTO);
+
+      const saved = queryRunner.manager.save.mock.calls[0][1] as SavedFunnel;
+      expect(saved.funnel_name).toBe('Leather Craft Co');
+      expect(mockLlmService.generateFunnelNameWithGemini).toHaveBeenCalledWith(
+        READY_DOC.parsed_text,
+        'unknown',
+      );
+    });
+
+    it('falls back to Groq if Gemini fails', async () => {
+      mockLlmService.generateFunnelNameWithGemini.mockRejectedValueOnce(new Error('Gemini error'));
+      mockLlmService.generateFunnelNameWithGroq.mockResolvedValueOnce('Groq Leather Co');
+
+      await service.createGeneration(USER_ID, UPLOAD_DTO);
+
+      const saved = queryRunner.manager.save.mock.calls[0][1] as SavedFunnel;
+      expect(saved.funnel_name).toBe('Groq Leather Co');
+      expect(mockLlmService.generateFunnelNameWithGroq).toHaveBeenCalledWith(
+        READY_DOC.parsed_text,
+        'unknown',
+      );
+    });
+
+    it('falls back to default funnel name if both Gemini and Groq fail', async () => {
+      mockLlmService.generateFunnelNameWithGemini.mockRejectedValueOnce(new Error('Gemini error'));
+      mockLlmService.generateFunnelNameWithGroq.mockRejectedValueOnce(new Error('Groq error'));
+
+      await service.createGeneration(USER_ID, UPLOAD_DTO);
+
+      const saved = queryRunner.manager.save.mock.calls[0][1] as SavedFunnel;
+      expect(saved.funnel_name).toBe('My Funnel');
+    });
+
+    it('skips LLM and uses default funnel name when parsed text is empty', async () => {
+      funnelAction.getUploadedDocuments.mockResolvedValue([
+        { ...READY_DOC, parsed_text: '' } as any,
+      ]);
+
+      await service.createGeneration(USER_ID, UPLOAD_DTO);
+
+      const saved = queryRunner.manager.save.mock.calls[0][1] as SavedFunnel;
+      expect(saved.funnel_name).toBe('My Funnel');
+      expect(mockLlmService.generateFunnelNameWithGemini).not.toHaveBeenCalled();
+    });
+
+    it('uses user business_name in businessContext, not the generated funnel name', async () => {
+      funnelAction.getUserProfile.mockResolvedValueOnce({
+        business_type: 'retail',
+        target_customer: 'premium buyers',
+        business_name: 'Craft House',
+      });
+      mockLlmService.generateFunnelNameWithGemini.mockResolvedValueOnce('Leather Craft Co');
+
+      await service.createGeneration(USER_ID, UPLOAD_DTO);
+
+      const saved = queryRunner.manager.save.mock.calls[0][1] as SavedFunnel;
+      expect(saved.funnel_name).toBe('Leather Craft Co');
+      expect(saved.business_context.business_name).toBe('Craft House');
+    });
+
+    it('falls back to funnel name in businessContext when user has no business_name', async () => {
+      funnelAction.getUserProfile.mockResolvedValueOnce({
+        business_type: 'retail',
+        target_customer: 'premium buyers',
+        business_name: null,
+      });
+      mockLlmService.generateFunnelNameWithGemini.mockResolvedValueOnce('Leather Craft Co');
+
+      await service.createGeneration(USER_ID, UPLOAD_DTO);
+
+      const saved = queryRunner.manager.save.mock.calls[0][1] as SavedFunnel;
+      expect(saved.business_context.business_name).toBe('Leather Craft Co');
     });
   });
 

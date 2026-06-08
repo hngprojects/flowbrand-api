@@ -51,7 +51,6 @@ import type {
 } from './../interfaces/funnels.interfaces';
 import { RenameFunnelDto } from './../dto/rename-funnel.dto';
 import { StageTask, StageTaskStatus } from './../entities/stage-task.entity';
-import { UploadedDocument } from '../../upload/entities/uploaded-document.entity';
 import { StageFeedbackModelAction } from '../actions/stage-feedback.action';
 import { SubmitStageFeedbackDto } from '../dto/submit-stage-feedback.dto';
 import { StageFeedback } from '../entities/stage-feedback.entity';
@@ -598,7 +597,26 @@ export class FunnelsService {
       .filter(Boolean)
       .join('\n')
       .slice(0, 4000);
-    const funnelName = this.deriveNameFromFiles(docs) || DEFAULT_FUNNEL_NAME;
+    let funnelName = DEFAULT_FUNNEL_NAME;
+    if (parsedJoin) {
+      try {
+        funnelName = await this.llmService.generateFunnelNameWithGemini(parsedJoin, 'unknown');
+      } catch (err) {
+        this.logger.warn({
+          message: 'Gemini funnel name generation failed, trying Groq',
+          error: (err as Error).message,
+        });
+        try {
+          funnelName = await this.llmService.generateFunnelNameWithGroq(parsedJoin, 'unknown');
+        } catch (groqErr) {
+          this.logger.warn({
+            message: 'Groq funnel name generation failed, falling back to default',
+            error: (groqErr as Error).message,
+          });
+          funnelName = DEFAULT_FUNNEL_NAME;
+        }
+      }
+    }
     const uploadUser = await this.funnelAction.getUserProfile(userId);
     const businessContext: BusinessContext = {
       businessType: 'unknown',
@@ -612,15 +630,6 @@ export class FunnelsService {
 
   private coerceString(value: unknown): string {
     return typeof value === 'string' ? value.trim() : '';
-  }
-
-  private deriveNameFromFiles(docs: UploadedDocument[]): string {
-    const first = docs[0]?.file_name;
-    if (!first) return '';
-    return first
-      .replace(/\.[a-zA-Z0-9]+$/, '')
-      .slice(0, 100)
-      .trim();
   }
 
   private buildStageCompletionResult(
