@@ -851,7 +851,7 @@ describe('FunnelsService', () => {
   describe('wizard context derivation', () => {
     type SavedFunnel = {
       funnel_name: string;
-      business_context: { businessType: string; business_description: string; target_customer: string };
+      business_context: { businessType: string; business_description: string; target_customer: string; business_name: string };
     };
 
     it('uses step_1.business_description to generate funnel_name', async () => {
@@ -925,6 +925,39 @@ describe('FunnelsService', () => {
       const saved = queryRunner.manager.save.mock.calls[0][1] as SavedFunnel;
       expect(saved.business_context.businessType).toBe('restaurant');
       expect(saved.business_context.target_customer).toBe('office workers');
+    });
+
+    it('uses user business_name in businessContext for wizard path', async () => {
+      funnelAction.findByIdempotency.mockResolvedValue(null);
+      funnelAction.getLatestCompletedWizard.mockResolvedValue(COMPLETE_WIZARD as WizardSession);
+      funnelAction.getUserProfile.mockResolvedValueOnce({
+        business_type: 'restaurant',
+        target_customer: 'office workers',
+        business_name: 'Jollof House',
+      });
+      mockLlmService.generateFunnelNameWithGemini.mockResolvedValueOnce('Jollof Spot');
+
+      await service.createGeneration(USER_ID, BASE_DTO);
+
+      const saved = queryRunner.manager.save.mock.calls[0][1] as SavedFunnel;
+      expect(saved.funnel_name).toBe('Jollof Spot');
+      expect(saved.business_context.business_name).toBe('Jollof House');
+    });
+
+    it('falls back to funnel_name in businessContext when user has no business_name (wizard path)', async () => {
+      funnelAction.findByIdempotency.mockResolvedValue(null);
+      funnelAction.getLatestCompletedWizard.mockResolvedValue(COMPLETE_WIZARD as WizardSession);
+      funnelAction.getUserProfile.mockResolvedValueOnce({
+        business_type: 'restaurant',
+        target_customer: 'office workers',
+        business_name: null,
+      });
+      mockLlmService.generateFunnelNameWithGemini.mockResolvedValueOnce('Jollof Spot');
+
+      await service.createGeneration(USER_ID, BASE_DTO);
+
+      const saved = queryRunner.manager.save.mock.calls[0][1] as SavedFunnel;
+      expect(saved.business_context.business_name).toBe(saved.funnel_name);
     });
   });
 

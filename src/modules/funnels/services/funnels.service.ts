@@ -550,26 +550,7 @@ export class FunnelsService {
         discoveryChannelStr = rawChannel.trim();
       }
 
-      let funnelName = DEFAULT_FUNNEL_NAME;
-      if (description) {
-        try {
-          funnelName = await this.llmService.generateFunnelNameWithGemini(description, discoveryChannelStr);
-        } catch (err) {
-          this.logger.warn({
-            message: 'Gemini funnel name generation failed, trying Groq',
-            error: (err as Error).message,
-          });
-          try {
-            funnelName = await this.llmService.generateFunnelNameWithGroq(description, discoveryChannelStr);
-          } catch (groqErr) {
-            this.logger.warn({
-              message: 'Groq funnel name generation failed, falling back to default',
-              error: (groqErr as Error).message,
-            });
-            funnelName = DEFAULT_FUNNEL_NAME;
-          }
-        }
-      }
+      const funnelName = await this.generateFunnelNameWithFallback(description, discoveryChannelStr);
 
       const businessType = this.coerceString(step1.business_type) || this.coerceString(user?.business_type) || 'unknown';
       const businessContext: BusinessContext = {
@@ -597,26 +578,7 @@ export class FunnelsService {
       .filter(Boolean)
       .join('\n')
       .slice(0, 4000);
-    let funnelName = DEFAULT_FUNNEL_NAME;
-    if (parsedJoin) {
-      try {
-        funnelName = await this.llmService.generateFunnelNameWithGemini(parsedJoin, 'unknown');
-      } catch (err) {
-        this.logger.warn({
-          message: 'Gemini funnel name generation failed, trying Groq',
-          error: (err as Error).message,
-        });
-        try {
-          funnelName = await this.llmService.generateFunnelNameWithGroq(parsedJoin, 'unknown');
-        } catch (groqErr) {
-          this.logger.warn({
-            message: 'Groq funnel name generation failed, falling back to default',
-            error: (groqErr as Error).message,
-          });
-          funnelName = DEFAULT_FUNNEL_NAME;
-        }
-      }
-    }
+    const funnelName = await this.generateFunnelNameWithFallback(parsedJoin, 'unknown');
     const uploadUser = await this.funnelAction.getUserProfile(userId);
     const businessContext: BusinessContext = {
       businessType: 'unknown',
@@ -626,6 +588,21 @@ export class FunnelsService {
       target_customer: '',
     };
     return { funnelName, businessContext };
+  }
+
+  private async generateFunnelNameWithFallback(description: string, discoveryChannel: string): Promise<string> {
+    if (!description) return DEFAULT_FUNNEL_NAME;
+    try {
+      return await this.llmService.generateFunnelNameWithGemini(description, discoveryChannel);
+    } catch (err) {
+      this.logger.warn({ message: 'Gemini funnel name generation failed, trying Groq', error: (err as Error).message });
+    }
+    try {
+      return await this.llmService.generateFunnelNameWithGroq(description, discoveryChannel);
+    } catch (groqErr) {
+      this.logger.warn({ message: 'Groq funnel name generation failed, falling back to default', error: (groqErr as Error).message });
+    }
+    return DEFAULT_FUNNEL_NAME;
   }
 
   private coerceString(value: unknown): string {
