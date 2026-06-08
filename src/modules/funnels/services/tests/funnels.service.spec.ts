@@ -417,7 +417,7 @@ describe('FunnelsService', () => {
 
       const geminiArg: string = mockLlmService.generateFunnelNameWithGemini.mock.calls[0][0];
       expect(geminiArg).toContain('B');
-      expect(geminiArg.length).toBeLessThanOrEqual(4000 + 1); // content + one '\n' separator
+      expect(geminiArg.length).toBeLessThanOrEqual(4000);
     });
 
     it('UPL-02: single document — gets the full 4000-char budget', async () => {
@@ -470,7 +470,22 @@ describe('FunnelsService', () => {
       const saved = queryRunner.manager.save.mock.calls[0][1] as SavedFunnel & { business_context: { business_description: string } };
       expect(saved.business_context.business_description).toContain('A');
       expect(saved.business_context.business_description).toContain('B');
-      expect(saved.business_context.business_description.length).toBeLessThanOrEqual(4001);
+      expect(saved.business_context.business_description.length).toBeLessThanOrEqual(4000);
+    });
+
+    it('UPL-06: four documents — total including newline separators stays within 4000-char budget', async () => {
+      const longText = 'X'.repeat(5000);
+      funnelAction.getUploadedDocuments.mockResolvedValue([
+        { ...READY_DOC, id: 'u1', parsed_text: longText } as any,
+        { ...READY_DOC, id: 'u2', parsed_text: longText } as any,
+        { ...READY_DOC, id: 'u3', parsed_text: longText } as any,
+        { ...READY_DOC, id: 'u4', parsed_text: longText } as any,
+      ]);
+
+      await service.createGeneration(USER_ID, { ...UPLOAD_DTO, upload_ids: ['u1', 'u2', 'u3', 'u4'] });
+
+      const geminiArg: string = mockLlmService.generateFunnelNameWithGemini.mock.calls[0][0];
+      expect(geminiArg.length).toBeLessThanOrEqual(4000);
     });
   });
 
