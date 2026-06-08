@@ -1,4 +1,5 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Request } from 'express';
@@ -13,6 +14,7 @@ import { UsersService } from '../../users/users.service';
 import { JwtPayload } from '../strategies/jwt.strategy';
 
 const ADMIN_ROLES: UserRole[] = [UserRole.ADMIN, UserRole.SUPER_ADMIN];
+export const IS_PUBLIC_KEY = 'isPublic';
 
 @Injectable()
 export class AdminJwtGuard implements CanActivate {
@@ -20,11 +22,18 @@ export class AdminJwtGuard implements CanActivate {
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
     private readonly usersService: UsersService,
+    private readonly reflector: Reflector,
     @InjectRepository(UserRoleEntity)
     private readonly userRoleRepository: Repository<UserRoleEntity>,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+ 
+    if (isPublic) return true;
     const request = context.switchToHttp().getRequest<AdminRequest>();
     const token = this.extractTokenFromHeader(request);
 
