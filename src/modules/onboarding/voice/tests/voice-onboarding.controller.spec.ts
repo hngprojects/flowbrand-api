@@ -98,6 +98,7 @@ describe('VoiceOnboardingController', () => {
 
   describe('getVoiceSessionStatus', () => {
     it('should retrieve status and compute correctly formatted response', async () => {
+      const mockUserId = 'user-123';
       const mockSessionId = 'session-456';
       
       mockVoiceOnboardingService.getSessionStatus.mockResolvedValue({
@@ -106,12 +107,12 @@ describe('VoiceOnboardingController', () => {
         isReady: true,
       });
 
-      const result = await controller.getVoiceSessionStatus(mockSessionId);
+      const result = await controller.getVoiceSessionStatus(mockUserId, mockSessionId);
 
-      expect(mockVoiceOnboardingService.getSessionStatus).toHaveBeenCalledWith(mockSessionId);
+      expect(mockVoiceOnboardingService.getSessionStatus).toHaveBeenCalledWith(mockUserId, mockSessionId);
       expect(result).toEqual({
         statusCode: HttpStatus.OK,
-        message: 'Status retrieved successfully',
+        message: SYS_MSG.VOICE_STATUS_RETRIEVED,
         data: {
           expectedCount: 3,
           completedCount: 3,

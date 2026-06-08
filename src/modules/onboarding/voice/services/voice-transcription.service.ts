@@ -53,6 +53,7 @@ export class VoiceTranscriptionService {
         authorization: env.ASSEMBLYAI_API_KEY!,
       },
       body: audioBuffer,
+      signal: AbortSignal.timeout(10000), // 10s timeout
     });
 
     if (!uploadRes.ok) {
@@ -68,6 +69,7 @@ export class VoiceTranscriptionService {
         'content-type': 'application/json',
       },
       body: JSON.stringify({ audio_url: upload_url }),
+      signal: AbortSignal.timeout(10000), // 10s timeout
     });
 
     if (!transcriptRes.ok) {
@@ -86,7 +88,12 @@ export class VoiceTranscriptionService {
     for (let i = 0; i < maxAttempts; i++) {
       const res = await fetch(`https://api.assemblyai.com/v2/transcript/${id}`, {
         headers: { authorization: env.ASSEMBLYAI_API_KEY! },
+        signal: AbortSignal.timeout(10000), // 10s timeout
       });
+
+      if (!res.ok) {
+        throw new Error(`AssemblyAI polling failed: ${res.status}`);
+      }
 
       const data = (await res.json()) as { status: string; text?: string; error?: string };
 

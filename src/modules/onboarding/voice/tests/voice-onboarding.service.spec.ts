@@ -18,7 +18,8 @@ describe('VoiceOnboardingService', () => {
     add: jest.fn(),
   };
 
-  const mockRedisClient = {
+  const mockRedisService = {
+    exists: jest.fn(),
     lpush: jest.fn(),
     lpop: jest.fn(),
     expire: jest.fn(),
@@ -26,11 +27,6 @@ describe('VoiceOnboardingService', () => {
     lrange: jest.fn(),
     del: jest.fn(),
     hgetall: jest.fn(),
-  };
-
-  const mockRedisService = {
-    exists: jest.fn(),
-    getClient: jest.fn().mockReturnValue(mockRedisClient),
   };
 
   const mockObjectStorage = {
@@ -73,15 +69,7 @@ describe('VoiceOnboardingService', () => {
       expect(sessionId).toBe('mocked-uuid');
 
       // Verify list initialization
-      const sessionKey = redisKeys.voiceSession('mocked-uuid');
-      expect(mockRedisClient.lpush).toHaveBeenCalledWith(sessionKey, 'SESSION_START');
-      expect(mockRedisClient.expire).toHaveBeenCalledWith(sessionKey, 1800);
-      expect(mockRedisClient.lpop).toHaveBeenCalledWith(sessionKey);
-
-      // Verify tracking
-      const metaKey = redisKeys.voiceSessionMeta('mocked-uuid');
-      expect(mockRedisClient.hincrby).toHaveBeenCalledWith(metaKey, 'expectedCount', 1);
-      expect(mockRedisClient.expire).toHaveBeenCalledWith(metaKey, 1800);
+      const metaKey = redisKeys.voiceSessionMeta(mockUserId, 'mocked-uuid');
 
       // Verify object storage
       expect(mockObjectStorage.putObject).toHaveBeenCalledWith({
@@ -97,9 +85,15 @@ describe('VoiceOnboardingService', () => {
           userId: mockUserId,
           voiceSessionId: 'mocked-uuid',
           storagePath: `voice-onboarding/${mockUserId}/mocked-uuid`,
+          mimeType: mockFile.mimetype,
+          originalName: mockFile.originalname,
         },
         expect.objectContaining({ attempts: 3 }),
       );
+
+      // Verify tracking after enqueue
+      expect(mockRedisService.hincrby).toHaveBeenCalledWith(metaKey, 'expectedCount', 1);
+      expect(mockRedisService.expire).toHaveBeenCalledWith(metaKey, 1800);
     });
 
     it('should append to an EXISTING session without initializing the list', async () => {
@@ -109,11 +103,11 @@ describe('VoiceOnboardingService', () => {
       const sessionId = await service.handleAudioUpload(mockUserId, mockFile, existingSessionId);
 
       expect(sessionId).toBe(existingSessionId);
-      expect(mockRedisService.exists).toHaveBeenCalledWith(redisKeys.voiceSession(existingSessionId));
-      expect(mockRedisClient.lpush).not.toHaveBeenCalled();
+      expect(mockRedisService.exists).toHaveBeenCalledWith(redisKeys.voiceSessionMeta(mockUserId, existingSessionId));
+      expect(mockRedisService.lpush).not.toHaveBeenCalled();
 
-      const metaKey = redisKeys.voiceSessionMeta(existingSessionId);
-      expect(mockRedisClient.hincrby).toHaveBeenCalledWith(metaKey, 'expectedCount', 1);
+      const metaKey = redisKeys.voiceSessionMeta(mockUserId, existingSessionId);
+      expect(mockRedisService.hincrby).toHaveBeenCalledWith(metaKey, 'expectedCount', 1);
     });
 
     it('should throw NotFoundException if EXISTING session is expired/missing', async () => {
@@ -128,18 +122,22 @@ describe('VoiceOnboardingService', () => {
   describe('completeSession', () => {
     const mockUserId = 'user-123';
     const mockSessionId = 'session-456';
-    const sessionKey = redisKeys.voiceSession(mockSessionId);
-    const metaKey = redisKeys.voiceSessionMeta(mockSessionId);
+    const sessionKey = redisKeys.voiceSession(mockUserId, mockSessionId);
+    const metaKey = redisKeys.voiceSessionMeta(mockUserId, mockSessionId);
 
     it('should aggregate transcripts, create a document, and cleanup keys', async () => {
       mockRedisService.exists.mockResolvedValue(true);
-      mockRedisClient.lrange.mockResolvedValue(['transcript 1.', 'transcript 2.']);
+      mockRedisService.hgetall.mockResolvedValue({
+        expectedCount: '2',
+        completedCount: '2',
+      });
+      mockRedisService.lrange.mockResolvedValue(['transcript 1.', 'transcript 2.']);
       mockDocumentAction.createDocument.mockResolvedValue({ id: 'doc-789' });
 
       const result = await service.completeSession(mockUserId, mockSessionId);
 
       expect(result).toBe('doc-789');
-      expect(mockRedisClient.lrange).toHaveBeenCalledWith(sessionKey, 0, -1);
+      expect(mockRedisService.lrange).toHaveBeenCalledWith(sessionKey, 0, -1);
       expect(mockDocumentAction.createDocument).toHaveBeenCalledWith(
         expect.objectContaining({
           user_id: mockUserId,
@@ -152,13 +150,17 @@ describe('VoiceOnboardingService', () => {
       );
 
       // Cleanup
-      expect(mockRedisClient.del).toHaveBeenCalledWith(sessionKey);
-      expect(mockRedisClient.del).toHaveBeenCalledWith(metaKey);
+      expect(mockRedisService.del).toHaveBeenCalledWith(sessionKey);
+      expect(mockRedisService.del).toHaveBeenCalledWith(metaKey);
     });
 
     it('should throw BadRequestException if transcripts list is empty', async () => {
       mockRedisService.exists.mockResolvedValue(true);
-      mockRedisClient.lrange.mockResolvedValue([]);
+      mockRedisService.hgetall.mockResolvedValue({
+        expectedCount: '1',
+        completedCount: '1',
+      });
+      mockRedisService.lrange.mockResolvedValue([]);
 
       await expect(service.completeSession(mockUserId, mockSessionId)).rejects.toThrow(BadRequestException);
       expect(mockDocumentAction.createDocument).not.toHaveBeenCalled();
@@ -172,16 +174,17 @@ describe('VoiceOnboardingService', () => {
   });
 
   describe('getSessionStatus', () => {
+    const mockUserId = 'user-123';
     const mockSessionId = 'session-456';
 
     it('should compute isReady as false if not all jobs are completed', async () => {
       mockRedisService.exists.mockResolvedValue(true);
-      mockRedisClient.hgetall.mockResolvedValue({
+      mockRedisService.hgetall.mockResolvedValue({
         expectedCount: '3',
         completedCount: '2',
       });
 
-      const result = await service.getSessionStatus(mockSessionId);
+      const result = await service.getSessionStatus(mockUserId, mockSessionId);
 
       expect(result).toEqual({
         expectedCount: 3,
@@ -192,12 +195,12 @@ describe('VoiceOnboardingService', () => {
 
     it('should compute isReady as true if all jobs are completed and > 0', async () => {
       mockRedisService.exists.mockResolvedValue(true);
-      mockRedisClient.hgetall.mockResolvedValue({
+      mockRedisService.hgetall.mockResolvedValue({
         expectedCount: '3',
         completedCount: '3',
       });
 
-      const result = await service.getSessionStatus(mockSessionId);
+      const result = await service.getSessionStatus(mockUserId, mockSessionId);
 
       expect(result).toEqual({
         expectedCount: 3,
@@ -208,9 +211,9 @@ describe('VoiceOnboardingService', () => {
 
     it('should compute isReady as false if 0 jobs are expected (e.g. tracking anomaly)', async () => {
       mockRedisService.exists.mockResolvedValue(true);
-      mockRedisClient.hgetall.mockResolvedValue({}); // defaults to 0
+      mockRedisService.hgetall.mockResolvedValue({}); // defaults to 0
 
-      const result = await service.getSessionStatus(mockSessionId);
+      const result = await service.getSessionStatus(mockUserId, mockSessionId);
 
       expect(result).toEqual({
         expectedCount: 0,
@@ -222,7 +225,7 @@ describe('VoiceOnboardingService', () => {
     it('should throw NotFoundException if meta tracking key does not exist', async () => {
       mockRedisService.exists.mockResolvedValue(false);
 
-      await expect(service.getSessionStatus(mockSessionId)).rejects.toThrow(NotFoundException);
+      await expect(service.getSessionStatus(mockUserId, mockSessionId)).rejects.toThrow(NotFoundException);
     });
   });
 });

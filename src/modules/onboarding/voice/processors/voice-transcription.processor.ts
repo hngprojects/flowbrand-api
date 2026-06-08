@@ -25,19 +25,32 @@ export class VoiceTranscriptionProcessor {
     try {
       const audioBuffer = await this.objectStorage.getObject(storagePath);
       
-      const { transcript, provider } = await this.transcriptionService.transcribe(audioBuffer, 'audio.webm');
+      const { transcript, provider } = await this.transcriptionService.transcribe(audioBuffer, job.data.originalName || 'audio.webm');
       this.logger.debug(`Transcription successful via ${provider} for session: ${voiceSessionId}`);
 
+      // Check idempotency guard
+      const idempotencyKey = `voice_job_processed:${job.id}`;
+      const isFirstProcessing = await this.redisService.setNx(idempotencyKey, '1', 1800);
+
+      if (!isFirstProcessing) {
+        this.logger.debug(`Job ${job.id} already processed, skipping redis updates.`);
+        await this.objectStorage.deleteObject(storagePath);
+        return;
+      }
+
       // Append to Redis list and reset TTL
-      const sessionKey = redisKeys.voiceSession(voiceSessionId);
-      const redisClient = this.redisService.getClient();
+      const sessionKey = redisKeys.voiceSession(job.data.userId, voiceSessionId);
       
-      await redisClient.rpush(sessionKey, transcript);
-      await redisClient.expire(sessionKey, 1800); // 30 minutes TTL
+      await this.redisService.rpush(sessionKey, transcript);
+      await this.redisService.expire(sessionKey, 1800); // 30 minutes TTL
 
       // Update completed count
-      const metaKey = redisKeys.voiceSessionMeta(voiceSessionId);
-      await redisClient.hincrby(metaKey, 'completedCount', 1);
+      const metaKey = redisKeys.voiceSessionMeta(job.data.userId, voiceSessionId);
+      
+      if (await this.redisService.exists(metaKey)) {
+        await this.redisService.hincrby(metaKey, 'completedCount', 1);
+        await this.redisService.expire(metaKey, 1800);
+      }
 
       // Cleanup S3 audio
       await this.objectStorage.deleteObject(storagePath);

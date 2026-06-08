@@ -21,17 +21,14 @@ export class VoiceOnboardingService {
     const sessionId = existingSessionId || randomUUID();
     const storagePath = `voice-onboarding/${userId}/${randomUUID()}`;
 
+    const metaKey = redisKeys.voiceSessionMeta(userId, sessionId);
+
     // Ensure session validity if providing an existing one
     if (existingSessionId) {
-      const exists = await this.redisService.exists(redisKeys.voiceSession(existingSessionId));
+      const exists = await this.redisService.exists(metaKey);
       if (!exists) {
         throw new NotFoundException('SESSION_EXPIRED');
       }
-    } else {
-      // Initialize an empty list to track the session creation
-      await this.redisService.getClient().lpush(redisKeys.voiceSession(sessionId), 'SESSION_START');
-      await this.redisService.getClient().expire(redisKeys.voiceSession(sessionId), 1800);
-      await this.redisService.getClient().lpop(redisKeys.voiceSession(sessionId)); // remove placeholder
     }
 
     // Upload to MinIO/S3
@@ -42,17 +39,14 @@ export class VoiceOnboardingService {
       contentLength: file.size,
     });
 
-    // Update meta tracking
-    const metaKey = redisKeys.voiceSessionMeta(sessionId);
-    await this.redisService.getClient().hincrby(metaKey, 'expectedCount', 1);
-    await this.redisService.getClient().expire(metaKey, 1800);
-
     // Enqueue transcription job
     await this.transcriptionQueue.add(
       {
         userId,
         voiceSessionId: sessionId,
         storagePath,
+        mimeType: file.mimetype,
+        originalName: file.originalname,
       },
       {
         attempts: 3,
@@ -65,18 +59,31 @@ export class VoiceOnboardingService {
       },
     );
 
+    // Update meta tracking only after successful enqueue
+    await this.redisService.hincrby(metaKey, 'expectedCount', 1);
+    await this.redisService.expire(metaKey, 1800);
+
     return sessionId;
   }
 
   async completeSession(userId: string, sessionId: string): Promise<string> {
-    const sessionKey = redisKeys.voiceSession(sessionId);
-    const exists = await this.redisService.exists(sessionKey);
+    const sessionKey = redisKeys.voiceSession(userId, sessionId);
+    const metaKey = redisKeys.voiceSessionMeta(userId, sessionId);
+    const exists = await this.redisService.exists(metaKey);
     
     if (!exists) {
       throw new NotFoundException('SESSION_EXPIRED');
     }
 
-    const transcripts = await this.redisService.getClient().lrange(sessionKey, 0, -1);
+    const meta = await this.redisService.hgetall(metaKey);
+    const expectedCount = parseInt(meta.expectedCount || '0', 10);
+    const completedCount = parseInt(meta.completedCount || '0', 10);
+
+    if (expectedCount === 0 || expectedCount !== completedCount) {
+      throw new BadRequestException('TRANSCRIPTION_INCOMPLETE');
+    }
+
+    const transcripts = await this.redisService.lrange(sessionKey, 0, -1);
     if (transcripts.length === 0) {
       throw new BadRequestException('TRANSCRIPTION_EMPTY');
     }
@@ -95,21 +102,21 @@ export class VoiceOnboardingService {
       parsed_text: combinedTranscript,
     });
 
-    await this.redisService.getClient().del(sessionKey);
-    await this.redisService.getClient().del(redisKeys.voiceSessionMeta(sessionId));
+    await this.redisService.del(sessionKey);
+    await this.redisService.del(metaKey);
 
     return document.id;
   }
 
-  async getSessionStatus(sessionId: string): Promise<{ expectedCount: number; completedCount: number; isReady: boolean }> {
-    const metaKey = redisKeys.voiceSessionMeta(sessionId);
+  async getSessionStatus(userId: string, sessionId: string): Promise<{ expectedCount: number; completedCount: number; isReady: boolean }> {
+    const metaKey = redisKeys.voiceSessionMeta(userId, sessionId);
     const exists = await this.redisService.exists(metaKey);
 
     if (!exists) {
       throw new NotFoundException('SESSION_EXPIRED');
     }
 
-    const meta = await this.redisService.getClient().hgetall(metaKey);
+    const meta = await this.redisService.hgetall(metaKey);
     const expectedCount = parseInt(meta.expectedCount || '0', 10);
     const completedCount = parseInt(meta.completedCount || '0', 10);
 

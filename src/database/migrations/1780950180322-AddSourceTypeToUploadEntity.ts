@@ -16,7 +16,8 @@ export class AddSourceTypeToUploadEntity1780950180322 implements MigrationInterf
         await queryRunner.query(`DROP INDEX "public"."IDX_admin_logs_user_id"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_admin_logs_action_type"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_admin_logs_status"`);
-        await queryRunner.query(`ALTER TABLE "uploaded_documents" ADD "source_type" character varying NOT NULL DEFAULT 'document'`);
+        await queryRunner.query(`CREATE TYPE "public"."uploaded_documents_source_type_enum" AS ENUM('document', 'voice')`);
+        await queryRunner.query(`ALTER TABLE "uploaded_documents" ADD "source_type" "public"."uploaded_documents_source_type_enum" NOT NULL DEFAULT 'document'`);
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_b780a282603aaa80e05def2203" ON "team_invitations" ("team_id", "email") WHERE "status" = 'pending'`);
         await queryRunner.query(`CREATE INDEX "IDX_7ace7c4b3262abd89cb75ae53b" ON "admin_logs" ("user_id") `);
         await queryRunner.query(`CREATE INDEX "IDX_d2b22ec3e7c92f1e670f91a305" ON "admin_logs" ("action_type") `);
@@ -45,6 +46,7 @@ export class AddSourceTypeToUploadEntity1780950180322 implements MigrationInterf
         await queryRunner.query(`DROP INDEX "public"."IDX_7ace7c4b3262abd89cb75ae53b"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_b780a282603aaa80e05def2203"`);
         await queryRunner.query(`ALTER TABLE "uploaded_documents" DROP COLUMN "source_type"`);
+        await queryRunner.query(`DROP TYPE "public"."uploaded_documents_source_type_enum"`);
         await queryRunner.query(`CREATE INDEX "IDX_admin_logs_status" ON "admin_logs" ("status") `);
         await queryRunner.query(`CREATE INDEX "IDX_admin_logs_action_type" ON "admin_logs" ("action_type") `);
         await queryRunner.query(`CREATE INDEX "IDX_admin_logs_user_id" ON "admin_logs" ("user_id") `);

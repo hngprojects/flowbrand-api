@@ -44,7 +44,7 @@ export class VoiceOnboardingController {
         }),
     )
     file: Express.Multer.File,
-    @Body('voiceSessionId') voiceSessionId?: string,
+    @Body('voiceSessionId', new ParseUUIDPipe({ optional: true })) voiceSessionId?: string,
   ) {
     // Note: Length validation (120s limit) requires an audio parsing library 
     // to strictly enforce without ffmpeg, but a 10MB limit generally handles it for compressed audio.
@@ -77,13 +77,14 @@ export class VoiceOnboardingController {
   @GetVoiceSessionStatusDocs()
   @HttpCode(HttpStatus.OK)
   async getVoiceSessionStatus(
+    @CurrentUser('sub') userId: string,
     @Param('voiceSessionId', new ParseUUIDPipe()) voiceSessionId: string,
   ) {
-    const status = await this.voiceOnboardingService.getSessionStatus(voiceSessionId);
+    const status = await this.voiceOnboardingService.getSessionStatus(userId, voiceSessionId);
     
     return {
       statusCode: HttpStatus.OK,
-      message: 'Status retrieved successfully',
+      message: SYS_MSG.VOICE_STATUS_RETRIEVED,
       data: VoiceSessionStatusResponseDto.from(status.expectedCount, status.completedCount),
     };
   }

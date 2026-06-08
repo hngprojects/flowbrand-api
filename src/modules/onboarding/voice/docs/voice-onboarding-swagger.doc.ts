@@ -40,7 +40,7 @@ export function UploadVoiceRoundDocs() {
             format: 'binary',
             description: 'The audio file to upload and transcribe. Max size 10MB.',
           },
-          voice_session_id: {
+          voiceSessionId: {
             type: 'string',
             format: 'uuid',
             description: 'Optional. Include to append to an existing session, omit for a new session.',

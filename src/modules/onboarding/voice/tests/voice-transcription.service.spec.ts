@@ -16,6 +16,8 @@ jest.mock('groq-sdk', () => {
 
 describe('VoiceTranscriptionService', () => {
   let service: VoiceTranscriptionService;
+  let originalFetch: typeof fetch;
+  let originalApiKey: string | undefined;
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -28,11 +30,16 @@ describe('VoiceTranscriptionService', () => {
     service = module.get<VoiceTranscriptionService>(VoiceTranscriptionService);
 
     // Mock global fetch for AssemblyAI fallback
+    originalFetch = global.fetch;
     global.fetch = jest.fn();
+
+    originalApiKey = process.env.ASSEMBLYAI_API_KEY;
+    process.env.ASSEMBLYAI_API_KEY = 'test-key';
   });
 
   afterEach(() => {
-    (global.fetch as jest.Mock).mockClear();
+    global.fetch = originalFetch;
+    process.env.ASSEMBLYAI_API_KEY = originalApiKey;
   });
 
   describe('transcribe', () => {
