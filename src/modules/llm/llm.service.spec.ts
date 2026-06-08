@@ -144,7 +144,7 @@ describe('LlmServiceImpl', () => {
       );
     });
 
-    it('AC-10: max_tokens=2000 is in the request body', async () => {
+    it('AC-10: maxOutputTokens=4096 is in the request body', async () => {
       const geminiWrapped = JSON.stringify({
         candidates: [{ content: { parts: [{ text: VALID_STAGES_JSON }] } }],
       });
@@ -158,7 +158,7 @@ describe('LlmServiceImpl', () => {
 
       const [, init] = (global.fetch as jest.Mock).mock.calls[0] as [string, RequestInit];
       const body = JSON.parse(init.body as string);
-      expect(body.generationConfig.maxOutputTokens).toBe(2000);
+      expect(body.generationConfig.maxOutputTokens).toBe(4096);
     });
   });
 
@@ -201,7 +201,7 @@ describe('LlmServiceImpl', () => {
       );
     });
 
-    it('AC-10: max_tokens=2000 is in the request body', async () => {
+    it('AC-10: max_tokens=4096 is in the request body', async () => {
       const groqWrapped = JSON.stringify({
         choices: [{ message: { content: VALID_STAGES_JSON } }],
       });
@@ -215,7 +215,7 @@ describe('LlmServiceImpl', () => {
 
       const [, init] = (global.fetch as jest.Mock).mock.calls[0] as [string, RequestInit];
       const body = JSON.parse(init.body as string);
-      expect(body.max_tokens).toBe(2000);
+      expect(body.max_tokens).toBe(4096);
     });
   });
 
