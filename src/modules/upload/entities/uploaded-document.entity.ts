@@ -3,6 +3,11 @@ import { BaseEntity } from '../../../common/entities/base.entity';
 import { User } from '../../users/entities/user.entity';
 import { UploadDocumentStatus, type UploadFileType } from '../upload.types';
 
+export enum DocumentSourceType {
+  DOCUMENT = 'document',
+  VOICE = 'voice',
+}
+
 /**
  * Funnel upload metadata — matches ERD `uploaded_documents`.
  * File bytes live in object storage at `storage_path`.
@@ -42,6 +47,13 @@ export class UploadedDocument extends BaseEntity {
   /** Brief explanation if status is 'failed' (max 200 chars). */
   @Column({ type: 'varchar', length: 200, nullable: true })
   failure_reason: string | null;
+
+  @Column({
+    type: 'enum',
+    enum: DocumentSourceType,
+    default: DocumentSourceType.DOCUMENT,
+  })
+  source_type: DocumentSourceType;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })

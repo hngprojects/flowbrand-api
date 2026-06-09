@@ -54,6 +54,9 @@ const envSchema = z.object({
   GROQ_API_KEY: z.string().min(1, 'GROQ_API_KEY is required'),
   GROQ_MODEL: z.string().default('llama-3.3-70b-versatile'),
   GROQ_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
+  GROQ_WHISPER_MODEL: z.string().default('whisper-large-v3-turbo'),
+
+  ASSEMBLYAI_API_KEY: z.string().optional(),
 
   QUEUE_CONCURRENCY: z.coerce
     .number()
