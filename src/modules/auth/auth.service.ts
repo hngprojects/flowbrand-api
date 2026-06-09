@@ -195,8 +195,11 @@ export class AuthService {
     let user: User;
 
     if (existingUser) {
+      if (existingUser.auth_provider !== 'google') {
+        throw new ConflictException(SYS_MSG.GOOGLE_EMAIL_ALREADY_LOCAL_ACCOUNT);
+      }
+
       if (
-        existingUser.auth_provider === 'google' &&
         existingUser.provider_user_id &&
         existingUser.provider_user_id !== profile.providerId
       ) {
@@ -223,8 +226,11 @@ export class AuthService {
             throw error;
           }
 
+          if (concurrentUser.auth_provider !== 'google') {
+            throw new ConflictException(SYS_MSG.GOOGLE_EMAIL_ALREADY_LOCAL_ACCOUNT);
+          }
+
           if (
-            concurrentUser.auth_provider === 'google' &&
             concurrentUser.provider_user_id &&
             concurrentUser.provider_user_id !== profile.providerId
           ) {

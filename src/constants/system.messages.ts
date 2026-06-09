@@ -28,6 +28,7 @@ export const USER_UNAUTHORIZED = 'User not authorized';
 // OAuth and external auth messages
 export const GOOGLE_ACCOUNT_NO_EMAIL = 'Google account has no email';
 export const GOOGLE_ACCOUNT_LINK_CONFLICT = 'Google account is linked to a different account';
+export const GOOGLE_EMAIL_ALREADY_LOCAL_ACCOUNT = 'This email is registered with a password. Please sign in with your email and password.';
 export const GOOGLE_OAUTH_FAILED = 'Google OAuth authentication failed';
 export const GOOGLE_OAUTH_CONFIGURATION_INVALID = 'Google OAuth configuration is missing';
 export const USER_OAUTH_CREATION_FAILED = 'Failed to create user account';
