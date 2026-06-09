@@ -92,8 +92,11 @@ export class UsersService {
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
-    const existing = await this.userModelAction.findByEmail(dto.email);
+    const existing = await this.userModelAction.findByEmailWithDeleted(dto.email);
     if (existing) {
+      if (existing.deleted_at) {
+        throw new ConflictException(SYS_MSG.ACCOUNT_EXISTS_WITH_RETENTION);
+      }
       if (existing.is_active === false) {
         throw new ConflictException(SYS_MSG.USER_ACCOUNT_LOCKED);
       }
@@ -177,6 +180,11 @@ export class UsersService {
 
   findByEmail(email: string): Promise<User | null> {
     return this.userModelAction.findByEmail(email);
+  }
+
+  /** Finds a user by email, including soft-deleted rows. Used to detect retention-period accounts. */
+  findByEmailWithDeleted(email: string): Promise<User | null> {
+    return this.userModelAction.findByEmailWithDeleted(email);
   }
 
   async update(id: string, dto: UpdateUserDto): Promise<User> {
