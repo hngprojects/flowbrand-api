@@ -36,7 +36,7 @@ const envSchema = z.object({
 
   CONTACT_ADMIN_EMAIL: z.string().email().default('useseil@hng14.com'),
 
-  SEED_ADMIN_EMAIL: z.string().email().default(''),
+  SEED_ADMIN_EMAIL: z.union([z.literal(''), z.string().email()]).default(''),
   SEED_ADMIN_PASSWORD: z.string().default(''),
 
   UPLOAD_STORAGE_ENDPOINT: z.string().default(''),
@@ -54,6 +54,9 @@ const envSchema = z.object({
   GROQ_API_KEY: z.string().min(1, 'GROQ_API_KEY is required'),
   GROQ_MODEL: z.string().default('llama-3.3-70b-versatile'),
   GROQ_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
+  GROQ_WHISPER_MODEL: z.string().default('whisper-large-v3-turbo'),
+
+  ASSEMBLYAI_API_KEY: z.string().optional(),
 
   QUEUE_CONCURRENCY: z.coerce
     .number()

@@ -2,6 +2,7 @@ export const QUEUES = {
   FUNNEL_GENERATION: 'funnel-generation',
   EMAIL: 'email',
   DOCUMENT_EXTRACTION: 'document-extraction',
+  VOICE_TRANSCRIPTION: 'voice-transcription',
 } as const;
 
 export const JOBS = {
