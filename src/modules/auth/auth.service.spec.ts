@@ -633,7 +633,7 @@ describe('AuthService login lockout (BE-005)', () => {
       expect(mockUsersService.updateGoogleAccount).not.toHaveBeenCalled();
     });
 
-    it('AC-04: throws ACCOUNT_EXISTS_WITH_RETENTION when a soft-deleted account holds the email', async () => {
+    it('AC-05: throws ACCOUNT_EXISTS_WITH_RETENTION when a soft-deleted account holds the email', async () => {
       mockUsersService.findByEmail.mockResolvedValueOnce(null);
       mockUsersService.findByEmailWithDeleted.mockResolvedValueOnce({
         ...TEST_USER,
@@ -653,7 +653,7 @@ describe('AuthService login lockout (BE-005)', () => {
       expect(mockUsersService.createGoogleAccount).not.toHaveBeenCalled();
     });
 
-    it('AC-05: throws ACCOUNT_EXISTS_WITH_RETENTION in concurrent fallback when soft-deleted account causes the 23505', async () => {
+    it('AC-06: throws ACCOUNT_EXISTS_WITH_RETENTION in concurrent fallback when soft-deleted account causes the 23505', async () => {
       const uniqueConstraintError = { driverError: { code: '23505' } };
       mockUsersService.findByEmail
         .mockResolvedValueOnce(null) // initial check — no active user
