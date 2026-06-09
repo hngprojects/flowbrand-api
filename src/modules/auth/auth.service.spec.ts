@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -27,6 +28,7 @@ jest.mock('bcrypt');
 
 const mockUsersService = {
   findByEmail: jest.fn(),
+  findByEmailWithDeleted: jest.fn(),
   findById: jest.fn(),
   create: jest.fn(),
   createGoogleAccount: jest.fn(),
@@ -135,9 +137,7 @@ describe('AuthService login lockout (BE-005)', () => {
 
       await service.register({ ...REGISTER_DTO, businessName: 'Ben Clothing' });
 
-      expect(mockUsersService.create).toHaveBeenCalledWith(
-        expect.objectContaining({ businessName: 'Ben Clothing' }),
-      );
+      expect(mockUsersService.create).toHaveBeenCalledWith(expect.objectContaining({ businessName: 'Ben Clothing' }));
     });
 
     it('forwards undefined businessName when omitted', async () => {
@@ -145,9 +145,7 @@ describe('AuthService login lockout (BE-005)', () => {
 
       await service.register(REGISTER_DTO);
 
-      expect(mockUsersService.create).toHaveBeenCalledWith(
-        expect.objectContaining({ businessName: undefined }),
-      );
+      expect(mockUsersService.create).toHaveBeenCalledWith(expect.objectContaining({ businessName: undefined }));
     });
 
     it('emits USER_SIGNED_UP with the new user id on success', async () => {
@@ -155,10 +153,7 @@ describe('AuthService login lockout (BE-005)', () => {
 
       await service.register(REGISTER_DTO);
 
-      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
-        APP_EVENTS.USER_SIGNED_UP,
-        expect.any(UserSignedUpEvent),
-      );
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(APP_EVENTS.USER_SIGNED_UP, expect.any(UserSignedUpEvent));
       const emittedEvent = mockEventEmitter.emit.mock.calls[0][1] as UserSignedUpEvent;
       expect(emittedEvent.userId).toBe(TEST_USER.id);
     });
@@ -430,9 +425,7 @@ describe('AuthService login lockout (BE-005)', () => {
   describe('M-1: ensureAuthMetadata concurrent first-login guard', () => {
     it('returns the row created by a concurrent request on unique-constraint collision', async () => {
       const concurrentMeta = buildMetadata();
-      mockAuthMetadataModelAction.findByUserId
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(concurrentMeta);
+      mockAuthMetadataModelAction.findByUserId.mockResolvedValueOnce(null).mockResolvedValueOnce(concurrentMeta);
       mockAuthMetadataModelAction.createForUser.mockRejectedValueOnce({
         driverError: { code: '23505' },
       });
@@ -541,41 +534,144 @@ describe('AuthService login lockout (BE-005)', () => {
       });
     });
 
-    it('links an existing local account to the Google provider', async () => {
+    it('AC-01: throws ConflictException when the email belongs to a local account', async () => {
       mockUsersService.findByEmail.mockResolvedValue({
         ...TEST_USER,
         auth_provider: 'local',
         provider_user_id: null,
-        password_hash: TEST_USER.password_hash,
       });
-      mockUsersService.updateGoogleAccount.mockResolvedValue({
+
+      await expect(
+        service.handleOAuthLogin({
+          provider: 'google',
+          providerId: 'google-456',
+          email: TEST_USER.email,
+          fullName: TEST_USER.full_name,
+          avatarUrl: null,
+        }),
+      ).rejects.toThrow(new ConflictException(SYS_MSG.GOOGLE_EMAIL_ALREADY_LOCAL_ACCOUNT));
+    });
+
+    it('AC-02: succeeds when an existing Google account uses the same providerId', async () => {
+      const googleUser = {
         ...TEST_USER,
         auth_provider: 'google',
-        provider_user_id: 'google-456',
-        is_verified: true,
-      });
+        provider_user_id: 'google-123',
+        password_hash: null,
+      };
+      mockUsersService.findByEmail.mockResolvedValue(googleUser);
+      mockUsersService.updateGoogleAccount.mockResolvedValue(googleUser);
 
       const result = await service.handleOAuthLogin({
         provider: 'google',
-        providerId: 'google-456',
+        providerId: 'google-123',
         email: TEST_USER.email,
         fullName: TEST_USER.full_name,
         avatarUrl: null,
       });
 
-      expect(mockUsersService.updateGoogleAccount).toHaveBeenCalledWith(
-        TEST_USER.id,
-        expect.objectContaining({
-          providerUserId: 'google-456',
-          fullName: TEST_USER.full_name,
-        }),
-      );
-      expect(result).toMatchObject({
-        statusCode: HttpStatus.OK,
-        message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
-        accessToken: 'signed.jwt.token',
-        refreshToken: 'signed.jwt.token',
+      expect(result).toMatchObject({ statusCode: HttpStatus.OK, message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL });
+    });
+
+    it('AC-03: throws GOOGLE_ACCOUNT_LINK_CONFLICT when a Google account has a different providerId', async () => {
+      mockUsersService.findByEmail.mockResolvedValue({
+        ...TEST_USER,
+        auth_provider: 'google',
+        provider_user_id: 'google-OTHER',
+        password_hash: null,
       });
+
+      await expect(
+        service.handleOAuthLogin({
+          provider: 'google',
+          providerId: 'google-NEW',
+          email: TEST_USER.email,
+          fullName: TEST_USER.full_name,
+          avatarUrl: null,
+        }),
+      ).rejects.toThrow(new ConflictException(SYS_MSG.GOOGLE_ACCOUNT_LINK_CONFLICT));
+    });
+
+    it('AC-04: throws ConflictException in concurrent fallback when the race-created account is local', async () => {
+      const uniqueConstraintError = { driverError: { code: '23505' } };
+      mockUsersService.findByEmail.mockResolvedValueOnce(null);
+      mockUsersService.createGoogleAccount.mockRejectedValueOnce(uniqueConstraintError);
+      mockUsersService.findByEmail.mockResolvedValueOnce({
+        ...TEST_USER,
+        auth_provider: 'local',
+        provider_user_id: null,
+      });
+
+      await expect(
+        service.handleOAuthLogin({
+          provider: 'google',
+          providerId: 'google-456',
+          email: TEST_USER.email,
+          fullName: TEST_USER.full_name,
+          avatarUrl: null,
+        }),
+      ).rejects.toThrow(new ConflictException(SYS_MSG.GOOGLE_EMAIL_ALREADY_LOCAL_ACCOUNT));
+    });
+
+    it('SEC-01: updateGoogleAccount is never called when the existing account is local', async () => {
+      mockUsersService.findByEmail.mockResolvedValue({
+        ...TEST_USER,
+        auth_provider: 'local',
+        provider_user_id: null,
+      });
+
+      await service
+        .handleOAuthLogin({
+          provider: 'google',
+          providerId: 'google-456',
+          email: TEST_USER.email,
+          fullName: TEST_USER.full_name,
+          avatarUrl: null,
+        })
+        .catch(() => null);
+
+      expect(mockUsersService.updateGoogleAccount).not.toHaveBeenCalled();
+    });
+
+    it('AC-05: throws ACCOUNT_EXISTS_WITH_RETENTION when a soft-deleted account holds the email', async () => {
+      mockUsersService.findByEmail.mockResolvedValueOnce(null);
+      mockUsersService.findByEmailWithDeleted.mockResolvedValueOnce({
+        ...TEST_USER,
+        deleted_at: new Date('2026-01-01'),
+      });
+
+      await expect(
+        service.handleOAuthLogin({
+          provider: 'google',
+          providerId: 'google-456',
+          email: TEST_USER.email,
+          fullName: TEST_USER.full_name,
+          avatarUrl: null,
+        }),
+      ).rejects.toThrow(new ConflictException(SYS_MSG.ACCOUNT_EXISTS_WITH_RETENTION));
+
+      expect(mockUsersService.createGoogleAccount).not.toHaveBeenCalled();
+    });
+
+    it('AC-06: throws ACCOUNT_EXISTS_WITH_RETENTION in concurrent fallback when soft-deleted account causes the 23505', async () => {
+      const uniqueConstraintError = { driverError: { code: '23505' } };
+      mockUsersService.findByEmail
+        .mockResolvedValueOnce(null) // initial check — no active user
+        .mockResolvedValueOnce(null); // concurrent fallback — still no active user
+      mockUsersService.findByEmailWithDeleted
+        .mockResolvedValueOnce(null) // pre-check passes (soft-deleted check before createGoogleAccount)
+        .mockResolvedValueOnce({ ...TEST_USER, deleted_at: new Date() }); // fallback finds soft-deleted
+      mockUsersService.createGoogleAccount.mockRejectedValueOnce(uniqueConstraintError);
+
+      await expect(
+        service.handleOAuthLogin({
+          provider: 'google',
+          providerId: 'google-456',
+          email: TEST_USER.email,
+          fullName: TEST_USER.full_name,
+          avatarUrl: null,
+        }),
+      ).rejects.toThrow(new ConflictException(SYS_MSG.ACCOUNT_EXISTS_WITH_RETENTION));
     });
   });
 
@@ -624,9 +720,9 @@ describe('AuthService login lockout (BE-005)', () => {
         expect(code).toHaveLength(64); // 32 bytes in hex = 64 characters
         expect(mockRedisService.setStrict).toHaveBeenCalledWith(`oauth:exchange:${code}`, expect.any(String), 60);
 
-        const exchangeCall = (
-          mockRedisService.setStrict.mock.calls as [string, string, number][]
-        ).find(([key]) => key === `oauth:exchange:${code}`);
+        const exchangeCall = (mockRedisService.setStrict.mock.calls as [string, string, number][]).find(
+          ([key]) => key === `oauth:exchange:${code}`,
+        );
 
         const storedData = JSON.parse(exchangeCall?.[1] ?? '{}') as { accessToken: string; refreshToken: string };
         expect(storedData).toMatchObject({
@@ -895,8 +991,8 @@ describe('AuthService - Password Reset Flow (BE-012)', () => {
 
       await service.verifyResetOtp(USER_EMAIL, OTP_CODE);
 
-      const [lockKey, lockToken, ttl] = mockRedisService.setNx.mock.calls.find(
-        ([k]: [string]) => k.includes('password-reset:verify:lock:'),
+      const [lockKey, lockToken, ttl] = mockRedisService.setNx.mock.calls.find(([k]: [string]) =>
+        k.includes('password-reset:verify:lock:'),
       ) as [string, string, number];
       expect(lockKey).toContain('password-reset:verify:lock:');
       expect(typeof lockToken).toBe('string');

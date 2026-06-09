@@ -61,6 +61,7 @@ jest.mock('file-type', () => ({
 // Mock UserModelAction
 const mockUserModelAction = {
   findByEmail: jest.fn(),
+  findByEmailWithDeleted: jest.fn(),
   create: jest.fn(),
   get: jest.fn(),
   list: jest.fn(),
@@ -265,20 +266,20 @@ describe('UsersService', () => {
       termsAccepted: true,
     };
 
-    it('creates a user and returns the created user', async () => {
-      mockUserModelAction.findByEmail.mockResolvedValue(null);
-      mockUserModelAction.create.mockResolvedValue(mockUser());
+    it('AC-02: creates a user and returns the created user when email is fresh', async () => {
+      mockUserModelAction.findByEmailWithDeleted.mockResolvedValueOnce(null);
+      mockUserModelAction.create.mockResolvedValueOnce(mockUser());
 
       const result = await service.create(createDto);
 
-      expect(mockUserModelAction.findByEmail).toHaveBeenCalledWith(USER_EMAIL);
+      expect(mockUserModelAction.findByEmailWithDeleted).toHaveBeenCalledWith(USER_EMAIL);
       expect(bcrypt.hash).toHaveBeenCalledWith('Password123!', 10);
       expect(result).toEqual(mockUser());
     });
 
     it('persists business_name when businessName is provided', async () => {
-      mockUserModelAction.findByEmail.mockResolvedValue(null);
-      mockUserModelAction.create.mockResolvedValue(mockUser());
+      mockUserModelAction.findByEmailWithDeleted.mockResolvedValueOnce(null);
+      mockUserModelAction.create.mockResolvedValueOnce(mockUser());
 
       await service.create({ ...createDto, businessName: 'Ben Clothing' });
 
@@ -290,8 +291,8 @@ describe('UsersService', () => {
     });
 
     it('stores null business_name when businessName is omitted', async () => {
-      mockUserModelAction.findByEmail.mockResolvedValue(null);
-      mockUserModelAction.create.mockResolvedValue(mockUser());
+      mockUserModelAction.findByEmailWithDeleted.mockResolvedValueOnce(null);
+      mockUserModelAction.create.mockResolvedValueOnce(mockUser());
 
       await service.create(createDto);
 
@@ -302,27 +303,46 @@ describe('UsersService', () => {
       );
     });
 
-    it('throws 409 when email already exists', async () => {
-      mockUserModelAction.findByEmail.mockResolvedValue(mockUser());
+    it('AC-01: throws 409 ACCOUNT_EXISTS_WITH_RETENTION when email belongs to a soft-deleted account', async () => {
+      mockUserModelAction.findByEmailWithDeleted.mockResolvedValueOnce({
+        ...mockUser(),
+        deleted_at: new Date('2026-01-01'),
+      });
 
-      await expect(service.create(createDto)).rejects.toBeInstanceOf(ConflictException);
+      const error = await service.create(createDto).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).message).toBe(SYS_MSG.ACCOUNT_EXISTS_WITH_RETENTION);
+      expect(mockUserModelAction.create).not.toHaveBeenCalled();
+    });
+
+    it('AC-03: throws 409 USER_EMAIL_IN_USE when an active account already holds the email', async () => {
+      mockUserModelAction.findByEmailWithDeleted.mockResolvedValueOnce({ ...mockUser(), deleted_at: null });
+
+      const error = await service.create(createDto).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).message).toBe(SYS_MSG.USER_EMAIL_IN_USE);
       expect(mockUserModelAction.create).not.toHaveBeenCalled();
     });
 
     it('throws 409 with USER_ACCOUNT_LOCKED when account is inactive', async () => {
-      mockUserModelAction.findByEmail.mockResolvedValue({ ...mockUser(), is_active: false });
+      mockUserModelAction.findByEmailWithDeleted.mockResolvedValueOnce({ ...mockUser(), is_active: false, deleted_at: null });
 
       await expect(service.create(createDto)).rejects.toThrow(SYS_MSG.USER_ACCOUNT_LOCKED);
     });
 
-    it('throws 409 on duplicate key DB error', async () => {
-      mockUserModelAction.findByEmail.mockResolvedValue(null);
+    it('EC-01: throws 409 USER_EMAIL_IN_USE on concurrent INSERT race for a fresh email', async () => {
+      mockUserModelAction.findByEmailWithDeleted.mockResolvedValueOnce(null);
       const dbError = Object.assign(new QueryFailedError('', [], new Error()), {
         driverError: { code: '23505' },
       });
-      mockUserModelAction.create.mockRejectedValue(dbError);
+      mockUserModelAction.create.mockRejectedValueOnce(dbError);
 
-      await expect(service.create(createDto)).rejects.toBeInstanceOf(ConflictException);
+      const error = await service.create(createDto).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).message).toBe(SYS_MSG.USER_EMAIL_IN_USE);
     });
   });
 
@@ -1370,9 +1390,9 @@ describe('UsersService', () => {
     });
 
     describe('EC-01: re-registration during retention window', () => {
-      it('should throw USER_ACCOUNT_LOCKED when user exists with deleted_at not null', async () => {
+      it('should throw ACCOUNT_EXISTS_WITH_RETENTION when email belongs to a soft-deleted account', async () => {
         const deletedUser = { ...mockLocalUser, is_active: false, deleted_at: new Date() };
-        mockUserModelAction.findByEmail.mockResolvedValue(deletedUser);
+        mockUserModelAction.findByEmailWithDeleted.mockResolvedValueOnce(deletedUser);
 
         const createDto = {
           email: USER_EMAIL,
@@ -1381,7 +1401,7 @@ describe('UsersService', () => {
           termsAccepted: true,
         };
 
-        await expect(service.create(createDto)).rejects.toThrow(SYS_MSG.USER_ACCOUNT_LOCKED);
+        await expect(service.create(createDto)).rejects.toThrow(SYS_MSG.ACCOUNT_EXISTS_WITH_RETENTION);
         expect(mockUserModelAction.create).not.toHaveBeenCalled();
       });
     });

@@ -17,6 +17,10 @@ export class UserModelAction extends AbstractModelAction<User> {
     return this.get({ identifierOptions: { email } });
   }
 
+  async findByEmailWithDeleted(email: string): Promise<User | null> {
+    return this.repository.findOne({ where: { email }, withDeleted: true });
+  }
+
   async findById(id: string): Promise<User | null> {
     return this.get({ identifierOptions: { id } });
   }
