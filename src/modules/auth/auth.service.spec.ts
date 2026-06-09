@@ -28,6 +28,7 @@ jest.mock('bcrypt');
 
 const mockUsersService = {
   findByEmail: jest.fn(),
+  findByEmailWithDeleted: jest.fn(),
   findById: jest.fn(),
   create: jest.fn(),
   createGoogleAccount: jest.fn(),
@@ -136,9 +137,7 @@ describe('AuthService login lockout (BE-005)', () => {
 
       await service.register({ ...REGISTER_DTO, businessName: 'Ben Clothing' });
 
-      expect(mockUsersService.create).toHaveBeenCalledWith(
-        expect.objectContaining({ businessName: 'Ben Clothing' }),
-      );
+      expect(mockUsersService.create).toHaveBeenCalledWith(expect.objectContaining({ businessName: 'Ben Clothing' }));
     });
 
     it('forwards undefined businessName when omitted', async () => {
@@ -146,9 +145,7 @@ describe('AuthService login lockout (BE-005)', () => {
 
       await service.register(REGISTER_DTO);
 
-      expect(mockUsersService.create).toHaveBeenCalledWith(
-        expect.objectContaining({ businessName: undefined }),
-      );
+      expect(mockUsersService.create).toHaveBeenCalledWith(expect.objectContaining({ businessName: undefined }));
     });
 
     it('emits USER_SIGNED_UP with the new user id on success', async () => {
@@ -156,10 +153,7 @@ describe('AuthService login lockout (BE-005)', () => {
 
       await service.register(REGISTER_DTO);
 
-      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
-        APP_EVENTS.USER_SIGNED_UP,
-        expect.any(UserSignedUpEvent),
-      );
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(APP_EVENTS.USER_SIGNED_UP, expect.any(UserSignedUpEvent));
       const emittedEvent = mockEventEmitter.emit.mock.calls[0][1] as UserSignedUpEvent;
       expect(emittedEvent.userId).toBe(TEST_USER.id);
     });
@@ -431,9 +425,7 @@ describe('AuthService login lockout (BE-005)', () => {
   describe('M-1: ensureAuthMetadata concurrent first-login guard', () => {
     it('returns the row created by a concurrent request on unique-constraint collision', async () => {
       const concurrentMeta = buildMetadata();
-      mockAuthMetadataModelAction.findByUserId
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(concurrentMeta);
+      mockAuthMetadataModelAction.findByUserId.mockResolvedValueOnce(null).mockResolvedValueOnce(concurrentMeta);
       mockAuthMetadataModelAction.createForUser.mockRejectedValueOnce({
         driverError: { code: '23505' },
       });
@@ -628,15 +620,58 @@ describe('AuthService login lockout (BE-005)', () => {
         provider_user_id: null,
       });
 
-      await service.handleOAuthLogin({
-        provider: 'google',
-        providerId: 'google-456',
-        email: TEST_USER.email,
-        fullName: TEST_USER.full_name,
-        avatarUrl: null,
-      }).catch(() => null);
+      await service
+        .handleOAuthLogin({
+          provider: 'google',
+          providerId: 'google-456',
+          email: TEST_USER.email,
+          fullName: TEST_USER.full_name,
+          avatarUrl: null,
+        })
+        .catch(() => null);
 
       expect(mockUsersService.updateGoogleAccount).not.toHaveBeenCalled();
+    });
+
+    it('AC-04: throws ACCOUNT_EXISTS_WITH_RETENTION when a soft-deleted account holds the email', async () => {
+      mockUsersService.findByEmail.mockResolvedValueOnce(null);
+      mockUsersService.findByEmailWithDeleted.mockResolvedValueOnce({
+        ...TEST_USER,
+        deleted_at: new Date('2026-01-01'),
+      });
+
+      await expect(
+        service.handleOAuthLogin({
+          provider: 'google',
+          providerId: 'google-456',
+          email: TEST_USER.email,
+          fullName: TEST_USER.full_name,
+          avatarUrl: null,
+        }),
+      ).rejects.toThrow(new ConflictException(SYS_MSG.ACCOUNT_EXISTS_WITH_RETENTION));
+
+      expect(mockUsersService.createGoogleAccount).not.toHaveBeenCalled();
+    });
+
+    it('AC-05: throws ACCOUNT_EXISTS_WITH_RETENTION in concurrent fallback when soft-deleted account causes the 23505', async () => {
+      const uniqueConstraintError = { driverError: { code: '23505' } };
+      mockUsersService.findByEmail
+        .mockResolvedValueOnce(null) // initial check — no active user
+        .mockResolvedValueOnce(null); // concurrent fallback — still no active user
+      mockUsersService.findByEmailWithDeleted
+        .mockResolvedValueOnce(null) // pre-check passes (soft-deleted check before createGoogleAccount)
+        .mockResolvedValueOnce({ ...TEST_USER, deleted_at: new Date() }); // fallback finds soft-deleted
+      mockUsersService.createGoogleAccount.mockRejectedValueOnce(uniqueConstraintError);
+
+      await expect(
+        service.handleOAuthLogin({
+          provider: 'google',
+          providerId: 'google-456',
+          email: TEST_USER.email,
+          fullName: TEST_USER.full_name,
+          avatarUrl: null,
+        }),
+      ).rejects.toThrow(new ConflictException(SYS_MSG.ACCOUNT_EXISTS_WITH_RETENTION));
     });
   });
 
@@ -685,9 +720,9 @@ describe('AuthService login lockout (BE-005)', () => {
         expect(code).toHaveLength(64); // 32 bytes in hex = 64 characters
         expect(mockRedisService.setStrict).toHaveBeenCalledWith(`oauth:exchange:${code}`, expect.any(String), 60);
 
-        const exchangeCall = (
-          mockRedisService.setStrict.mock.calls as [string, string, number][]
-        ).find(([key]) => key === `oauth:exchange:${code}`);
+        const exchangeCall = (mockRedisService.setStrict.mock.calls as [string, string, number][]).find(
+          ([key]) => key === `oauth:exchange:${code}`,
+        );
 
         const storedData = JSON.parse(exchangeCall?.[1] ?? '{}') as { accessToken: string; refreshToken: string };
         expect(storedData).toMatchObject({
@@ -956,8 +991,8 @@ describe('AuthService - Password Reset Flow (BE-012)', () => {
 
       await service.verifyResetOtp(USER_EMAIL, OTP_CODE);
 
-      const [lockKey, lockToken, ttl] = mockRedisService.setNx.mock.calls.find(
-        ([k]: [string]) => k.includes('password-reset:verify:lock:'),
+      const [lockKey, lockToken, ttl] = mockRedisService.setNx.mock.calls.find(([k]: [string]) =>
+        k.includes('password-reset:verify:lock:'),
       ) as [string, string, number];
       expect(lockKey).toContain('password-reset:verify:lock:');
       expect(typeof lockToken).toBe('string');
