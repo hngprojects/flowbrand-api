@@ -68,7 +68,7 @@ export class AuthService {
     private readonly logService: LogService,
     @Optional() private readonly logger = new Logger(AuthService.name),
     private readonly eventEmitter: EventEmitter2,
-  ) { }
+  ) {}
 
   // Local minimal interface to avoid unsafe-call lint issues from third-party model action types
   private get userSessionAction(): {
@@ -199,10 +199,7 @@ export class AuthService {
         throw new ConflictException(SYS_MSG.GOOGLE_EMAIL_ALREADY_LOCAL_ACCOUNT);
       }
 
-      if (
-        existingUser.provider_user_id &&
-        existingUser.provider_user_id !== profile.providerId
-      ) {
+      if (existingUser.provider_user_id && existingUser.provider_user_id !== profile.providerId) {
         throw new ConflictException(SYS_MSG.GOOGLE_ACCOUNT_LINK_CONFLICT);
       }
 
@@ -212,6 +209,11 @@ export class AuthService {
         avatarUrl: profile.avatarUrl,
       });
     } else {
+      const deletedUser = await this.usersService.findByEmailWithDeleted(email);
+      if (deletedUser?.deleted_at) {
+        throw new ConflictException(SYS_MSG.ACCOUNT_EXISTS_WITH_RETENTION);
+      }
+
       try {
         user = await this.usersService.createGoogleAccount({
           email,
@@ -223,6 +225,10 @@ export class AuthService {
         if (this.isUniqueEmailConflict(error)) {
           const concurrentUser = await this.usersService.findByEmail(email);
           if (!concurrentUser) {
+            const deletedConcurrent = await this.usersService.findByEmailWithDeleted(email);
+            if (deletedConcurrent?.deleted_at) {
+              throw new ConflictException(SYS_MSG.ACCOUNT_EXISTS_WITH_RETENTION);
+            }
             throw error;
           }
 
@@ -230,10 +236,7 @@ export class AuthService {
             throw new ConflictException(SYS_MSG.GOOGLE_EMAIL_ALREADY_LOCAL_ACCOUNT);
           }
 
-          if (
-            concurrentUser.provider_user_id &&
-            concurrentUser.provider_user_id !== profile.providerId
-          ) {
+          if (concurrentUser.provider_user_id && concurrentUser.provider_user_id !== profile.providerId) {
             throw new ConflictException(SYS_MSG.GOOGLE_ACCOUNT_LINK_CONFLICT);
           }
 
@@ -616,7 +619,11 @@ export class AuthService {
 
     const authResponse = await this.issueTokens(user);
 
-    this.logger.log({ message: 'Password reset successful with auto-login', userId: user.id, email: maskEmail(user.email) });
+    this.logger.log({
+      message: 'Password reset successful with auto-login',
+      userId: user.id,
+      email: maskEmail(user.email),
+    });
 
     return authResponse;
   }
