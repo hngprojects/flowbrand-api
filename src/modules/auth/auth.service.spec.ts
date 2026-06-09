@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -541,41 +542,101 @@ describe('AuthService login lockout (BE-005)', () => {
       });
     });
 
-    it('links an existing local account to the Google provider', async () => {
+    it('AC-01: throws ConflictException when the email belongs to a local account', async () => {
       mockUsersService.findByEmail.mockResolvedValue({
         ...TEST_USER,
         auth_provider: 'local',
         provider_user_id: null,
-        password_hash: TEST_USER.password_hash,
       });
-      mockUsersService.updateGoogleAccount.mockResolvedValue({
+
+      await expect(
+        service.handleOAuthLogin({
+          provider: 'google',
+          providerId: 'google-456',
+          email: TEST_USER.email,
+          fullName: TEST_USER.full_name,
+          avatarUrl: null,
+        }),
+      ).rejects.toThrow(new ConflictException(SYS_MSG.GOOGLE_EMAIL_ALREADY_LOCAL_ACCOUNT));
+    });
+
+    it('AC-02: succeeds when an existing Google account uses the same providerId', async () => {
+      const googleUser = {
         ...TEST_USER,
         auth_provider: 'google',
-        provider_user_id: 'google-456',
-        is_verified: true,
-      });
+        provider_user_id: 'google-123',
+        password_hash: null,
+      };
+      mockUsersService.findByEmail.mockResolvedValue(googleUser);
+      mockUsersService.updateGoogleAccount.mockResolvedValue(googleUser);
 
       const result = await service.handleOAuthLogin({
         provider: 'google',
-        providerId: 'google-456',
+        providerId: 'google-123',
         email: TEST_USER.email,
         fullName: TEST_USER.full_name,
         avatarUrl: null,
       });
 
-      expect(mockUsersService.updateGoogleAccount).toHaveBeenCalledWith(
-        TEST_USER.id,
-        expect.objectContaining({
-          providerUserId: 'google-456',
-          fullName: TEST_USER.full_name,
-        }),
-      );
-      expect(result).toMatchObject({
-        statusCode: HttpStatus.OK,
-        message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL,
-        accessToken: 'signed.jwt.token',
-        refreshToken: 'signed.jwt.token',
+      expect(result).toMatchObject({ statusCode: HttpStatus.OK, message: SYS_MSG.OAUTH_LOGIN_SUCCESSFUL });
+    });
+
+    it('AC-03: throws GOOGLE_ACCOUNT_LINK_CONFLICT when a Google account has a different providerId', async () => {
+      mockUsersService.findByEmail.mockResolvedValue({
+        ...TEST_USER,
+        auth_provider: 'google',
+        provider_user_id: 'google-OTHER',
+        password_hash: null,
       });
+
+      await expect(
+        service.handleOAuthLogin({
+          provider: 'google',
+          providerId: 'google-NEW',
+          email: TEST_USER.email,
+          fullName: TEST_USER.full_name,
+          avatarUrl: null,
+        }),
+      ).rejects.toThrow(new ConflictException(SYS_MSG.GOOGLE_ACCOUNT_LINK_CONFLICT));
+    });
+
+    it('AC-04: throws ConflictException in concurrent fallback when the race-created account is local', async () => {
+      const uniqueConstraintError = { driverError: { code: '23505' } };
+      mockUsersService.findByEmail.mockResolvedValueOnce(null);
+      mockUsersService.createGoogleAccount.mockRejectedValueOnce(uniqueConstraintError);
+      mockUsersService.findByEmail.mockResolvedValueOnce({
+        ...TEST_USER,
+        auth_provider: 'local',
+        provider_user_id: null,
+      });
+
+      await expect(
+        service.handleOAuthLogin({
+          provider: 'google',
+          providerId: 'google-456',
+          email: TEST_USER.email,
+          fullName: TEST_USER.full_name,
+          avatarUrl: null,
+        }),
+      ).rejects.toThrow(new ConflictException(SYS_MSG.GOOGLE_EMAIL_ALREADY_LOCAL_ACCOUNT));
+    });
+
+    it('SEC-01: updateGoogleAccount is never called when the existing account is local', async () => {
+      mockUsersService.findByEmail.mockResolvedValue({
+        ...TEST_USER,
+        auth_provider: 'local',
+        provider_user_id: null,
+      });
+
+      await service.handleOAuthLogin({
+        provider: 'google',
+        providerId: 'google-456',
+        email: TEST_USER.email,
+        fullName: TEST_USER.full_name,
+        avatarUrl: null,
+      }).catch(() => null);
+
+      expect(mockUsersService.updateGoogleAccount).not.toHaveBeenCalled();
     });
   });
 
