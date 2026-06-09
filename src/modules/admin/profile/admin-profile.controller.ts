@@ -85,9 +85,8 @@ export class AdminProfileController {
           }),
       }),
     )
-    rawDto: Record<string, unknown>,
+    dto: UpdateAdminNotificationPreferencesDto,
   ) {
-    const dto = rawDto as UpdateAdminNotificationPreferencesDto;
     const data = await this.adminProfileService.updateNotificationPreferences(currentUser.userId, dto);
     return {
       statusCode: HttpStatus.OK,

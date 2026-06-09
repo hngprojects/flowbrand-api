@@ -1,6 +1,7 @@
 import { Repository } from 'typeorm';
 import { AdminNotificationPreferenceModelAction } from '../actions/admin-notification-preference.action';
 import { AdminNotificationPreference } from '../entities/admin-notification-preference.entity';
+import { EntityManager } from 'typeorm';
 
 describe('AdminNotificationPreferenceModelAction', () => {
   it('creates defaults without a transaction by default', async () => {
@@ -18,7 +19,7 @@ describe('AdminNotificationPreferenceModelAction', () => {
   });
 
   it('creates defaults within a supplied transaction manager', async () => {
-    const transaction = {} as never;
+    const transaction = {} as EntityManager;
     const action = new AdminNotificationPreferenceModelAction({} as Repository<AdminNotificationPreference>);
     const createSpy = jest.spyOn(action, 'create').mockResolvedValue({} as AdminNotificationPreference);
 
