@@ -28,7 +28,8 @@ export const USER_UNAUTHORIZED = 'User not authorized';
 // OAuth and external auth messages
 export const GOOGLE_ACCOUNT_NO_EMAIL = 'Google account has no email';
 export const GOOGLE_ACCOUNT_LINK_CONFLICT = 'Google account is linked to a different account';
-export const GOOGLE_EMAIL_ALREADY_LOCAL_ACCOUNT = 'This email is registered with a password. Please sign in with your email and password.';
+export const GOOGLE_EMAIL_ALREADY_LOCAL_ACCOUNT =
+  'This email is registered with a password. Please sign in with your email and password.';
 export const GOOGLE_OAUTH_FAILED = 'Google OAuth authentication failed';
 export const GOOGLE_OAUTH_CONFIGURATION_INVALID = 'Google OAuth configuration is missing';
 export const USER_OAUTH_CREATION_FAILED = 'Failed to create user account';
@@ -274,8 +275,7 @@ export const ADMIN_PROFILE_EMAIL_CHANGE_FORBIDDEN = 'Email cannot be changed her
 export const ADMIN_PROFILE_RESPONSE_ROLE_RESOLUTION_FAILED = 'Failed to resolve admin role for profile response';
 export const ADMIN_PASSWORD_UPDATED_SUCCESSFULLY = 'Password updated successfully';
 export const ADMIN_OLD_PASSWORD_INCORRECT = 'Old password is incorrect';
-export const ADMIN_NEW_PASSWORD_MUST_DIFFER_FROM_OLD =
-  'New password must be different from your current password';
+export const ADMIN_NEW_PASSWORD_MUST_DIFFER_FROM_OLD = 'New password must be different from your current password';
 export const ADMIN_CONFIRM_PASSWORD_MISMATCH = 'Confirm password must match new password';
 export const ADMIN_PASSWORD_POLICY_VALIDATION_FAILED =
   'new_password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, one digit, and one symbol';
@@ -357,11 +357,12 @@ export const TEAM_INVITE_ALREADY_PENDING = 'An invitation for this email is alre
 export const TEAM_ALREADY_MEMBER = 'This user is already a team member.';
 
 // Invite Accept & member Revoke
-export const INVITE_TOKEN_INVALID          = 'Invalid invitation token.';
-export const INVITE_ALREADY_USED           = 'This invitation has already been used or revoked.';
-export const INVITE_EXPIRED                = 'This invitation has expired.';
-export const INVITE_ACCEPTED_SUCCESSFULLY  = 'Invitation accepted successfully.';
-export const MEMBER_REVOKE_SELF_FORBIDDEN  = 'You cannot revoke your own access.';
-export const MEMBER_NOT_FOUND              = 'Team member not found.';
-export const MEMBER_REVOKED_SUCCESSFULLY   = 'Member access revoked successfully.';
-export const PASSWORD_VALIDATION_FAILED    = 'password must contain at least one uppercase letter, one lowercase letter, one digit, and one special character'
+export const INVITE_TOKEN_INVALID = 'Invalid invitation token.';
+export const INVITE_ALREADY_USED = 'This invitation has already been used or revoked.';
+export const INVITE_EXPIRED = 'This invitation has expired.';
+export const INVITE_ACCEPTED_SUCCESSFULLY = 'Invitation accepted successfully.';
+export const MEMBER_REVOKE_SELF_FORBIDDEN = 'You cannot revoke your own access.';
+export const MEMBER_NOT_FOUND = 'Team member not found.';
+export const MEMBER_REVOKED_SUCCESSFULLY = 'Member access revoked successfully.';
+export const PASSWORD_VALIDATION_FAILED =
+  'password must contain at least one uppercase letter, one lowercase letter, one digit, and one special character';
