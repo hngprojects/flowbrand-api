@@ -20,4 +20,8 @@ export const redisKeys = {
   adminDashboardFunnelPerformance: () => 'admin-dashboard:funnel-performance',
   adminDashboardUserStages: () => 'admin-dashboard:user-stages',
   adminDashboardUserRetention: () => 'admin-dashboard:user-retention',
+
+  voiceSession: (userId: string, sessionId: string) => `voice_session:${userId}:${sessionId}`,
+  voiceSessionMeta: (userId: string, sessionId: string) => `voice_session_meta:${userId}:${sessionId}`,
+  activeVoiceSession: (userId: string) => `active_voice_session:${userId}`,
 };

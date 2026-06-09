@@ -219,4 +219,66 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     await this.client?.quit();
     this.logger.log(SYS_MSG.REDIS_CONNECTION_CLOSED);
   }
+
+  async rpush(key: string, ...values: (string | number | Buffer)[]): Promise<number> {
+    try {
+      return await this.client.rpush(key, ...values);
+    } catch (err) {
+      this.logger.error(`RPUSH failed`, (err as Error).message);
+      throw err;
+    }
+  }
+
+  async lpush(key: string, ...values: (string | number | Buffer)[]): Promise<number> {
+    try {
+      return await this.client.lpush(key, ...values);
+    } catch (err) {
+      this.logger.error(`LPUSH failed`, (err as Error).message);
+      throw err;
+    }
+  }
+
+  async lpop(key: string): Promise<string | null> {
+    try {
+      return await this.client.lpop(key);
+    } catch (err) {
+      this.logger.error(`LPOP failed`, (err as Error).message);
+      return null;
+    }
+  }
+
+  async lrange(key: string, start: number, stop: number): Promise<string[]> {
+    try {
+      return await this.client.lrange(key, start, stop);
+    } catch (err) {
+      this.logger.error(`LRANGE failed`, (err as Error).message);
+      return [];
+    }
+  }
+
+  async hincrby(key: string, field: string, increment: number): Promise<number> {
+    try {
+      return await this.client.hincrby(key, field, increment);
+    } catch (err) {
+      this.logger.error(`HINCRBY failed`, (err as Error).message);
+      throw err;
+    }
+  }
+
+  async hgetall(key: string): Promise<Record<string, string>> {
+    try {
+      return await this.client.hgetall(key);
+    } catch (err) {
+      this.logger.error(`HGETALL failed`, (err as Error).message);
+      return {};
+    }
+  }
+
+  /**
+   * @deprecated Do not use the raw Redis client directly. 
+   * Use the wrapper methods provided by RedisService instead.
+   */
+  getClient(): Redis {
+    return this.client;
+  }
 }
