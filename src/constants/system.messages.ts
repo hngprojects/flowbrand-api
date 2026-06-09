@@ -373,6 +373,7 @@ export const VOICE_FILE_TOO_LARGE = 'Recording is too large. Please try a shorte
 export const VOICE_AUDIO_TOO_LONG = 'Please keep each recording under 2 minutes.';
 export const VOICE_SESSION_EXPIRED = 'Your session has expired. Please start again.';
 export const VOICE_TRANSCRIPTION_EMPTY = 'We couldn\'t understand that recording. Please try again in a quieter environment.';
+export const VOICE_TRANSCRIPTION_INCOMPLETE = 'Transcription incomplete';
 export const VOICE_TRANSCRIPTION_UNAVAILABLE = 'Transcription is temporarily unavailable. Please try again in a moment.';
 export const VOICE_STATUS_RETRIEVED = 'Status retrieved successfully';
 export const VOICE_ACTIVE_SESSION_RETRIEVED = 'Active session retrieved successfully';

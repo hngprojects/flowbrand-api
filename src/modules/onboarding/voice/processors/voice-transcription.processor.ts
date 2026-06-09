@@ -6,8 +6,9 @@ import { VoiceTranscriptionService } from '../services/voice-transcription.servi
 import { VoiceTranscriptionJobData } from '../interfaces/voice-onboarding.interfaces';
 import { RedisService } from '../../../redis/redis.service';
 import { redisKeys } from '../../../../constants/redis-keys';
+import { QUEUES } from '../../../../common/constants/queue.constants';
 
-@Processor('voice-transcription')
+@Processor(QUEUES.VOICE_TRANSCRIPTION)
 export class VoiceTranscriptionProcessor {
   private readonly logger = new Logger(VoiceTranscriptionProcessor.name);
 
@@ -24,17 +25,17 @@ export class VoiceTranscriptionProcessor {
 
     try {
       const audioBuffer = await this.objectStorage.getObject(storagePath);
-      
-      const { transcript, provider } = await this.transcriptionService.transcribe(audioBuffer, job.data.originalName || 'audio.webm');
-      this.logger.debug(`Transcription successful via ${provider} for session: ${voiceSessionId}`);
 
-      // Check idempotency guard
+      // Check idempotency guard before expensive transcribe call
       const idempotencyKey = `voice_job_processed:${job.id}`;
       if (await this.redisService.exists(idempotencyKey)) {
         this.logger.debug(`Job ${job.id} already processed, skipping redis updates.`);
         await this.objectStorage.deleteObject(storagePath);
         return;
       }
+      
+      const { transcript, provider } = await this.transcriptionService.transcribe(audioBuffer, job.data.originalName || 'audio.webm');
+      this.logger.debug(`Transcription successful via ${provider} for session: ${voiceSessionId}`);
 
       // Append to Redis list and reset TTL
       const sessionKey = redisKeys.voiceSession(job.data.userId, voiceSessionId);

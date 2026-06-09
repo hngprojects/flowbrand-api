@@ -7,6 +7,7 @@ import { UPLOAD_OBJECT_STORAGE, UploadDocumentStatus } from '../../../upload/upl
 import { DocumentSourceType } from '../../../upload/entities/uploaded-document.entity';
 import { UploadedDocumentModelAction } from '../../../upload/actions/uploaded-document.action';
 import { redisKeys } from '../../../../constants/redis-keys';
+import { QUEUES } from '../../../../common/constants/queue.constants';
 
 jest.mock('node:crypto', () => ({
   randomUUID: jest.fn(() => 'mocked-uuid'),
@@ -24,7 +25,6 @@ describe('VoiceOnboardingService', () => {
     get: jest.fn(),
     setStrict: jest.fn(),
     lpush: jest.fn(),
-    lpop: jest.fn(),
     expire: jest.fn(),
     hincrby: jest.fn(),
     lrange: jest.fn(),
@@ -46,7 +46,7 @@ describe('VoiceOnboardingService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VoiceOnboardingService,
-        { provide: getQueueToken('voice-transcription'), useValue: mockQueue },
+        { provide: getQueueToken(QUEUES.VOICE_TRANSCRIPTION), useValue: mockQueue },
         { provide: RedisService, useValue: mockRedisService },
         { provide: UPLOAD_OBJECT_STORAGE, useValue: mockObjectStorage },
         { provide: UploadedDocumentModelAction, useValue: mockDocumentAction },

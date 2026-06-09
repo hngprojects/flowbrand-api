@@ -8,11 +8,13 @@ import { UPLOAD_OBJECT_STORAGE, UploadDocumentStatus, type ObjectStorage } from 
 import { UploadedDocumentModelAction } from '../../../upload/actions/uploaded-document.action';
 import { DocumentSourceType } from '../../../upload/entities/uploaded-document.entity';
 import { VoiceTranscriptionJobData } from '../interfaces/voice-onboarding.interfaces';
+import * as SYS_MSG from '../../../../constants/system.messages';
+import { QUEUES } from '../../../../common/constants/queue.constants';
 
 @Injectable()
 export class VoiceOnboardingService {
   constructor(
-    @InjectQueue('voice-transcription') private readonly transcriptionQueue: Queue<VoiceTranscriptionJobData>,
+    @InjectQueue(QUEUES.VOICE_TRANSCRIPTION) private readonly transcriptionQueue: Queue<VoiceTranscriptionJobData>,
     private readonly redisService: RedisService,
     @Inject(UPLOAD_OBJECT_STORAGE) private readonly objectStorage: ObjectStorage,
     private readonly documentAction: UploadedDocumentModelAction,
@@ -28,7 +30,7 @@ export class VoiceOnboardingService {
     if (existingSessionId) {
       const exists = await this.redisService.exists(metaKey);
       if (!exists) {
-        throw new NotFoundException('SESSION_EXPIRED');
+        throw new NotFoundException(SYS_MSG.VOICE_SESSION_EXPIRED);
       }
     }
 
@@ -76,7 +78,7 @@ export class VoiceOnboardingService {
     const exists = await this.redisService.exists(metaKey);
     
     if (!exists) {
-      throw new NotFoundException('SESSION_EXPIRED');
+      throw new NotFoundException(SYS_MSG.VOICE_SESSION_EXPIRED);
     }
 
     const meta = await this.redisService.hgetall(metaKey);
@@ -84,12 +86,12 @@ export class VoiceOnboardingService {
     const completedCount = parseInt(meta.completedCount || '0', 10);
 
     if (expectedCount === 0 || expectedCount !== completedCount) {
-      throw new BadRequestException('TRANSCRIPTION_INCOMPLETE');
+      throw new BadRequestException(SYS_MSG.VOICE_TRANSCRIPTION_INCOMPLETE);
     }
 
     const transcripts = await this.redisService.lrange(sessionKey, 0, -1);
     if (transcripts.length === 0) {
-      throw new BadRequestException('TRANSCRIPTION_EMPTY');
+      throw new BadRequestException(SYS_MSG.VOICE_TRANSCRIPTION_EMPTY);
     }
 
     const combinedTranscript = transcripts.join(' ');
@@ -118,7 +120,7 @@ export class VoiceOnboardingService {
     const exists = await this.redisService.exists(metaKey);
 
     if (!exists) {
-      throw new NotFoundException('SESSION_EXPIRED');
+      throw new NotFoundException(SYS_MSG.VOICE_SESSION_EXPIRED);
     }
 
     const meta = await this.redisService.hgetall(metaKey);
