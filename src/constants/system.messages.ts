@@ -238,6 +238,11 @@ export const PROFILE_AVATAR_DELETE_FAILED = 'Failed to remove profile avatar';
 export const NOTIFICATION_PREFERENCES_RETRIEVED_SUCCESSFULLY = 'Notification preferences retrieved successfully';
 export const NOTIFICATION_PREFERENCES_UPDATED_SUCCESSFULLY = 'Notification preferences updated successfully';
 
+// Admin notification preferences
+export const ADMIN_NOTIFICATION_PREFERENCES_RETRIEVED_SUCCESSFULLY = 'Admin notification preferences retrieved successfully';
+export const ADMIN_NOTIFICATION_PREFERENCES_UPDATED_SUCCESSFULLY = 'Admin notification preferences updated successfully';
+export const ADMIN_NOTIFICATION_PREFERENCES_UPDATE_FAILED = 'Failed to update admin notification preferences';
+
 // Account Deletion
 export const ACCOUNT_DELETED_SUCCESSFULLY = 'Your account has been deleted. You will be signed out.';
 export const ACCOUNT_ALREADY_DELETED = 'Account already deleted';

@@ -7,11 +7,13 @@ import {
 import * as bcrypt from 'bcrypt';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as SYS_MSG from '../../../../constants/system.messages';
+import { AdminNotificationPreferenceModelAction } from '../actions/admin-notification-preference.action';
 import { UserRoleModelAction } from '../../../users/actions/user-role.action';
 import { UserRole } from '../../../users/enums/user-role.enum';
 import { AdminProfileModelAction } from '../actions/admin-profile.action';
 import { AdminProfileService } from '../admin-profile.service';
 import { AdminProfileActionType } from '../enums/admin-profile-action-type.enum';
+import { UpdateAdminNotificationPreferencesDto } from '../dto/update-admin-notification-preferences.dto';
 import { LogService } from '../services/log.service';
 
 jest.mock('bcrypt', () => ({
@@ -23,6 +25,12 @@ const mockAdminProfileAction = {
   findById: jest.fn(),
   updateProfile: jest.fn(),
   updatePasswordAndRevokeSessions: jest.fn(),
+};
+
+const mockAdminNotificationPreferenceAction = {
+  findByUserId: jest.fn(),
+  createDefaultForUser: jest.fn(),
+  updateByUserId: jest.fn(),
 };
 
 const mockUserRoleModelAction = {
@@ -57,6 +65,7 @@ describe('AdminProfileService', () => {
       providers: [
         AdminProfileService,
         { provide: AdminProfileModelAction, useValue: mockAdminProfileAction },
+        { provide: AdminNotificationPreferenceModelAction, useValue: mockAdminNotificationPreferenceAction },
         { provide: UserRoleModelAction, useValue: mockUserRoleModelAction },
         { provide: LogService, useValue: mockLogService },
       ],
@@ -369,6 +378,132 @@ describe('AdminProfileService', () => {
         status: 'failed',
         metadata: { failed_stage: 'update_failed' },
       });
+    });
+  });
+
+  describe('notification preferences', () => {
+    const current = {
+      id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      user_id: ADMIN_ID,
+      general_notifications: true,
+      push_email: true,
+      created_at: new Date('2026-05-29T10:30:00.000Z'),
+      updated_at: new Date('2026-05-29T10:30:00.000Z'),
+    };
+
+    beforeEach(() => {
+      mockAdminNotificationPreferenceAction.findByUserId.mockReset();
+      mockAdminNotificationPreferenceAction.createDefaultForUser.mockReset();
+      mockAdminNotificationPreferenceAction.updateByUserId.mockReset();
+    });
+
+    it('AC-01: returns current preferences for the authenticated admin', async () => {
+      mockAdminNotificationPreferenceAction.findByUserId.mockResolvedValue(current);
+
+      const result = await service.getNotificationPreferences(ADMIN_ID);
+
+      expect(result).toEqual({ generalNotifications: true, pushEmail: true });
+      expect(mockAdminNotificationPreferenceAction.createDefaultForUser).not.toHaveBeenCalled();
+    });
+
+    it('AC-03: creates default preferences when none exist', async () => {
+      mockAdminNotificationPreferenceAction.findByUserId.mockResolvedValue(null);
+      mockAdminNotificationPreferenceAction.createDefaultForUser.mockResolvedValue(current);
+
+      const result = await service.getNotificationPreferences(ADMIN_ID);
+
+      expect(mockAdminNotificationPreferenceAction.createDefaultForUser).toHaveBeenCalledWith(ADMIN_ID);
+      expect(result).toEqual({ generalNotifications: true, pushEmail: true });
+    });
+
+    it('AC-04: returns concurrently created defaults after a unique violation race', async () => {
+      mockAdminNotificationPreferenceAction.findByUserId
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(current);
+      mockAdminNotificationPreferenceAction.createDefaultForUser.mockRejectedValue({
+        driverError: { code: '23505' },
+      });
+
+      const result = await service.getNotificationPreferences(ADMIN_ID);
+
+      expect(mockAdminNotificationPreferenceAction.findByUserId).toHaveBeenCalledTimes(2);
+      expect(result).toEqual({ generalNotifications: true, pushEmail: true });
+    });
+
+    it('AC-02: updates a single preference field and returns the updated preferences', async () => {
+      mockAdminNotificationPreferenceAction.findByUserId.mockResolvedValue(current);
+      mockAdminNotificationPreferenceAction.updateByUserId.mockResolvedValue({
+        ...current,
+        push_email: false,
+      });
+
+      const result = await service.updateNotificationPreferences(ADMIN_ID, {
+        push_email: false,
+      });
+
+      expect(mockAdminNotificationPreferenceAction.updateByUserId).toHaveBeenCalledWith(ADMIN_ID, {
+        push_email: false,
+      });
+      expect(result).toEqual({ generalNotifications: true, pushEmail: false });
+    });
+
+    it('AC-03 / EC-03: allows both preferences to be false at the same time', async () => {
+      mockAdminNotificationPreferenceAction.findByUserId.mockResolvedValue(current);
+      mockAdminNotificationPreferenceAction.updateByUserId.mockResolvedValue({
+        ...current,
+        general_notifications: false,
+        push_email: false,
+      });
+
+      const result = await service.updateNotificationPreferences(ADMIN_ID, {
+        general_notifications: false,
+        push_email: false,
+      });
+
+      expect(result).toEqual({ generalNotifications: false, pushEmail: false });
+    });
+
+    it('AC-05: empty body returns unchanged preferences', async () => {
+      mockAdminNotificationPreferenceAction.findByUserId.mockResolvedValue(current);
+
+      const result = await service.updateNotificationPreferences(ADMIN_ID, {} as UpdateAdminNotificationPreferencesDto);
+
+      expect(mockAdminNotificationPreferenceAction.updateByUserId).not.toHaveBeenCalled();
+      expect(result).toEqual({ generalNotifications: true, pushEmail: true });
+    });
+
+    it('AC-05: empty body creates defaults when row does not exist', async () => {
+      mockAdminNotificationPreferenceAction.findByUserId.mockResolvedValue(null);
+      mockAdminNotificationPreferenceAction.createDefaultForUser.mockResolvedValue(current);
+
+      const result = await service.updateNotificationPreferences(ADMIN_ID, {} as UpdateAdminNotificationPreferencesDto);
+
+      expect(mockAdminNotificationPreferenceAction.createDefaultForUser).toHaveBeenCalledWith(ADMIN_ID);
+      expect(result).toEqual({ generalNotifications: true, pushEmail: true });
+    });
+
+    it('SEC-01: scopes preference reads and writes to the provided user id', async () => {
+      mockAdminNotificationPreferenceAction.findByUserId.mockResolvedValue(current);
+      mockAdminNotificationPreferenceAction.updateByUserId.mockResolvedValue({
+        ...current,
+        push_email: false,
+      });
+
+      await service.updateNotificationPreferences(ADMIN_ID, { push_email: false });
+
+      expect(mockAdminNotificationPreferenceAction.findByUserId).toHaveBeenCalledWith(ADMIN_ID);
+      expect(mockAdminNotificationPreferenceAction.updateByUserId).toHaveBeenCalledWith(ADMIN_ID, {
+        push_email: false,
+      });
+    });
+
+    it('throws a conflict when the update affects no row', async () => {
+      mockAdminNotificationPreferenceAction.findByUserId.mockResolvedValue(current);
+      mockAdminNotificationPreferenceAction.updateByUserId.mockResolvedValue(null);
+
+      await expect(
+        service.updateNotificationPreferences(ADMIN_ID, { push_email: false }),
+      ).rejects.toThrow(SYS_MSG.ADMIN_NOTIFICATION_PREFERENCES_UPDATE_FAILED);
     });
   });
 });  

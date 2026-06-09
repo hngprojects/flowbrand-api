@@ -19,6 +19,7 @@ import { UserAccountStatus } from '../../users/enums/user-account-status.enum';
 import { User } from '../../users/entities/user.entity';
 import { ACCOUNT_DELETION_QUEUE } from '../../users/processors/account-deletion.processor';
 import { RedisService } from '../../redis/redis.service';
+import { AdminNotificationPreferenceModelAction } from '../profile/actions/admin-notification-preference.action';
 import { LogService } from '../profile/services/log.service';
 import { AdminProfileActionType } from '../profile/enums/admin-profile-action-type.enum';
 import { ACTIVE_WINDOW_DAYS, AdminUsersListAction } from './actions/admin-users-list.action';
@@ -41,6 +42,7 @@ export class AdminUsersService {
     private readonly userModelAction: UserModelAction,
     private readonly userRoleModelAction: UserRoleModelAction,
     private readonly userSessionModelAction: UserSessionModelAction,
+    private readonly adminNotificationPreferenceAction: AdminNotificationPreferenceModelAction,
     private readonly dataSource: DataSource,
     private readonly adminUsersListAction: AdminUsersListAction,
     private readonly adminUserDetailAction: AdminUserDetailAction,
@@ -75,6 +77,8 @@ export class AdminUsersService {
           createPayload: { user_id: user.id, role: dto.role },
           transactionOptions: { useTransaction: true, transaction: manager },
         });
+
+        await this.adminNotificationPreferenceAction.createDefaultForUser(user.id, manager);
       });
     } catch (error: unknown) {
       if (this.isUniqueEmailConflict(error)) {
