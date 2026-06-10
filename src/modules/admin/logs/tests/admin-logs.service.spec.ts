@@ -5,6 +5,11 @@ import { AdminLogsListAction, RawAdminLogRow } from '../actions/admin-logs-list.
 import { AdminLogsService } from '../admin-logs.service';
 import { GetAdminLogsQueryDto } from '../dto/get-admin-logs-query.dto';
 import { AdminLogActionType, AdminLogStatus } from '../enums/admin-log.enum';
+import { GeoLocationService } from '../services/geo-location.service';
+
+const CHROME_MAC_UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
+  '(KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36';
 
 const makeRow = (overrides: Partial<RawAdminLogRow> = {}): RawAdminLogRow => ({
   log_id: 'log-uuid-1',
@@ -14,12 +19,17 @@ const makeRow = (overrides: Partial<RawAdminLogRow> = {}): RawAdminLogRow => ({
   log_action_type: AdminLogActionType.LOGIN,
   log_description: 'User logged in',
   log_ip_address: '102.89.33.21',
+  log_user_agent: CHROME_MAC_UA,
   log_status: AdminLogStatus.SUCCESS,
   log_created_at: new Date('2026-06-06T09:15:00.000Z'),
   ...overrides,
 });
 
 const mockAdminLogsListAction = { findLogsWithFilters: jest.fn() };
+// Echoes one label per input IP so location mapping is deterministic in tests.
+const mockGeoLocationService = {
+  resolveMany: jest.fn((ips: Array<string | null>) => Promise.resolve(ips.map((ip) => (ip ? 'Lagos, NG' : null)))),
+};
 
 describe('AdminLogsService', () => {
   let service: AdminLogsService;
@@ -27,11 +37,15 @@ describe('AdminLogsService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     mockAdminLogsListAction.findLogsWithFilters.mockResolvedValue([[makeRow()], 1]);
+    mockGeoLocationService.resolveMany.mockImplementation((ips: Array<string | null>) =>
+      Promise.resolve(ips.map((ip) => (ip ? 'Lagos, NG' : null))),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AdminLogsService,
         { provide: AdminLogsListAction, useValue: mockAdminLogsListAction },
+        { provide: GeoLocationService, useValue: mockGeoLocationService },
       ],
     }).compile();
 
@@ -56,7 +70,7 @@ describe('AdminLogsService', () => {
       );
     });
 
-    it('FR-3: maps a row to exactly the nine allowed response fields', async () => {
+    it('FR-3: maps a row to exactly the allowed response fields, with location and device', async () => {
       const result = await service.listLogs({} as GetAdminLogsQueryDto);
       const item = result.data[0];
 
@@ -68,10 +82,20 @@ describe('AdminLogsService', () => {
         action_type: AdminLogActionType.LOGIN,
         description: 'User logged in',
         ip_address: '102.89.33.21',
+        location: 'Lagos, NG',
+        device: 'Chrome 134 · macOS 10.15.7',
         created_at: new Date('2026-06-06T09:15:00.000Z'),
         status: AdminLogStatus.SUCCESS,
       });
-      expect(Object.keys(item)).toHaveLength(9);
+      expect(Object.keys(item)).toHaveLength(11);
+    });
+
+    it('maps a null user agent to a null device', async () => {
+      mockAdminLogsListAction.findLogsWithFilters.mockResolvedValue([[makeRow({ log_user_agent: null })], 1]);
+
+      const result = await service.listLogs({} as GetAdminLogsQueryDto);
+
+      expect(result.data[0].device).toBeNull();
     });
 
     it('computes has_next true when more rows exist beyond the current page', async () => {

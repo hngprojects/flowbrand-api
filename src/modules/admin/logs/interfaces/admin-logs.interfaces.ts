@@ -9,6 +9,10 @@ export interface AdminLogItem {
   action_type: AdminLogActionType;
   description: string;
   ip_address: string | null;
+  /** "Region, CC" derived from ip_address, or null when it cannot be resolved. */
+  location: string | null;
+  /** "Browser Major · OS Version" parsed from the stored user agent, or null. */
+  device: string | null;
   created_at: Date;
   status: AdminLogStatus;
 }
