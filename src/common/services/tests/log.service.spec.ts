@@ -56,9 +56,34 @@ describe('LogService', () => {
         action_type: AdminLogActionType.LOGIN,
         description: 'User logged in',
         ip_address: '127.0.0.1',
+        user_agent: null,
         status: AdminLogStatus.SUCCESS,
         metadata: {},
       });
+    });
+
+    it('captures the User-Agent header when present', async () => {
+      const req = makeRequest({
+        headers: { 'user-agent': 'Mozilla/5.0 (Macintosh) Chrome/134.0.0.0 Safari/537.36' },
+      } as Partial<Request>);
+
+      service.log('user-1', AdminLogActionType.LOGIN, 'x', req, AdminLogStatus.SUCCESS);
+      await flushImmediates();
+
+      expect(mockAdminLogRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user_agent: 'Mozilla/5.0 (Macintosh) Chrome/134.0.0.0 Safari/537.36',
+        }),
+      );
+    });
+
+    it('stores a null user_agent when the header is absent', async () => {
+      service.log('user-1', AdminLogActionType.LOGIN, 'x', makeRequest(), AdminLogStatus.SUCCESS);
+      await flushImmediates();
+
+      expect(mockAdminLogRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ user_agent: null }),
+      );
     });
 
     it('AC-04 / FR-2: returns before the database write starts', () => {
