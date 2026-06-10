@@ -37,6 +37,10 @@ export class AdminLog {
   @Column({ type: 'varchar', length: 45, nullable: true })
   ip_address: string | null;
 
+  /** Raw User-Agent header captured at write time; parsed into a device label on read. */
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  user_agent: string | null;
+
   @Index()
   @Column({ type: 'varchar', length: 10 })
   status: AdminLogStatus;

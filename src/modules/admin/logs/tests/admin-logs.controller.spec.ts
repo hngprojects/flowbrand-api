@@ -17,6 +17,8 @@ const MOCK_LIST_RESPONSE = {
       action_type: AdminLogActionType.LOGIN,
       description: 'User logged in',
       ip_address: '102.89.33.21',
+      location: 'Lagos, NG',
+      device: 'Chrome 134 · macOS 10.15.7',
       created_at: new Date('2026-06-06T09:15:00.000Z'),
       status: AdminLogStatus.SUCCESS,
     },

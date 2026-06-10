@@ -3,6 +3,8 @@ import * as SYS_MSG from '../../../constants/system.messages';
 import { AdminLogsListAction, RawAdminLogRow } from './actions/admin-logs-list.action';
 import { GetAdminLogsQueryDto } from './dto/get-admin-logs-query.dto';
 import { AdminLogItem, AdminLogsListMeta, AdminLogsListResponse } from './interfaces/admin-logs.interfaces';
+import { GeoLocationService } from './services/geo-location.service';
+import { formatDevice } from './utils/parse-user-agent.util';
 
 const MAX_PER_PAGE = 50;
 const DEFAULT_PAGE = 1;
@@ -13,7 +15,10 @@ const DATE_ONLY_LENGTH = 10;
 
 @Injectable()
 export class AdminLogsService {
-  constructor(private readonly adminLogsListAction: AdminLogsListAction) {}
+  constructor(
+    private readonly adminLogsListAction: AdminLogsListAction,
+    private readonly geoLocationService: GeoLocationService,
+  ) {}
 
   /** Returns the paginated, filtered audit-log feed, newest first. */
   async listLogs(dto: GetAdminLogsQueryDto): Promise<AdminLogsListResponse> {
@@ -49,11 +54,14 @@ export class AdminLogsService {
       ...(capped ? { capped: true } : {}),
     };
 
-    return { data: rows.map((row) => this.toLogItem(row)), meta };
+    // Resolve every row's location in one deduplicated pass before mapping.
+    const locations = await this.geoLocationService.resolveMany(rows.map((row) => row.log_ip_address));
+
+    return { data: rows.map((row, index) => this.toLogItem(row, locations[index])), meta };
   }
 
   /** Maps a raw joined row to the FR-3 response shape (EC-01: never a null reference). */
-  private toLogItem(row: RawAdminLogRow): AdminLogItem {
+  private toLogItem(row: RawAdminLogRow, location: string | null): AdminLogItem {
     return {
       id: row.log_id,
       user_id: row.log_user_id,
@@ -62,6 +70,8 @@ export class AdminLogsService {
       action_type: row.log_action_type,
       description: row.log_description,
       ip_address: row.log_ip_address,
+      location,
+      device: formatDevice(row.log_user_agent),
       created_at: row.log_created_at,
       status: row.log_status,
     };
