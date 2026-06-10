@@ -23,6 +23,7 @@ export interface RawAdminLogRow {
   log_action_type: AdminLogActionType;
   log_description: string;
   log_ip_address: string | null;
+  log_user_agent: string | null;
   log_status: AdminLogStatus;
   log_created_at: Date;
 }
@@ -45,6 +46,7 @@ export class AdminLogsListAction {
       .addSelect('log.action_type', 'log_action_type')
       .addSelect('log.description', 'log_description')
       .addSelect('log.ip_address', 'log_ip_address')
+      .addSelect('log.user_agent', 'log_user_agent')
       .addSelect('log.status', 'log_status')
       .addSelect('log.created_at', 'log_created_at');
 

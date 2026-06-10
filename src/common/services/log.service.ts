@@ -14,6 +14,8 @@ const MAX_STRING_LENGTH = 500;
 const MAX_SCRUB_DEPTH = 8;
 /** ip_address column is varchar(45) — a full IPv6 textual address. */
 const MAX_IP_LENGTH = 45;
+/** user_agent column is varchar(512); truncate anything longer before persisting. */
+const MAX_USER_AGENT_LENGTH = 512;
 
 /**
  * Shared audit-trail writer (BE-ADM-609). Persists admin_logs rows for the
@@ -44,6 +46,7 @@ export class LogService {
       // Capture request-derived data synchronously: the request object may be
       // recycled by the framework before the deferred insert runs.
       const ipAddress = this.extractIpAddress(req);
+      const userAgent = this.extractUserAgent(req);
       const scrubbedMetadata = metadata ? this.scrubObject(metadata, 0) : {};
 
       setImmediate(() => {
@@ -55,6 +58,7 @@ export class LogService {
             action_type: actionType,
             description,
             ip_address: ipAddress,
+            user_agent: userAgent,
             status,
             metadata: scrubbedMetadata,
           });
@@ -82,6 +86,18 @@ export class LogService {
     const clientIp = rawForwarded?.split(',')[0]?.trim() || req.ip || null;
 
     return clientIp ? clientIp.slice(0, MAX_IP_LENGTH) : null;
+  }
+
+  /** Captures the raw User-Agent header; the read side parses it into a device label. */
+  private extractUserAgent(req: Request | null): string | null {
+    if (!req) {
+      return null;
+    }
+
+    // The 'user-agent' header is a single-value header (string | undefined).
+    const userAgent = req.headers?.['user-agent'];
+
+    return userAgent ? userAgent.slice(0, MAX_USER_AGENT_LENGTH) : null;
   }
 
   /** FR-4: redact sensitive keys and truncate oversized strings, recursively. */
