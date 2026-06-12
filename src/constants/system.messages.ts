@@ -28,6 +28,8 @@ export const USER_UNAUTHORIZED = 'User not authorized';
 // OAuth and external auth messages
 export const GOOGLE_ACCOUNT_NO_EMAIL = 'Google account has no email';
 export const GOOGLE_ACCOUNT_LINK_CONFLICT = 'Google account is linked to a different account';
+export const GOOGLE_EMAIL_ALREADY_LOCAL_ACCOUNT =
+  'This email is registered with a password. Please sign in with your email and password.';
 export const GOOGLE_OAUTH_FAILED = 'Google OAuth authentication failed';
 export const GOOGLE_OAUTH_CONFIGURATION_INVALID = 'Google OAuth configuration is missing';
 export const USER_OAUTH_CREATION_FAILED = 'Failed to create user account';
@@ -236,6 +238,11 @@ export const PROFILE_AVATAR_DELETE_FAILED = 'Failed to remove profile avatar';
 export const NOTIFICATION_PREFERENCES_RETRIEVED_SUCCESSFULLY = 'Notification preferences retrieved successfully';
 export const NOTIFICATION_PREFERENCES_UPDATED_SUCCESSFULLY = 'Notification preferences updated successfully';
 
+// Admin notification preferences
+export const ADMIN_NOTIFICATION_PREFERENCES_RETRIEVED_SUCCESSFULLY = 'Admin notification preferences retrieved successfully';
+export const ADMIN_NOTIFICATION_PREFERENCES_UPDATED_SUCCESSFULLY = 'Admin notification preferences updated successfully';
+export const ADMIN_NOTIFICATION_PREFERENCES_UPDATE_FAILED = 'Failed to update admin notification preferences';
+
 // Account Deletion
 export const ACCOUNT_DELETED_SUCCESSFULLY = 'Your account has been deleted. You will be signed out.';
 export const ACCOUNT_ALREADY_DELETED = 'Account already deleted';
@@ -273,8 +280,7 @@ export const ADMIN_PROFILE_EMAIL_CHANGE_FORBIDDEN = 'Email cannot be changed her
 export const ADMIN_PROFILE_RESPONSE_ROLE_RESOLUTION_FAILED = 'Failed to resolve admin role for profile response';
 export const ADMIN_PASSWORD_UPDATED_SUCCESSFULLY = 'Password updated successfully';
 export const ADMIN_OLD_PASSWORD_INCORRECT = 'Old password is incorrect';
-export const ADMIN_NEW_PASSWORD_MUST_DIFFER_FROM_OLD =
-  'New password must be different from your current password';
+export const ADMIN_NEW_PASSWORD_MUST_DIFFER_FROM_OLD = 'New password must be different from your current password';
 export const ADMIN_CONFIRM_PASSWORD_MISMATCH = 'Confirm password must match new password';
 export const ADMIN_PASSWORD_POLICY_VALIDATION_FAILED =
   'new_password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, one digit, and one symbol';
@@ -363,4 +369,18 @@ export const INVITE_ACCEPTED_SUCCESSFULLY  = 'Invitation accepted successfully.'
 export const MEMBER_REVOKE_SELF_FORBIDDEN  = 'You cannot revoke your own access.';
 export const MEMBER_NOT_FOUND              = 'Team member not found.';
 export const MEMBER_REVOKED_SUCCESSFULLY   = 'Member access revoked successfully.';
-export const PASSWORD_VALIDATION_FAILED    = 'password must contain at least one uppercase letter, one lowercase letter, one digit, and one special character'
+export const PASSWORD_VALIDATION_FAILED    = 'password must contain at least one uppercase letter, one lowercase letter, one digit, and one special character';
+
+// Voice Onboarding
+export const VOICE_UPLOAD_ACCEPTED = 'Voice recording accepted for processing';
+export const VOICE_SESSION_COMPLETED = 'Voice session completed successfully';
+export const VOICE_INVALID_AUDIO_FORMAT = 'Please upload a WebM, MP3, WAV, OGG, or M4A file.';
+export const VOICE_FILE_TOO_LARGE = 'Recording is too large. Please try a shorter clip.';
+export const VOICE_AUDIO_TOO_LONG = 'Please keep each recording under 2 minutes.';
+export const VOICE_SESSION_EXPIRED = 'Your session has expired. Please start again.';
+export const VOICE_TRANSCRIPTION_EMPTY = 'We couldn\'t understand that recording. Please try again in a quieter environment.';
+export const VOICE_TRANSCRIPTION_INCOMPLETE = 'Transcription incomplete';
+export const VOICE_TRANSCRIPTION_UNAVAILABLE = 'Transcription is temporarily unavailable. Please try again in a moment.';
+export const VOICE_STATUS_RETRIEVED = 'Status retrieved successfully';
+export const VOICE_ACTIVE_SESSION_RETRIEVED = 'Active session retrieved successfully';
+export const VOICE_NO_ACTIVE_SESSION = 'No active session exists';

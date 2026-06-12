@@ -19,9 +19,9 @@ Output schema (strict):
       "explanation": "<2-3 sentences, 10-2000 chars>",
       "actionPrompt": "<1 clear action, 10-500 chars>",
       "tasks": [
-        { "name": "<short punchy title, 2-5 words>", "taskText": "<Detailed, step-by-step actionable guide (2-4 sentences) explaining exactly how to execute this task>" },
-        { "name": "<short punchy title, 2-5 words>", "taskText": "<Detailed, step-by-step actionable guide (2-4 sentences) explaining exactly how to execute this task>" },
-        { "name": "<short punchy title, 2-5 words>", "taskText": "<Detailed, step-by-step actionable guide (2-4 sentences) explaining exactly how to execute this task>" }
+        { "name": "<short punchy title, 2-5 words>", "taskText": "<comprehensive how-to guide, 4-6 full sentences, about 350-700 characters; see Rules>" },
+        { "name": "<short punchy title, 2-5 words>", "taskText": "<comprehensive how-to guide, 4-6 full sentences, about 350-700 characters; see Rules>" },
+        { "name": "<short punchy title, 2-5 words>", "taskText": "<comprehensive how-to guide, 4-6 full sentences, about 350-700 characters; see Rules>" }
       ]
     }
   ]
@@ -31,6 +31,10 @@ Rules:
 - stages array must have EXACTLY 4 items (positions 1, 2, 3, 4).
 - Each tasks array must have EXACTLY 3 items.
 - All string fields must be non-empty.
+- Each taskText must be a detailed, comprehensive guide of 4-6 full sentences (roughly 350-700 characters). Never return a single short sentence.
+- In each taskText cover: what to do, the concrete step-by-step actions, why it matters for this specific business and its customers, and what a good result looks like.
+- Keep name a short punchy 2-5 word title; put all the detail in taskText, not the name.
+- Write taskText in a clear, encouraging, coaching tone for the business owner.
 - Plain text only inside field values — no nested JSON, no HTML.
 - Return ONLY the JSON object. No text before or after. No markdown.`;
 
@@ -87,7 +91,7 @@ export class LlmServiceImpl extends LlmService {
     const body = JSON.stringify({
       system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 2000, temperature: 0.4 },
+      generationConfig: { maxOutputTokens: 4096, temperature: 0.4 },
     });
 
     let raw: string;
@@ -134,7 +138,7 @@ export class LlmServiceImpl extends LlmService {
 
     const body = JSON.stringify({
       model,
-      max_tokens: 2000,
+      max_tokens: 4096,
       temperature: 0.4,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },

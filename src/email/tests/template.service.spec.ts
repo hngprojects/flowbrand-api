@@ -12,12 +12,12 @@ const WAITLIST_HBS = `<p>Hi {{user.name}}</p><p>You are on the waitlist</p>`;
 const CONTACT_CONFIRMATION_HBS = `<p>Hi {{fullName}}</p><p>We've received your message</p>`;
 const CONTACT_ADMIN_HBS = `<p>New message from {{fullName}}</p><p>{{message}}</p>`;
 const PASSWORD_RESET_HBS = `<p>Hi {{fullName}}</p><p>Your reset code is {{otpCode}}</p>`;
-const FUNNEL_READY_HBS = `<p>Hi {{name}}</p><p>Your funnel for {{businessName}} is ready</p>`;
+const FUNNEL_READY_HBS = `<p>Hi {{name}}</p><p>Your funnel for {{businessName}} is ready</p><p>Open <a href="{{dashboardUrl}}">SEIL</a></p>`;
 const STAGE_UNLOCKED_HBS = `<p>Hi {{name}}</p><p><a href="{{dashboardUrl}}">SEIL</a> {{stageName}} is now active</p>`;
 const STAGE_COMPLETED_HBS = `<p>Hi {{name}}</p><p>You completed {{stageName}}</p><p>Open <a href="{{dashboardUrl}}">SEIL</a></p>`;
-const WEEKLY_DIGEST_HBS = `<p>Hi {{name}}</p><p>{{completedTasks}} of {{totalTasks}}</p>`;
+const WEEKLY_DIGEST_HBS = `<p>Hi {{name}}</p><p>{{completedTasks}} of {{totalTasks}}</p><p>Open <a href="{{dashboardUrl}}">SEIL</a></p>`;
 const TEAM_INVITE_HBS = `<p>Hi {{inviteeName}}</p><p>You have been invited to {{teamName}}</p><p><a href="{{inviteUrl}}">Join</a></p>`;
-const PAYMENT_SUCCESSFUL_HBS = `<p>Hi {{name}}</p><p>Amount: {{amount}}</p><p>Ref: {{reference}}</p>`;
+const PAYMENT_SUCCESSFUL_HBS = `<p>Hi {{name}}</p><p>Amount: {{amount}}</p><p>Ref: {{reference}}</p><a href="{{dashboardUrl}}">Go to dashboard</a>`;
 const PAYMENT_FAILED_HBS = `<p>Hi {{name}}</p><p>Payment failed</p><a href="{{upgradeUrl}}">Update details</a>`;
 const SUBSCRIPTION_CANCELLED_HBS = `<p>Hi {{name}}</p><p>Access until {{accessUntil}}</p><a href="{{upgradeUrl}}">Reactivate</a>`;
 const NOTIFICATION_ALERT_HBS = `<p>Hi {{name}}</p><p>You have {{unreadCount}} notifications</p><a href="{{dashboardUrl}}">View</a>`;
@@ -105,6 +105,8 @@ describe('TemplateService', () => {
 
       expect(html).toContain('Ada');
       expect(html).toContain('Acme');
+      expect(html).toContain('/dashboard');
+      expect(html).toContain('>SEIL<');
       expect(subject).toBe('Your funnel is ready');
     });
 
@@ -136,7 +138,26 @@ describe('TemplateService', () => {
 
       expect(html).toContain('3');
       expect(html).toContain('6');
+      expect(html).toContain('/dashboard');
+      expect(html).toContain('>SEIL<');
       expect(subject).toBe('Your weekly SEIL progress');
+    });
+
+    it('renders payment-successful with a dashboard CTA button', () => {
+      const { html, subject } = service.render('payment-successful', {
+        name: 'Ada',
+        amount: '₦10,000.00',
+        cardLast4: null,
+        cardBrand: null,
+        reference: 'ref-123',
+        paidAt: null,
+      });
+
+      expect(html).toContain('₦10,000.00');
+      expect(html).toContain('ref-123');
+      expect(html).toContain('/dashboard');
+      expect(html).toContain('Go to dashboard');
+      expect(subject).toBe('Payment Successful — Your FlowBrand subscription is now active');
     });
 
     it('wraps inner content in base layout (contains DOCTYPE)', () => {

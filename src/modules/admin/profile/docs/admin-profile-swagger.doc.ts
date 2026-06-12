@@ -10,6 +10,7 @@ import {
 } from '@nestjs/swagger';
 import * as SYS_MSG from '../../../../constants/system.messages';
 import { ChangeAdminPasswordDto } from '../dto/change-admin-password.dto';
+import { UpdateAdminNotificationPreferencesDto } from '../dto/update-admin-notification-preferences.dto';
 import { UpdateAdminProfileDto } from '../dto/update-admin-profile.dto';
 
 const profileExample = {
@@ -240,6 +241,126 @@ export function ChangeAdminPasswordDocs() {
               message: SYS_MSG.ADMIN_NEW_PASSWORD_MUST_DIFFER_FROM_OLD,
             },
           },
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.FORBIDDEN,
+      description: 'Authenticated but role is not admin/super_admin',
+      schema: {
+        example: {
+          success: false,
+          statusCode: HttpStatus.FORBIDDEN,
+          error: 'ForbiddenException',
+          message: SYS_MSG.ADMIN_ACCESS_DENIED,
+        },
+      },
+    }),
+  );
+}
+
+export function GetAdminNotificationPreferencesDocs() {
+  return applyDecorators(
+    ApiBearerAuth('JWT'),
+    ApiOperation({
+      summary: 'Get authenticated admin notification preferences',
+      description:
+        'Returns the current authenticated admin notification preferences for the Profile > Notification Preferences tab. ' +
+        'If no preferences row exists yet, the service creates one on the fly with both settings enabled and returns it. ' +
+        'The endpoint is always scoped to the authenticated admin and never exposes another user row.',
+    }),
+    ApiOkResponse({
+      description: 'Admin notification preferences retrieved successfully',
+      schema: {
+        example: {
+          success: true,
+          statusCode: HttpStatus.OK,
+          message: SYS_MSG.ADMIN_NOTIFICATION_PREFERENCES_RETRIEVED_SUCCESSFULLY,
+          data: {
+            generalNotifications: true,
+            pushEmail: true,
+          },
+        },
+      },
+    }),
+    ApiUnauthorizedResponse({
+      description: 'Missing or invalid JWT',
+      schema: {
+        example: {
+          success: false,
+          statusCode: HttpStatus.UNAUTHORIZED,
+          error: 'UnauthorizedException',
+          message: SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE,
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.FORBIDDEN,
+      description: 'Authenticated but role is not admin/super_admin',
+      schema: {
+        example: {
+          success: false,
+          statusCode: HttpStatus.FORBIDDEN,
+          error: 'ForbiddenException',
+          message: SYS_MSG.ADMIN_ACCESS_DENIED,
+        },
+      },
+    }),
+  );
+}
+
+export function UpdateAdminNotificationPreferencesDocs() {
+  return applyDecorators(
+    ApiBearerAuth('JWT'),
+    ApiOperation({
+      summary: 'Update authenticated admin notification preferences',
+      description:
+        'Accepts partial updates for general_notifications and push_email. ' +
+        'Unknown fields are rejected with HTTP 422. ' +        
+        'An empty request body is valid and returns HTTP 200 with the current preferences unchanged. ' +
+        'If the row does not exist, it is created with defaults before the update is applied.',
+    }),
+    ApiBody({ type: UpdateAdminNotificationPreferencesDto }),
+    ApiOkResponse({
+      description: 'Admin notification preferences updated successfully',
+      schema: {
+        example: {
+          success: true,
+          statusCode: HttpStatus.OK,
+          message: SYS_MSG.ADMIN_NOTIFICATION_PREFERENCES_UPDATED_SUCCESSFULLY,
+          data: {
+            generalNotifications: true,
+            pushEmail: false,
+          },
+        },
+      },
+    }),
+    ApiResponse({
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'Validation failed',
+      schema: {
+        example: {
+          success: false,
+          statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          error: 'UnprocessableEntityException',
+          message: SYS_MSG.VALIDATION_FAILED,
+          details: [
+            {
+              property: 'general_notifications',
+              constraints: { isBoolean: 'general_notifications must be a boolean value' },
+            },
+          ],
+        },
+      },
+    }),
+    ApiUnauthorizedResponse({
+      description: 'Missing or invalid JWT',
+      schema: {
+        example: {
+          success: false,
+          statusCode: HttpStatus.UNAUTHORIZED,
+          error: 'UnauthorizedException',
+          message: SYS_MSG.AUTH_UNAUTHENTICATED_MESSAGE,
         },
       },
     }),

@@ -1,8 +1,16 @@
 <tr>
   <td align="left" style="padding: 40px 40px 0">
-    <h1 style="margin: 0 0 28px; font-size: 32px; line-height: 1.2; font-weight: 700; color: #020e1f">We can&apos;t process your payment</h1>
+    <h1
+      style="margin: 0 0 28px; font-size: 32px; line-height: 1.2; font-weight: 700; color: #020e1f"
+    >
+      We can&apos;t process your payment
+    </h1>
     <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.55; color: #020e1f">Hi {{name}},</p>
-    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.55; color: #020e1f">We&apos;re having some trouble collecting your Seil premium payment. Please take a moment to review your payment details and double check that there was money in your associated account. We&apos;ll try to process the payment again in a few days.</p>
+    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.55; color: #020e1f">
+      We&apos;re having some trouble collecting your Seil premium payment. Please take a moment to
+      review your payment details and double check that there was money in your associated account.
+      We&apos;ll try to process the payment again in a few days.
+    </p>
     {{#if failureReason}}
     <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #64748b">Reason: {{failureReason}}</p>
     {{/if}}
@@ -13,7 +21,12 @@
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
       <tr>
         <td align="center" style="border-radius: 8px; background-color: #326ad1">
-          <a href="{{upgradeUrl}}" target="_blank" style="display: block; width: 100%; padding: 14px 24px; font-size: 16px; font-weight: 600; line-height: 1.25; color: #ffffff; text-align: center; text-decoration: none; border-radius: 8px; box-sizing: border-box">Update payment details</a>
+          <a href="{{upgradeUrl}}" target="_blank"
+             style="display: block; width: 100%; padding: 14px 24px; font-size: 16px;
+                    font-weight: 600; line-height: 1.25; color: #ffffff; text-align: center;
+                    text-decoration: none; border-radius: 8px; box-sizing: border-box">
+            Update payment details
+          </a>
         </td>
       </tr>
     </table>

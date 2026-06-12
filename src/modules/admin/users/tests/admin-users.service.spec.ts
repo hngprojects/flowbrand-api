@@ -7,6 +7,7 @@ import { UserModelAction } from '../../../users/actions/user.action';
 import { UserRoleModelAction } from '../../../users/actions/user-role.action';
 import { UsersService } from '../../../users/users.service';
 import { UserRole } from '../../../users/enums/user-role.enum';
+import { AdminNotificationPreferenceModelAction } from '../../profile/actions/admin-notification-preference.action';
 import { UserAccountStatus } from '../../../users/enums/user-account-status.enum';
 import * as SYS_MSG from '../../../../constants/system.messages';
 import { UserSessionModelAction } from '../../../users/actions/user-session.action';
@@ -22,6 +23,7 @@ jest.mock('bcrypt');
 const mockUsersService = { findByEmail: jest.fn() };
 const mockUserModelAction = { create: jest.fn(), findById: jest.fn(), update: jest.fn() };
 const mockUserRoleModelAction = { create: jest.fn() };
+const mockAdminNotificationPreferenceAction = { createDefaultForUser: jest.fn() };
 const mockUserSessionModelAction = { revokeAllUserSessionsInDb: jest.fn() };
 const mockAdminUserDetailAction = { findUserWithDetails: jest.fn() };
 const mockLogService = { logAction: jest.fn() };
@@ -65,6 +67,7 @@ describe('AdminUsersService', () => {
         { provide: UsersService, useValue: mockUsersService },
         { provide: UserModelAction, useValue: mockUserModelAction },
         { provide: UserRoleModelAction, useValue: mockUserRoleModelAction },
+        { provide: AdminNotificationPreferenceModelAction, useValue: mockAdminNotificationPreferenceAction },
         { provide: UserSessionModelAction, useValue: mockUserSessionModelAction },
         { provide: AdminUserDetailAction, useValue: mockAdminUserDetailAction },
         { provide: AdminUsersListAction, useValue: {} },
@@ -83,6 +86,7 @@ describe('AdminUsersService', () => {
       mockUsersService.findByEmail.mockResolvedValue(null);
       mockUserModelAction.create.mockResolvedValue(CREATED_USER);
       mockUserRoleModelAction.create.mockResolvedValue(undefined);
+      mockAdminNotificationPreferenceAction.createDefaultForUser.mockResolvedValue(undefined);
 
       const result = await service.createAdmin(CREATE_ADMIN_DTO);
 
@@ -101,12 +105,17 @@ describe('AdminUsersService', () => {
           createPayload: { user_id: CREATED_USER.id, role: UserRole.ADMIN },
         }),
       );
+      expect(mockAdminNotificationPreferenceAction.createDefaultForUser).toHaveBeenCalledWith(
+        CREATED_USER.id,
+        expect.any(Object),
+      );
     });
 
     it('hashes the password with bcrypt 12 rounds before storing', async () => {
       mockUsersService.findByEmail.mockResolvedValue(null);
       mockUserModelAction.create.mockResolvedValue(CREATED_USER);
       mockUserRoleModelAction.create.mockResolvedValue(undefined);
+      mockAdminNotificationPreferenceAction.createDefaultForUser.mockResolvedValue(undefined);
 
       await service.createAdmin(CREATE_ADMIN_DTO);
 
@@ -119,6 +128,7 @@ describe('AdminUsersService', () => {
       mockUsersService.findByEmail.mockResolvedValue(null);
       mockUserModelAction.create.mockResolvedValue(CREATED_USER);
       mockUserRoleModelAction.create.mockResolvedValue(undefined);
+      mockAdminNotificationPreferenceAction.createDefaultForUser.mockResolvedValue(undefined);
 
       await service.createAdmin({ ...CREATE_ADMIN_DTO, role: UserRole.SUPER_ADMIN });
 
@@ -162,6 +172,7 @@ describe('AdminUsersService', () => {
 
       await expect(service.createAdmin(CREATE_ADMIN_DTO)).rejects.toThrow();
       expect(mockUserRoleModelAction.create).not.toHaveBeenCalled();
+      expect(mockAdminNotificationPreferenceAction.createDefaultForUser).not.toHaveBeenCalled();
     });
   });
 

@@ -2,6 +2,7 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  ConflictException,
   NotFoundException,
   UnauthorizedException,
   UnprocessableEntityException,
@@ -12,9 +13,16 @@ import { UserRoleModelAction } from '../../users/actions/user-role.action';
 import { UserRole } from '../../users/enums/user-role.enum';
 import { User } from '../../users/entities/user.entity';
 import { AdminProfileModelAction } from './actions/admin-profile.action';
+import { AdminNotificationPreferenceModelAction } from './actions/admin-notification-preference.action';
 import { ChangeAdminPasswordDto } from './dto/change-admin-password.dto';
+import { UpdateAdminNotificationPreferencesDto } from './dto/update-admin-notification-preferences.dto';
 import { UpdateAdminProfileDto } from './dto/update-admin-profile.dto';
 import { AdminProfileActionType } from './enums/admin-profile-action-type.enum';
+import {
+  ADMIN_NOTIFICATION_PREFERENCE_FIELDS,
+  AdminNotificationPreferenceUpdatePayload,
+  AdminNotificationPreferencesResponse,
+} from './interfaces/admin-notification-preference.interface';
 import { IAdminProfile } from './interfaces/admin-profile.interface';
 import { LogService } from './services/log.service';
 
@@ -26,6 +34,7 @@ export class AdminProfileService {
 
   constructor(
     private readonly adminProfileAction: AdminProfileModelAction,
+    private readonly adminNotificationPreferenceAction: AdminNotificationPreferenceModelAction,
     private readonly userRoleModelAction: UserRoleModelAction,
     private readonly logService: LogService,
   ) {}
@@ -131,6 +140,48 @@ export class AdminProfileService {
     });
   }
 
+  /** Returns the authenticated admin's notification preferences, creating defaults when needed. */
+  async getNotificationPreferences(adminId: string): Promise<AdminNotificationPreferencesResponse> {
+    const existing = await this.adminNotificationPreferenceAction.findByUserId(adminId);
+    if (existing) {
+      return this.toNotificationPreferenceResponse(existing);
+    }
+
+    try {
+      const created = await this.adminNotificationPreferenceAction.createDefaultForUser(adminId);
+      return this.toNotificationPreferenceResponse(created);
+    } catch (error: unknown) {
+      if (this.isUniqueViolation(error)) {
+        const createdByConcurrentRequest = await this.adminNotificationPreferenceAction.findByUserId(adminId);
+        if (createdByConcurrentRequest) {
+          return this.toNotificationPreferenceResponse(createdByConcurrentRequest);
+        }
+      }
+
+      throw error;
+    }
+  }
+
+  /** Partially updates admin notification preferences and returns the current row for empty updates. */
+  async updateNotificationPreferences(
+    adminId: string,
+    dto: UpdateAdminNotificationPreferencesDto,
+  ): Promise<AdminNotificationPreferencesResponse> {
+    const updatePayload = this.toNotificationPreferenceUpdatePayload(dto);
+
+    if (Object.keys(updatePayload).length === 0) {
+      return this.getNotificationPreferences(adminId);
+    }
+
+    await this.getNotificationPreferences(adminId);
+    const updated = await this.adminNotificationPreferenceAction.updateByUserId(adminId, updatePayload);
+    if (updated) {
+      return this.toNotificationPreferenceResponse(updated);
+    }
+
+    throw new ConflictException(SYS_MSG.ADMIN_NOTIFICATION_PREFERENCES_UPDATE_FAILED);
+  }
+
   private async logPasswordChangeFailure(adminId: string, failedStage: string): Promise<void> {
     await this.logService.logAction({
       admin_id: adminId,
@@ -165,5 +216,35 @@ export class AdminProfileService {
       role: role ?? fallbackRole ?? null,
       created_at: user.created_at,
     };
+  }
+
+  private toNotificationPreferenceResponse(preference: {
+    general_notifications: boolean;
+    push_email: boolean;
+  }): AdminNotificationPreferencesResponse {
+    return {
+      generalNotifications: preference.general_notifications,
+      pushEmail: preference.push_email,
+    };
+  }
+
+  private toNotificationPreferenceUpdatePayload(
+    dto: UpdateAdminNotificationPreferencesDto,
+  ): AdminNotificationPreferenceUpdatePayload {
+    return ADMIN_NOTIFICATION_PREFERENCE_FIELDS.reduce<AdminNotificationPreferenceUpdatePayload>((payload, field) => {
+      if (dto[field] !== undefined) {
+        payload[field] = dto[field];
+      }
+
+      return payload;
+    }, {});
+  }
+
+  private isUniqueViolation(error: unknown): boolean {
+    if (!error || typeof error !== 'object') {
+      return false;
+    }
+
+    return (error as { driverError?: { code?: string } }).driverError?.code === '23505';
   }
 }

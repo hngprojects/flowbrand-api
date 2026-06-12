@@ -1,9 +1,12 @@
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
+import { env } from '../../config/env';
 import { User } from '../../modules/users/entities/user.entity';
 import { Seeder } from './seeder.interface';
 import { UserRole } from '../../modules/users/enums/user-role.enum';
 import { UserRoleEntity } from '../../modules/users/entities/user-role.entity';
+import { AdminNotificationPreference } from '../../modules/admin/profile/entities/admin-notification-preference.entity';
+import { AdminNotificationPreferenceModelAction } from '../../modules/admin/profile/actions/admin-notification-preference.action';
 
 /** Validates that a password meets the minimum policy. */
 function validatePassword(password: string): void {
@@ -27,8 +30,8 @@ function validatePassword(password: string): void {
 export const userSeeder: Seeder = {
   name: 'UserSeeder',
   async run(dataSource: DataSource) {
-    const email = process.env.SEED_ADMIN_EMAIL;
-    const password = process.env.SEED_ADMIN_PASSWORD;
+    const email = env.SEED_ADMIN_EMAIL;
+    const password = env.SEED_ADMIN_PASSWORD;
 
     if (!email) {
       throw new Error('SEED_ADMIN_EMAIL env var is required');
@@ -53,6 +56,7 @@ export const userSeeder: Seeder = {
     await dataSource.transaction(async (manager) => {
       const userRepository = manager.getRepository(User);
       const txRoleRepository = manager.getRepository(UserRoleEntity);
+      
 
       const admin = userRepository.create({
         email,
@@ -66,6 +70,9 @@ export const userSeeder: Seeder = {
         user_id: savedAdmin.id,
         role: UserRole.SUPER_ADMIN,
       });
+
+      const action = new AdminNotificationPreferenceModelAction(manager.getRepository(AdminNotificationPreference));
+      await action.createDefaultForUser(savedAdmin.id, manager);
     });
 
     console.log('[UserSeeder] Super admin created successfully');
